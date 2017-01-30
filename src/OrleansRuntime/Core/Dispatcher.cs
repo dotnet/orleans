@@ -3,11 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
@@ -23,6 +25,7 @@ namespace Orleans.Runtime
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MessageFactory messagefactory;
+        private readonly SerializationManager serializationManager;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -35,7 +38,8 @@ namespace Orleans.Runtime
             ClusterConfiguration config,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
-            MessageFactory messagefactory)
+            MessageFactory messagefactory,
+            SerializationManager serializationManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -44,6 +48,7 @@ namespace Orleans.Runtime
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
+            this.serializationManager = serializationManager;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -370,7 +375,20 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.State == ActivationState.Invalid)
+                if (targetActivation.Grain.IsGrain)
+                {
+                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    if (request.InterfaceVersion != 0)
+                    {
+                        var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                        if (supportedVersion < request.InterfaceVersion)
+                        {
+                            catalog.DeactivateActivationOnIdle(targetActivation);
+                        }
+                    }
+                }
+
+                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
                 {
                     ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
                     return;
