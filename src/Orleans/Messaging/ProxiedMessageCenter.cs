@@ -83,6 +83,7 @@ namespace Orleans.Messaging
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
+        private int numberOfConnectedGateways = 0;
 
         public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
         {
@@ -372,7 +373,10 @@ namespace Orleans.Messaging
         /// </summary>
         public void Disconnect()
         {
-            throw new NotImplementedException("Disconnect");
+            foreach (var connection in gatewayConnections.Values)
+            {
+                connection.Stop();
+            }
         }
 
         /// <summary>
@@ -423,6 +427,19 @@ namespace Orleans.Messaging
                 throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
 
             ClientId = clientId;
+        }
+
+        internal void OnGatewayConnectionOpen()
+        {
+            Interlocked.Increment(ref numberOfConnectedGateways);
+        }
+
+        internal void OnGatewayConnectionClosed()
+        {
+            if (Interlocked.Decrement(ref numberOfConnectedGateways) == 0)
+            {
+                GrainClient.NotifyClusterConnectionLost();
+            }
         }
 
         public void Dispose()
