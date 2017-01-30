@@ -34,13 +34,15 @@ namespace Orleans.Runtime
 
             internal Type Interface { get { return iface; } }
             internal int InterfaceId { get; private set; }
+            internal ushort InterfaceVersion { get; private set; }
             internal string GrainInterface { get; private set; }
             internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
             internal GrainClassData PrimaryImplementation { get; private set; }
 
-            internal GrainInterfaceData(int interfaceId, Type iface, string grainInterface)
+            internal GrainInterfaceData(int interfaceId, ushort interfaceVersion, Type iface, string grainInterface)
             {
                 InterfaceId = interfaceId;
+                InterfaceVersion = interfaceVersion;
                 this.iface = iface;
                 GrainInterface = grainInterface;
                 implementations = new HashSet<GrainClassData>();
@@ -81,6 +83,16 @@ namespace Orleans.Runtime
         internal IList<int> SupportedGrainTypes
         {
             get { return implementationIndex.Keys.ToList(); }
+        }
+
+        internal IList<GrainClassData> SupportedGrainClassData
+        {
+            get { return implementationIndex.Values.ToList(); }
+        }
+
+        internal IList<GrainInterfaceData> SupportedInterfaces
+        {
+            get { return table.Values.ToList(); }
         }
 
         public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
@@ -166,6 +178,7 @@ namespace Orleans.Runtime
         private GrainInterfaceData GetOrAddGrainInterfaceData(Type iface, bool isGenericGrainClass)
         {
             var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
+            var version = GrainInterfaceUtils.GetGrainInterfaceVersion(iface);
 
             // If already exist
             GrainInterfaceData grainInterfaceData;
@@ -174,7 +187,7 @@ namespace Orleans.Runtime
 
             // If not create new entry
             var interfaceName = TypeUtils.GetRawClassName(TypeUtils.GetFullName(iface));
-            grainInterfaceData = new GrainInterfaceData(interfaceId, iface, interfaceName);
+            grainInterfaceData = new GrainInterfaceData(interfaceId, version, iface, interfaceName);
             table[interfaceId] = grainInterfaceData;
 
             // Add entry to mapping iface string -> data
@@ -219,6 +232,11 @@ namespace Orleans.Runtime
                 iface = interfaceData.Interface;
                 return true;
             }
+        }
+
+        internal ushort GetInterfaceVersion(int ifaceId)
+        {
+            return table[ifaceId].InterfaceVersion;
         }
 
         internal bool ContainsGrainInterface(int interfaceId)
@@ -420,7 +438,6 @@ namespace Orleans.Runtime
     [Serializable]
     internal sealed class GrainClassData
     {
-        [NonSerialized]
         private readonly GrainInterfaceMap.GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;

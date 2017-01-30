@@ -16,7 +16,7 @@ namespace Orleans.Runtime
     {
         private IDictionary<string, GrainTypeData> grainTypes;
         private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
-        private Dictionary<int, IList<SiloAddress>> supportedSilosByTypeCode;
+        private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
         private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
@@ -24,6 +24,8 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
+        private Dictionary<int, HashSet<ushort>> interfaceVersions;
+        private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
         {
@@ -143,9 +145,34 @@ namespace Orleans.Runtime
             RebuildFullGrainInterfaceMap();
         }
 
-        internal IList<SiloAddress> GetSupportedSilos(int typeCode)
+        internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode)
         {
             return supportedSilosByTypeCode[typeCode];
+        }
+
+        internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, IList<ushort> versions)
+        {
+            var result = new List<SiloAddress>();
+
+            var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
+
+            foreach (var version in versions)
+            {
+                var silosWithIface = supportedSilosByInterface[ifaceId][version];
+                result.AddRange(silosWithIface.Intersect(silosWithTypeCode));
+            }
+
+            return result;
+        }
+
+        internal IReadOnlyList<ushort> GetAvailableVersions(int ifaceId)
+        {
+            return supportedSilosByInterface[ifaceId].Keys.ToList();
+        }
+
+        internal int GetLocalSupportedVersion(int ifaceId)
+        {
+            return grainInterfaceMap.GetInterfaceVersion(ifaceId);
         }
 
         private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
@@ -246,24 +273,40 @@ namespace Orleans.Runtime
 
         private void RebuildFullGrainInterfaceMap()
         {
-            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, defaultPlacementStrategy);
-            var newSupportedSilosByTypeCode = new Dictionary<int, IList<SiloAddress>>();
-            newClusterGrainInterfaceMap.AddMap(grainInterfaceMap);
+            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, this.defaultPlacementStrategy);
+            var newSupportedSilosByTypeCode = new Dictionary<int, List<SiloAddress>>();
+            var newSupportedSilosByInterface = new Dictionary<int, Dictionary<ushort, List<SiloAddress>>>();
+            var newInterfaceVersions = new Dictionary<int, HashSet<ushort>>();
+
             foreach (var kvp in grainInterfaceMapsBySilo)
             {
                 newClusterGrainInterfaceMap.AddMap(kvp.Value);
-                foreach (var grainType in kvp.Value.SupportedGrainTypes)
+
+                foreach (var supportedInterface in kvp.Value.SupportedInterfaces)
                 {
-                    IList<SiloAddress> supportedSilos;
-                    if (!newSupportedSilosByTypeCode.TryGetValue(grainType, out supportedSilos))
-                    {
-                        newSupportedSilosByTypeCode[grainType] = supportedSilos = new List<SiloAddress>();
-                    }
+                    var ifaceId = supportedInterface.InterfaceId;
+                    var version = supportedInterface.InterfaceVersion;
+
+                    var ifaceVersions = newInterfaceVersions.GetValueOrAddNew(ifaceId);
+                    ifaceVersions.Add(version);
+
+                    var supportedSilosByVersion = newSupportedSilosByInterface.GetValueOrAddNew(ifaceId);
+                    var supportedSilosForVersion = supportedSilosByVersion.GetValueOrAddNew(version);
+                    supportedSilosForVersion.Add(kvp.Key);
+                }
+
+                foreach (var grainClassData in kvp.Value.SupportedGrainClassData)
+                {
+                    var grainType = grainClassData.GrainTypeCode;
+
+                    var supportedSilos = newSupportedSilosByTypeCode.GetValueOrAddNew(grainType);
                     supportedSilos.Add(kvp.Key);
                 }
             }
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
+            supportedSilosByInterface = newSupportedSilosByInterface;
+            interfaceVersions = newInterfaceVersions;
         }
 
         private class InvokerData
