@@ -97,6 +97,8 @@ namespace Orleans.Serialization
             writers[typeof(CorrelationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.CorrelationId); stream.Write((CorrelationId) obj); };
         }
 
+        internal ByteArrayBuilder ByteArrayBuilder => ab;
+
         /// <summary> Default constructor. </summary>
         public BinaryTokenStreamWriter()
         {

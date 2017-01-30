@@ -24,6 +24,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private TimeSpan? messageVisibilityTimeout;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
+        private bool hasLargeMessageSupport;
 
         /// <summary>"DataConnectionString".</summary>
         public const string DataConnectionStringPropertyName = "DataConnectionString";
@@ -31,6 +32,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         public const string DeploymentIdPropertyName = "DeploymentId";
         /// <summary>"MessageVisibilityTimeout".</summary>
         public const string MessageVisibilityTimeoutPropertyName = "VisibilityTimeout";
+        /// <summary>Support payloads that span multiple cloud queue messages</summary>
+        public const string SupportLargeMessagesPropertyName = "SupportLargeMessages";
 
         /// <summary>
         /// Application level failure handler override.
@@ -61,6 +64,25 @@ namespace Orleans.Providers.Streams.AzureQueue
             {
                 messageVisibilityTimeout = null;
             }
+
+            string largeMessageSupportString;
+            if (config.Properties.TryGetValue(SupportLargeMessagesPropertyName, out largeMessageSupportString))
+            {
+                bool hasLargeMessageSupport;
+                if (bool.TryParse(largeMessageSupportString, out hasLargeMessageSupport))
+                {
+                    this.hasLargeMessageSupport = hasLargeMessageSupport;
+                }
+                else
+                {
+                    throw new ArgumentException($"The {SupportLargeMessagesPropertyName} attribute must be a boolean value.");
+                }
+            }
+            else
+            {
+                this.hasLargeMessageSupport = false;
+            }
+
             
             cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
 
@@ -85,7 +107,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName, hasLargeMessageSupport, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
