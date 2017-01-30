@@ -256,6 +256,20 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// The VersionAttribute allows to specify the version number of the interface
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Interface)]
+        public sealed class VersionAttribute : Attribute
+        {
+            public ushort Version { get; private set; }
+
+            public VersionAttribute(ushort version)
+            {
+                Version = version;
+            }
+        }
+
     /// <summary>
     /// Used to mark a method as providing a copier function for that type.
     /// </summary>
