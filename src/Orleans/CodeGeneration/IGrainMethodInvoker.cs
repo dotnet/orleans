@@ -11,6 +11,8 @@ namespace Orleans.CodeGeneration
         /// <summary> The interface id that this invoker supports. </summary>
         int InterfaceId { get; }
 
+        ushort InterfaceVersion { get; }
+
         /// <summary>
         /// Invoke a grain method.
         /// Invoker classes in generated code implement this method to provide a method call jump-table to map invoke data to a strongly typed call to the correct method on the correct interface.

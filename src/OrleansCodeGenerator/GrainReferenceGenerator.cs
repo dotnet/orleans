@@ -79,6 +79,7 @@ namespace Orleans.CodeGenerator
                     .AddMembers(GenerateConstructors(className))
                     .AddMembers(
                         GenerateInterfaceIdProperty(grainType),
+                        GenerateInterfaceVersionProperty(grainType),
                         GenerateInterfaceNameProperty(grainType),
                         GenerateIsCompatibleMethod(grainType),
                         GenerateGetMethodNameMethod(grainType))
@@ -298,6 +299,20 @@ namespace Orleans.CodeGenerator
                 SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
             return
                 SF.PropertyDeclaration(typeof(int).GetTypeSyntax(), property.Name)
+                    .AddAccessorListAccessors(
+                        SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                            .AddBodyStatements(SF.ReturnStatement(returnValue)))
+                    .AddModifiers(SF.Token(SyntaxKind.ProtectedKeyword), SF.Token(SyntaxKind.OverrideKeyword));
+        }
+
+        private static MemberDeclarationSyntax GenerateInterfaceVersionProperty(Type grainType)
+        {
+            var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceVersion);
+            var returnValue = SF.LiteralExpression(
+                SyntaxKind.NumericLiteralExpression,
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType))); 
+            return
+                SF.PropertyDeclaration(typeof(ushort).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
                         SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                             .AddBodyStatements(SF.ReturnStatement(returnValue)))

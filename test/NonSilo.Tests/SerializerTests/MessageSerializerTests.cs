@@ -34,7 +34,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
 
         private void RunTest(int numItems)
         {
-            InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
+            InvokeMethodRequest request = new InvokeMethodRequest(0, 0, 0, null);
             Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
