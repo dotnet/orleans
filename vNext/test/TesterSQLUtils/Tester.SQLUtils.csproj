@@ -1,24 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="**\*.cs" />
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -30,17 +26,15 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
     <PackageReference Include="System.Data.SqlClient" Version="4.3.0" />
-    <PackageReference Include="FluentAssertions" Version="4.17.0" />
+    <PackageReference Include="FluentAssertions" Version="4.18.0" />
     <PackageReference Include="Microsoft.Data.SQLite" Version="1.1.0" />
     <PackageReference Include="Npgsql" Version="3.1.9" />
     <PackageReference Include="MySql.Data" Version="7.0.6-IR31" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj" />
@@ -57,7 +51,6 @@
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\..\test\TesterSQLUtils\CollectionFixtures.cs">
       <Link>CollectionFixtures.cs</Link>
@@ -150,7 +143,6 @@
       <Link>SqlServerRemindersTableTests.cs</Link>
     </Compile>
   </ItemGroup>
-
   <ItemGroup>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <Link>CreateOrleansTables_MySql.sql</Link>
@@ -173,7 +165,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>

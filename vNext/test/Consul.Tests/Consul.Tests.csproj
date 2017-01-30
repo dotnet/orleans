@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
-    <PackageReference Include="FluentAssertions" Version="4.17.0" />
+    <PackageReference Include="FluentAssertions" Version="4.18.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansConsulUtils\OrleansConsulUtils.csproj" />
