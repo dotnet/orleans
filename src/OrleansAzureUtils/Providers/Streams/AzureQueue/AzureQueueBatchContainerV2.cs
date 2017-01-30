@@ -12,6 +12,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary>
     /// Second version of AzureQueueBatchContainer.  This version supports external serializers (like json)
     /// </summary>
+    [Serializable]
     internal class AzureQueueBatchContainerV2 : IBatchContainer
     {
         [JsonProperty]
