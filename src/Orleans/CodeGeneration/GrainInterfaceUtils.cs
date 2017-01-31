@@ -126,6 +126,9 @@ namespace Orleans.CodeGeneration
         
         public static int ComputeMethodId(MethodInfo methodInfo)
         {
+            var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
+            if (attr != null) return attr.MethodId;
+
             var strMethodId = new StringBuilder(methodInfo.Name + "(");
             ParameterInfo[] parameters = methodInfo.GetParameters();
             bool bFirstTime = true;

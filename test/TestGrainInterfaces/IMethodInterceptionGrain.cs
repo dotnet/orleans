@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 
 namespace UnitTests.GrainInterfaces
 {
     using Orleans;
     public interface IMethodInterceptionGrain : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
+        [MethodId(14142)]
         Task<string> One();
         Task<string> Echo(string someArg);
         Task<string> NotIntercepted();
