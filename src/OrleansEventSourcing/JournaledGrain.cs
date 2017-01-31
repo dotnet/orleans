@@ -177,6 +177,24 @@ namespace Orleans.EventSourcing
 
 
         /// <summary>
+        /// Retrieves a segment of the confirmed event sequence, possibly from storage. 
+        /// Throws <see cref="NotSupportedException"/> if the events are not available to read.
+        /// Whether events are available, and for how long, depends on the providers used and how they are configured.
+        /// </summary>
+        /// <param name="fromVersion">the position of the event sequence from which to start</param>
+        /// <param name="toVersion">the position of the event sequence on which to end</param>
+        /// <returns>a task which returns the sequence of events between the two versions</returns>
+        protected Task<IReadOnlyList<TEventBase>> RetrieveConfirmedEvents(int fromVersion, int toVersion)
+        {
+            if (fromVersion < 0)
+                throw new ArgumentException("fromVersion");
+            if (toVersion < fromVersion || toVersion > LogViewAdaptor.ConfirmedVersion)
+                throw new ArgumentException("toVersion");
+
+            return LogViewAdaptor.RetrieveLogSegment(fromVersion, toVersion);
+        }
+
+        /// <summary>
         /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
         /// <para>Override this to monitor the health of the log-consistency protocol and/or
         /// to customize retry delays.

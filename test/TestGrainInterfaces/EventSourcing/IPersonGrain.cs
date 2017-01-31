@@ -20,10 +20,10 @@ namespace TestGrainInterfaces
     /// <summary>
     /// Orleans grain communication interface IPerson
     /// </summary>
-    public interface IJournaledPersonGrain : Orleans.IGrainWithGuidKey
+    public interface IPersonGrain : Orleans.IGrainWithGuidKey
     {
         Task RegisterBirth(PersonAttributes person);
-        Task Marry(IJournaledPersonGrain spouse);
+        Task Marry(IPersonGrain spouse);
 
         Task<PersonAttributes> GetPersonalAttributes();
 

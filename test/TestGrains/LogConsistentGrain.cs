@@ -7,9 +7,14 @@ using Orleans.LogConsistency;
 using UnitTests.GrainInterfaces;
 using Orleans.EventSourcing;
 
-namespace UnitTests.Grains
+namespace TestGrains
 {
-
+    /// <summary>
+    /// A class used by many different unit tests for the various log consistency providers.
+    /// The content of this class is pretty arbitrary and messy;
+    /// (don't use this as an introduction on how to use JournaledGrain)
+    /// it started from SimpleGrain, but a lot of stuff got added over time 
+    /// </summary>
     [Serializable]
     public class MyGrainState
     {
@@ -56,7 +61,7 @@ namespace UnitTests.Grains
     /// and a dictionary of reservations thatcan be aded and removed
     /// We subclass this to create variations for all storage providers
     /// </summary>
-    public abstract class LogConsistentGrain : JournaledGrain<MyGrainState,object>, GrainInterfaces.ILogConsistentGrain
+    public abstract class LogConsistentGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogConsistentGrain
     {
         public async Task SetAGlobal(int x)
         {
@@ -174,6 +179,10 @@ namespace UnitTests.Grains
         {
             DeactivateOnIdle();
             return TaskDone.Done;
+        }
+
+        public Task<IReadOnlyList<object>> GetEventLog() {
+            return this.RetrieveConfirmedEvents(0, ConfirmedVersion);
         }
 
     }

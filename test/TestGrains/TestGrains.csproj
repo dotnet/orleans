@@ -46,6 +46,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
+    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
@@ -61,6 +62,13 @@
     <Compile Include="ConsumerEventCountingGrain.cs" />
     <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
+    <Compile Include="EventSourcing\AccountGrain.cs" />
+    <Compile Include="EventSourcing\ChatFormat.cs" />
+    <Compile Include="EventSourcing\ChatEvents.cs" />
+    <Compile Include="EventSourcing\ChatGrain.cs" />
+    <Compile Include="EventSourcing\CountersGrain.cs" />
+    <Compile Include="EventSourcing\CountersGrainVariations.cs" />
+    <Compile Include="EventSourcing\SeatReservationGrain.cs" />
     <Compile Include="GrainService\CustomGrainService.cs" />
     <Compile Include="GrainService\GrainServiceTestGrain.cs" />
     <Compile Include="RoundtripSerializationGrain.cs" />
@@ -87,8 +95,8 @@
     <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="JsonEchoGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
-    <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
-    <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
+    <Compile Include="EventSourcing\PersonGrain.cs" />
+    <Compile Include="EventSourcing\PersonEvents.cs" />
     <Compile Include="MyObserverSubscriptionManager.cs" />
     <Compile Include="PolymorphicTestGrain.cs" />
     <Compile Include="ProducerEventCountingGrain.cs" />

@@ -9,7 +9,7 @@ using Orleans.Runtime;
 
 namespace TestGrains
 {
-    public class JournaledPersonGrain : JournaledGrain<PersonState,IPersonEvent>, IJournaledPersonGrain
+    public class PersonGrain : JournaledGrain<PersonState,IPersonEvent>, IPersonGrain
     {
 
         public Task RegisterBirth(PersonAttributes props)
@@ -24,7 +24,7 @@ namespace TestGrains
             return TaskDone.Done;
         }
 
-        public async Task Marry(IJournaledPersonGrain spouse)
+        public async Task Marry(IPersonGrain spouse)
         {
             if (State.IsMarried)
                 throw new NotSupportedException(string.Format("{0} is already married.", State.LastName));
@@ -87,11 +87,17 @@ namespace TestGrains
             return Task.FromResult(Version);
         }
 
+
+
+        // below is a unit test; ideally this code would be in the Tester project,
+        // but this test has to run on the grain, not the client, so we had to add it here
+
         private static void AssertEqual<T>(T a, T b)
         {
             if (!Object.Equals(a, b))
                 throw new OrleansException($"Test failed. Expected = {a}. Actual = {b}.");
         }
+
 
         public async Task RunTentativeConfirmedStateTest()
         {
@@ -129,6 +135,7 @@ namespace TestGrains
             AssertEqual("Solo", State.LastName);
 
             // this time, we wait for (what should be) enough time to commit to MemoryStorage.
+            // we would never use such timing assumptions in real code. But this is a unit test.
             await Task.Delay(20);
 
             // now the two versions should be the same again

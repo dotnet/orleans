@@ -9,8 +9,9 @@ using System.Text;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace TestGrains
 {
+    // variations of the log consistent grain are used to test a variety of provider and configurations
 
     // use azure storage and a explicitly configured consistency provider
     [OneInstancePerCluster]
