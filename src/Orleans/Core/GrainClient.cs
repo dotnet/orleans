@@ -387,7 +387,15 @@ namespace Orleans
 
         internal static void NotifyClusterConnectionLost()
         {
-            ClusterConnectionLost?.Invoke(null, null);
+            try
+            {
+                // TODO: first argument should be 'this' when this class will no longer be static
+                ClusterConnectionLost?.Invoke(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+            }
         }
 
         internal static IList<Uri> Gateways
