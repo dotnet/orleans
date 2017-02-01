@@ -324,7 +324,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             quit[0] = true;
         } 
   
-        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
             Initialize(DEFAULT_IDLE_TIMEOUT);
