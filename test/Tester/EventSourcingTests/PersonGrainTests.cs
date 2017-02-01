@@ -18,7 +18,7 @@ namespace Tester.EventSourcingTests
         {
             var grainWithState = GrainClient.GrainFactory.GetGrain<IPersonGrain>(Guid.Empty);
 
-            Assert.NotNull(await grainWithState.GetPersonalAttributes());
+            Assert.NotNull(await grainWithState.GetTentativePersonalAttributes());
         }
 
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
@@ -28,7 +28,7 @@ namespace Tester.EventSourcingTests
 
             await grainWithState.RegisterBirth(new PersonAttributes { FirstName = "Luke", LastName = "Skywalker", Gender = GenderType.Male });
 
-            var attributes = await grainWithState.GetPersonalAttributes();
+            var attributes = await grainWithState.GetTentativePersonalAttributes();
 
             Assert.NotNull(attributes);
             Assert.Equal("Luke", attributes.FirstName);
@@ -45,7 +45,7 @@ namespace Tester.EventSourcingTests
 
             await leia.Marry(han);
 
-            var attributes = await leia.GetPersonalAttributes();
+            var attributes = await leia.GetTentativePersonalAttributes();
             Assert.NotNull(attributes);
             Assert.Equal("Leia", attributes.FirstName);
             Assert.Equal("Solo", attributes.LastName);

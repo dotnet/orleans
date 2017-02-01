@@ -63,7 +63,7 @@ namespace TestGrains
 
         public Task<XDocument> GetChat()
         {
-            return Task.FromResult(State);
+            return Task.FromResult(TentativeState);
         }
  
         public Task Post(Guid guid, string user, string text)

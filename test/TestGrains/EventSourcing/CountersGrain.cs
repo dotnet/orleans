@@ -84,19 +84,19 @@ namespace TestGrains
 
         public Task<int> Get(string key)
         {
-            return Task.FromResult(State.Counts[key]);
+            return Task.FromResult(TentativeState.Counts[key]);
         }
 
         public Task<IReadOnlyDictionary<string, int>> GetAll()
         {
-            return Task.FromResult((IReadOnlyDictionary<string, int>)State.Counts);
+            return Task.FromResult((IReadOnlyDictionary<string, int>)TentativeState.Counts);
         }
 
 
         // some providers allow you to look at the log of events
         public Task<IReadOnlyList<object>> GetAllEvents()
         {
-            return RetrieveConfirmedEvents(0, ConfirmedVersion);
+            return RetrieveConfirmedEvents(0, Version);
         }
     }
 }

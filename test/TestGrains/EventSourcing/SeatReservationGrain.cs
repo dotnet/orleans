@@ -41,8 +41,8 @@ namespace TestGrains
 
             // we can determine if the reservation went through
             // by re-reading it - if it is not there, it means a different user won
-            var success = (ConfirmedState.Reservations.ContainsKey(seatnumber)
-                                 && ConfirmedState.Reservations[seatnumber].UserId == userid);
+            var success = (State.Reservations.ContainsKey(seatnumber)
+                                 && State.Reservations[seatnumber].UserId == userid);
             return success;
         }
     }

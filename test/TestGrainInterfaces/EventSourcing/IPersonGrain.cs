@@ -25,7 +25,7 @@ namespace TestGrainInterfaces
         Task RegisterBirth(PersonAttributes person);
         Task Marry(IPersonGrain spouse);
 
-        Task<PersonAttributes> GetPersonalAttributes();
+        Task<PersonAttributes> GetTentativePersonalAttributes();
 
         // Tests
 

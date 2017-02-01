@@ -71,7 +71,7 @@ namespace TestGrains
 
         public async Task<Tuple<int, bool>> SetAConditional(int x)
         {
-            int version = this.ConfirmedVersion;
+            int version = this.Version;
             bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
             return new Tuple<int, bool>(version, success);
         }
@@ -109,23 +109,23 @@ namespace TestGrains
         public async Task<int> GetAGlobal()
         {
             await RefreshNow();
-            return ConfirmedState.A;
+            return State.A;
         }
 
         public Task<int> GetALocal()
         {
-            return Task.FromResult(State.A);
+            return Task.FromResult(TentativeState.A);
         }
 
         public async Task<AB> GetBothGlobal()
         {
             await RefreshNow();
-            return new AB() { A = ConfirmedState.A, B = ConfirmedState.B };
+            return new AB() { A = State.A, B = State.B };
         }
 
         public Task<AB> GetBothLocal()
         {
-            return Task.FromResult(new AB() { A = State.A, B = State.B });
+            return Task.FromResult(new AB() { A = TentativeState.A, B = TentativeState.B });
         }
 
         public Task AddReservationLocal(int val)
@@ -143,7 +143,7 @@ namespace TestGrains
         public async Task<int[]> GetReservationsGlobal()
         {
             await RefreshNow();
-            return ConfirmedState.Reservations.Values.ToArray();
+            return State.Reservations.Values.ToArray();
         }
 
         public Task SynchronizeGlobalState()
@@ -153,7 +153,7 @@ namespace TestGrains
 
         public Task<int> GetConfirmedVersion()
         {
-            return Task.FromResult(this.ConfirmedVersion);
+            return Task.FromResult(this.Version);
         }
 
         public Task<IEnumerable<ConnectionIssue>> GetUnresolvedConnectionIssues()
@@ -164,13 +164,13 @@ namespace TestGrains
         public async Task<KeyValuePair<int, object>> Read()
         {
             await RefreshNow();
-            return new KeyValuePair<int, object>(ConfirmedVersion, ConfirmedState);
+            return new KeyValuePair<int, object>(Version, State);
         }
         public async Task<bool> Update(IReadOnlyList<object> updates, int expectedversion)
         {
-            if (expectedversion > ConfirmedVersion)
+            if (expectedversion > Version)
                 await RefreshNow();
-            if (expectedversion != ConfirmedVersion)
+            if (expectedversion != Version)
                 return false;
             return await RaiseConditionalEvents(updates);
         }
@@ -182,7 +182,7 @@ namespace TestGrains
         }
 
         public Task<IReadOnlyList<object>> GetEventLog() {
-            return this.RetrieveConfirmedEvents(0, ConfirmedVersion);
+            return this.RetrieveConfirmedEvents(0, Version);
         }
 
     }

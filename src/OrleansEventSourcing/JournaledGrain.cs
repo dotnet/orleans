@@ -91,54 +91,45 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// The current state (includes both confirmed and unconfirmed events).
+        /// The current confirmed state. 
+        /// Includes only confirmed events.
         /// </summary>
         protected TGrainState State
-        {
-            get { return this.LogViewAdaptor.TentativeView; }
-        }
-
-        /// <summary>
-        /// The version of the state.
-        /// Always equal to the confirmed version plus the number of unconfirmed events.
-        /// </summary>
-        protected int Version
-        {
-            get { return this.LogViewAdaptor.ConfirmedVersion + this.LogViewAdaptor.UnconfirmedSuffix.Count(); }
-        }
-
-        /// <summary>
-        /// Called whenever the current state may have changed due to local or remote events.
-        /// <para>Override this to react to changes of the state.</para>
-        /// </summary>
-        protected virtual void OnStateChanged()
-        {
-        }
-
-        /// <summary>
-        /// The current confirmed state (includes only confirmed events).
-        /// </summary>
-        protected TGrainState ConfirmedState
         {
             get { return this.LogViewAdaptor.ConfirmedView; }
         }
 
         /// <summary>
-        /// The version of the confirmed state.
-        /// Always equal to the number of confirmed events.
+        /// The version of the current confirmed state. 
+        /// Equals the total number of confirmed events.
         /// </summary>
-        protected int ConfirmedVersion
+        protected int Version
         {
             get { return this.LogViewAdaptor.ConfirmedVersion; }
         }
 
+        /// <summary>
+        /// Called whenever the tentative state may have changed due to local or remote events.
+        /// <para>Override this to react to changes of the state.</para>
+        /// </summary>
+        protected virtual void OnTentativeStateChanged()
+        {
+        }
 
+        /// <summary>
+        /// The current tentative state.
+        /// Includes both confirmed and unconfirmed events.
+        /// </summary>
+        protected TGrainState TentativeState
+        {
+            get { return this.LogViewAdaptor.TentativeView; }
+        }
 
         /// <summary>
         /// Called after the confirmed state may have changed (i.e. the confirmed version number is larger).
         /// <para>Override this to react to changes of the confirmed state.</para>
         /// </summary>
-        protected virtual void OnConfirmedStateChanged()
+        protected virtual void OnStateChanged()
         {
             // overridden by journaled grains that want to react to state changes
         }
@@ -348,9 +339,9 @@ namespace Orleans.EventSourcing
         void ILogViewAdaptorHost<TGrainState, TEventBase>.OnViewChanged(bool tentative, bool confirmed)
         {
             if (tentative)
-                OnStateChanged();
+                OnTentativeStateChanged();
             if (confirmed)
-                OnConfirmedStateChanged();
+                OnStateChanged();
         }
 
         /// <summary>

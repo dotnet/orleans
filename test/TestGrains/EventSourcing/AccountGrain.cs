@@ -93,7 +93,7 @@ namespace TestGrains
 
         public Task<IReadOnlyList<Transaction>> GetTransactionLog()
         {
-            return RetrieveConfirmedEvents(0, ConfirmedVersion);
+            return RetrieveConfirmedEvents(0, Version);
         }
     }
 
