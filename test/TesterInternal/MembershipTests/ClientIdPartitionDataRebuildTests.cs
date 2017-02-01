@@ -44,7 +44,7 @@ namespace UnitTests.MembershipTests
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional")]
+        [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Observer()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
