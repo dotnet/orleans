@@ -602,7 +602,7 @@ namespace Orleans.Runtime
         {
             get { return appLogger; }
         }
-        public string Identity
+        public string CurrentActivationIdentity
         {
             get { return MySilo.ToLongString(); }
         }

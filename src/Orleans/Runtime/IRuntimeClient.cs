@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         /// A unique identifier for the current client.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
-        string Identity { get; }
+        string CurrentActivationIdentity { get; }
 
         /// <summary>
         /// Get the current response timeout setting for this client.

@@ -85,7 +85,7 @@ namespace Orleans
             get { return CurrentActivationAddress.Silo; }
         }
 
-        public string Identity
+        public string CurrentActivationIdentity
         {
             get { return CurrentActivationAddress.ToString(); }
         }
