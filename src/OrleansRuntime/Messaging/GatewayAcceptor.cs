@@ -11,8 +11,12 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
 
-        internal GatewayAcceptor(MessageCenter msgCtr, Gateway gateway, IPEndPoint gatewayAddress)
-            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient)
+        internal GatewayAcceptor(
+            MessageCenter msgCtr,
+            Gateway gateway,
+            IPEndPoint gatewayAddress,
+            MessageFactory messageFactory)
+            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory)
         {
             this.gateway = gateway;
             loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
@@ -85,7 +89,7 @@ namespace Orleans.Runtime.Messaging
             if ((MessageCenter.Metrics != null) && MessageCenter.Metrics.IsOverloaded)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.GatewayTooBusy, "Shedding load");
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 MessageCenter.TryDeliverToProxy(rejection);
                 if (Log.IsVerbose) Log.Verbose("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();

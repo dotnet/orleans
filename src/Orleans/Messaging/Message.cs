@@ -429,29 +429,6 @@ namespace Orleans.Runtime
             Direction = subtype;
         }
 
-        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            var message = new Message(
-                Categories.Application,
-                (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
-            {
-                Id = CorrelationId.GetNext(),
-                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
-                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request
-            };
-
-            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
-                message.IsAlwaysInterleave = true;
-
-            var contextData = RequestContext.Export();
-            if (contextData != null)
-            {
-                message.RequestContextData = contextData;
-            }
-            return message;
-        }
-
         // Initializes body and header but does not take ownership of byte.
         // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header)
@@ -483,67 +460,6 @@ namespace Orleans.Runtime
         public void DeserializeBodyObject(List<ArraySegment<byte>> body)
         {
             this.BodyObject = DeserializeBody(body);
-        }
-
-        public Message CreateResponseMessage()
-        {
-            var response = new Message(this.Category, Directions.Response)
-            {
-                Id = this.Id,
-                IsReadOnly = this.IsReadOnly,
-                IsAlwaysInterleave = this.IsAlwaysInterleave,
-                TargetSilo = this.SendingSilo
-            };
-
-            if (SendingGrain != null)
-            {
-                response.TargetGrain = SendingGrain;
-                if (SendingActivation != null)
-                {
-                    response.TargetActivation = SendingActivation;
-                }
-            }
-
-            response.SendingSilo = this.TargetSilo;
-            if (TargetGrain != null)
-            {
-                response.SendingGrain = TargetGrain;
-                if (TargetActivation != null)
-                {
-                    response.SendingActivation = TargetActivation;
-                }
-                else if (this.TargetGrain.IsSystemTarget)
-                {
-                    response.SendingActivation = ActivationId.GetSystemActivation(TargetGrain, TargetSilo);
-                }
-            }
-
-            if (DebugContext != null)
-            {
-                response.DebugContext = DebugContext;
-            }
-
-            response.CacheInvalidationHeader = CacheInvalidationHeader;
-            response.Expiration = Expiration;
-
-            var contextData = RequestContext.Export();
-            if (contextData != null)
-            {
-                response.RequestContextData = contextData;
-            }
-
-            return response;
-        }
-
-        public Message CreateRejectionResponse(RejectionTypes type, string info, OrleansException ex = null)
-        {
-            var response = CreateResponseMessage();
-            response.Result = ResponseTypes.Rejection;
-            response.RejectionType = type;
-            response.RejectionInfo = info;
-            response.BodyObject = ex;
-            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
-            return response;
         }
 
         public Message CreatePromptExceptionResponse(Exception exception)

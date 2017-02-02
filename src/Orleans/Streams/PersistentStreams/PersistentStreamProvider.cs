@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -44,7 +46,7 @@ namespace Orleans.Providers.Streams.Common
         internal const string StartupStatePropertyName = "StartupState";
         internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
         private PersistentStreamProviderState startupState;
-        private ProviderStateManager stateManager = new ProviderStateManager();
+        private readonly ProviderStateManager stateManager = new ProviderStateManager();
 
         public string Name { get; private set; }
 
@@ -53,7 +55,7 @@ namespace Orleans.Providers.Streams.Common
         // this is a workaround until an IServiceProvider instance is used in the Orleans client
         private class GrainFactoryServiceProvider : IServiceProvider
         {
-            private IStreamProviderRuntime providerRuntime;
+            private readonly IStreamProviderRuntime providerRuntime;
             public GrainFactoryServiceProvider(IStreamProviderRuntime providerRuntime)
             {
                 this.providerRuntime = providerRuntime;

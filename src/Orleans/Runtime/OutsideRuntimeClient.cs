@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -50,13 +51,8 @@ namespace Orleans
         private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
-
-        private readonly GrainFactory grainFactory;
-
-        public IInternalGrainFactory InternalGrainFactory
-        {
-            get { return grainFactory; }
-        }
+        
+        public IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
         /// Response timeout.
@@ -65,9 +61,8 @@ namespace Orleans
 
         private static readonly Object staticLock = new Object();
 
-        private TypeMetadataCache typeCache;
-
         private readonly AssemblyProcessor assemblyProcessor;
+        private readonly MessageFactory messageFactory;
 
         Logger IRuntimeClient.AppLogger
         {
@@ -104,21 +99,32 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            this.typeCache = new TypeMetadataCache();
-            this.assemblyProcessor = new AssemblyProcessor(this.typeCache);
-            this.grainFactory = new GrainFactory(this, this.typeCache);
-
             if (cfg == null)
             {
                 Console.WriteLine("An attempt to create an OutsideRuntimeClient with null ClientConfiguration object.");
                 throw new ArgumentException("OutsideRuntimeClient was attempted to be created with null ClientConfiguration object.", "cfg");
             }
+            
+            var services = new ServiceCollection();
+            services.AddSingleton(cfg);
+            services.AddSingleton<IServiceProvider>(sp => sp);
+            services.AddSingleton<TypeMetadataCache>();
+            services.AddSingleton<AssemblyProcessor>();
+            services.AddSingleton<IRuntimeClient>(this);
+            services.AddSingleton<GrainFactory>();
+            services.AddFromExisting<IGrainFactory, GrainFactory>();
+            services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
+            services.AddSingleton<MessageFactory>();
+            this.ServiceProvider = services.BuildServiceProvider();
+            this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+            this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
             this.config = cfg;
 
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
             StatisticsCollector.Initialize(config);
             SerializationManager.Initialize(cfg.SerializationProviders, cfg.FallbackSerializationProvider);
+            this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
             logger = LogManager.GetLogger("OutsideRuntimeClient", LoggerType.Runtime);
@@ -146,7 +152,7 @@ namespace Orleans
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
-                clientProviderRuntime = new ClientProviderRuntime(grainFactory, null);
+                clientProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, null);
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);
@@ -177,7 +183,7 @@ namespace Orleans
                 var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
                 var gatewayListProvider = new GatewayProviderFactory(this.config).CreateGatewayListProvider();
                 gatewayListProvider.InitializeGatewayListProvider(this.config, LogManager.GetLogger(gatewayListProvider.GetType().Name)).WaitWithThrow(initTimeout);
-                transport = new ProxiedMessageCenter(config, localAddress, generation, handshakeClientId, gatewayListProvider);
+                transport = new ProxiedMessageCenter(config, localAddress, generation, handshakeClientId, gatewayListProvider, this.messageFactory);
 
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
@@ -192,9 +198,11 @@ namespace Orleans
             }
         }
 
+        public IServiceProvider ServiceProvider { get; }
+
         private void StreamingInitialize()
         {
-            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(grainFactory).Result;
+            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory).Result;
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
             var streamProviderManager = new Streams.StreamProviderManager();
             streamProviderManager
@@ -279,8 +287,8 @@ namespace Orleans
                     }
                 }
             );
-            grainInterfaceMap = transport.GetTypeCodeMap(grainFactory).Result;
-
+            grainInterfaceMap = transport.GetTypeCodeMap(this.InternalGrainFactory).Result;
+            
             ClientStatistics.Start(statisticsProviderManager, transport, clientId)
                 .WaitWithThrow(initTimeout);
 
@@ -565,7 +573,7 @@ namespace Orleans
 
         private void SendResponse(Message request, Response response)
         {
-            var message = request.CreateResponseMessage();
+            var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
             transport.SendMessage(message);
@@ -593,7 +601,7 @@ namespace Orleans
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
-            var message = Message.CreateMessage(request, options);
+            var message = this.messageFactory.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 

@@ -10,9 +10,10 @@ namespace Orleans.Runtime.Messaging
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Dispatcher dispatcher;
+        private readonly MessageFactory messageFactory;
         private readonly Message.Categories category;
 
-        internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher) :
+        internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher, MessageFactory messageFactory) :
             base(cat.ToString())
         {
             category = cat;
@@ -20,6 +21,7 @@ namespace Orleans.Runtime.Messaging
             directory = ad;
             scheduler = sched;
             this.dispatcher = dispatcher;
+            this.messageFactory = messageFactory;
             OnFault = FaultBehavior.RestartOnFault;
         }
 
@@ -90,7 +92,7 @@ namespace Orleans.Runtime.Messaging
                 if (target == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message response = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable,
+                    Message response = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                         String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
                     messageCenter.SendMessage(response);
                     Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);

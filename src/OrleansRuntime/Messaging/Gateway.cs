@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
     internal class Gateway
     {
         private readonly MessageCenter messageCenter;
+        private readonly MessageFactory messageFactory;
         private readonly GatewayAcceptor acceptor;
         private readonly Lazy<GatewaySender>[] senders;
         private readonly GatewayClientCleanupAgent dropper;
@@ -31,11 +32,15 @@ namespace Orleans.Runtime.Messaging
         private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
-        
-        internal Gateway(MessageCenter msgCtr, IPEndPoint gatewayAddress)
+
+        internal Gateway(
+            MessageCenter msgCtr,
+            IPEndPoint gatewayAddress,
+            MessageFactory messageFactory)
         {
             messageCenter = msgCtr;
-            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress);
+            this.messageFactory = messageFactory;
+            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress, this.messageFactory);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
@@ -56,7 +61,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<GatewaySender>(() =>
                 {
-                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this);
+                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -349,12 +354,14 @@ namespace Orleans.Runtime.Messaging
         private class GatewaySender : AsynchQueueAgent<OutgoingClientMessage>
         {
             private readonly Gateway gateway;
+            private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
 
-            internal GatewaySender(string name, Gateway gateway)
+            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory)
                 : base(name, gateway.MessagingConfiguration)
             {
                 this.gateway = gateway;
+                this.messageFactory = messageFactory;
                 gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
                 OnFault = FaultBehavior.RestartOnFault;
             }
@@ -386,7 +393,10 @@ namespace Orleans.Runtime.Messaging
                     if (msg.Direction == Message.Directions.Request)
                     {
                         MessagingStatisticsGroup.OnRejectedMessage(msg);
-                        Message error = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, "Unknown client " + client);
+                        Message error = this.messageFactory.CreateRejectionResponse(
+                            msg,
+                            Message.RejectionTypes.Unrecoverable,
+                            "Unknown client " + client);
                         gateway.SendMessage(error);
                     }
                     else

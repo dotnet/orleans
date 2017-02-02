@@ -89,6 +89,7 @@
     <Compile Include="Logging\LogManager.cs" />
     <Compile Include="LogConsistency\ConnectionIssues.cs" />
     <Compile Include="LogConsistency\IConnectionIssueListener.cs" />
+    <Compile Include="Messaging\MessageFactory.cs" />
     <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
@@ -277,6 +278,7 @@
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
+    <Compile Include="Utils\ServiceCollectionExtensions.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
     <Compile Include="Placement\StatelessWorkerPlacement.cs" />

@@ -259,6 +259,7 @@ namespace Orleans.Runtime
             services.AddSingleton<SiloProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
+            services.AddSingleton<MessageFactory>();
 
             // Placement
             services.AddSingleton<PlacementDirectorsManager>();
@@ -344,12 +345,13 @@ namespace Orleans.Runtime
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
             siloStatistics.MetricsTable.ActivationCollector = catalog.ActivationCollector;
             siloStatistics.MetricsTable.MessageCenter = messageCenter;
-            
+
             // Now the incoming message agents
-            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
-            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
-            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
-            
+            var messageFactory = this.Services.GetRequiredService<MessageFactory>();
+            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
+            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
+            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
+
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
 
             if (!this.GlobalConfig.HasMultiClusterNetwork)
