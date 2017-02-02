@@ -70,12 +70,12 @@ namespace TestGrains
         }
  
 
-        public Task<bool> ApplyUpdatesToStorageAsync(IReadOnlyList<object> updates, int expectedversion)
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
         {
             return GetStorageGrain().Update(updates, expectedversion);
         }
 
-        public async Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorageAsync()
+        public async Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorage()
         {
             var kvp = await GetStorageGrain().Read();
             return new KeyValuePair<int, MyGrainState>(kvp.Key, (MyGrainState)kvp.Value);
@@ -104,7 +104,7 @@ namespace TestGrains
         }
 
 
-        public Task<bool> ApplyUpdatesToStorageAsync(IReadOnlyList<object> updates, int expectedversion)
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
         {
             if (state == null)
             {
@@ -124,7 +124,7 @@ namespace TestGrains
             return Task.FromResult(true);
         }
 
-        public Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorageAsync()
+        public Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorage()
         {
             if (state == null)
             {

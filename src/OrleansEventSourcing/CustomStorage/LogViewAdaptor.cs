@@ -126,7 +126,7 @@ namespace Orleans.EventSourcing.CustomStorage
                     if (MayAccessStorage())
                     {
                         // read from storage
-                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorageAsync();
+                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
                         version = result.Key;
                         cached = result.Value;
                     }
@@ -178,7 +178,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             try
             {
-                writesuccessful = await ((ICustomStorageInterface<TLogView,TLogEntry>) Host).ApplyUpdatesToStorageAsync(updates, version);
+                writesuccessful = await ((ICustomStorageInterface<TLogView,TLogEntry>) Host).ApplyUpdatesToStorage(updates, version);
 
                 LastPrimaryIssue.Resolve(Host, Services);
             }
@@ -223,7 +223,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
                     try
                     {
-                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorageAsync();
+                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
                         version = result.Key;
                         cached = result.Value;
 
