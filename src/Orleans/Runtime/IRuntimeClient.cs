@@ -49,9 +49,7 @@ namespace Orleans.Runtime
         GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
         void DeleteObjectReference(IAddressable obj);
-
-        SiloAddress CurrentSilo { get; }
-
+        
         Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
 
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
