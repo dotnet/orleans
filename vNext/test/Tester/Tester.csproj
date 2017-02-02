@@ -84,9 +84,7 @@
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
       <Link>SerializationTests\SerializationTestsUtils.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\EventSourcingTests\JournaledGrainTests.cs">
-      <Link>EventSourcingTests\JournaledGrainTests.cs</Link>
-    </Compile>
+    <Compile Include="..\..\..\test\Tester\EventSourcingTests\*.cs"/>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
