@@ -112,6 +112,7 @@
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
+    <Compile Include="Runtime\RequestContextUtil.cs" />
     <Compile Include="Runtime\RingRange.cs" />
     <Compile Include="Serialization\ILBasedExceptionSerializer.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
@@ -277,6 +278,7 @@
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
+    <Compile Include="Utils\ServiceCollectionExtensions.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
     <Compile Include="Placement\StatelessWorkerPlacement.cs" />

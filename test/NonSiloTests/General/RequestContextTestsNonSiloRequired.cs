@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -22,10 +23,12 @@ namespace UnitTests.General
 
         private static readonly SafeRandom random = new SafeRandom();
         private readonly TestEnvironmentFixture fixture;
+        private readonly RequestContextUtil requestContextUtil;
 
         public RequestContextTests_Local(TestEnvironmentFixture fixture)
         {
             this.fixture = fixture;
+            this.requestContextUtil = this.fixture.Services.GetRequiredService<RequestContextUtil>();
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;
@@ -63,7 +66,7 @@ namespace UnitTests.General
                 promises[i] = Task.Run(() =>
                 {
                     flag.Wait();
-                    msg.RequestContextData = RequestContext.Export();
+                    msg.RequestContextData = this.requestContextUtil.Export();
                 });
                 flag.Set();
                 Thread.Sleep(1);
@@ -80,7 +83,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -94,7 +97,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -116,7 +119,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = nullActivityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -130,7 +133,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId2;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             foreach (var kvp in msg.RequestContextData)
             {
                 headers.Add(kvp.Key, kvp.Value);
@@ -155,7 +158,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             var actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -167,7 +170,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -192,7 +195,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = nullActivityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -205,7 +208,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId2;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = this.requestContextUtil.Export();
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);

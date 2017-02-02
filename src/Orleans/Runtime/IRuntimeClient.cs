@@ -27,6 +27,11 @@ namespace Orleans.Runtime
         string CurrentActivationIdentity { get; }
 
         /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+
+        /// <summary>
         /// Get the current response timeout setting for this client.
         /// </summary>
         /// <returns>Response timeout value</returns>
