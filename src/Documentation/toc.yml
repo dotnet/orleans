@@ -129,6 +129,23 @@
     - name: Global-Single-Instance Grains
       href: Multi-Cluster/GlobalSingleInstance.md
 
+- name: Event Sourcing
+  href: Event-Sourcing/Overview.md
+  homepage: Event-Sourcing/Overview.md
+  items:
+    - name: JournaledGrain Basics
+      href: Event-Sourcing/GrainStateAPI.md
+    - name: Replicated Instances
+      href: Event-Sourcing/MultiInstance.md
+    - name: Immediate/Delayed Confirmation
+      href: Event-Sourcing/MultiVersion.md
+    - name: Configuration
+      href: Event-Sourcing/Configuration.md
+    - name: Built-In Log-Consistency Providers
+      href: Event-Sourcing/LogConsistencyProviders.md
+    - name: Diagnostics
+      href: Event-Sourcing/Diagnostics.md
+ 
 - name: Configuration Guide
   homepage: Orleans-Configuration-Guide/index.md
   href: Orleans-Configuration-Guide/index.md
