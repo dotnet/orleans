@@ -10,11 +10,11 @@ using TestExtensions;
 
 namespace Tests.GeoClusterTests
 {
-    public class BasicLogConsistentGrainTests : TestingSiloHost
+    public class BasicLogTestGrainTests : TestingSiloHost
     {
 
 
-        public BasicLogConsistentGrainTests() :
+        public BasicLogTestGrainTests() :
             base(
                 new TestingSiloOptions
                 {
@@ -35,32 +35,32 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster")]
         public async Task DefaultStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainDefaultStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
         }
         [Fact, TestCategory("GeoCluster")]
         public async Task MemoryStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainMemoryStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainMemoryStorage");
         }
         [Fact, TestCategory("GeoCluster")]
         public async Task SharedStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainSharedStateStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedStateStorage");
         }
         [Fact, TestCategory("GeoCluster")]
         public async Task SharedLogStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainSharedLogStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedLogStorage");
         }
         [Fact, TestCategory("GeoCluster")]
         public async Task CustomStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainCustomStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
         }
         [Fact, TestCategory("GeoCluster")]
         public async Task GsiStorage()
         {
-            await DoBasicLogConsistentGrainTest("UnitTests.Grains.GsiLogConsistentGrain");
+            await DoBasicLogTestGrainTest("TestGrains.GsiLogTestGrain");
         }
 
         private int GetRandom()
@@ -70,7 +70,7 @@ namespace Tests.GeoClusterTests
         }
 
 
-        private async Task DoBasicLogConsistentGrainTest(string grainClass, int phases = 100)
+        private async Task DoBasicLogTestGrainTest(string grainClass, int phases = 100)
         {
             await ThreeCheckers(grainClass, phases);
         }
@@ -81,7 +81,7 @@ namespace Tests.GeoClusterTests
             Func<Task> checker1 = async () =>
             {
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogConsistentGrain>(x, grainClass);
+                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetAGlobal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a); // value of A survive grain call
@@ -92,7 +92,7 @@ namespace Tests.GeoClusterTests
             Func<Task> checker2 = async () =>
             {
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogConsistentGrain>(x, grainClass);
+                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 Assert.Equal(0, await grain.GetConfirmedVersion());
                 await grain.SetALocal(x);
                 int a = await grain.GetALocal();
@@ -104,7 +104,7 @@ namespace Tests.GeoClusterTests
             {
                 // Local then Global
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogConsistentGrain>(x, grainClass);
+                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetALocal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a);

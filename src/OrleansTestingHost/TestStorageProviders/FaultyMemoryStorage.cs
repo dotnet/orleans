@@ -24,10 +24,12 @@ namespace Orleans.TestingHost
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>
         /// <param name="numStorageGrains">The number of storage grains to use.</param>
+        /// <param name="delayMilliseconds">A delay to add to each access, in milliseconds</param>
         public static void AddFaultyMemoryStorageProvider(
             this ClusterConfiguration config,
             string providerName = "FaultyMemoryStore",
-            int numStorageGrains = MemoryStorage.NumStorageGrainsDefaultValue)
+            int numStorageGrains = MemoryStorage.NumStorageGrainsDefaultValue,
+            int delayMilliseconds = 0)
         {
             //TODO: find a way to share the provider configuration setup so we don't have duplicate code.
 
@@ -36,6 +38,7 @@ namespace Orleans.TestingHost
             var properties = new Dictionary<string, string>
             {
                 { MemoryStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
+                { FaultyMemoryStorage.DelayMillisecondsPropertyName, delayMilliseconds.ToString() },
             };
 
             config.Globals.RegisterStorageProvider<FaultyMemoryStorage>(providerName, properties);

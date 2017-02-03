@@ -64,6 +64,15 @@ namespace Orleans.LogConsistency
         /// </summary>
         IEnumerable<TLogEntry> UnconfirmedSuffix { get; }
 
+        /// <summary>
+        /// Attempt to retrieve a segment of the log, possibly from storage. Throws <see cref="NotSupportedException"/> if
+        /// the log cannot be read, which depends on the providers used and how they are configured.
+        /// </summary>
+        /// <param name="fromVersion">the start position </param>
+        /// <param name="toVersion">the end position</param>
+        /// <returns>a </returns>
+        Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int toVersion);
+
     }
 
     /// <summary>
