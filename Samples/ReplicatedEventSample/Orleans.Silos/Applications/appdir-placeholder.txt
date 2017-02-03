@@ -1,0 +1,4 @@
+This is a placeholder file for the Orleans Applications directory.
+
+To load Orleans grains copy the DLLs into this directory or create an app-specific subdirectory.
+Then restart OrleansHost.exe to pick up the changes.
