@@ -8,6 +8,99 @@ namespace Tester.CodeGenTests
     using Orleans;
     using Orleans.Providers;
 
+    public interface IGrainWithGenericMethods : IGrainWithGuidKey
+    {
+        Task<Type[]> GetTypesExplicit<T, U, V>();
+        Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v);
+        Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v);
+        Task<T> RoundTrip<T>(T val);
+        Task<int> RoundTrip(int val);
+        Task<T> Default<T>();
+        Task<string> Default();
+        Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IGrain;
+        Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value);
+    }
+
+    public interface IGrainObserverWithGenericMethods : IGrainObserver
+    {
+        void SetValue<T>(T value);
+    }
+
+    public class GrainWithGenericMethods : Grain, IGrainWithGenericMethods
+    {
+        private object state;
+
+        public Task<Type[]> GetTypesExplicit<T, U, V>()
+        {
+            return Task.FromResult(new[] {typeof(T), typeof(U), typeof(V)});
+        }
+
+        public Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v)
+        {
+            return Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
+        }
+
+        public Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v)
+        {
+            return Task.FromResult(new[] { typeof(T), typeof(U) });
+        }
+
+        public Task<T> RoundTrip<T>(T val)
+        {
+            return Task.FromResult(val);
+        }
+
+        public Task<int> RoundTrip(int val)
+        {
+            return Task.FromResult(-val);
+        }
+
+        public Task<T> Default<T>()
+        {
+            return Task.FromResult(default(T));
+        }
+
+        public Task<string> Default()
+        {
+            return Task.FromResult("default string");
+        }
+
+        public Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IGrain
+        {
+            return Task.FromResult(grain);
+        }
+
+        public void SetValue<T>(T value)
+        {
+            this.state = value;
+        }
+
+        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+
+        public Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value)
+        {
+            observer.SetValue<T>(value);
+            return Task.FromResult(0);
+        }
+    }
+
+    public interface IGenericGrainWithGenericMethods<T> : IGrainWithGuidKey
+    {
+        Task<T> Method(T value);
+#pragma warning disable 693
+        Task<T> Method<T>(T value);
+#pragma warning restore 693
+    }
+
+    public class GrainWithGenericMethods<T> : Grain, IGenericGrainWithGenericMethods<T>
+    {
+        public Task<T> Method(T value) => Task.FromResult(default(T));
+
+#pragma warning disable 693
+        public Task<T> Method<T>(T value) => Task.FromResult(value);
+#pragma warning restore 693
+    }
+
     [StorageProvider(ProviderName = "MemoryStore")]
     public class RuntimeGenericGrain : Grain<GenericGrainState<@event>>, IRuntimeCodeGenGrain<@event>
     {

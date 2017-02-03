@@ -161,6 +161,24 @@ namespace Orleans.CodeGenerator.Utilities
             var syntax =
                 SyntaxFactory.MethodDeclaration(method.ReturnType.GetTypeSyntax(), method.Name.ToIdentifier())
                     .WithParameterList(SyntaxFactory.ParameterList().AddParameters(method.GetParameterListSyntax()));
+            if (method.IsGenericMethodDefinition)
+            {
+              syntax = syntax.WithTypeParameterList(SyntaxFactory.TypeParameterList().AddParameters(method.GetTypeParameterListSyntax()));
+
+                // Handle type constraints on type parameters.
+                var typeParameters = method.GetGenericArguments();
+                var typeParameterConstraints = new List<TypeParameterConstraintClauseSyntax>();
+                foreach (var arg in typeParameters)
+                {
+                    typeParameterConstraints.AddRange(GetTypeParameterConstraints(arg));
+                }
+
+                if (typeParameterConstraints.Count > 0)
+                {
+                    syntax = syntax.AddConstraintClauses(typeParameterConstraints.ToArray());
+                }
+            }
+
             if (method.IsPublic)
             {
                 syntax = syntax.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
@@ -249,6 +267,25 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
+        /// Returns the parameter list syntax for the provided method.
+        /// </summary>
+        /// <param name="method">
+        /// The method.
+        /// </param>
+        /// <returns>
+        /// The parameter list syntax for the provided method.
+        /// </returns>
+        public static TypeParameterSyntax[] GetTypeParameterListSyntax(this MethodInfo method)
+        {
+            return
+                method.GetGenericArguments()
+                      .Select(
+                          (parameter) =>
+                              SyntaxFactory.TypeParameter(parameter.Name))
+                      .ToArray();
+        }
+
+        /// <summary>
         /// Returns the parameter list syntax for the provided constructor
         /// </summary>
         /// <param name="constructor">
@@ -285,50 +322,58 @@ namespace Orleans.CodeGenerator.Utilities
                 var constraints = new List<TypeParameterConstraintClauseSyntax>();
                 foreach (var genericParameter in typeInfo.GetGenericArguments())
                 {
-                    var parameterConstraints = new List<TypeParameterConstraintSyntax>();
-                    var attributes = genericParameter.GetTypeInfo().GenericParameterAttributes;
-
-                    // The "class" or "struct" constraints must come first.
-                    if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
-                    {
-                        parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
-                    }
-                    else if (attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
-                    {
-                        parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
-                    }
-
-                    // Follow with the base class or interface constraints.
-                    foreach (var genericType in genericParameter.GetTypeInfo().GetGenericParameterConstraints())
-                    {
-                        // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
-                        if (genericType == typeof(ValueType))
-                        {
-                            continue;
-                        }
-
-                        parameterConstraints.Add(SyntaxFactory.TypeConstraint(genericType.GetTypeSyntax()));
-                    }
-
-                    // The "new()" constraint must be the last constraint in the sequence.
-                    if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint)
-                        && !attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
-                    {
-                        parameterConstraints.Add(SyntaxFactory.ConstructorConstraint());
-                    }
-
-                    if (parameterConstraints.Count > 0)
-                    {
-                        constraints.Add(
-                            SyntaxFactory.TypeParameterConstraintClause(genericParameter.Name)
-                                .AddConstraints(parameterConstraints.ToArray()));
-                    }
+                    constraints.AddRange(GetTypeParameterConstraints(genericParameter));
                 }
 
                 return constraints.ToArray();
             }
 
             return new TypeParameterConstraintClauseSyntax[0];
+        }
+
+        private static TypeParameterConstraintClauseSyntax[] GetTypeParameterConstraints(Type genericParameter)
+        {
+            var results = new List<TypeParameterConstraintClauseSyntax>();
+            var parameterConstraints = new List<TypeParameterConstraintSyntax>();
+            var attributes = genericParameter.GetTypeInfo().GenericParameterAttributes;
+
+            // The "class" or "struct" constraints must come first.
+            if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
+            {
+                parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+            }
+            else if (attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
+            {
+                parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
+            }
+
+            // Follow with the base class or interface constraints.
+            foreach (var genericType in genericParameter.GetTypeInfo().GetGenericParameterConstraints())
+            {
+                // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
+                if (genericType == typeof(ValueType))
+                {
+                    continue;
+                }
+
+                parameterConstraints.Add(SyntaxFactory.TypeConstraint(genericType.GetTypeSyntax()));
+            }
+
+            // The "new()" constraint must be the last constraint in the sequence.
+            if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint)
+                && !attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
+            {
+                parameterConstraints.Add(SyntaxFactory.ConstructorConstraint());
+            }
+
+            if (parameterConstraints.Count > 0)
+            {
+                results.Add(
+                    SyntaxFactory.TypeParameterConstraintClause(genericParameter.Name)
+                                 .AddConstraints(parameterConstraints.ToArray()));
+            }
+
+            return results.ToArray();
         }
 
         /// <summary>

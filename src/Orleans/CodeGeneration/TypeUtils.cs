@@ -875,6 +875,29 @@ namespace Orleans.Runtime
 
             throw new ArgumentException("Expression type unsupported.");
         }
+        
+        /// <summary>
+        /// Returns the <see cref="PropertyInfo"/> for the simple member access in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="TResult">
+        /// The return type of the property.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="PropertyInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static PropertyInfo Property<TResult>(Expression<Func<TResult>> expression)
+        {
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member as PropertyInfo;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
 
         /// <summary>
         /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.

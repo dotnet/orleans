@@ -113,7 +113,6 @@ namespace Orleans.Serialization
             var il = new ILDelegateBuilder<SerializationManager.DeepCopier>(
                 FieldBuilder,
                 type.Name + "DeepCopier",
-                SerializationMethodInfos,
                 SerializationMethodInfos.DeepCopierDelegate);
 
             // Declare local variables.
@@ -126,7 +125,7 @@ namespace Orleans.Serialization
             il.StoreLocal(typedInput);
 
             // Construct the result.
-            il.CreateInstance(type, result);
+            il.CreateInstance(type, result, SerializationMethodInfos.GetUninitializedObject);
 
             // Record the object.
             il.LoadArgument(1); // Load 'context' parameter.
@@ -169,7 +168,6 @@ namespace Orleans.Serialization
             var il = new ILDelegateBuilder<SerializationManager.Serializer>(
                 FieldBuilder,
                 type.Name + "Serializer",
-                SerializationMethodInfos,
                 SerializationMethodInfos.SerializerDelegate);
 
             // Declare local variables.
@@ -226,14 +224,13 @@ namespace Orleans.Serialization
             var il = new ILDelegateBuilder<SerializationManager.Deserializer>(
                 FieldBuilder,
                 type.Name + "Deserializer",
-                SerializationMethodInfos,
                 SerializationMethodInfos.DeserializerDelegate);
 
             // Declare local variables.
             var result = il.DeclareLocal(type);
 
             // Construct the result.
-            il.CreateInstance(type, result);
+            il.CreateInstance(type, result, SerializationMethodInfos.GetUninitializedObject);
 
             // Record the object.
             il.LoadArgument(1); // Load the 'context' parameter.
