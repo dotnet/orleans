@@ -18,14 +18,14 @@ namespace Orleans.EventSourcing.CustomStorage
         /// (note that the state object may be mutated by the provider, so it must not be shared).
         /// </summary>
         /// <returns>the version number and a  state object.</returns>
-        Task<KeyValuePair<int,TState>> ReadStateFromStorageAsync();
+        Task<KeyValuePair<int,TState>> ReadStateFromStorage();
 
         /// <summary>
         /// Applies the given array of deltas to storage, and returns true, if the version in storage matches the expected version. 
         /// Otherwise, does nothing and returns false. If successful, the version of storage must be increased by the number of deltas.
         /// </summary>
         /// <returns>true if the deltas were applied, false otherwise</returns>
-        Task<bool> ApplyUpdatesToStorageAsync(IReadOnlyList<TDelta> updates, int expectedversion);
+        Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedversion);
     }
 
 }

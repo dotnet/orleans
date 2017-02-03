@@ -7,9 +7,14 @@ using Orleans.LogConsistency;
 using UnitTests.GrainInterfaces;
 using Orleans.EventSourcing;
 
-namespace UnitTests.Grains
+namespace TestGrains
 {
-
+    /// <summary>
+    /// A class used by many different unit tests for the various log consistency providers.
+    /// The content of this class is pretty arbitrary and messy;
+    /// (don't use this as an introduction on how to use JournaledGrain)
+    /// it started from SimpleGrain, but a lot of stuff got added over time 
+    /// </summary>
     [Serializable]
     public class MyGrainState
     {
@@ -56,7 +61,7 @@ namespace UnitTests.Grains
     /// and a dictionary of reservations thatcan be aded and removed
     /// We subclass this to create variations for all storage providers
     /// </summary>
-    public abstract class LogConsistentGrain : JournaledGrain<MyGrainState,object>, GrainInterfaces.ILogConsistentGrain
+    public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
         public async Task SetAGlobal(int x)
         {
@@ -66,7 +71,7 @@ namespace UnitTests.Grains
 
         public async Task<Tuple<int, bool>> SetAConditional(int x)
         {
-            int version = this.ConfirmedVersion;
+            int version = this.Version;
             bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
             return new Tuple<int, bool>(version, success);
         }
@@ -104,23 +109,23 @@ namespace UnitTests.Grains
         public async Task<int> GetAGlobal()
         {
             await RefreshNow();
-            return ConfirmedState.A;
+            return State.A;
         }
 
         public Task<int> GetALocal()
         {
-            return Task.FromResult(State.A);
+            return Task.FromResult(TentativeState.A);
         }
 
         public async Task<AB> GetBothGlobal()
         {
             await RefreshNow();
-            return new AB() { A = ConfirmedState.A, B = ConfirmedState.B };
+            return new AB() { A = State.A, B = State.B };
         }
 
         public Task<AB> GetBothLocal()
         {
-            return Task.FromResult(new AB() { A = State.A, B = State.B });
+            return Task.FromResult(new AB() { A = TentativeState.A, B = TentativeState.B });
         }
 
         public Task AddReservationLocal(int val)
@@ -138,7 +143,7 @@ namespace UnitTests.Grains
         public async Task<int[]> GetReservationsGlobal()
         {
             await RefreshNow();
-            return ConfirmedState.Reservations.Values.ToArray();
+            return State.Reservations.Values.ToArray();
         }
 
         public Task SynchronizeGlobalState()
@@ -148,7 +153,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetConfirmedVersion()
         {
-            return Task.FromResult(this.ConfirmedVersion);
+            return Task.FromResult(this.Version);
         }
 
         public Task<IEnumerable<ConnectionIssue>> GetUnresolvedConnectionIssues()
@@ -159,13 +164,13 @@ namespace UnitTests.Grains
         public async Task<KeyValuePair<int, object>> Read()
         {
             await RefreshNow();
-            return new KeyValuePair<int, object>(ConfirmedVersion, ConfirmedState);
+            return new KeyValuePair<int, object>(Version, State);
         }
         public async Task<bool> Update(IReadOnlyList<object> updates, int expectedversion)
         {
-            if (expectedversion > ConfirmedVersion)
+            if (expectedversion > Version)
                 await RefreshNow();
-            if (expectedversion != ConfirmedVersion)
+            if (expectedversion != Version)
                 return false;
             return await RaiseConditionalEvents(updates);
         }
@@ -174,6 +179,10 @@ namespace UnitTests.Grains
         {
             DeactivateOnIdle();
             return TaskDone.Done;
+        }
+
+        public Task<IReadOnlyList<object>> GetEventLog() {
+            return this.RetrieveConfirmedEvents(0, Version);
         }
 
     }
