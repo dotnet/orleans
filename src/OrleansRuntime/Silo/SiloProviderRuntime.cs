@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Providers
         }
 
         /// <inheritdoc />
-        public string ExecutingEntityIdentity() => runtimeClient.ExecutingEntityIdentity();
+        public string ExecutingEntityIdentity() => runtimeClient.CurrentActivationIdentity;
 
         /// <inheritdoc />
         public StreamDirectory GetStreamDirectory() => runtimeClient.GetStreamDirectory();
