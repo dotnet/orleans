@@ -10,22 +10,18 @@ namespace Orleans.Serialization
         private readonly DynamicMethod dynamicMethod;
 
         private readonly ILGenerator il;
-
-        private readonly ReflectedSerializationMethodInfo methods;
-
+        
         private readonly ILFieldBuilder fields;
 
         /// <summary>Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.</summary>
         /// <param name="fields">The field builder.</param>
         /// <param name="name">The name of the new delegate.</param>
-        /// <param name="methods">The reflected methods used during delegate creation.</param>
         /// <param name="methodInfo">
         /// The method info for <typeparamref name="TDelegate"/> delegates, used for determining parameter types.
         /// </param>
-        public ILDelegateBuilder(ILFieldBuilder fields, string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
+        public ILDelegateBuilder(ILFieldBuilder fields, string name, MethodInfo methodInfo)
         {
             this.fields = fields;
-            this.methods = methods;
             var returnType = methodInfo.ReturnType;
             var parameterTypes = GetParameterTypes(methodInfo);
             this.dynamicMethod = new DynamicMethod(
@@ -74,6 +70,62 @@ namespace Orleans.Serialization
                     else
                     {
                         this.il.Emit(OpCodes.Ldarg, index);
+                    }
+
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Loads the element from the array on the stack at the given index onto the stack.
+        /// </summary>
+        public void LoadReferenceElement()
+        {
+            this.il.Emit(OpCodes.Ldelem_Ref);
+        }
+
+        /// <summary>
+        /// Loads the provided constant integer value onto the stack.
+        /// </summary>
+        public void LoadConstant(int value)
+        {
+            switch (value)
+            {
+                case 0:
+                    this.il.Emit(OpCodes.Ldc_I4_0);
+                    break;
+                case 1:
+                    this.il.Emit(OpCodes.Ldc_I4_1);
+                    break;
+                case 2:
+                    this.il.Emit(OpCodes.Ldc_I4_2);
+                    break;
+                case 3:
+                    this.il.Emit(OpCodes.Ldc_I4_3);
+                    break;
+                case 4:
+                    this.il.Emit(OpCodes.Ldc_I4_4);
+                    break;
+                case 5:
+                    this.il.Emit(OpCodes.Ldc_I4_5);
+                    break;
+                case 6:
+                    this.il.Emit(OpCodes.Ldc_I4_6);
+                    break;
+                case 7:
+                    this.il.Emit(OpCodes.Ldc_I4_7);
+                    break;
+                case 8:
+                    this.il.Emit(OpCodes.Ldc_I4_8);
+                    break;
+                default:
+                    if (value < 0xFF)
+                    {
+                        this.il.Emit(OpCodes.Ldc_I4_S, (byte) value);
+                    }
+                    else
+                    {
+                        this.il.Emit(OpCodes.Ldc_I4, value);
                     }
 
                     break;
@@ -320,7 +372,8 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <param name="local">The local.</param>
-        public void CreateInstance(Type type, Local local)
+        /// <param name="getUninitializedObject">The method used to get an uninitialized instance of a type.</param>
+        public void CreateInstance(Type type, Local local, MethodInfo getUninitializedObject)
         {
             var constructorInfo = type.GetConstructor(Type.EmptyTypes);
             if (type.GetTypeInfo().IsValueType)
@@ -337,7 +390,7 @@ namespace Orleans.Serialization
             else
             {
                 this.LoadType(type);
-                this.Call(this.methods.GetUninitializedObject);
+                this.Call(getUninitializedObject);
                 this.CastClass(type);
                 this.StoreLocal(local);
             }

@@ -11,6 +11,8 @@ namespace Orleans.CodeGeneration
 {
     internal static class GrainInterfaceUtils
     {
+        private static readonly IEqualityComparer<MethodInfo> MethodComparer = new MethodInfoComparer();
+
         [Serializable]
         internal class RulesViolationException : ArgumentException
         {
@@ -47,9 +49,8 @@ namespace Orleans.CodeGeneration
                 flags |= BindingFlags.DeclaredOnly;
 
             MethodInfo[] infos = grainType.GetMethods(flags);
-            IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
             foreach (var methodInfo in infos)
-                if (!methodInfos.Contains(methodInfo, methodComparer))
+                if (!methodInfos.Contains(methodInfo, MethodComparer))
                     methodInfos.Add(methodInfo);
 
             return methodInfos.ToArray();
@@ -129,13 +130,29 @@ namespace Orleans.CodeGeneration
             var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
             if (attr != null) return attr.MethodId;
 
-            var strMethodId = new StringBuilder(methodInfo.Name + "(");
+            var strMethodId = new StringBuilder(methodInfo.Name);
+
+            if (methodInfo.IsGenericMethodDefinition)
+            {
+                strMethodId.Append('<');
+                var first = true;
+                foreach (var arg in methodInfo.GetGenericArguments())
+                {
+                    if (!first) strMethodId.Append(',');
+                    else first = false;
+                    strMethodId.Append(arg.Name);
+                }
+
+                strMethodId.Append('>');
+            }
+
+            strMethodId.Append('(');
             ParameterInfo[] parameters = methodInfo.GetParameters();
             bool bFirstTime = true;
             foreach (ParameterInfo info in parameters)
             {
                 if (!bFirstTime)
-                    strMethodId.Append(",");
+                    strMethodId.Append(',');
 
                 strMethodId.Append(info.ParameterType.Name);
                 var typeInfo = info.ParameterType.GetTypeInfo();
@@ -147,7 +164,7 @@ namespace Orleans.CodeGeneration
                 }
                 bFirstTime = false;
             }
-            strMethodId.Append(")");
+            strMethodId.Append(')');
             return Utils.CalculateIdHash(strMethodId.ToString());
         }
 
@@ -306,35 +323,37 @@ namespace Orleans.CodeGeneration
 
             public bool Equals(MethodInfo x, MethodInfo y)
             {
-                var xString = new StringBuilder(x.Name);
-                var yString = new StringBuilder(y.Name);
+                return string.Equals(GetSignature(x), GetSignature(y), StringComparison.Ordinal);
+            }
 
-                ParameterInfo[] parms = x.GetParameters();
-                foreach (ParameterInfo info in parms)
+            private static string GetSignature(MethodInfo method)
+            {
+                var result = new StringBuilder(method.Name);
+
+                if (method.IsGenericMethodDefinition)
                 {
-                    var typeInfo = info.ParameterType.GetTypeInfo();
-                    xString.Append(typeInfo.Name);
-                    if (typeInfo.IsGenericType)
+                    foreach (var arg in method.GetGenericArguments())
                     {
-                        Type[] args = info.ParameterType.GetGenericArguments();
-                        foreach (Type arg in args)
-                            xString.Append(arg.Name);
+                        result.Append(arg.Name);
                     }
                 }
 
-                parms = y.GetParameters();
-                foreach (ParameterInfo info in parms)
+                var parms = method.GetParameters();
+                foreach (var info in parms)
                 {
-                    yString.Append(info.ParameterType.Name);
                     var typeInfo = info.ParameterType.GetTypeInfo();
+                    result.Append(typeInfo.Name);
                     if (typeInfo.IsGenericType)
                     {
-                        Type[] args = info.ParameterType.GetGenericArguments();
-                        foreach (Type arg in args)
-                            yString.Append(arg.Name);
+                        var args = info.ParameterType.GetGenericArguments();
+                        foreach (var arg in args)
+                        {
+                            result.Append(arg.Name);
+                        }
                     }
                 }
-                return String.CompareOrdinal(xString.ToString(), yString.ToString()) == 0;
+
+                return result.ToString();
             }
 
             public int GetHashCode(MethodInfo obj)
