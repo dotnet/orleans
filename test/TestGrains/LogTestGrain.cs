@@ -61,7 +61,7 @@ namespace TestGrains
     /// and a dictionary of reservations thatcan be aded and removed
     /// We subclass this to create variations for all storage providers
     /// </summary>
-    public abstract class LogConsistentGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogConsistentGrain
+    public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
         public async Task SetAGlobal(int x)
         {

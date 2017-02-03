@@ -17,7 +17,7 @@ namespace TestGrains
     [OneInstancePerCluster]
     [StorageProvider(ProviderName = "AzureStore")]
     [LogConsistencyProvider(ProviderName = "StateStorage")]
-    public class LogConsistentGrainSharedStateStorage : LogConsistentGrain
+    public class LogTestGrainSharedStateStorage : LogTestGrain
     {
     }
 
@@ -25,13 +25,13 @@ namespace TestGrains
     [OneInstancePerCluster]
     [StorageProvider(ProviderName = "AzureStore")]
     [LogConsistencyProvider(ProviderName = "LogStorage")]
-    public class LogConsistentGrainSharedLogStorage : LogConsistentGrain
+    public class LogTestGrainSharedLogStorage : LogTestGrain
     {
     }
 
     // use the default storage provider as the shared storage
     [OneInstancePerCluster]
-    public class LogConsistentGrainDefaultStorage : LogConsistentGrain
+    public class LogTestGrainDefaultStorage : LogTestGrain
     {
     }
 
@@ -39,32 +39,32 @@ namespace TestGrains
     [GlobalSingleInstance]
     [StorageProvider(ProviderName = "AzureStore")]
     [LogConsistencyProvider(ProviderName = "StateStorage")]
-    public class GsiLogConsistentGrain : LogConsistentGrain
+    public class GsiLogTestGrain : LogTestGrain
     {
     }
 
     // use MemoryStore (which uses GSI grain)
     [OneInstancePerCluster]
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class LogConsistentGrainMemoryStorage : LogConsistentGrain
+    public class LogTestGrainMemoryStorage : LogTestGrain
     {
     }
 
     // use the explictly specified "CustomStorage" log-consistency provider with symmetric access from all clusters
     [OneInstancePerCluster]
     [LogConsistencyProvider(ProviderName = "CustomStorage")]
-    public class LogConsistentGrainCustomStorage : LogConsistentGrain,
+    public class LogTestGrainCustomStorage : LogTestGrain,
         Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<MyGrainState, object>
     {
 
         // we use another impl of this grain as the primary.
-        private ILogConsistentGrain storagegrain;
+        private ILogTestGrain storagegrain;
 
-        private ILogConsistentGrain GetStorageGrain()
+        private ILogTestGrain GetStorageGrain()
         {
             if (storagegrain == null)
             {
-                storagegrain = GrainFactory.GetGrain<ILogConsistentGrain>(this.GetPrimaryKeyLong(), "UnitTests.Grains.LogConsistentGrainSharedStateStorage");
+                storagegrain = GrainFactory.GetGrain<ILogTestGrain>(this.GetPrimaryKeyLong(), "TestGrains.LogTestGrainSharedStateStorage");
             }
             return storagegrain;
         }
@@ -85,7 +85,7 @@ namespace TestGrains
     // use the explictly specified "CustomStorage" log-consistency provider with access from primary cluster only
     [OneInstancePerCluster]
     [LogConsistencyProvider(ProviderName = "CustomStoragePrimaryCluster")]
-    public class LogConsistentGrainCustomStoragePrimaryCluster : LogConsistentGrain,
+    public class LogTestGrainCustomStoragePrimaryCluster : LogTestGrain,
         Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<MyGrainState, object>
     {
 

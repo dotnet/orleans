@@ -36,72 +36,72 @@ namespace Tests.GeoClusterTests
 
             public string GetGrainRef(string grainclass, int i)
             {
-                return GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass).ToString();
+                return GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass).ToString();
             }
 
             public void SetALocal(string grainclass, int i, int a)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.SetALocal(a).GetResult();
             }
 
             public void SetAGlobal(string grainclass, int i, int a)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.SetAGlobal(a).GetResult();
             }
 
             public Tuple<int, bool> SetAConditional(string grainclass, int i, int a)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.SetAConditional(a).GetResult();
             }
 
             public void IncrementAGlobal(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.IncrementAGlobal().GetResult();
             }
 
             public void IncrementALocal(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.IncrementALocal().GetResult();
             }
 
             public int GetAGlobal(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.GetAGlobal().GetResult();
             }
 
             public int GetALocal(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.GetALocal().GetResult();
             }    
 
             public void AddReservationLocal(string grainclass, int i, int x)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.AddReservationLocal(x).GetResult();
             }
 
             public void RemoveReservationLocal(string grainclass, int i, int x)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.RemoveReservationLocal(x).GetResult();
             }
 
             public int[] GetReservationsGlobal(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.GetReservationsGlobal().GetResult();
             }
 
             public void Synchronize(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 grainRef.SynchronizeGlobalState().GetResult();
             }
 
@@ -113,13 +113,13 @@ namespace Tests.GeoClusterTests
 
             public long GetConfirmedVersion(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.GetConfirmedVersion().GetResult();
             }
 
             public IEnumerable<ConnectionIssue> GetUnresolvedConnectionIssues(string grainclass, int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogConsistentGrain>(i, grainclass);
+                var grainRef = GrainClient.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ILogTestGrain>(i, grainclass);
                 return grainRef.GetUnresolvedConnectionIssues().GetResult();
             }
 
