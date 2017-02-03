@@ -15,9 +15,11 @@ namespace Orleans.Providers
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
         private InvokeInterceptor invokeInterceptor;
+        private readonly IRuntimeClient runtimeClient;
 
         public ClientProviderRuntime(IGrainFactory grainFactory, IServiceProvider serviceProvider) 
         {
+            this.runtimeClient = RuntimeClient.Current;
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
             GrainFactory = grainFactory;
@@ -95,7 +97,7 @@ namespace Orleans.Providers
 
         public string ExecutingEntityIdentity()
         {
-            return RuntimeClient.Current.Identity;
+            return this.runtimeClient.CurrentActivationIdentity;
         }
 
         public SiloAddress ExecutingSiloAddress

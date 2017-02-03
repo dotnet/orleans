@@ -602,9 +602,14 @@ namespace Orleans.Runtime
         {
             get { return appLogger; }
         }
-        public string Identity
+
+        public string CurrentActivationIdentity
         {
-            get { return MySilo.ToLongString(); }
+            get
+            {
+                var currentActivation = this.GetCurrentActivationData();
+                return currentActivation.Address.ToString();
+            }
         }
 
         public IActivationData CurrentActivationData
@@ -732,12 +737,6 @@ namespace Orleans.Runtime
         {
             var currentActivation = GetCurrentActivationData();
             return currentActivation.GetStreamDirectory();
-        }
-
-        public string ExecutingEntityIdentity()
-        {
-            var currentActivation = GetCurrentActivationData();
-            return currentActivation.Address.ToString();
         }
 
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)

@@ -14,12 +14,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>The stream directory.</returns>
         StreamDirectory GetStreamDirectory();
-
-        /// <summary>
-        /// Retrieves the opaque identity of currently executing grain or client object. 
-        /// </summary>
-        /// <remarks>Exposed for logging purposes.</remarks>
-        string ExecutingEntityIdentity();
         
         /// <summary>
         /// Attempts to add the provided extension handler to the currently executing grain.
