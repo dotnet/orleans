@@ -14,13 +14,24 @@ using Xunit.Sdk;
 
 namespace Tester.EventSourcingTests
 {
-    [TestCaseOrderer("SimplePriorityOrderer", "Tester")]
+    [TestCaseOrderer("Tester.EventSourcingTests.SimplePriorityOrderer", "Tester")]
     public partial class CountersGrainTests
     {
 
         // you can look at the time taken by each of the tests below
         // to get a rough idea on how the synchronization choices, and the configuration parameters,
         // and the consistency provider, affect throughput
+
+        // To run these perf tests from within visual studio, first type
+        // "CountersGrainTests.Perf" in the search box, and then "Run All"
+        // This will run the warmup and then all tests, in the same test cluster. Afterwards it reports
+        // approximate time taken for each. It's not really a test, just an
+        // illustration of how JournaledGrain performance can vary with the choices made.
+
+        // what you should see is:
+        // - the conservative approach (confirm each update, disallow reentrancy) is slow.
+        // - confirming at end only, instead of after each update, is fast.
+        // - allowing reentrancy, while still confirming after each update, is also fast. 
 
         private int iterations = 800;
 

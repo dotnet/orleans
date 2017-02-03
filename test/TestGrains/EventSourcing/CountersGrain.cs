@@ -64,32 +64,43 @@ namespace TestGrains
         {
         }
 
-        public async Task Add(string key, int amount, bool wait_till_persisted)
+        public async Task Add(string key, int amount, bool wait_for_confirmation)
         {
             RaiseEvent(new UpdatedEvent() { Key = key, Amount = amount });
 
             // optionally, wait until the event has been persisted to storage
-            if (wait_till_persisted)
+            if (wait_for_confirmation)
                 await ConfirmEvents();
         }
 
-        public async Task Reset(bool wait_till_persisted)
+        public async Task Reset(bool wait_for_confirmation)
         {
             RaiseEvent(new ResetAllEvent());
 
             // optionally, wait until the event has been persisted to storage
-            if (wait_till_persisted)
+            if (wait_for_confirmation)
                 await ConfirmEvents();
         }
 
-        public Task<int> Get(string key)
+        public Task ConfirmAllPreviouslyRaisedEvents()
         {
-            return Task.FromResult(TentativeState.Counts[key]);
+            return ConfirmEvents();
+        }
+            
+
+        public Task<int> GetTentativeCount(string key)
+        {
+            return Task.FromResult(State.Counts[key]);
         }
 
-        public Task<IReadOnlyDictionary<string, int>> GetAll()
+        public Task<IReadOnlyDictionary<string, int>> GetTentativeState()
         {
             return Task.FromResult((IReadOnlyDictionary<string, int>)TentativeState.Counts);
+        }
+
+        public Task<IReadOnlyDictionary<string, int>> GetConfirmedState()
+        {
+            return Task.FromResult((IReadOnlyDictionary<string, int>)State.Counts);
         }
 
 

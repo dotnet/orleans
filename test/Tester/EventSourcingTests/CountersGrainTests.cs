@@ -21,7 +21,7 @@ namespace Tester.EventSourcingTests
         {
             var grain = GrainClient.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
 
-            var currentstate = await grain.GetAll();
+            var currentstate = await grain.GetTentativeState();
             Assert.NotNull(currentstate);
             Assert.Equal(0, currentstate.Count());
 
@@ -29,12 +29,13 @@ namespace Tester.EventSourcingTests
             await grain.Add("Alice", 1, false);
             await grain.Add("Alice", 1, false);
 
-            // all three updates should be visible (even if not persisted to storage yet)
-            Assert.Equal(3, await grain.Get("Alice"));
+            // all three updates should be visible in the tentative count (even if not confirmed yet)
+            Assert.Equal(3, await grain.GetTentativeCount("Alice"));
 
+            // reset all counters to zero, and wait for confirmation
             await grain.Reset(true);
 
-            Assert.Equal(0, (await grain.GetAll()).Count());
+            Assert.Equal(0, (await grain.GetTentativeState()).Count());
         }
 
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
@@ -50,16 +51,23 @@ namespace Tester.EventSourcingTests
         private string RandomKey() { return keys[random.Next(keys.Length)]; }
 
 
-        private async Task ConcurrentIncrements(ICountersGrain grain, int count, bool wait_till_persisted_on_each)
+        private async Task ConcurrentIncrements(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
         {
-            // increment (count) times, on random keys, in parallel
+            // increment (count) times, on random keys, concurrently
             var tasks = new List<Task>();
             for (int i = 0; i < count; i++)
-                tasks.Add(grain.Add(RandomKey(), 1, wait_till_persisted_on_each));
+                tasks.Add(grain.Add(RandomKey(), 1, wait_for_confirmation_on_each));
             await Task.WhenAll(tasks);
 
-            // check that the sum of all the counters is correct
-            Assert.Equal(count, (await grain.GetAll()).Aggregate(0, (c, kvp) => c + kvp.Value));
+            // check that the tentative state shows all increments
+            Assert.Equal(count, (await grain.GetTentativeState()).Aggregate(0, (c, kvp) => c + kvp.Value));
+
+            // if we did not wait for confirmation on each event, wait now
+            if (!wait_for_confirmation_on_each)
+                await grain.ConfirmAllPreviouslyRaisedEvents();
+
+            // check that the confirmed state shows all the increments
+            Assert.Equal(count, (await grain.GetConfirmedState()).Aggregate(0, (c, kvp) => c + kvp.Value));
 
             // reset all counters
             await grain.Reset(true);
