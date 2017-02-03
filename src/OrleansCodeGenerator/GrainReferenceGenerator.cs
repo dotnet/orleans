@@ -61,13 +61,11 @@ namespace Orleans.CodeGenerator
             var attributes = SF.AttributeList()
                 .AddAttributes(
                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
-
                     SF.Attribute(typeof(SerializableAttribute).GetNameSyntax()),
 #if !NETSTANDARD_TODO
                     //ExcludeFromCodeCoverageAttribute became an internal class in netstandard
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
 #endif
-
                     markerAttribute);
 
             var className = CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix;
@@ -156,10 +154,27 @@ namespace Orleans.CodeGenerator
                                     .AddArgumentListArguments(SF.Argument(parameter.Name.ToIdentifierName()))));
                     }
                 }
-
+                
                 // Get the parameters argument value.
                 ExpressionSyntax args;
-                if (parameters.Length == 0)
+                if (method.IsGenericMethodDefinition)
+                {
+                    // Create an arguments array which includes the method's type parameters followed by the method's parameter list.
+                    var allParameters = new List<ExpressionSyntax>();
+                    foreach (var typeParameter in method.GetGenericArguments())
+                    {
+                        allParameters.Add(SF.TypeOfExpression(typeParameter.GetTypeSyntax()));
+                    }
+
+                    allParameters.AddRange(parameters.Select(GetParameterForInvocation));
+
+                    args =
+                        SF.ArrayCreationExpression(typeof(object).GetArrayTypeSyntax())
+                        .WithInitializer(
+                            SF.InitializerExpression(SyntaxKind.ArrayInitializerExpression)
+                              .AddExpressions(allParameters.ToArray()));
+                }
+                else if (parameters.Length == 0)
                 {
                     args = SF.LiteralExpression(SyntaxKind.NullLiteralExpression);
                 }
