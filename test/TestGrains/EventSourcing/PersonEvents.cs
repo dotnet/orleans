@@ -3,7 +3,10 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    // we use a marker interface, so we get a bit more typechecking than with plain objects
+    // We list all the events supported by the JournaledPersonGrain 
+
+    // we chose to have all these events implement the following marker interface
+    // (this is optional, but gives us a bit more typechecking)
     public interface IPersonEvent { } 
 
     [Serializable]

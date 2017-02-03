@@ -45,6 +45,7 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="LogConsistencyConfigurationExtensions.cs" />
     <Compile Include="CustomStorage\LogViewAdaptor.cs" />
     <Compile Include="CustomStorage\LogConsistencyProvider.cs" />
     <Compile Include="CustomStorage\ICustomStorageInterface.cs" />

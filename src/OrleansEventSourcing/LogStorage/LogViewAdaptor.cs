@@ -84,6 +84,17 @@ namespace Orleans.EventSourcing.LogStorage
             ConfirmedVersionInternal = GlobalLog.StateAndMetaData.GlobalVersion;
         }
 
+
+        /// <inheritdoc/>
+        public override Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int toVersion)
+        {
+
+            // make a copy of the entries in the range asked for
+            IReadOnlyList<TLogEntry> segment = GlobalLog.StateAndMetaData.Log.GetRange(fromVersion, (toVersion - fromVersion));
+
+            return Task.FromResult(segment);
+        }
+
         // no special tagging is required, thus we create a plain submission entry
         /// <inheritdoc/>
         protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)

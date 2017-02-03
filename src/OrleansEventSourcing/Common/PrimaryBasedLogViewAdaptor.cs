@@ -87,6 +87,11 @@ namespace Orleans.EventSourcing.Common
             throw new NotImplementedException();
         }
 
+        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length)
+        {
+            throw new NotSupportedException();
+        }
+
         /// <summary>
         /// Handle notification messages. Override this to handle notification subtypes.
         /// </summary>

@@ -8,8 +8,11 @@ namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// A grain used for testing log-consistency providers.
+    /// The content of this class is pretty arbitrary and messy;
+    /// (don't use this as an introduction on how to use JournaledGrain)
+    /// it started from SimpleGrain, but a lot of stuff got added over time 
     /// </summary>
-    public interface ILogConsistentGrain: IGrainWithIntegerKey
+    public interface ILogTestGrain: IGrainWithIntegerKey
     {
         #region Queries
 
@@ -71,11 +74,14 @@ namespace UnitTests.GrainInterfaces
         Task<KeyValuePair<int, object>> Read();
         Task<bool> Update(IReadOnlyList<object> updates, int expectedversion);
 
-        #region Other
+        Task<IReadOnlyList<object>> GetEventLog();
 
-        // other operations
 
-        Task SynchronizeGlobalState();
+            #region Other
+
+            // other operations
+
+            Task SynchronizeGlobalState();
         Task Deactivate();
 
         #endregion
