@@ -178,9 +178,9 @@ namespace Orleans.EventSourcing
         protected Task<IReadOnlyList<TEventBase>> RetrieveConfirmedEvents(int fromVersion, int toVersion)
         {
             if (fromVersion < 0)
-                throw new ArgumentException("fromVersion");
+                throw new ArgumentException("invalid range", nameof(fromVersion));
             if (toVersion < fromVersion || toVersion > LogViewAdaptor.ConfirmedVersion)
-                throw new ArgumentException("toVersion");
+                throw new ArgumentException("invalid range", nameof(toVersion));
 
             return LogViewAdaptor.RetrieveLogSegment(fromVersion, toVersion);
         }

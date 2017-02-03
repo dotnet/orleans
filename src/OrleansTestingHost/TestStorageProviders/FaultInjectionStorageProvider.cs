@@ -63,6 +63,14 @@ namespace Orleans.TestingHost
                 await realStorageProvider.Close();
         }
 
+        private Task InsertDelay()
+        {
+            if (delayMilliseconds > 0)
+                return Task.Delay(delayMilliseconds);
+            else
+                return TaskDone.Done;
+        }
+           
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>
@@ -73,8 +81,7 @@ namespace Orleans.TestingHost
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
-                if (delayMilliseconds > 0)
-                    await Task.Delay(delayMilliseconds);
+                await InsertDelay();
                 await faultGrain.OnRead(grainReference);
             }
             catch (Exception)
@@ -96,8 +103,7 @@ namespace Orleans.TestingHost
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
-                if (delayMilliseconds > 0)
-                    await Task.Delay(delayMilliseconds);
+                await InsertDelay();
                 await faultGrain.OnWrite(grainReference);
             }
             catch (Exception)
@@ -119,8 +125,7 @@ namespace Orleans.TestingHost
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
-                if (delayMilliseconds > 0)
-                    await Task.Delay(delayMilliseconds);
+                await InsertDelay();
                 await faultGrain.OnClear(grainReference);
             }
             catch (Exception)
