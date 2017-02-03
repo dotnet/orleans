@@ -245,9 +245,10 @@ namespace Orleans.Storage
                         AccessCondition.GenerateIfMatchCondition(grainState.ETag),
                         null,
                         null).ConfigureAwait(false);
-                grainState.ETag = blob.Properties.ETag;
 
-                if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_Cleared, "Cleared: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+                grainState.ETag = null;
+
+                if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_Cleared, "Cleared: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4}", grainType, grainId, blob.Properties.ETag, blobName, container.Name);
             }
             catch (Exception ex)
             {
