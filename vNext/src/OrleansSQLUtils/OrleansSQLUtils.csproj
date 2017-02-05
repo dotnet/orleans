@@ -1,4 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansSqlUtils</PackageId>
+    <Title>Microsoft Orleans Sql Utilities</Title>
+    <Description>
+      Library of utility types for relational storage of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -13,17 +22,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansSQLUtils\**\*.cs" Exclude="..\..\..\src\OrleansSQLUtils\Properties\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.cs;..\..\..\src\OrleansSQLUtils\bin\**\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.sql;..\..\..\src\OrleansSQLUtils\bin\**\*.sql" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NETStandard.Library" Version="1.6.1" />
     <PackageReference Include="System.Data.Common" Version="4.3.0" />
     <PackageReference Include="System.Xml.XmlSerializer" Version="4.3.0" />
     <PackageReference Include="System.Reflection" Version="4.3.0" />
@@ -36,12 +39,18 @@
   <ItemGroup>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\MySql\</PackagePath>
     </None>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\PostgreSql\</PackagePath>
     </None>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
     </None>
   </ItemGroup>
 </Project>

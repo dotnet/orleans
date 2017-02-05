@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -9,11 +9,6 @@
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\TestInternalGrainInterfaces\**\*.cs" Exclude="..\..\..\test\TestInternalGrainInterfaces\obj\**\*.cs;..\..\..\test\TestInternalGrainInterfaces\bin\**\*.cs;..\..\..\test\TestInternalGrainInterfaces\Properties\*.cs" />
