@@ -3,7 +3,7 @@
   <metadata>
     <id>Microsoft.Orleans.OrleansSqlUtils</id>
     <version>$version$</version>
-    <title>icrosoft Orleans Sql Utilities</title>
+    <title>Microsoft Orleans Sql Utilities</title>
     <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>

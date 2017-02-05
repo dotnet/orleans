@@ -1,7 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansAWSUtils</PackageId>
+    <Title>Microsoft Orleans AWS Utilities</Title>
+    <Description>
+      Library of utility types for Amazon AWS of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -10,19 +20,17 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
+
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansAWSUtils\**\*.cs" Exclude="..\..\..\src\OrleansAWSUtils\Properties\*.cs;..\..\..\src\OrleansAWSUtils\obj\**\*.cs;..\..\..\src\OrleansAWSUtils\bin\**\*.cs" />
   </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="NETStandard.Library" Version="1.6.1" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.3.2" />
     <PackageReference Include="AWSSDK.SQS" Version="3.3.1.6" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />

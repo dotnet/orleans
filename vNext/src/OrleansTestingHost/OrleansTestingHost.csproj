@@ -1,4 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.TestingHost</PackageId>
+    <Title>Microsoft Orleans Testing Host Library</Title>
+    <Description>
+      Microsoft Orleans library for hosting a silo in a testing project.
+    </Description>
+  </PropertyGroup>
+
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -13,8 +22,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
     <None Include="App.config" />
   </ItemGroup>
 
@@ -50,6 +57,7 @@
     <Content Include="..\..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
       <Link>ClientConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
     </Content>
   </ItemGroup>
 </Project>

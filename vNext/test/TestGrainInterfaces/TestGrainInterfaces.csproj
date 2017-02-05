@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -11,7 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="**\*.cs" />
     <Compile
       Include="..\..\..\test\TestGrainInterfaces\**\*.cs"
       Exclude="
@@ -20,7 +19,6 @@
         ..\..\..\test\TestGrainInterfaces\Properties\*.cs;
         ..\..\..\test\TestGrainInterfaces\obj\**\*.cs;
         ..\..\..\test\TestGrainInterfaces\bin\**\*.cs"/>
-    <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
 
   <ItemGroup>
