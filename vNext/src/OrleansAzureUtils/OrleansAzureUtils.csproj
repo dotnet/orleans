@@ -1,4 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
+    <Title>Microsoft Orleans Azure Utilities</Title>
+    <Description>
+      Support library for hosting Orleans on Microsoft Azure.
+    </Description>
+  </PropertyGroup>
+
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -14,8 +23,6 @@
 
   <ItemGroup>
     <None Include="App.config" />
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,7 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NETStandard.Library" Version="1.6.1" />
     <PackageReference Include="System.Net.Requests" Version="4.3.0" />
     <PackageReference Include="WindowsAzure.Storage" Version="7.2.1" />
   </ItemGroup>

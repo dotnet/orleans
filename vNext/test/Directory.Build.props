@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Include="ShowFilesOutsideOfProject" />
+  </ItemGroup>
+</Project>
