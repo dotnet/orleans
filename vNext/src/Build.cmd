@@ -20,27 +20,25 @@ SET VERSION_FILE=%CMDHOME%\Build\Version.txt
 if EXIST "%VERSION_FILE%" (
     @Echo Using version number from file %VERSION_FILE%
     FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION_FILE%"`) do set PRODUCT_VERSION=%%i.%%j.%%k
+    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION_FILE%"`) do set VERSION_SUFFIX=%%l
 ) else (
     @Echo ERROR: Unable to read version number from file %VERSION_FILE%
     SET PRODUCT_VERSION=1.0
 )
 @Echo PRODUCT_VERSION=%PRODUCT_VERSION%
+@Echo VERSION_SUFFIX=%VERSION_SUFFIX%
 
 if "%builduri%" == "" set builduri=Build.cmd
 
 SET BINARIES_PATH=%CMDHOME%\..\Binaries
 SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 
+SET PACK_FLAGS=--no-build --include-symbols /p:VersionPrefix=%PRODUCT_VERSION%;VersionSuffix=%VERSION_SUFFIX%
+
 set SOLUTION=%CMDHOME%\Orleans.vNext.sln
 
 @echo ===== Building %SOLUTION% =====
 call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES_PATH%
-
-:: Restore the code generator related packages individually
-call %_dotnet% restore "%CMDHOME%\Orleans.PlatformServices\Orleans.PlatformServices.csproj"
-call %_dotnet% restore "%CMDHOME%\Orleans\Orleans.csproj"
-call %_dotnet% restore "%CMDHOME%\OrleansCodeGenerator\OrleansCodeGenerator.csproj"
-call %_dotnet% restore "%CMDHOME%\ClientGenerator\ClientGenerator.csproj"
 
 :: Restore packages for the solution
 call %_dotnet% restore "%SOLUTION%"
@@ -54,8 +52,9 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
-call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
+call %_dotnet% pack %PACK_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
+@echo PACK ok for %CONFIGURATION% %SOLUTION%
 
 @echo Build Release ============================
 
@@ -66,8 +65,9 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
-call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
+call %_dotnet% pack %PACK_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
+@echo PACK ok for %CONFIGURATION% %SOLUTION%
 
 REM set STEP=VSIX
 

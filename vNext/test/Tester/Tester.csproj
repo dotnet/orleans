@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -8,10 +8,6 @@
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
@@ -39,7 +35,6 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
-    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
@@ -85,7 +80,6 @@
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
       <Link>SerializationTests\SerializationTestsUtils.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\EventSourcingTests\*.cs"/>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
