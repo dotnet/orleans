@@ -313,7 +313,7 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Generates <see cref="GenericMethodInvoker"/> fields for the generic methods in <see cref="grainType"/>.
+        /// Generates <see cref="GenericMethodInvoker"/> fields for the generic methods in <paramref name="grainType"/>.
         /// </summary>
         /// <param name="grainType">The grain type.</param>
         /// <returns>The generated fields.</returns>
