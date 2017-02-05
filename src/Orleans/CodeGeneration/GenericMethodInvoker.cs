@@ -81,23 +81,26 @@ namespace Orleans.CodeGeneration
                 $"GenericMethodInvoker_{this.grainInterfaceType}_{concreteMethod.Name}",
                 GenericMethodInvokerDelegateMethodInfo);
 
-            // Load the grain and cast it into the appropriate type.
+            // Load the grain and cast it to the type the concrete method is declared on.
+            // Eg: cast from IAddressable to IGrainWithGenericMethod.
             il.LoadArgument(0);
             il.CastOrUnbox(this.grainInterfaceType);
 
-            // Load every argument from the argument array.
+            // Load each of the method parameters from the argument array, skipping the type parameters.
             var methodParameters = concreteMethod.GetParameters();
             for (var i = 0; i < methodParameters.Length; i++)
             {
                 il.LoadArgument(1); // Load the argument array.
 
-                // The argument is offset by the type parameter count, since type parameters come first.
+                // Skip the type parameters and load the particular argument.
                 il.LoadConstant(i + this.typeParameterCount); 
                 il.LoadReferenceElement();
+
+                // Cast the argument from 'object' to the type expected by the concrete method.
                 il.CastOrUnbox(methodParameters[i].ParameterType);
             }
 
-            // Call the target method.
+            // Call the concrete method.
             il.Call(concreteMethod);
 
             // If the result type is Task or Task<T>, convert it to Task<object>.
