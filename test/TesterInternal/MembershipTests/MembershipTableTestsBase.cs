@@ -363,6 +363,32 @@ namespace UnitTests.MembershipTests
             Assert.Equal(1, tableData.Members.Count);
         }
 
+        protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
+        {
+            MembershipTableData tableData = await membershipTable.ReadAll();
+
+            TableVersion newTableVersion = tableData.Version.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            bool ok = await membershipTable.InsertRow(newEntry, newTableVersion);
+            Assert.True(ok);
+            
+            
+            var amAliveTime = DateTime.UtcNow;
+            
+            // This mimics the arguments MembershipOracle.OnIAmAliveUpdateInTableTimer passes in
+            var entry = new MembershipEntry
+            {
+                SiloAddress = newEntry.SiloAddress,
+                IAmAliveTime = amAliveTime
+            };
+
+            await membershipTable.UpdateIAmAlive(entry);
+
+            tableData = await membershipTable.ReadAll();
+            Tuple<MembershipEntry, string> member = tableData.Members.First();
+            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(1));
+        }
+
         private static int generation;
         // Utility methods
         private static MembershipEntry CreateMembershipEntryForTest()
