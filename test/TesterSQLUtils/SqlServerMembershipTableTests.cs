@@ -87,5 +87,11 @@ namespace UnitTests.MembershipTests
         {
             await MembershipTable_UpdateRowInParallel();
         }
+
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task MembershipTable_SqlServer_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
+        }
     }
 }

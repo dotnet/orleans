@@ -42,45 +42,51 @@ namespace Consul.Tests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_GetGateways()
+        public async Task MembershipTable_Consul_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable()
+        public async Task MembershipTable_Consul_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_InsertRow()
+        public async Task MembershipTable_Consul_InsertRow()
         {
             await MembershipTable_InsertRow(false);
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
+        public async Task MembershipTable_Consul_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read(false);
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadAll_Insert_ReadAll()
+        public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll(false);
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_UpdateRow()
+        public async Task MembershipTable_Consul_UpdateRow()
         {
             await MembershipTable_UpdateRow(false);
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
+        public async Task MembershipTable_Consul_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task MembershipTable_Consul_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive(false);
         }
     }
 }

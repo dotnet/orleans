@@ -82,10 +82,16 @@ namespace Tester.AzureUtils
             await MembershipTable_UpdateRow();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task MembershipTable_Azure_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
         }
     }
 }
