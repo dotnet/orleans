@@ -82,5 +82,11 @@ namespace AWSUtils.Tests.MembershipTests
         {
             await MembershipTable_UpdateRowInParallel(false);
         }
+
+        [SkippableFact]
+        public async Task MembershipTable_DynamoDB_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive(false);
+        }
     }
 }
