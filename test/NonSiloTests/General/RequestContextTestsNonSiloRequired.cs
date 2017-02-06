@@ -13,6 +13,7 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
@@ -20,10 +21,11 @@ namespace UnitTests.General
         private static bool oldPropagateActivityId;
 
         private static readonly SafeRandom random = new SafeRandom();
+        private readonly TestEnvironmentFixture fixture;
 
-        public RequestContextTests_Local()
+        public RequestContextTests_Local(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;

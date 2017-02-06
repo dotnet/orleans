@@ -19,7 +19,7 @@ namespace Tester.AzureUtils
     /// </summary>
     public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTestFixture>
     {
-        public AzureMembershipTableTests(ConnectionStringFixture fixture):base(fixture)
+        public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
             LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);

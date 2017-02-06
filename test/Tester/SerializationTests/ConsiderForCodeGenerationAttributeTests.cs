@@ -6,11 +6,14 @@ using Xunit;
 
 namespace Tester.SerializationTests
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ConsiderForCodeGenerationAttributeTests
     {
-        public ConsiderForCodeGenerationAttributeTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public ConsiderForCodeGenerationAttributeTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]

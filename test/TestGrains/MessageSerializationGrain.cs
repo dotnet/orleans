@@ -42,11 +42,6 @@
     [Serializable]
     public struct SimpleType
     {
-        static SimpleType()
-        {
-            SerializationManager.Register(typeof(SimpleType));
-        }
-
         public SimpleType(int num)
         {
             this.Number = num;

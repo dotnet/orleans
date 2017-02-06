@@ -12,19 +12,20 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class Identifiertests
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture environment;
         private static readonly Random random = new Random();
 
         class A { }
         class B : A { }
         
-        public Identifiertests(ITestOutputHelper output)
+        public Identifiertests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            SerializationTestEnvironment.Initialize();
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            this.environment = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]

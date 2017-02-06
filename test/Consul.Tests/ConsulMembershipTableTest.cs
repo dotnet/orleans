@@ -4,6 +4,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using System.Threading.Tasks;
+using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -16,7 +17,7 @@ namespace Consul.Tests
     [TestCategory("Membership"), TestCategory("Consul")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
-        public ConsulMembershipTableTest(ConnectionStringFixture fixture) : base(fixture)
+        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride("ConsulBasedMembershipTable", Severity.Verbose3);
             LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);

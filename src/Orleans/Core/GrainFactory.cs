@@ -169,6 +169,7 @@ namespace Orleans
             return TaskDone.Done;
         }
 
+        /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
                 where TGrainObserverInterface : IAddressable
         {

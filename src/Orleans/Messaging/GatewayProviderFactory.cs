@@ -9,13 +9,20 @@ namespace Orleans.Messaging
 {
     internal class GatewayProviderFactory
     {
-        private static readonly Logger logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
+        private readonly ClientConfiguration cfg;
+        private readonly Logger logger;
 
-        internal static async Task<IGatewayListProvider> CreateGatewayListProvider(ClientConfiguration cfg)
+        public GatewayProviderFactory(ClientConfiguration cfg)
         {
-            IGatewayListProvider listProvider = null;
-            ClientConfiguration.GatewayProviderType gatewayProviderToUse = cfg.GatewayProviderToUse;
+            this.cfg = cfg;
+            this.logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
+        }
 
+        internal IGatewayListProvider CreateGatewayListProvider()
+        {
+            IGatewayListProvider listProvider;
+            ClientConfiguration.GatewayProviderType gatewayProviderToUse = cfg.GatewayProviderToUse;
+            
             switch (gatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
@@ -42,7 +49,6 @@ namespace Orleans.Messaging
                     throw new NotImplementedException(gatewayProviderToUse.ToString());
             }
 
-            await listProvider.InitializeGatewayListProvider(cfg, LogManager.GetLogger(listProvider.GetType().Name));
             return listProvider;
         }
     }

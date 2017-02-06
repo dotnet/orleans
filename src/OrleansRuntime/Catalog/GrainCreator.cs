@@ -10,7 +10,7 @@ using Orleans.GrainDirectory;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Helper classe used to create local instances of grains.
+    /// Helper class used to create local instances of grains.
     /// </summary>
     public class GrainCreator
     {

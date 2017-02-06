@@ -12,19 +12,16 @@ using Xunit.Abstractions;
 
 namespace NonSiloTests.UnitTests.SerializerTests
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class MessageSerializerTests
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-        public MessageSerializerTests(ITestOutputHelper output)
+        public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            MessagingStatisticsGroup.Init(false);
-
-            var orleansConfig = ClusterConfiguration.LocalhostPrimarySilo();
-            BufferPool.InitGlobalBufferPool(orleansConfig.Globals);
-
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

@@ -15,14 +15,17 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Tests for the serialization system.
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class InternalSerializationTests
     {
+        private readonly TestEnvironmentFixture fixture;
+
         /// <summary>
         /// Initializes the system for testing.
         /// </summary>
-        public InternalSerializationTests()
+        public InternalSerializationTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         /// <summary>
