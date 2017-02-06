@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,7 +13,6 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -48,8 +46,10 @@ namespace Orleans.Runtime
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
-            OrleansTaskScheduler scheduler)
+            OrleansTaskScheduler scheduler,
+            IServiceProvider serviceProvider)
         {
+            this.ServiceProvider = serviceProvider;
             this.dispatcher = dispatcher;
             MySilo = catalog.LocalSilo;
             this.directory = directory;
@@ -70,6 +70,8 @@ namespace Orleans.Runtime
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
 
+        public IServiceProvider ServiceProvider { get; }
+
         public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
@@ -81,8 +83,6 @@ namespace Orleans.Runtime
         public ClusterConfiguration Config { get; private set; }
 
         public OrleansTaskScheduler Scheduler { get; }
-
-        public IGrainFactory GrainFactory => this.ConcreteGrainFactory;
 
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
@@ -699,28 +699,6 @@ namespace Orleans.Runtime
 
         public IGrainTypeResolver GrainTypeResolver { get; private set; }
 
-        private void CheckValidReminderServiceType(string doingWhat)
-        {
-            var remType = Config.Globals.ReminderServiceType;
-            if (remType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified) ||
-                remType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
-            {
-                throw new InvalidOperationException(
-                    string.Format("Cannot {0} when ReminderServiceProviderType is {1}",
-                    doingWhat, remType));
-            }
-        }
-
-        private SiloAddress MapGrainReferenceToSiloRing(GrainReference grainRef)
-        {
-            var hashCode = grainRef.GetUniformHashCode();
-            return ConsistentRingProvider.GetPrimaryTargetSilo(hashCode);
-        }
-
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
-        {
-            return typeManager.GetInvoker(interfaceId, genericGrainType);
-        }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

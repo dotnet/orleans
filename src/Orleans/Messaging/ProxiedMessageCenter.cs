@@ -276,13 +276,13 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
+        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
@@ -401,7 +401,7 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private IClusterTypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
+        private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
             return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
         }

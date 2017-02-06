@@ -8,11 +8,14 @@ using TestExtensions;
 
 namespace Tester.SerializationTests
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationTestsImmutableCollections
     {
-        public SerializationTestsImmutableCollections()
+        private readonly TestEnvironmentFixture fixture;
+
+        public SerializationTestsImmutableCollections(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)

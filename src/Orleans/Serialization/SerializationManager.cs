@@ -1974,33 +1974,6 @@ namespace Orleans.Serialization
 
 #region Utilities
 
-        private static bool HasOrleansSerialization(Type t)
-        {
-            switch (Type.GetTypeCode(t))
-            {
-                case TypeCode.Boolean:
-                case TypeCode.Byte:
-                case TypeCode.SByte:
-                case TypeCode.Int16:
-                case TypeCode.Int32:
-                case TypeCode.Int64:
-                case TypeCode.UInt16:
-                case TypeCode.UInt32:
-                case TypeCode.UInt64:
-                case TypeCode.Single:
-                case TypeCode.Double:
-                case TypeCode.Decimal:
-                case TypeCode.Char:
-                case TypeCode.DateTime:
-                    return true;
-                default:
-                    if (t.IsArray)
-                        return HasOrleansSerialization(t.GetElementType());
-
-                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle) || typeToExternalSerializerDictionary.ContainsKey(t);
-            }
-        }
-
         internal static Type ResolveTypeName(string typeName)
         {
             Type t;

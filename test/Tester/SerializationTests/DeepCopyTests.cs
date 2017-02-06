@@ -11,11 +11,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Test the deep copy of built-in and user-defined types
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DeepCopyTests
     {
-        public DeepCopyTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public DeepCopyTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

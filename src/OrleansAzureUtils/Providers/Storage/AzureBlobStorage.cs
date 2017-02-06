@@ -132,7 +132,7 @@ namespace Orleans.Storage
                 }
                 catch (StorageException exception)
                 {
-                    var errorCode = exception.RequestInformation.ExtendedErrorInformation.ErrorCode;
+                    var errorCode = exception.RequestInformation.ExtendedErrorInformation?.ErrorCode;
                     if (errorCode == BlobErrorCodeStrings.BlobNotFound)
                     {
                         if (this.Log.IsVerbose2) this.Log.Verbose2((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound, "BlobNotFound reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
@@ -199,7 +199,7 @@ namespace Orleans.Storage
                 }
                 catch (StorageException exception)
                 {
-                    var errorCode = exception.RequestInformation.ExtendedErrorInformation.ErrorCode;
+                    var errorCode = exception.RequestInformation.ExtendedErrorInformation?.ErrorCode;
                     containerNotFound = errorCode == BlobErrorCodeStrings.ContainerNotFound;
                 }
                 if (containerNotFound)

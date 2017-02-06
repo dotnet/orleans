@@ -9,11 +9,14 @@ namespace UnitTests.Serialization
     using Xunit;
 
     [TestCategory("BVT"), TestCategory("Serialization")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ILSerializerTests
     {
-        public ILSerializerTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public ILSerializerTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         /// <summary>

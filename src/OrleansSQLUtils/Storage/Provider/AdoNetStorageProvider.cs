@@ -167,7 +167,7 @@ namespace Orleans.Storage
             //NOTE: StorageSerializationPicker should be defined outside and given as a parameter in constructor or via Init in IProviderConfiguration perhaps.
             //Currently this limits one's options to much to the current situation of providing only one serializer for serialization and deserialization
             //with no regard to state update or serializer changes. Maybe have this serialized as a JSON in props and read via a key?
-            StorageSerializationPicker = new DefaultRelationalStoragePicker(ConfigureDeserializers(config), ConfigureSerializers(config));
+            StorageSerializationPicker = new DefaultRelationalStoragePicker(this.ConfigureDeserializers(config), this.ConfigureSerializers(config));
 
             //NOTE: Currently there should be only one pair of providers given. That is, only UseJsonFormatPropertyName, UseXmlFormatPropertyName or UseBinaryFormatPropertyName.
             if(StorageSerializationPicker.Deserializers.Count > 1 || StorageSerializationPicker.Serializers.Count > 1)
@@ -544,7 +544,7 @@ namespace Orleans.Storage
         }
 
 
-        private static ICollection<IStorageDeserializer> ConfigureDeserializers(IProviderConfiguration config)
+        private ICollection<IStorageDeserializer> ConfigureDeserializers(IProviderConfiguration config)
         {
             const string @true = "true";
             var deserializers = new List<IStorageDeserializer>();
@@ -568,7 +568,7 @@ namespace Orleans.Storage
         }
 
 
-        private static ICollection<IStorageSerializer> ConfigureSerializers(IProviderConfiguration config)
+        private ICollection<IStorageSerializer> ConfigureSerializers(IProviderConfiguration config)
         {
             const string @true = "true";
             var serializers = new List<IStorageSerializer>();

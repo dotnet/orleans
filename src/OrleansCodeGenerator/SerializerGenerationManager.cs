@@ -107,7 +107,7 @@ namespace Orleans.CodeGenerator
 
             // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
             var skipSerializerGeneration =
-                t.GetAllFields().Any(field => IsFieldInaccessibleForSerialization(module, targetAssembly, field));
+                t.GetAllFields().Any(field => this.IsFieldInaccessibleForSerialization(module, targetAssembly, field));
             if (skipSerializerGeneration)
             {
                 return false;
@@ -117,7 +117,7 @@ namespace Orleans.CodeGenerator
             return true;
         }
 
-        private static bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
+        private bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
         {
             return field.GetCustomAttributes().All(attr => attr.GetType().Name != "NonSerializedAttribute")
                    && !SerializationManager.HasSerializer(field.FieldType)

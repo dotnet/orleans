@@ -89,17 +89,17 @@ namespace DefaultCluster.Tests.General
             TestGrainReferenceSerialization(id, false, true);
         }
 
-        private static void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize, bool useJson)
+        private void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize, bool useJson)
         {
             // Make sure grain references serialize well through .NET serializer.
-            var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            var grain = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
 
             if (resolveBeforeSerialize)
             {
                 grain.SetA(id).Wait(); //  Resolve GR
             }
 
-            object other;
+            ISimpleGrain other;
             if (useJson)
             {
                 // Serialize + Deserialise through Json serializer
@@ -117,33 +117,32 @@ namespace DefaultCluster.Tests.General
             }
 
             Assert.IsAssignableFrom(grain.GetType(), other);
-            ISimpleGrain otherGrain = other as ISimpleGrain;
-            Assert.NotNull(otherGrain);
-            Assert.Equal(grain,  otherGrain);  // "Deserialized grain reference equality is preserved"
-            int res = otherGrain.GetA().Result;
+            Assert.NotNull(other);
+            Assert.Equal(grain,  other);  // "Deserialized grain reference equality is preserved"
+            int res = other.GetA().Result;
             Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
         }
 
-        private static object DotNetSerialiseRoundtrip(object obj)
+        private static T DotNetSerialiseRoundtrip<T>(T obj)
         {
-            object other;
+            T other;
             using (var memoryStream = new MemoryStream())
             {
                 var formatter = new BinaryFormatter();
                 formatter.Serialize(memoryStream, obj);
                 memoryStream.Flush();
                 memoryStream.Position = 0; // Reset to start
-                other = formatter.Deserialize(memoryStream);
+                other = (T)formatter.Deserialize(memoryStream);
             }
             return other;
         }
 
-        private static object NewtonsoftJsonSerialiseRoundtrip(object obj)
+        private static T NewtonsoftJsonSerialiseRoundtrip<T>(T obj)
         {
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
             string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
             object other = Newtonsoft.Json.JsonConvert.DeserializeObject(json, obj.GetType());
-            return other;
+            return (T)other;
         }
     }
 }

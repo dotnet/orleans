@@ -10,11 +10,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Test the built-in serializers
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializerGenerationTests
     {
-        public SerializerGenerationTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public SerializerGenerationTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

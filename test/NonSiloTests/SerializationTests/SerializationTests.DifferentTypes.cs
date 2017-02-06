@@ -11,11 +11,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationTestsDifferentTypes
     {
-        public SerializationTestsDifferentTypes()
+        private readonly TestEnvironmentFixture fixture;
+
+        public SerializationTestsDifferentTypes(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

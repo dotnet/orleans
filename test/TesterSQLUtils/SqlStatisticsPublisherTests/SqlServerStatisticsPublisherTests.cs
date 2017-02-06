@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Orleans.SqlUtils;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.SqlStatisticsPublisherTests
@@ -9,7 +10,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
     /// </summary>
     public class SqlServerStatisticsPublisherTests : SqlStatisticsPublisherTestsBase
     {
-        public SqlServerStatisticsPublisherTests(ConnectionStringFixture fixture) : base(fixture)
+        public SqlServerStatisticsPublisherTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
         }
         protected override string AdoInvariant

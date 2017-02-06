@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using OrleansServiceBus.Providers.Streams.EventHub;
@@ -14,12 +11,25 @@ using TestExtensions;
 
 namespace UnitTests.Serialization
 {
-    public class StreamTypeSerializationTests
+    public class FakeSerializerFixture
     {
-        public StreamTypeSerializationTests()
+        public SerializationTestEnvironment Environment = SerializationTestEnvironment.InitializeWithDefaults(
+            new ClientConfiguration
+            {
+                SerializationProviders =
+                {
+                    typeof(FakeSerializer).GetTypeInfo()
+                }
+            });
+    }
+
+    public class StreamTypeSerializationTests : IClassFixture<FakeSerializerFixture>
+    {
+        private readonly FakeSerializerFixture fixture;
+
+        public StreamTypeSerializationTests(FakeSerializerFixture fixture)
         {
-            // FakeSerializer definied in ExternalSerializerTest.cs
-            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

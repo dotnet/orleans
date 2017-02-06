@@ -22,9 +22,11 @@ namespace UnitTests
     {
         private readonly ITestOutputHelper output;
         private double timingFactor;
-                
-        public LoggerTest(ITestOutputHelper output)
+        private DefaultClusterFixture fixture;
+
+        public LoggerTest(ITestOutputHelper output, DefaultClusterFixture fixture)
         {
+            this.fixture = fixture;
             this.output = output;
             LogManager.UnInitialize();
             LogManager.SetRuntimeLogLevel(Severity.Verbose);

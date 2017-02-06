@@ -53,6 +53,8 @@ namespace TestExtensions
 
         internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
 
+        internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
+
         public void Dispose()
         {
             this.RuntimeClient?.Dispose();

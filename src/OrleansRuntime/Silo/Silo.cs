@@ -259,6 +259,7 @@ namespace Orleans.Runtime
             services.AddSingleton<SiloProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
+            services.AddSingleton<RequestContextUtil>();
 
             // Placement
             services.AddSingleton<PlacementDirectorsManager>();

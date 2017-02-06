@@ -8,6 +8,7 @@ using Orleans.Providers.SqlServer;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using TestExtensions;
 using UnitTests.General;
 using Xunit;
 
@@ -16,8 +17,10 @@ namespace UnitTests.SqlStatisticsPublisherTests
     /// <summary>
     /// Tests for operation of Orleans Statistics Publisher using relational storage
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public abstract class SqlStatisticsPublisherTestsBase: IClassFixture<ConnectionStringFixture>
     {
+        private readonly TestEnvironmentFixture environment;
         protected abstract string AdoInvariant { get; }
 
         private readonly string ConnectionString;
@@ -28,8 +31,9 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         private readonly SqlStatisticsPublisher StatisticsPublisher;
         
-        protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture)
+        protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
+            this.environment = environment;
             LogManager.Initialize(new NodeConfiguration());
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
 

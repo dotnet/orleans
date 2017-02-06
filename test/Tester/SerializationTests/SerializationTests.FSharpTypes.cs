@@ -9,11 +9,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
-    public class SerializationTestsFsharpTypes
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class SerializationTestsFSharpTypes
     {
-        public SerializationTestsFsharpTypes()
+        private readonly TestEnvironmentFixture fixture;
+
+        public SerializationTestsFSharpTypes(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         void RoundtripSerializationTest<T>(T input)

@@ -12,17 +12,17 @@ namespace Orleans.Serialization
     internal class ReflectedSerializationMethodInfo
     {
         /// <summary>
-        /// A reference to the <see cref="SerializationContext.StreamWriter"/> getter.
+        /// A reference to the <see cref="ISerializationContext.StreamWriter"/> getter.
         /// </summary>
         public readonly MethodInfo GetStreamFromSerializationContext;
 
         /// <summary>
-        /// A reference to the getter for <see cref="SerializationManager.CurrentDeserializationContext"/>.
+        /// A reference to the getter for <see cref="IDeserializationContext.StreamReader"/>.
         /// </summary>
         public readonly MethodInfo GetStreamFromDeserializationContext;
 
         /// <summary>
-        /// A reference to the <see cref="SerializationContext.RecordCopy"/> method.
+        /// A reference to the <see cref="ICopyContext.RecordCopy"/> method.
         /// </summary>
         public readonly MethodInfo RecordObjectWhileCopying;
 
