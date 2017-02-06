@@ -80,5 +80,11 @@ namespace UnitTests.MembershipTests
         {
             await MembershipTable_UpdateRowInParallel();
         }
+
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task MembershipTable_ZooKeeper_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
+        }
     }
 }

@@ -38,7 +38,6 @@ namespace UnitTests.MembershipTests
                     .Result.CurrentConnectionString;
         }
 
-
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
         public void MembershipTable_PostgreSql_Init()
         {
@@ -84,6 +83,12 @@ namespace UnitTests.MembershipTests
         public async Task MembershipTable_PostgreSql_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task MembershipTable_PostgreSql_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
         }
     }
 }
