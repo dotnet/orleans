@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -33,7 +34,7 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
-            return new AzureBasedReminderTable();
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
         }
 
         protected override string GetConnectionString()

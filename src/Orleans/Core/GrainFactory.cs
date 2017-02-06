@@ -11,7 +11,7 @@ namespace Orleans
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
-    internal class GrainFactory : IInternalGrainFactory
+    internal class GrainFactory : IInternalGrainFactory, IGrainReferenceConverter
     {
         /// <summary>
         /// The mapping between concrete grain interface types and delegate
@@ -139,6 +139,9 @@ namespace Orleans
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
+
+        /// <inheritdoc />
+        public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key);
 
         /// <summary>
         /// Creates a reference to the provided <paramref name="obj"/>.

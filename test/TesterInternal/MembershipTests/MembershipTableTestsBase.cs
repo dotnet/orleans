@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -73,6 +74,10 @@ namespace UnitTests.MembershipTests
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
+
+        public IGrainReferenceConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<IGrainReferenceConverter>();
+
+        public IServiceProvider Services => this.environment.Services;
 
         public void Dispose()
         {

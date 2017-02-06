@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -456,7 +457,7 @@ namespace UnitTests.General
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)
         {
             string str = input.ToKeyString();
-            GrainReference output = GrainReference.FromKeyString(str);
+            GrainReference output = this.environment.Services.GetRequiredService<IGrainReferenceConverter>().GetGrainFromKeyString(str);
             return output;
         }
     }
