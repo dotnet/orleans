@@ -129,6 +129,7 @@
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="LivenessTests.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
+    <Compile Include="MembershipTests\SiloInstanceRecordTests.cs" />
     <Compile Include="Reminder\DynamoDBRemindersTableTests.cs" />
     <Compile Include="StorageTests\AWSTestConstants.cs" />
     <Compile Include="StorageTests\Base_PersistenceGrainTests_AWSStore.cs" />

@@ -149,7 +149,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var keys = new Dictionary<string, AttributeValue>();
             keys.Add(DEPLOYMENT_ID_PROPERTY_NAME, new AttributeValue(DeploymentId));
-            keys.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue($"{Address}-{Port}-{Generation}"));
+            keys.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity));
             return keys;
         }
 
@@ -160,7 +160,7 @@ namespace Orleans.Runtime.MembershipService
             if (includeKeys)
             {
                 fields.Add(DEPLOYMENT_ID_PROPERTY_NAME, new AttributeValue(DeploymentId));
-                fields.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue($"{Address}-{Port}-{Generation}")); 
+                fields.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity)); 
             }
             
             if (!string.IsNullOrWhiteSpace(Address))
