@@ -88,5 +88,11 @@ namespace UnitTests.MembershipTests
         {
             await MembershipTable_UpdateRowInParallel();
         }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task MembershipTable_MySql_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
+        }
     }
 }

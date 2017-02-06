@@ -82,6 +82,12 @@ namespace Consul.Tests
         {
             await MembershipTable_UpdateRowInParallel(false);
         }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task MembershipTable_Consul_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive(false);
+        }
     }
 }
 
