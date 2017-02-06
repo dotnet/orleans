@@ -3,7 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
@@ -193,8 +197,13 @@ namespace Orleans.ServiceBus.Providers
         {
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
             cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
+#if NETSTANDARD
+            cachedMessage.SequenceNumber = queueMessage.SystemProperties.SequenceNumber;
+            cachedMessage.EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc;
+#else
             cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
-            cachedMessage.EnqueueTimeUtc = queueMessage.EnqueuedTimeUtc;
+            cachedMessage.EnqueueTimeUtc = queueMessage.EnqueuedTimeUtc; 
+#endif
             cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
             cachedMessage.Segment = EncodeMessageIntoSegment(streamPosition, queueMessage);
             return streamPosition;
@@ -238,10 +247,20 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public virtual StreamPosition GetStreamPosition(EventData queueMessage)
         {
-            Guid streamGuid = Guid.Parse(queueMessage.PartitionKey);
+            Guid streamGuid =
+#if NETSTANDARD
+            Guid.Parse(queueMessage.SystemProperties.PartitionKey);
+#else
+            Guid.Parse(queueMessage.PartitionKey); 
+#endif
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
             IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
-            StreamSequenceToken token = new EventSequenceTokenV2(queueMessage.SequenceNumber, 0);
+            StreamSequenceToken token =
+#if NETSTANDARD
+                new EventSequenceTokenV2(queueMessage.SystemProperties.SequenceNumber, 0);
+#else
+                new EventSequenceTokenV2(queueMessage.SequenceNumber, 0); 
+#endif
             return new StreamPosition(stremIdentity, token);
         }
 
@@ -299,11 +318,20 @@ namespace Orleans.ServiceBus.Providers
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties();
-            byte[] payload = queueMessage.GetBytes();
+#if NETSTANDARD
+            byte[] payload = queueMessage.Body.Array;
+#else
+            byte[] payload = queueMessage.GetBytes(); 
+#endif
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
+#if NETSTANDARD
+            SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.Offset) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.PartitionKey) +
+#else
             SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
-            SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) + 
+#endif
             SegmentBuilder.CalculateAppendSize(propertiesBytes) +
             SegmentBuilder.CalculateAppendSize(payload);
 
@@ -313,8 +341,13 @@ namespace Orleans.ServiceBus.Providers
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
+#if NETSTANDARD
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.Offset);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.PartitionKey);
+#else
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey); 
+#endif
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);
 

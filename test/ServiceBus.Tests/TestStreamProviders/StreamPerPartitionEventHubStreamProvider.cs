@@ -1,14 +1,21 @@
 ﻿
 using System;
 using System.Text;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
+using TestExtensions;
+using Xunit;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class StreamPerPartitionEventHubStreamProvider : PersistentStreamProvider<StreamPerPartitionEventHubStreamProvider.AdapterFactory>
     {
         public class AdapterFactory : EventHubAdapterFactory
@@ -45,7 +52,12 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             public override StreamPosition GetStreamPosition(EventData queueMessage)
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
-                StreamSequenceToken token = new EventSequenceTokenV2(queueMessage.SequenceNumber, 0);
+                StreamSequenceToken token =
+#if NETSTANDARD
+                new EventSequenceTokenV2(queueMessage.SystemProperties.SequenceNumber, 0);
+#else
+                new EventSequenceTokenV2(queueMessage.SequenceNumber, 0); 
+#endif
                 return new StreamPosition(stremIdentity, token);
             }
         }

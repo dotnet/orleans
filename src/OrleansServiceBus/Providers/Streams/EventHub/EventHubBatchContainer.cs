@@ -2,7 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -101,7 +105,12 @@ namespace Orleans.ServiceBus.Providers
                 RequestContext = requestContext
             };
             var bytes = SerializationManager.SerializeToByteArray(payload);
-            var eventData = new EventData(bytes) { PartitionKey = streamGuid.ToString() };
+#if NETSTANDARD
+            var eventData = new EventData(bytes);
+#else
+            var eventData = new EventData(bytes) { PartitionKey = streamGuid.ToString() }; 
+#endif
+
             if (!string.IsNullOrWhiteSpace(streamNamespace))
             {
                 eventData.SetStreamNamespaceProperty(streamNamespace);

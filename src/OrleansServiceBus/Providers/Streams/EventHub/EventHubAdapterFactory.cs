@@ -3,8 +3,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus;
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -108,7 +112,15 @@ namespace Orleans.ServiceBus.Providers
             adapterSettings = new EventHubStreamProviderSettings(providerName);
             adapterSettings.PopulateFromProviderConfig(providerConfig);
             hubSettings = adapterSettings.GetEventHubSettings(providerConfig, serviceProvider);
+#if NETSTANDARD
+            var connectionStringBuilder = new EventHubsConnectionStringBuilder(hubSettings.ConnectionString)
+            {
+                EntityPath = hubSettings.Path
+            };
+            client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+#else
             client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
+#endif
 
             if (CheckpointerFactory == null)
             {
@@ -203,7 +215,11 @@ namespace Orleans.ServiceBus.Providers
                 throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
             }
             EventData eventData = EventHubBatchContainer.ToEventData(streamGuid, streamNamespace, events, requestContext);
-            return client.SendAsync(eventData);
+#if NETSTANDARD
+            return client.SendAsync(eventData, streamGuid.ToString());
+#else
+            return client.SendAsync(eventData); 
+#endif
         }
 
         /// <summary>
@@ -243,9 +259,14 @@ namespace Orleans.ServiceBus.Providers
 
         private async Task<string[]> GetPartitionIdsAsync()
         {
+#if NETSTANDARD
+            EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
+            return runtimeInfo.PartitionIds;
+#else
             NamespaceManager namespaceManager = NamespaceManager.CreateFromConnectionString(hubSettings.ConnectionString);
             EventHubDescription hubDescription = await namespaceManager.GetEventHubAsync(hubSettings.Path);
-            return hubDescription.PartitionIds;
+            return hubDescription.PartitionIds; 
+#endif
         }
     }
 }

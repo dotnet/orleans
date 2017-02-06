@@ -1,5 +1,8 @@
-﻿
+﻿#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 
@@ -11,7 +14,11 @@ namespace Orleans.ServiceBus.Providers
 
         public EventHubPartitionCheckpointEntity()
         {
-            Offset = EventHubConsumerGroup.StartOfStream;
+#if NETSTANDARD
+            Offset = PartitionReceiver.StartOfStream;
+#else
+            Offset = EventHubConsumerGroup.StartOfStream; 
+#endif
         }
 
         public static EventHubPartitionCheckpointEntity Create(string streamProviderName, string checkpointNamespace, string partition)
