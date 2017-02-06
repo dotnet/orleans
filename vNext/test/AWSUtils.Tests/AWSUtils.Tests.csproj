@@ -52,6 +52,9 @@
     <Compile Include="..\..\..\test\AWSUtils.Tests\MembershipTests\DynamoDBMembershipTableTest.cs">
       <Link>MembershipTests\DynamoDBMembershipTableTest.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\AWSUtils.Tests\MembershipTests\SiloInstanceRecordTests.cs">
+      <Link>MembershipTests\SiloInstanceRecordTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\AWSUtils.Tests\Reminder\DynamoDBRemindersTableTests.cs">
       <Link>Reminder\DynamoDBRemindersTableTests.cs</Link>
     </Compile>
