@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Providers.SqlServer;
 using Orleans.Runtime;
@@ -72,7 +73,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
                 DataConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable();
+            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>());
             await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddress.NewLocalAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));

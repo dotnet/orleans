@@ -1,6 +1,8 @@
 ﻿using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
 using OrleansAWSUtils.Reminders;
 using TestExtensions;
 using UnitTests;
@@ -22,7 +24,7 @@ namespace AWSUtils.Tests.RemindersTest
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
-            return new DynamoDBReminderTable();
+            return new DynamoDBReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
         }
 
         protected override string GetConnectionString()

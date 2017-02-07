@@ -2,8 +2,6 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using Xunit;
 

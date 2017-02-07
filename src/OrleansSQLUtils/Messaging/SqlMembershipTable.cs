@@ -10,10 +10,16 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class SqlMembershipTable: IMembershipTable, IGatewayListProvider
     {
+        private readonly IGrainReferenceConverter grainReferenceConverter;
         private string deploymentId;        
         private TimeSpan maxStaleness;
         private Logger logger;
         private RelationalOrleansQueries orleansQueries;
+
+        public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter)
+        {
+            this.grainReferenceConverter = grainReferenceConverter;
+        }
 
         public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger traceLogger)
         {
@@ -23,8 +29,8 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.InitializeMembershipTable called.");
 
             //This initializes all of Orleans operational queries from the database using a well known view
-            //and assumes the database with appropriate defintions exists already.
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString);
+            //and assumes the database with appropriate definitions exists already.
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
             
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
@@ -47,7 +53,7 @@ namespace Orleans.Runtime.MembershipService
 
             deploymentId = config.DeploymentId;            
             maxStaleness = config.GatewayListRefreshPeriod;
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
         }
 
 

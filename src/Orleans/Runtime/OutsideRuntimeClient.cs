@@ -114,6 +114,7 @@ namespace Orleans
             services.AddSingleton<GrainFactory>();
             services.AddFromExisting<IGrainFactory, GrainFactory>();
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
+            services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.AddSingleton<MessageFactory>();
             this.ServiceProvider = services.BuildServiceProvider();
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();

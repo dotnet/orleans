@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
@@ -18,7 +19,7 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
-            return new SqlReminderTable();
+            return new SqlReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
         }
 
         protected override string GetAdoInvariant()

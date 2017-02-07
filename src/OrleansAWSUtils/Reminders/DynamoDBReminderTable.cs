@@ -11,10 +11,11 @@ using Amazon.DynamoDBv2;
 namespace OrleansAWSUtils.Reminders
 {
     /// <summary>
-    /// Implementation for IRemiderTable using DynamoDB as underlying  strorage 
+    /// Implementation for IReminderTable using DynamoDB as underlying storage.
     /// </summary>
     public class DynamoDBReminderTable : IReminderTable
     {
+        private readonly IGrainReferenceConverter grainReferenceConverter;
         private const string DEPLOYMENT_ID_PROPERTY_NAME = "DeploymentId";
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
         private const string REMINDER_NAME_PROPERTY_NAME = "ReminderName";
@@ -33,6 +34,15 @@ namespace OrleansAWSUtils.Reminders
         private DynamoDBStorage storage;
         private string deploymentId;
         private Guid serviceId;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.
+        /// </summary>
+        /// <param name="grainReferenceConverter">The grain factory.</param>
+        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        {
+            this.grainReferenceConverter = grainReferenceConverter;
+        }
 
         /// <summary>
         /// Initialize current instance with specific global configuration and logger
@@ -172,12 +182,12 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
-        private static ReminderEntry Resolve(Dictionary<string, AttributeValue> item)
+        private ReminderEntry Resolve(Dictionary<string, AttributeValue> item)
         {
             return new ReminderEntry
             {
                 ETag = item[ETAG_PROPERTY_NAME].N,
-                GrainRef = GrainReference.FromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
+                GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
                 StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)

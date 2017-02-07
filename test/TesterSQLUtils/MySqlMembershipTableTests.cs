@@ -22,12 +22,12 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return new SqlMembershipTable();
+            return new SqlMembershipTable(this.GrainReferenceConverter);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new SqlMembershipTable();
+            return new SqlMembershipTable(this.GrainReferenceConverter);
         }
 
         protected override string GetAdoInvariant()
@@ -41,7 +41,6 @@ namespace UnitTests.MembershipTests
                 RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
                     .Result.CurrentConnectionString;
         }
-
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]
         public void MembershipTable_MySql_Init()

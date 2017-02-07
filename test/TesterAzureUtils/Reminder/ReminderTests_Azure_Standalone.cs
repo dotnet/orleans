@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -44,7 +45,7 @@ namespace UnitTests.TimerTests
         [Fact, TestCategory("ReminderService"), TestCategory("Azure"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            IReminderTable table = new AzureBasedReminderTable();
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>());
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
@@ -61,7 +62,7 @@ namespace UnitTests.TimerTests
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string deploymentId = NewDeploymentId();
-            IReminderTable table = new AzureBasedReminderTable();
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>());
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
