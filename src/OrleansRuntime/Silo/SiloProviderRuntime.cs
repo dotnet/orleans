@@ -131,7 +131,18 @@ namespace Orleans.Runtime.Providers
         public string ExecutingEntityIdentity() => runtimeClient.CurrentActivationIdentity;
 
         /// <inheritdoc />
-        public StreamDirectory GetStreamDirectory() => runtimeClient.GetStreamDirectory();
+        public StreamDirectory GetStreamDirectory()
+        {
+            if (runtimeClient.CurrentActivationData == null)
+            {
+                throw new InvalidOperationException(
+                    String.Format("Trying to get a Stream or send a stream message on a silo not from within grain and not from within system target (CurrentActivationData is null) "
+                        + "RuntimeContext.Current={0} TaskScheduler.Current={1}",
+                        RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString(),
+                        TaskScheduler.Current));
+            }
+            return runtimeClient.GetStreamDirectory();
+        }
 
         /// <inheritdoc />
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension
