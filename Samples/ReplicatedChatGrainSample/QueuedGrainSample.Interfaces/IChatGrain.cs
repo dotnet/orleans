@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Concurrency;
 
 namespace ReplicatedChatGrainSample.Interfaces
 {
-    public interface IChatGrainInterface : IGrainWithIntegerKey
+    public interface IChatGrain : IGrainWithIntegerKey
     {
         /// <summary>
         /// Append a message to the chat.
@@ -27,7 +24,6 @@ namespace ReplicatedChatGrainSample.Interfaces
         /// </summary>
         /// <returns></returns>
         Task<LocalState> GetLocalState();
- 
     }
 
     [Serializable]

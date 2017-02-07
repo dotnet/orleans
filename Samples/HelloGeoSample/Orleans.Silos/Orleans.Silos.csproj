@@ -40,6 +40,8 @@
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -131,10 +133,6 @@
       <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.4.0\lib\net451\OrleansCounterControl.exe</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansHost">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.4.0\lib\net451\OrleansHost.exe</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="OrleansProviders">
       <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.4.0\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
@@ -185,9 +183,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Applications\appdir-placeholder.txt">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="OrleansConfiguration.xml">
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

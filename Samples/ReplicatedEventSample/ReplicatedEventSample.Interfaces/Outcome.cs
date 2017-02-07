@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 
 namespace ReplicatedEventSample.Interfaces
 {
@@ -24,11 +19,5 @@ namespace ReplicatedEventSample.Interfaces
         /// Time at which the score was achieved
         /// </summary>
         public DateTime When;
-
     }
-
-
-
-
-
 }
