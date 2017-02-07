@@ -12,13 +12,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{CD264809-ED61-47C3-8F07-666FD9D88BDF}"
-	ProjectSection(SolutionItems) = preProject
-		.nuget\NuGet.Config = .nuget\NuGet.Config
-		.nuget\NuGet.exe = .nuget\NuGet.exe
-		.nuget\NuGet.targets = .nuget\NuGet.targets
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReplicatedChatGrainSample.Grains", "QueuedGrainSample.Grains\ReplicatedChatGrainSample.Grains.csproj", "{27A256FD-E8F8-46B8-997C-FA092F9C4503}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReplicatedChatGrainSample.Interfaces", "QueuedGrainSample.Interfaces\ReplicatedChatGrainSample.Interfaces.csproj", "{0B475524-90DD-4D3B-B150-C9DBF30A8346}"
