@@ -201,7 +201,6 @@
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
-    <Compile Include="Utilities\ServiceCollectionExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

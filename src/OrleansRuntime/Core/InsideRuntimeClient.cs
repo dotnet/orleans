@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -14,7 +13,6 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -37,6 +35,7 @@ namespace Orleans.Runtime
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
+        private readonly MessageFactory messageFactory;
 
         internal readonly IConsistentRingProvider ConsistentRingProvider;
 
@@ -48,8 +47,11 @@ namespace Orleans.Runtime
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
-            OrleansTaskScheduler scheduler)
+            OrleansTaskScheduler scheduler,
+            IServiceProvider serviceProvider,
+            MessageFactory messageFactory)
         {
+            this.ServiceProvider = serviceProvider;
             this.dispatcher = dispatcher;
             MySilo = catalog.LocalSilo;
             this.directory = directory;
@@ -61,6 +63,7 @@ namespace Orleans.Runtime
             config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
+            this.messageFactory = messageFactory;
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             tryResendMessage = TryResendMessage;
@@ -69,6 +72,8 @@ namespace Orleans.Runtime
         }
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
+
+        public IServiceProvider ServiceProvider { get; }
 
         public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 
@@ -81,8 +86,6 @@ namespace Orleans.Runtime
         public ClusterConfiguration Config { get; private set; }
 
         public OrleansTaskScheduler Scheduler { get; }
-
-        public IGrainFactory GrainFactory => this.ConcreteGrainFactory;
 
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
@@ -100,7 +103,7 @@ namespace Orleans.Runtime
             InvokeMethodOptions options,
             string genericArguments = null)
         {
-            var message = Message.CreateMessage(request, options);
+            var message = this.messageFactory.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 

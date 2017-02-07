@@ -84,12 +84,20 @@ namespace Orleans.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
         private int numberOfConnectedGateways = 0;
+        private MessageFactory messageFactory;
 
-        public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
+        public ProxiedMessageCenter(
+            ClientConfiguration config,
+            IPAddress localAddress,
+            int gen,
+            GrainId clientId,
+            IGatewayListProvider gatewayListProvider,
+            MessageFactory messageFactory)
         {
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
+            this.messageFactory = messageFactory;
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
@@ -161,7 +169,7 @@ namespace Orleans.Messaging
                 {
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
@@ -192,7 +200,7 @@ namespace Orleans.Messaging
                     Uri addr = gatewayNames[msgNumber % numGateways];
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
@@ -228,7 +236,7 @@ namespace Orleans.Messaging
                         if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
-                            gatewayConnection = new GatewayConnection(addr, this);
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                             gatewayConnections[addr] = gatewayConnection;
                             if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));
@@ -276,13 +284,13 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
+        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
@@ -363,7 +371,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
                 QueueIncomingMessage(error);
             }
         }
@@ -401,7 +409,7 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private IClusterTypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
+        private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
             return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
         }

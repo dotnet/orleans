@@ -22,6 +22,7 @@ namespace Orleans.Runtime
         private readonly ClusterConfiguration config;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly MessageFactory messagefactory;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -33,7 +34,8 @@ namespace Orleans.Runtime
             Catalog catalog, 
             ClusterConfiguration config,
             PlacementDirectorsManager placementDirectorsManager,
-            ILocalGrainDirectory localGrainDirectory)
+            ILocalGrainDirectory localGrainDirectory,
+            MessageFactory messagefactory)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -41,6 +43,7 @@ namespace Orleans.Runtime
             this.config = config;
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
+            this.messagefactory = messagefactory;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -205,7 +208,7 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = message.CreateRejectionResponse(rejectType, str, exc as OrleansException);
+                Message rejection = this.messagefactory.CreateRejectionResponse(message, rejectType, str, exc as OrleansException);
                 SendRejectionMessage(rejection);
             }
             else
@@ -602,7 +605,7 @@ namespace Orleans.Runtime
         internal void SendResponse(Message request, Response response)
         {
             // create the response
-            var message = request.CreateResponseMessage();
+            var message = this.messagefactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
             if (message.TargetGrain.IsSystemTarget)

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -17,11 +18,13 @@ namespace NonSiloTests.UnitTests.SerializerTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
+        private readonly MessageFactory messageFactory;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
+            this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -33,7 +36,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         private void RunTest(int numItems)
         {
             InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
-            Message resp = Message.CreateMessage(request, InvokeMethodOptions.None);
+            Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);

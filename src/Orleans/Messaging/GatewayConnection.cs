@@ -14,6 +14,7 @@ namespace Orleans.Messaging
     /// </summary>
     internal class GatewayConnection : OutgoingMessageSender
     {
+        private readonly MessageFactory messageFactory;
         internal bool IsLive { get; private set; }
         internal ProxiedMessageCenter MsgCenter { get; private set; }
 
@@ -34,9 +35,10 @@ namespace Orleans.Messaging
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ProxiedMessageCenter mc)
+        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory)
             : base("GatewayClientSender_" + address, mc.MessagingConfiguration)
         {
+            this.messageFactory = messageFactory;
             Address = address;
             MsgCenter = mc;
             receiver = new GatewayClientReceiver(this);
@@ -281,7 +283,7 @@ namespace Orleans.Messaging
             {
                 if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
                 MsgCenter.QueueIncomingMessage(error);
             }
             else
