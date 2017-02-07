@@ -45,9 +45,15 @@ namespace Orleans.Runtime.MembershipService
             var expressionValues = new Dictionary<string, AttributeValue>
             {
                 { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) },
-                { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue { N =  INSTANCE_STATUS_ACTIVE } }
+                { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue { N = INSTANCE_STATUS_ACTIVE } },
+                { $":{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}", new AttributeValue { N = "0"} }
             };
-            var expression = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} AND {SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME}";
+
+            var expression =
+                $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} " +
+                $"AND {SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME} " + 
+                $"AND {SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME} > :{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}";
+
             var records = await storage.ScanAsync<Uri>(TABLE_NAME_DEFAULT_VALUE, expressionValues,
                 expression, gateway =>
                 {

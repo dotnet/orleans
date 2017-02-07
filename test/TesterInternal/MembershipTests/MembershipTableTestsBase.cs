@@ -108,8 +108,13 @@ namespace UnitTests.MembershipTests
 
             var entries = new List<string>(gateways.Select(g => g.ToString()));
 
+            // only members with a non-zero Gateway port
+            Assert.False(entries.Contains(membershipEntries[3].SiloAddress.ToGatewayUri().ToString()));
+
+            // only Active members
             Assert.True(entries.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString()));
             Assert.True(entries.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString()));
+            Assert.Equal(2, entries.Count);
         }
 
         protected async Task MembershipTable_ReadAll_EmptyTable()
@@ -394,7 +399,6 @@ namespace UnitTests.MembershipTests
         private static MembershipEntry CreateMembershipEntryForTest()
         {
             SiloAddress siloAddress = CreateSiloAddressForTest();
-
 
             var membershipEntry = new MembershipEntry
             {
