@@ -416,12 +416,12 @@ namespace UnitTests.SchedulerTests
                 }
             }), context);
 
-            result0.Task.Wait(TimeSpan.FromSeconds(1));
+            result0.Task.Wait(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(result0.Task.Result, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            result1.Task.Wait(TimeSpan.FromSeconds(1));
+            result1.Task.Wait(TimeSpan.FromMinutes(1));
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(result1.Task.Result, "Task-1 completed");
@@ -463,12 +463,12 @@ namespace UnitTests.SchedulerTests
                 }
             }), context);
 
-            result0.Task.Wait(TimeSpan.FromSeconds(1));
+            result0.Task.Wait(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(result0.Task.Result, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            result1.Task.Wait(TimeSpan.FromSeconds(1));
+            result1.Task.Wait(TimeSpan.FromMinutes(1));
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(result1.Task.Result, "Task-1 completed");
