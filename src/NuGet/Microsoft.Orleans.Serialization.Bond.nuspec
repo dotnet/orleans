@@ -20,7 +20,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Bond.Runtime.CSharp" version="3.0.7" />
+      <dependency id="Bond.Runtime.CSharp" version="5.1.0" />
     </dependencies>
   </metadata>
   <files>
