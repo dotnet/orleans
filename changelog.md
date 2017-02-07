@@ -9,6 +9,7 @@ The idea is to track end-user facing changes as they occur.*
 
 ### [v1.4.0-beta]
 - Improvements
+  - Support for grains with generic methods #2670
   - IL-based fallback serializer #2162
   - IncomingMessageAcceptor sockets change from APM to EAP #2275
   - Show clearer error when ADO.NET provider fails to init #2303, #2306
@@ -35,7 +36,7 @@ The idea is to track end-user facing changes as they occur.*
   - Removed GrainStateStorageBridge from GrainCreator to allow better control of the IStorage used when using non-silo unit tests. #2243
   - Failsafe Exception serialization #2633
   - Added a data adapter to azure queue stream provider #2658
-  Client cluster disconnection #2628
+  - Client cluster disconnection #2628
 - Performance
   - Several major performance improvements: #2220, #2221, #2170, #2218, #2312, #2524, #2510, #2481, #2579
   - Replace CallContext.LogicalSetData with AsyncLocal #2200
