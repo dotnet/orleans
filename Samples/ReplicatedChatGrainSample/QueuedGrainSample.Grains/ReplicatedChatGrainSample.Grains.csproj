@@ -63,7 +63,6 @@
   <ItemGroup>
     <Compile Include="ChatGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\QueuedGrainSample.Interfaces\ReplicatedChatGrainSample.Interfaces.csproj">
