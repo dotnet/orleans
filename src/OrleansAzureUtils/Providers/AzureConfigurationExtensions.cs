@@ -103,13 +103,17 @@ namespace Orleans.Runtime.Configuration
             int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
             int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+#pragma warning disable CS0618 // Type or member is obsolete
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+#pragma warning restore CS0618 // Type or member is obsolete
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
             deploymentId = deploymentId ?? config.Globals.DeploymentId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
+#pragma warning disable 618
             config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
+#pragma warning restore 618
         }
 
         /// <summary>
@@ -130,7 +134,9 @@ namespace Orleans.Runtime.Configuration
             int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
             int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+#pragma warning disable 618
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+#pragma warning restore 618
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
@@ -157,13 +163,17 @@ namespace Orleans.Runtime.Configuration
             int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
             int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+#pragma warning disable 618
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+#pragma warning restore 618
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
             deploymentId = deploymentId ?? config.DeploymentId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
+#pragma warning disable 618
             config.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
+#pragma warning restore 618
         }
 
         /// <summary>
@@ -184,7 +194,9 @@ namespace Orleans.Runtime.Configuration
             int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
             int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+#pragma warning disable 618
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+#pragma warning restore 618
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
@@ -204,7 +216,9 @@ namespace Orleans.Runtime.Configuration
                 { AzureQueueAdapterConstants.NumQueuesPropertyName, numberOfQueues.ToString() },
                 { AzureQueueAdapterConstants.DeploymentIdPropertyName, deploymentId },
                 { SimpleQueueAdapterCache.CacheSizePropertyName, cacheSize.ToString() },
+#pragma warning disable 618
                 { AzureQueueStreamProvider.StartupStatePropertyName, startupState.ToString() },
+#pragma warning restore 618
             };
 
             persistentStreamProviderConfig?.WriteProperties(properties);
