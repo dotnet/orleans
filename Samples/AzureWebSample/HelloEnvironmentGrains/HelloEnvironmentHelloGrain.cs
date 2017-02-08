@@ -11,7 +11,7 @@ namespace HelloEnvironmentGrains
     {
         Task<string> IHelloEnvironment.RequestDetails()
         {
-            return Task.FromResult(String.Format("{0} - {1} - {2} Processors", Environment.MachineName, Environment.OSVersion, Environment.ProcessorCount));
+            return Task.FromResult($"{Environment.MachineName} - {Environment.OSVersion} - {Environment.ProcessorCount} Processors");
         }
     }
 }
