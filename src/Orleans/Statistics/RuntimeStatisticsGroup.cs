@@ -233,11 +233,11 @@ namespace Orleans.Runtime
 
         public void Stop()
         {
-            if (cpuUsageTimer != null)
-                cpuUsageTimer.Dispose();
+            cpuUsageTimer?.Dispose();
             cpuUsageTimer = null;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", MessageId = "cpuUsageTimer")]
         public void Dispose()
         {
             cpuCounterPF.Dispose();
@@ -254,7 +254,7 @@ namespace Orleans.Runtime
             numberOfInducedGCsPF.Dispose();
             largeObjectHeapSizePF.Dispose();
             promotedFinalizationMemoryFromGen0PF.Dispose();
-            cpuUsageTimer.Dispose();
+            this.cpuUsageTimer?.Dispose();
         }
     }
 }
