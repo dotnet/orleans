@@ -4,6 +4,8 @@
 # Tool Runtime Dir
 /vNext/src/[Tt]ools/
 /vNext/src/[Bb]ootstrap/
+/src/[Tt]ools/
+/src/[Bb]ootstrap/
 
 # Orleans code-gen files
 orleans.codegen.cs

@@ -37,7 +37,7 @@ namespace UnitTests.Serialization
         {
             var token = new EventSequenceToken(long.MaxValue, int.MaxValue);
             Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token);
-   
+
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

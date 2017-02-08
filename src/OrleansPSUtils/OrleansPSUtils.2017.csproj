@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansPSUtils</PackageId>
+    <Title>Microsoft Orleans PowerShell Utilities</Title>
+    <Description>
+      Library of utility types for PowerShell of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>OrleansPSUtils</AssemblyName>
+    <RootNamespace>OrleansPSUtils</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Management.Automation.dll" Version="10.0.10586" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Orleans.psd1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <UsingTask TaskName="UpdateVersion" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.dll">
+    <ParameterGroup>
+      <InputFilename ParameterType="System.String" Required="true" />
+      <OutputFilename ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="System.Core" />
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+                var version = File.ReadAllText(InputFilename)                                    
+                                    .Replace("\r\n", "")
+                                    .Replace("\n", "")
+                                    .Replace("\r", "");
+                var inputText = File.ReadAllText(OutputFilename);
+                File.WriteAllText(
+                    OutputFilename,
+                    inputText.Replace("$version$", version)
+                    );
+              ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="AfterBuild">
+    <UpdateVersion InputFilename="$(SolutionDir)src\Build\Version.txt" OutputFilename="$(OutDir)Orleans.psd1" />
+  </Target>
+</Project>

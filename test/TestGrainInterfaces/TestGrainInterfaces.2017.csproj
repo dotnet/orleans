@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
+    <AssemblyName>TestGrainInterfaces</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="IFSharpParametersGrain.cs" />
+    <Compile Remove="IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IFSharpParametersGrain.cs" />
+    <None Include="IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.2017.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.2017.csproj" />
+  </ItemGroup>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>
