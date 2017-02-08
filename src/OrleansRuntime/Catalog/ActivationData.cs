@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
 
 namespace Orleans.Runtime
@@ -191,6 +192,7 @@ namespace Orleans.Runtime
 
 
             GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
+            this.SchedulingContext = new SchedulingContext(this);
         }
 
         #region Method invocation
@@ -242,6 +244,8 @@ namespace Orleans.Runtime
         }
 
         #endregion
+
+        public ISchedulingContext SchedulingContext { get; }
 
         public string GrainTypeName
         {

@@ -378,10 +378,9 @@ namespace Orleans.Runtime
 
                 // Now we can actually scheduler processing of this request
                 targetActivation.RecordRunning(message);
-                var context = new SchedulingContext(targetActivation);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context, this), context);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this), targetActivation.SchedulingContext);
             }
         }
 

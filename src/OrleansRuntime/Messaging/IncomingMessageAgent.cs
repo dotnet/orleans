@@ -136,7 +136,7 @@ namespace Orleans.Runtime.Messaging
                             }
 
                             // Run ReceiveMessage in context of target activation
-                            context = new SchedulingContext(target);
+                            context = target.SchedulingContext;
                         }
                         else
                         {
