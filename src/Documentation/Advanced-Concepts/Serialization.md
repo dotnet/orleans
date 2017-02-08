@@ -73,7 +73,7 @@ There are 2 ways how application can customize serialization:
 In both way the custom serialization code has to include three routines: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
 
 ## Introduction
-As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Advanced-Concepts/Using-Immutable-to-Optimize-Copying), Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
+As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.html), Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
 
  The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.
 
@@ -83,14 +83,14 @@ As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io
 It is rare that a hand-crafted serializer routine will perform meaningfully better than the generated versions. If you are tempted to do so, you should first consider the following options:
 
  If there are fields or properties within your data types that don't have to be serialized or copied, you can mark them with the `NonSerialized` attribute. This will cause the generated code to skip these fields when copying and serializing.
- Use Immutable<T> where possible to avoid copying immutable data. See [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Advanced-Concepts/Using-Immutable-to-Optimize-Copying) for details.
+ Use Immutable<T> where possible to avoid copying immutable data. See [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.html) for details.
  If you're avoiding using the standard generic collection types, don't. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special "abbreviated" representations in the serialized byte stream, resulting in even more performance advantages. For instance, a `Dictionary<string, string>` will be faster than a `List<Tuple<string, string>>`.
 
  The most common case where a custom serializer can provide a noticeable performance gain is when there is significant semantic information encoded in the data type that is not available by simply copying field values. For instance, arrays that are sparsely populated may often be more efficiently serialized by treating the array as a collection of index/value pairs, even if the application keeps the data as a fully realized array for speed of operation.
 
  A key thing to do before writing a custom serializer is to make sure that the generated serializer is really hurting your performance. Profiling will help a bit here, but even more valuable is running end-to-end stress tests of your application with varying serialization loads to gauge the system-level impact, rather than the micro-impact of serialization. For instance, building a test version that passes no parameters to or results from grain methods, simply using canned values at either end, will zoom in on the impact of serialization and copying on system performance.
 
-## Method 1: Adding 3 Serialization Routines to your Type
+## Method 1: Adding Serialization Methods to the Type
 
 All serializer routines should be implemented as static members of the class or struct they operate on. The names shown here are not required; registration is based on the presence of the respective attributes, not on method names. Note that serializer methods need not be public.
 
@@ -238,7 +238,7 @@ public interface IExternalSerializer
 }
 ```
 
-## Method 3: Writing a Serialization Class for Individual Types
+## Method 3: Writing a Serializer for Individual Types
 
 In this method you write a new class annotated with an attribute `[SerializerAttribute(typeof(TargetType))]`, where `TargetType` is the type which is being serialized, and implement the 3 serialization routines. The rules for how to write those routines are identical to method 1. Orleans uses the `[SerializerAttribute(typeof(TargetType))]` to determine that this class is a serializer for `TargetType` and this attribute can be specified multiple times on the same class if it's able to serialize multiple types. Below is an example for such a class:
 
