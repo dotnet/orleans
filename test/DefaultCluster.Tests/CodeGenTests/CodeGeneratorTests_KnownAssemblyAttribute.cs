@@ -53,6 +53,7 @@ namespace DefaultCluster.Tests.General
         {
             ClientSerializerExists(typeof(FSharpOption<>));
         }
+#if !EXCLUDEFSHARP
 #if !NETSTANDARD_TODO
         // wait for FSharp projetcs ported over
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
@@ -66,6 +67,7 @@ namespace DefaultCluster.Tests.General
         {
             ClientSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
         }
+#endif
 #endif
     }
 }

@@ -158,7 +158,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="DefaultCluster.Tests..xunit.runner.json" />
+    <None Include="DefaultCluster.Tests.xunit.runner.json" />
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>

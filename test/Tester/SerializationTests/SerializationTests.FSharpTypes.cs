@@ -1,7 +1,11 @@
+#if !EXCLUDEFSHARP
 using Microsoft.FSharp.Core;
+#endif
 using Orleans.Serialization;
 using TestExtensions;
+#if !EXCLUDEFSHARP
 using UnitTests.FSharpTypes;
+#endif
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -25,6 +29,7 @@ namespace UnitTests.Serialization
             Assert.Equal(input, output);
         }
 
+#if !EXCLUDEFSHARP
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
@@ -54,5 +59,6 @@ namespace UnitTests.Serialization
         {
             RoundtripSerializationTest(RecordOfIntOption.Empty);
         }
+#endif
     }
 }
