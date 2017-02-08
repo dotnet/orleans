@@ -104,10 +104,6 @@
       <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.3.1\lib\net451\OrleansCounterControl.exe</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansHost, Version=1.3.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.3.1\lib\net451\OrleansHost.exe</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="OrleansProviders, Version=1.3.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.3.1\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
