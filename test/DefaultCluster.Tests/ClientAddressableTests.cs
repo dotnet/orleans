@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -12,6 +13,7 @@ namespace DefaultCluster.Tests
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
+        private IRuntimeClient runtimeClient;
 
         private class MyPseudoGrain : IClientAddressableTestClientObject
         {
@@ -69,6 +71,7 @@ namespace DefaultCluster.Tests
 
         public ClientAddressableTests(DefaultClusterFixture fixture) : base(fixture)
         {
+            this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -83,7 +86,7 @@ namespace DefaultCluster.Tests
             var actual = await proxy.HappyPath(expected);
             Assert.Equal(expected, actual);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -101,7 +104,7 @@ namespace DefaultCluster.Tests
                 proxy.SadPath(message)
             );
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -118,7 +121,7 @@ namespace DefaultCluster.Tests
             var n = await consumer.PollProducer();
             Assert.Equal(1, n);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -133,7 +136,7 @@ namespace DefaultCluster.Tests
             await proxy.SetTarget(myRef);
             await proxy.MicroSerialStressTest(iterationCount);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -148,7 +151,7 @@ namespace DefaultCluster.Tests
             await proxy.SetTarget(myRef);
             await proxy.MicroParallelStressTest(iterationCount);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
 
             myOb.VerifyNumbers(iterationCount);
         }

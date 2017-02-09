@@ -87,6 +87,16 @@ namespace Orleans
             }
         }
 
+        internal static IServiceProvider ServiceProvider
+        {
+            get
+            {
+                CheckInitialized();
+                return outsideRuntimeClient.ServiceProvider;
+            }
+        }
+
+
         /// <summary>
         /// Initializes the client runtime from the standard client configuration file.
         /// </summary>
