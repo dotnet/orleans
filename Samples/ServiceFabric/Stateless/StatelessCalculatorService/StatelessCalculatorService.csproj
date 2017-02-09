@@ -69,7 +69,7 @@
       <HintPath>..\..\packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0\lib\netstandard1.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Orleans.ServiceFabric, Version=0.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+    <Reference Include="Microsoft.Orleans.ServiceFabric, Version=1.4.0.0, Culture=neutral, processorArchitecture=AMD64">
       <HintPath>..\..\packages\Microsoft.Orleans.ServiceFabric.1.4.0\lib\net451\Microsoft.Orleans.ServiceFabric.dll</HintPath>
       <Private>True</Private>
     </Reference>
