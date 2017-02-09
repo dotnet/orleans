@@ -58,8 +58,6 @@
     href: Advanced-Concepts/Timers-and-Reminders.md
   - name: Using Azure Web Apps
     href: Advanced-Concepts/Using-Azure-Web-Apps.md
-  - name: Using Immutable to Optimize Copying
-    href: Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md
   - name: Activation Garbage Collection
     href: Advanced-Concepts/Activation-Garbage-Collection.md
   - name: Application Bootstrap within a Silo
