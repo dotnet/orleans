@@ -247,19 +247,19 @@ namespace UnitTests.SchedulerTests
             Task wrapper1 = new Task(() =>
             {
                 task1.Start(scheduler);
-                bool ok = task1.Wait(TimeSpan.FromMilliseconds(100));
+                bool ok = task1.Wait(TimeSpan.FromSeconds(10));
                 if (!ok) throw new TimeoutException();
             });
             Task wrapper2 = new Task(() =>
             {
                 task2.Start(scheduler);
-                bool ok = task2.Wait(TimeSpan.FromMilliseconds(100));
+                bool ok = task2.Wait(TimeSpan.FromSeconds(10));
                 if (!ok) throw new TimeoutException();
             });
 
             pause1.Set();
             wrapper1.Start(scheduler);
-            bool ok1 = wrapper1.Wait(TimeSpan.FromMilliseconds(1000));
+            bool ok1 = wrapper1.Wait(TimeSpan.FromSeconds(10));
             if (!ok1) throw new TimeoutException();
 
             Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
@@ -267,7 +267,7 @@ namespace UnitTests.SchedulerTests
 
             wrapper2.Start(scheduler);
             pause2.Set();
-            bool finished = wrapper2.Wait(TimeSpan.FromMilliseconds(100));
+            bool finished = wrapper2.Wait(TimeSpan.FromSeconds(10));
             if (!finished) throw new TimeoutException();
 
             Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
