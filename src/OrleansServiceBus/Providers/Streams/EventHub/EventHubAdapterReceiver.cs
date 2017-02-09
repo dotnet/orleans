@@ -91,7 +91,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
                 cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
-                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) {cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit()};
+                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit() };
                 string offset = await checkpointer.Load();
                 receiver = await CreateReceiver(settings, offset, logger);
                 monitor.TrackInitialization(true);
@@ -129,7 +129,7 @@ namespace Orleans.ServiceBus.Providers
                 var watch = Stopwatch.StartNew();
                 messages = (await receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
                 watch.Stop();
-                
+
                 monitor.TrackRead(true);
                 monitor.TrackMessagesRecieved(messages?.Count ?? 0, watch.Elapsed);
             }
@@ -266,7 +266,7 @@ namespace Orleans.ServiceBus.Providers
             }
 #endif
             // if we have a starting offset or if we're not configured to start reading from utc now, read from offset
-            if (!partitionSettings.Hub.StartFromNow || 
+            if (!partitionSettings.Hub.StartFromNow ||
                 offset != EventHubConstants.StartOfStream)
             {
                 logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
@@ -286,7 +286,10 @@ namespace Orleans.ServiceBus.Providers
             }
 #if NETSTANDARD
             PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
-            receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
+
+            if (partitionSettings.Hub.PrefetchCount.HasValue)
+                receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
+
             return receiver;
 #else
             return await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive); 
