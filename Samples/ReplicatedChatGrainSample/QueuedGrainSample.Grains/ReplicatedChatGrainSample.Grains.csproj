@@ -7,8 +7,8 @@
     <ProjectGuid>{27A256FD-E8F8-46B8-997C-FA092F9C4503}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ReplicatedChatGrainSamples.Grains</RootNamespace>
-    <AssemblyName>ReplicatedChatGrainSamples.Grains</AssemblyName>
+    <RootNamespace>ReplicatedChatGrainSample.Grains</RootNamespace>
+    <AssemblyName>ReplicatedChatGrainSample.Grains</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <NuGetPackageImportStamp>

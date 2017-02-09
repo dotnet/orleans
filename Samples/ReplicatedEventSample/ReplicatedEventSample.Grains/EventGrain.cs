@@ -1,34 +1,32 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage;
-using ReplicatedEventSample.Interfaces;
 using Orleans;
-using Orleans.Concurrency;
-using Orleans.Core;
-using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.EventSourcing;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.MultiCluster;
+using Orleans.Providers;
+using Orleans.Runtime;
+using ReplicatedEventSample.Interfaces;
 
 namespace ReplicatedEventSample.Grains
 {
     [OneInstancePerCluster]
     [LogConsistencyProvider(ProviderName = "CustomStorage")]
-    public class EventGrain : 
-        JournaledGrain<EventState, Outcome>, 
+    public class EventGrain :
+        JournaledGrain<EventState, Outcome>,
         IEventGrain,
-        ICustomStorageInterface<EventState,Outcome>
+        ICustomStorageInterface<EventState, Outcome>
     {
+        private Logger logger;
+        private string lastAnnouncedLeader;
+        private bool resultsHaveStarted;
+        private ITickerGrain tickerGrain;
 
         public string EventName
         {
-            get {
-                return this.GetPrimaryKeyString();
-            }
+            get { return this.GetPrimaryKeyString(); }
         }
 
         public async Task NewOutcome(Outcome outcome)
@@ -38,7 +36,7 @@ namespace ReplicatedEventSample.Grains
             RaiseEvent(outcome);
 
             // optional: wait for the updates to be acked from storage
-            await this.ConfirmEvents();
+            await ConfirmEvents();
         }
 
         public Task<List<KeyValuePair<string, int>>> GetTopThree()
@@ -48,7 +46,7 @@ namespace ReplicatedEventSample.Grains
                 .Take(3)
                 .Select(o => new KeyValuePair<string, int>(o.Value.Name, o.Value.Score))
                 .ToList();
-           
+
             return Task.FromResult(result);
         }
 
@@ -60,7 +58,7 @@ namespace ReplicatedEventSample.Grains
         public override async Task OnActivateAsync()
         {
             // get reference to ticker grain (there is just one per deployment, it has key 0)
-            tickergrain = GrainFactory.GetGrain<ITickerGrain>(0);
+            tickerGrain = GrainFactory.GetGrain<ITickerGrain>(0);
 
             // we create a logger for each event grain
             logger = GetLogger();
@@ -73,13 +71,6 @@ namespace ReplicatedEventSample.Grains
             await RefreshNow();
         }
 
-        Orleans.Runtime.Logger logger;
-
-
-        bool results_have_started;
-        string last_announced_leader;
-        ITickerGrain tickergrain;
-
 
         // we override this virtual method to have an opportunity to react
         // to changes in the confirmed state
@@ -88,31 +79,29 @@ namespace ReplicatedEventSample.Grains
             string message = null;
 
             // notify on first results
-            if (!results_have_started && State.outcomes.Count > 0)
+            if (!resultsHaveStarted && State.outcomes.Count > 0)
             {
                 message = string.Format("first results arriving for {0}", EventName);
-                results_have_started = true;
+                resultsHaveStarted = true;
             }
 
             // notify about leader after first 5 results are in
             if (State.outcomes.Count > 5)
             {
                 var leader = State.outcomes.OrderByDescending(o => o.Value.Score).First().Value.Name;
-                if (last_announced_leader == null)
+                if (lastAnnouncedLeader == null)
                     message = string.Format("{0} is leading {1}", leader, EventName);
-                else if (last_announced_leader != leader)
+                else if (lastAnnouncedLeader != leader)
                     message = string.Format("{0} is now leading {1}", leader, EventName);
-                last_announced_leader = leader;
+                lastAnnouncedLeader = leader;
             }
 
             if (message != null)
             {
                 // send message as a background task
-                var bgtask = tickergrain.SomethingHappened(message);
+                tickerGrain.SomethingHappened(message).Ignore();
             }
         }
-
-
 
         #region storage interface
 
@@ -155,10 +144,7 @@ namespace ReplicatedEventSample.Grains
                 return false;
             }
         }
-        
 
- 
         #endregion
-
     }
 }

@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using ReplicatedEventSample.Interfaces;
-
 
 namespace ReplicatedEventSample.Grains
 {
@@ -17,7 +13,7 @@ namespace ReplicatedEventSample.Grains
         /// <summary>
         ///  list of all outcomes, sorted by timestamp
         /// </summary>
-        public SortedDictionary<DateTime,Outcome> outcomes;
+        public SortedDictionary<DateTime, Outcome> outcomes;
 
         public EventState()
         {
@@ -36,6 +32,4 @@ namespace ReplicatedEventSample.Grains
             outcomes.Add(outcome.When, outcome);
         }
     }
-
-
 }
