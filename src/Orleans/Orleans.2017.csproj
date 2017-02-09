@@ -13,6 +13,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
+    <AssemblyName>Orleans</AssemblyName>
+    <RootNamespace>Orleans</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
@@ -83,9 +85,6 @@
     <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
     <!-- TFS build -->
     <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
-    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
-    <AssemblyName>Orleans</AssemblyName>
-    <RootNamespace>Orleans</RootNamespace>
   </PropertyGroup>
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" Condition="'$(Bootstrap)' != 'true'" />
   <!--End Orleans -->

@@ -22,15 +22,4 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-
-  <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <!-- Set path to ClientGenerator.exe -->
-  <PropertyGroup>
-    <!-- Visual Studio or MsBuild .sln build -->
-    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
-    <!-- TFS build -->
-    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
-  </PropertyGroup>
-  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
-  <!--End Orleans -->
 </Project>
