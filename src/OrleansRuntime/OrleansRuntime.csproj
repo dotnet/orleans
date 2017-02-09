@@ -98,7 +98,7 @@
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
     <Compile Include="Catalog\IActivationCollector.cs" />
-    <Compile Include="Core\GrainTimer.cs" />
+    <Compile Include="Timers\GrainTimer.cs" />
     <Compile Include="Counters\SiloStatisticsManager.cs" />
     <Compile Include="ConsistentRing\IConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\ConsistentRingProvider.cs" />
@@ -201,6 +201,7 @@
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
+    <Compile Include="Timers\TimerRegistry.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
