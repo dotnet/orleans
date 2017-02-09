@@ -131,7 +131,7 @@ namespace Orleans.ServiceBus.Providers
                 watch.Stop();
                 
                 monitor.TrackRead(true);
-                monitor.TrackMessagesRecieved(messages != null ? messages.Count : 0, watch.Elapsed);
+                monitor.TrackMessagesRecieved(messages?.Count ?? 0, watch.Elapsed);
             }
             catch (Exception ex)
             {
@@ -219,12 +219,9 @@ namespace Orleans.ServiceBus.Providers
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
-#if NETSTANDARD
-                PartitionReceiver
-#else
-                EventHubReceiver  
-#endif
-                    localReceiver = Interlocked.Exchange(ref receiver, null);
+
+                var localReceiver = Interlocked.Exchange(ref receiver, null);
+
                 // start closing receiver
                 Task closeTask = TaskDone.Done;
                 if (localReceiver != null)
@@ -269,12 +266,8 @@ namespace Orleans.ServiceBus.Providers
             }
 #endif
             // if we have a starting offset or if we're not configured to start reading from utc now, read from offset
-            if (!partitionSettings.Hub.StartFromNow ||
-#if NETSTANDARD
-                offset != PartitionReceiver.StartOfStream)
-#else
-                offset != EventHubConsumerGroup.StartOfStream) 
-#endif
+            if (!partitionSettings.Hub.StartFromNow || 
+                offset != EventHubConstants.StartOfStream)
             {
                 logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
             }
@@ -286,13 +279,15 @@ namespace Orleans.ServiceBus.Providers
 #else
                 PartitionRuntimeInformation partitionInfo = 
 #endif
-                await client.GetPartitionRuntimeInformationAsync(partitionSettings.Partition);
+                    await client.GetPartitionRuntimeInformationAsync(partitionSettings.Partition);
                 offset = partitionInfo.LastEnqueuedOffset;
                 offsetInclusive = false;
                 logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
             }
 #if NETSTANDARD
-            return client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
+            PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
+            receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
+            return receiver;
 #else
             return await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive); 
 #endif
