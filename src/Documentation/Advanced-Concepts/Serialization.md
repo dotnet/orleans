@@ -73,7 +73,7 @@ There are 2 ways how application can customize serialization:
 In both way the custom serialization code has to include three routines: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
 
 ## Introduction
-As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.html), Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
+Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
 
  The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.
 
@@ -83,8 +83,7 @@ As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io
 It is rare that a hand-crafted serializer routine will perform meaningfully better than the generated versions. If you are tempted to do so, you should first consider the following options:
 
  If there are fields or properties within your data types that don't have to be serialized or copied, you can mark them with the `NonSerialized` attribute. This will cause the generated code to skip these fields when copying and serializing.
- Use Immutable<T> where possible to avoid copying immutable data. See [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.html) for details.
- If you're avoiding using the standard generic collection types, don't. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special "abbreviated" representations in the serialized byte stream, resulting in even more performance advantages. For instance, a `Dictionary<string, string>` will be faster than a `List<Tuple<string, string>>`.
+ Use `Immutable<T>` & `[Immutable]` where possible to avoid copying immutable data. The section on *Optimizing Copying* below for details. If you're avoiding using the standard generic collection types, don't. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special "abbreviated" representations in the serialized byte stream, resulting in even more performance advantages. For instance, a `Dictionary<string, string>` will be faster than a `List<Tuple<string, string>>`.
 
  The most common case where a custom serializer can provide a noticeable performance gain is when there is significant semantic information encoded in the data type that is not available by simply copying field values. For instance, arrays that are sparsely populated may often be more efficiently serialized by treating the array as a collection of index/value pairs, even if the application keeps the data as a fully realized array for speed of operation.
 
@@ -298,6 +297,74 @@ Alternatively, the fallback serialization provider can be specified in XML confi
 ```
 
 .NET Core uses the `ILBasedSerializer` by default, whereas .NET 4.6 uses `BinaryFormatterSerializer` by default.
+
+# Optimize Copying Using Immutable Types
+
+Orleans has a feature that can be used to avoid some of the overhead associated with serializing messages containing immutable types. This section describes the feature and its application, starting with context on where it is relevant.
+
+## Serialization in Orleans
+When a grain method is invoked, the Orleans runtime makes a deep copy of the method arguments and forms the request out of the copies. This protects against the calling code modifying the argument objects before the data is passed to the called grain.
+
+If the called grain is on a different silo, then the copies are eventually serialized into a byte stream and sent over the network to the target silo, where they are deserialized back into objects. If the called grain is on the same silo, then the copies are handed directly to the called method.
+
+Return values are handled the same way: first copied, then possibly serialized and deserialized.
+
+Note that all 3 processes, copying, serializing, and deserializing, respect object identity. In other words, if you pass a list that has the same object in it twice, on the receiving side you'll get a list with the same object in it twice, rather than with two objects with the same values in them.
+
+## Optimizing Copying
+In many cases, the deep copying is unnecessary. For instance, a possible scenario is a web front-end that receives a byte array from its client and passes that request, including the byte array, on to a grain for processing. The front-end process doesn't do anything with the array once it has passed it on to the grain; in particular, it doesn't reuse the array to receive a future request. Inside the grain, the byte array is parsed to fetch the input data, but not modified. The grain returns another byte array that it has created to get passed back to the web client; it discards the array as soon as it returns it. The web front-end passes the result byte array back to its client, without modification.
+
+In such a scenario, there is no need to copy either the request or response byte arrays. Unfortunately, the Orleans runtime can't figure this out by itself, since it can't tell whether or not the arrays are modified later on by the web front-end or by the grain. In the best of all possible worlds, we'd have some sort of .NET mechanism for indicating that a value is no longer modified; lacking that, we've added Orleans-specific mechanisms for this: the `Immutable<T>` wrapper class and the `[Immutable]` attribute.
+
+### Using `Immutable<T>`
+
+The `Orleans.Concurrency.Immutable<T>` wrapper class is used to indicate that a value may be considered immutable; that is, the underlying value will not be modified, so no copying is required for safe sharing. Note that using `Immutable<T>` implies that neither the provider of the value nor the recipient of the value will modify it in the future; it is not a one-sided commitment, but rather a mutual dual-side commitment.
+
+Using `Immutable<T>` is simple: in your grain interface, instead of passing `T`, pass `Immutable<T>`. For instance, in the above described scenario, the grain method that was:
+
+``` csharp
+Task<byte[]> ProcessRequest(byte[] request);
+```
+
+Becomes:
+
+``` csharp
+Task<Immutable<byte[]>> ProcessRequest(Immutable<byte[]> request);
+```
+
+To create an `Immutable<T>`, simply use the constructor:
+
+``` csharp
+Immutable<byte[]> immutable = new Immutable<byte[]>(buffer);
+```
+
+To get the value inside the immutable, use the `.Value` property:
+
+``` csharp
+byte[] buffer = immutable.Value;
+```
+
+### Using `[Immutable]`
+For user-defined types, the `[Orleans.Concurrency.Immutable]` attribute can be added to the type. This instructs Orleans' serializer to avoid copying instances of this type.
+The following code snippet demonstrates using `[Immutable]` to denote an immutable type. This type will not be copied during transmission.
+``` csharp
+[Immutable]
+public class MyImmutableType
+{
+    public MyImmutableType(int value)
+    {
+        this.MyValue = value;
+    }
+
+    public int MyValue { get; }
+}
+```
+
+## Immutability in Orleans
+
+For Orleans' purposes, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item's semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability.
+
+In some cases it is safe to relax this to logical immutability, but care must be taken to ensure that the mutating code is properly thread-safe; because dealing with multithreading is complex, and uncommon in an Orleans context, we strongly recommend against this approach and recommend sticking to bitwise immutability.
 
 # Serialization Best Practices
 Serialization serves two primary purposes in Orleans:

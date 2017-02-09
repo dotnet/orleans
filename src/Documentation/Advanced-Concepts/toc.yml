@@ -14,8 +14,6 @@
   href: Timers-and-Reminders.md
 - name: Using Azure Web Apps
   href: Using-Azure-Web-Apps.md
-- name: Using Immutable to Optimize Copying
-  href: Using-Immutable-to-Optimize-Copying.md
 - name: Activation Garbage Collection
   href: Activation-Garbage-Collection.md
 - name: Application Bootstrap within a Silo
@@ -36,7 +34,7 @@
   href: Troubleshooting-Deployments.md
 - name: Powershell Client
   href: Powershell-Client.md
-- name: Code generation
+- name: Code Generation
   href: Codegen.md
 - name: Heterogeneous silos
   href: Heterogeneous-Silos.md
