@@ -243,7 +243,13 @@ namespace Orleans.Runtime
         {
             if (gcTimer != null) gcTimer.Dispose();
 
-            var t = GrainTimer.FromTaskCallback(OnTimer, null, TimeSpan.Zero, ActivationCollector.Quantum, "Catalog.GCTimer");
+            var t = GrainTimer.FromTaskCallback(
+                this.RuntimeClient.Scheduler,
+                OnTimer,
+                null,
+                TimeSpan.Zero,
+                ActivationCollector.Quantum,
+                "Catalog.GCTimer");
             t.Start();
             gcTimer = t;
         }
@@ -1479,7 +1485,7 @@ namespace Orleans.Runtime
             if (!status.IsTerminating()) return;
             if (status == SiloStatus.Dead)
             {
-                RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+                RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
             }
 
             var activationsToShutdown = new List<ActivationData>();

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 
@@ -46,8 +45,6 @@ namespace Orleans.Runtime
         void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
 
         void ReceiveResponse(Message message);
-
-        Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
         void Reset(bool cleanup);
 

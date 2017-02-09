@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 
@@ -87,14 +88,15 @@ namespace Orleans.Runtime
         /// <param name="state"></param>
         /// <param name="dueTime"></param>
         /// <param name="period"></param>
+        /// <param name="name"></param>
         /// <returns></returns>
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
-            String name = ctxt.Name + "Timer";
-          
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, name);
+            name = name ?? ctxt.Name + "Timer";
+
+            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, asyncCallback, state, dueTime, period, name);
             timer.Start();
             return timer;
         }

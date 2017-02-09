@@ -20,7 +20,6 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
-        private IGrainTimer clientRefreshTimer;
         private Gateway gateway;
 
 
@@ -50,13 +49,12 @@ namespace Orleans.Runtime
         {
             var random = new SafeRandom();
             var randomOffset = random.NextTimeSpan(orleansConfig.Globals.ClientRegistrationRefresh);
-            clientRefreshTimer = GrainTimer.FromTaskCallback(
-                    OnClientRefreshTimer, 
-                    null, 
-                    randomOffset, 
-                    orleansConfig.Globals.ClientRegistrationRefresh, 
-                    "ClientObserverRegistrar.ClientRefreshTimer");
-            clientRefreshTimer.Start();
+            this.RegisterTimer(
+                this.OnClientRefreshTimer,
+                null,
+                randomOffset,
+                orleansConfig.Globals.ClientRegistrationRefresh,
+                "ClientObserverRegistrar.ClientRefreshTimer");
             if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
         }
 

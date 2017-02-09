@@ -45,8 +45,7 @@ namespace Orleans.Runtime
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = random.NextTimeSpan(statisticsRefreshTime);
-                var t = GrainTimer.FromTaskCallback(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
-                t.Start();
+                this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
             }
             await RefreshStatistics();
             await PublishStatistics(null);
