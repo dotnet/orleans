@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -51,5 +52,8 @@ namespace Orleans.Runtime
         IActivationData CurrentActivationData { get; }
 
         void DeactivateOnIdle(ActivationId id);
+
+        OrleansTaskScheduler Scheduler { get; }
+        Task Invoke(IAddressable target, IInvokable invokable, Message message);
     }
 }

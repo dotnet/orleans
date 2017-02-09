@@ -319,7 +319,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal async Task Invoke(IAddressable target, IInvokable invokable, Message message)
+        public async Task Invoke(IAddressable target, IInvokable invokable, Message message)
         {
             try
             {
