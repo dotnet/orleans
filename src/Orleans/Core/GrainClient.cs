@@ -337,7 +337,7 @@ namespace Orleans
             get
             {
                 CheckInitialized();
-                return RuntimeClient.Current.AppLogger;
+                return ((IRuntimeClient)outsideRuntimeClient).AppLogger;
             }
         }
 
@@ -349,7 +349,7 @@ namespace Orleans
         public static void SetResponseTimeout(TimeSpan timeout)
         {
             CheckInitialized();
-            RuntimeClient.Current.SetResponseTimeout(timeout);
+            outsideRuntimeClient.SetResponseTimeout(timeout);
         }
 
         /// <summary>
@@ -360,7 +360,7 @@ namespace Orleans
         public static TimeSpan GetResponseTimeout()
         {
             CheckInitialized();
-            return RuntimeClient.Current.GetResponseTimeout();
+            return outsideRuntimeClient.GetResponseTimeout();
         }
 
         /// <summary>
@@ -376,19 +376,19 @@ namespace Orleans
 
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
+            return outsideRuntimeClient.CurrentStreamProviderManager.GetStreamProviders();
         }
 
         internal static IStreamProviderRuntime CurrentStreamProviderRuntime
         {
-            get { return RuntimeClient.Current.CurrentStreamProviderRuntime; }
+            get { return outsideRuntimeClient.CurrentStreamProviderRuntime; }
         }
 
         public static Streams.IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
+            return outsideRuntimeClient.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
         public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
 

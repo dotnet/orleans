@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+#if NETSTANDARD
 using System.Reflection;
+#endif
 using System.Runtime;
 using System.Text;
 using System.Threading;
@@ -324,7 +326,8 @@ namespace Orleans.Runtime
 
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
-            messageCenter.RerouteHandler = runtimeClient.RerouteMessage;
+            var dispatcher  = this.Services.GetRequiredService<Dispatcher>();
+            messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             // GrainRuntime can be created only here, after messageCenter was created.
@@ -340,10 +343,7 @@ namespace Orleans.Runtime
             // Now the consistent ring provider
             RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
 
-            // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
-            // service provider, meaning that he is explicitly opting into it.
             catalog = Services.GetRequiredService<Catalog>();
-
             siloStatistics.MetricsTable.Scheduler = scheduler;
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
             siloStatistics.MetricsTable.ActivationCollector = catalog.ActivationCollector;
@@ -403,7 +403,7 @@ namespace Orleans.Runtime
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
             var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
-            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable);
+            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory);
             this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");

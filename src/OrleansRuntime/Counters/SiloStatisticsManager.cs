@@ -7,16 +7,14 @@ namespace Orleans.Runtime.Counters
 {
     internal class SiloStatisticsManager
     {
-        private readonly IServiceProvider serviceProvider;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
         private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
-        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, IServiceProvider serviceProvider)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager)
         {
-            this.serviceProvider = serviceProvider;
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);

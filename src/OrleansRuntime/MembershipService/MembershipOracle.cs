@@ -11,6 +11,7 @@ namespace Orleans.Runtime.MembershipService
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
         private readonly MembershipTableFactory membershipTableFactory;
+        private readonly IInternalGrainFactory grainFactory;
         private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
@@ -37,10 +38,11 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
-        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory)
+        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {
             this.membershipTableFactory = membershipTableFactory;
+            this.grainFactory = grainFactory;
             logger = LogManager.GetLogger("MembershipOracle");
             membershipOracleData = new MembershipOracleData(silo, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
@@ -171,7 +173,7 @@ namespace Orleans.Runtime.MembershipService
                     timerProbeOtherSilos.Start();
                 };
                 orleansConfig.OnConfigChange(
-                    "Globals/Liveness", () => InsideRuntimeClient.Current.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
+                    "Globals/Liveness", () => this.RuntimeClient.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
 
                 configure();
                 logger.Info(ErrorCode.MembershipFinishBecomeActive, "-Finished BecomeActive.");
@@ -1132,9 +1134,9 @@ namespace Orleans.Runtime.MembershipService
 
         #endregion
 
-        private static IMembershipService GetOracleReference(SiloAddress silo)
+        private IMembershipService GetOracleReference(SiloAddress silo)
         {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
+            return this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
         }
     }
 }

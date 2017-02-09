@@ -134,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
             return Instances.Count == 0;
         }
 
-        public bool Merge(GrainId grain, IGrainInfo other)
+        public bool Merge(GrainId grain, IGrainInfo other, IInternalGrainFactory grainFactory)
         {
             bool modified = false;
             foreach (var pair in other.Instances)
@@ -163,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
                 foreach (var activation in activationsToDrop.Select(keyValuePair => ActivationAddress.GetAddress(keyValuePair.Value.SiloAddress, grain, keyValuePair.Key)))
                 {
                     list.Add(activation);
-                    InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, activation.Silo).
+                    grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, activation.Silo).
                         DeleteActivations(list).Ignore();
 
                     list.Clear();
@@ -478,11 +478,12 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Merges one partition into another, asuuming partitions are disjoint.
+        /// Merges one partition into another, assuming partitions are disjoint.
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
+        /// <param name="grainFactory"></param>
         /// <param name="other"></param>
-        internal void Merge(GrainDirectoryPartition other)
+        internal void Merge(IInternalGrainFactory grainFactory, GrainDirectoryPartition other)
         {
             lock (lockable)
             {
@@ -491,7 +492,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (partitionData.ContainsKey(pair.Key))
                     {
                         if (log.IsVerbose) log.Verbose("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
-                        partitionData[pair.Key].Merge(pair.Key, pair.Value);
+                        partitionData[pair.Key].Merge(pair.Key, pair.Value, grainFactory);
                     }
                     else
                     {

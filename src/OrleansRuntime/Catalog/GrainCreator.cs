@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Helper class used to create local instances of grains.
     /// </summary>
-    public class GrainCreator
+    internal class GrainCreator
     {
         private readonly Lazy<IGrainRuntime> grainRuntime;
 
@@ -24,6 +24,7 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
         private readonly SerializationManager serializationManager;
+        private readonly IInternalGrainFactory grainFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainCreator"/> class.
@@ -31,10 +32,12 @@ namespace Orleans.Runtime
         /// <param name="services">Service provider used to create new grains</param>
         /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
         /// <param name="serializationManager">The serialization manager.</param>
-        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime, SerializationManager serializationManager)
+        /// <param name="grainFactory"></param>
+        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime, SerializationManager serializationManager, IInternalGrainFactory grainFactory)
         {
             this.services = services;
             this.serializationManager = serializationManager;
+            this.grainFactory = grainFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
             this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
@@ -101,7 +104,7 @@ namespace Orleans.Runtime
             var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
            
             // encapsulate runtime services used by consistency adaptors
-            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy, this.serializationManager);
+            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy, this.serializationManager, this.grainFactory);
 
             var state = Activator.CreateInstance(stateType);
 

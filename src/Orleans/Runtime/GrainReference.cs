@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         
         private bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
-        private IRuntimeClient RuntimeClient
+        internal IRuntimeClient RuntimeClient
         {
             get
             {

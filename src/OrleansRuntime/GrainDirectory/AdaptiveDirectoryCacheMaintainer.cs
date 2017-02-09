@@ -14,6 +14,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly AdaptiveGrainDirectoryCache<TValue> cache;
         private readonly LocalGrainDirectory router;
         private readonly Func<List<ActivationAddress>, TValue> updateFunc;
+        private readonly IInternalGrainFactory grainFactory;
 
         private long lastNumAccesses;       // for stats
         private long lastNumHits;           // for stats
@@ -21,9 +22,11 @@ namespace Orleans.Runtime.GrainDirectory
         internal AdaptiveDirectoryCacheMaintainer(
             LocalGrainDirectory router,
             AdaptiveGrainDirectoryCache<TValue> cache,
-            Func<List<ActivationAddress>, TValue> updateFunc)
+            Func<List<ActivationAddress>, TValue> updateFunc,
+            IInternalGrainFactory grainFactory)
         {
             this.updateFunc = updateFunc;
+            this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
             
@@ -133,7 +136,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
+                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
                                 
                 router.Scheduler.QueueTask(async () =>
                 {

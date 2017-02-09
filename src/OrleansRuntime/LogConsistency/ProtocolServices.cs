@@ -25,6 +25,7 @@ namespace Orleans.Runtime.LogConsistency
         public GrainReference GrainReference { get { return grain.GrainReference; } }
 
         private Logger log;
+        private readonly IInternalGrainFactory grainFactory;
 
         public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
@@ -33,10 +34,11 @@ namespace Orleans.Runtime.LogConsistency
         // pseudo-configuration to use if there is no actual multicluster network
         private static MultiClusterConfiguration PseudoMultiClusterConfiguration;
 
-        internal ProtocolServices(Grain gr, Logger log, IMultiClusterRegistrationStrategy strategy, SerializationManager serializationManager)
+        internal ProtocolServices(Grain gr, Logger log, IMultiClusterRegistrationStrategy strategy, SerializationManager serializationManager, IInternalGrainFactory grainFactory)
         {
             this.grain = gr;
             this.log = log;
+            this.grainFactory = grainFactory;
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
 
@@ -84,7 +86,7 @@ namespace Orleans.Runtime.LogConsistency
             if (clusterGateway == null)
                 throw new ProtocolTransportException("no active gateways found for cluster");
 
-            var repAgent = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
+            var repAgent = this.grainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
 
             // test hook
             var filter = (oracle as MultiClusterNetwork.MultiClusterOracle).ProtocolMessageFilterForTesting;

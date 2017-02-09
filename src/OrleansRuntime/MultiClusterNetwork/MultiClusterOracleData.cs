@@ -19,12 +19,14 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly HashSet<GrainReference> confListeners;
 
         private readonly Logger logger;
+        private readonly IInternalGrainFactory grainFactory;
 
         internal MultiClusterData Current { get { return localData; } }
 
-        internal MultiClusterOracleData(Logger log)
+        internal MultiClusterOracleData(Logger log, IInternalGrainFactory grainFactory)
         {
             logger = log;
+            this.grainFactory = grainFactory;
             localData = new MultiClusterData();
             activeGatewaysByCluster = new Dictionary<string, List<SiloAddress>>();
             confListeners = new HashSet<GrainReference>();
@@ -114,7 +116,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                             logger.Verbose2("-NotificationWork: notify IProtocolParticipant {0} of configuration {1}", listener, delta.Configuration);
 
                         // enqueue conf change event as grain call
-                        var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<ILogConsistencyProtocolParticipant>(listener);
+                        var g = this.grainFactory.Cast<ILogConsistencyProtocolParticipant>(listener);
                         g.OnMultiClusterConfigurationChange(delta.Configuration).Ignore();
                     }
                     catch (Exception exc)

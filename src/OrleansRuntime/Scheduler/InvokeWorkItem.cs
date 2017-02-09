@@ -42,8 +42,9 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                IAddressable grain = activation.GrainInstance;
-                Task task = InsideRuntimeClient.Current.Invoke(grain, activation, message);
+                var grain = activation.GrainInstance;
+                var runtimeClient = (ISiloRuntimeClient)grain.GrainReference.RuntimeClient;
+                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
                 task.ContinueWith(t =>
                 {
                     // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault

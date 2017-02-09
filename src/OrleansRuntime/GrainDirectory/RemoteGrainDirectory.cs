@@ -105,24 +105,5 @@ namespace Orleans.Runtime.GrainDirectory
             router.HandoffManager.RemoveHandoffPartition(source);
             return TaskDone.Done;
         }
-        
-        /// <summary>
-        /// This method is called before retrying to access the current owner of a grain, following
-        /// a request that was sent to us, while we are not the owner of the given grain.
-        /// This may happen if during the time the request was on its way, a ring has changed 
-        /// (new servers came up / failed down).
-        /// Here we might take some actions before the actual retrial is done.
-        /// For example, we might back-off for some random time.
-        /// </summary>
-        /// <param name="retries"></param>
-        protected void PrepareForRetry(int retries)
-        {
-            // For now, we do not do anything special ...
-        }
-
-        private IRemoteGrainDirectory GetDirectoryReference(SiloAddress target)
-        {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, target);
-        }
     }
 }
