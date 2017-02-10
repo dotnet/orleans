@@ -1,12 +1,11 @@
-﻿using Microsoft.WindowsAzure.Storage;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.WindowsAzure.Storage.Table.Queryable;
 using ReplicatedEventSample.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ReplicatedEventSample.Grains
 {
@@ -18,13 +17,13 @@ namespace ReplicatedEventSample.Grains
     /// The event name is used as partition key.
     /// The sequence number is used as the row key.
     /// </summary>
-    class ReplicatedEventTable
+    public class ReplicatedEventTable
     {
+        private CloudTable tableRef;
+
         public ReplicatedEventTable()
         {
         }
-
-        private CloudTable tableRef;
 
         /// <summary>
         /// Connect to azure storage table
@@ -45,22 +44,19 @@ namespace ReplicatedEventSample.Grains
             var state = new EventState();
 
             var query = from ent in tableRef.CreateQuery<OutcomeEntity>()
-                        where ent.PartitionKey == eventname
-                        select ent;
- 
-            await IterateOverQuery(query, (OutcomeEntity e) =>
-            {
-                state.Apply(e.ToOutcome());
-            });
+                where ent.PartitionKey == eventname
+                select ent;
+
+            await IterateOverQuery(query, (OutcomeEntity e) => { state.Apply(e.ToOutcome()); });
 
             return state;
         }
 
         public Task ApplyUpdatesToStorageAsync(string eventname, int expectedversion, IReadOnlyList<Outcome> outcomes)
         {
-           TableBatchOperation batchOperation = new TableBatchOperation();
+            TableBatchOperation batchOperation = new TableBatchOperation();
 
-           foreach (var outcome in outcomes)
+            foreach (var outcome in outcomes)
                 batchOperation.Insert(new OutcomeEntity(eventname, expectedversion++, outcome));
 
             // there cannot be two inserts with the same (eventname,sequencenumber)
@@ -77,8 +73,9 @@ namespace ReplicatedEventSample.Grains
             while (querySegment == null || querySegment.ContinuationToken != null)
             {
                 querySegment = await query.AsTableQuery()
-                                          .ExecuteSegmentedAsync(querySegment != null ?
-                                                 querySegment.ContinuationToken : null);
+                    .ExecuteSegmentedAsync(querySegment != null
+                        ? querySegment.ContinuationToken
+                        : null);
                 foreach (var entity in querySegment)
                     action(entity);
             }
@@ -86,24 +83,33 @@ namespace ReplicatedEventSample.Grains
 
         public class OutcomeEntity : TableEntity
         {
-            public string EventName {  get { return PartitionKey;  } }
-            public int SequenceNumber { get { return int.Parse(RowKey); } }
+            // entities must have a default parameterless constructor
+            public OutcomeEntity()
+            {
+            }
+
+            // construct entity from Outcome object
+            public OutcomeEntity(string eventname, int sequencenumber, Outcome outcome)
+                : base(eventname, sequencenumber.ToString("D10"))
+            {
+                Name = outcome.Name;
+                Score = outcome.Score;
+                When = outcome.When;
+            }
+
+            public string EventName
+            {
+                get { return PartitionKey; }
+            }
+
+            public int SequenceNumber
+            {
+                get { return int.Parse(RowKey); }
+            }
 
             public string Name { get; set; }
             public int Score { get; set; }
             public DateTime When { get; set; }
-
-            // entities must have a default parameterless constructor
-            public OutcomeEntity() { }
-
-            // construct entity from Outcome object
-            public OutcomeEntity(string eventname, int sequencenumber, Outcome outcome)
-                :base(eventname, sequencenumber.ToString("D10"))
-            {                
-                this.Name = outcome.Name;
-                this.Score = outcome.Score;
-                this.When = outcome.When;
-            }
 
             // construct Outcome object from entity
             public Outcome ToOutcome()
@@ -116,7 +122,5 @@ namespace ReplicatedEventSample.Grains
                 };
             }
         }
-
-
     }
 }

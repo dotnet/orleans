@@ -9,6 +9,6 @@
         About - Orleans running in Azure
     </h2>
     <p>
-        OrleansAzureUtils v<%=Orleans.Host.Azure.Utils.OrleansAzureConstants.Version%>
+        OrleansAzureUtils v<%= Orleans.Host.Azure.Utils.OrleansAzureConstants.Version %>
     </p>
 </asp:Content>

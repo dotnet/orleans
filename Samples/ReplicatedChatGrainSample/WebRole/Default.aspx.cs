@@ -1,61 +1,39 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-using System;
+﻿using System;
 using System.IO;
-using ReplicatedChatGrainSample.Interfaces;
-using Orleans.Runtime.Host;
 using System.Threading.Tasks;
 using Microsoft.Azure;
+using Orleans.Runtime.Host;
+using ReplicatedChatGrainSample.Interfaces;
 
 namespace Orleans.Azure.Samples.Web
 {
     public partial class _Default : System.Web.UI.Page
     {
+        private static int sequencecounter = 1;
+
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (Page.IsPostBack)
+            if (this.Page.IsPostBack)
             {
                 if (!AzureClient.IsInitialized)
                 {
                     FileInfo clientConfigFile = AzureConfigUtils.ClientConfigFileLocation;
                     if (!clientConfigFile.Exists)
                     {
-                        throw new FileNotFoundException(string.Format("Cannot find Orleans client config file for initialization at {0}", clientConfigFile.FullName), clientConfigFile.FullName);
+                        throw new FileNotFoundException(
+                            string.Format("Cannot find Orleans client config file for initialization at {0}",
+                                clientConfigFile.FullName), clientConfigFile.FullName);
                     }
                     AzureClient.Initialize(clientConfigFile);
 
                     UpdateMessageText();
                 }
-
             }
         }
 
-        private static int sequencecounter = 1;
-
         private void UpdateMessageText()
         {
-            NameTextBox.Text = CloudConfigurationManager.GetSetting("MessagePrefix") + " " + sequencecounter++;
+            this.NameTextBox.Text = CloudConfigurationManager.GetSetting("MessagePrefix") + " " + sequencecounter++;
         }
 
         protected async void ButtonRefresh_Click(object sender, EventArgs e)
@@ -72,7 +50,7 @@ namespace Orleans.Azure.Samples.Web
         {
             try
             {
-                IChatGrainInterface grainRef = GrainClient.GrainFactory.GetGrain<IChatGrainInterface>(0);
+                IChatGrain grainRef = GrainClient.GrainFactory.GetGrain<IChatGrain>(0);
                 LocalState s = await grainRef.GetLocalState();
                 UpdateText(s);
             }
@@ -81,19 +59,20 @@ namespace Orleans.Azure.Samples.Web
                 DisplayError(exc);
             }
         }
- 
+
         private void UpdateText(LocalState s)
         {
-           var confirmedstate = string.Join("\n", s.ConfirmedState);
-           if (this.ConfirmedState.Text != confirmedstate)
-               this.ConfirmedState.Text = confirmedstate;
-           var unconfirmedupdates = string.Join("\n", s.UnconfirmedEvents);
-           if (this.UnconfirmedUpdates.Text != unconfirmedupdates)
-               this.UnconfirmedUpdates.Text = unconfirmedupdates;
-           var tentativestate = string.Join("\n", s.TentativeState);
-           if (this.TentativeState.Text != tentativestate)
-               this.TentativeState.Text = tentativestate;
+            var confirmedStateText = string.Join("\n", s.ConfirmedState);
+            if (this.ConfirmedState.Text != confirmedStateText)
+                this.ConfirmedState.Text = confirmedStateText;
+            var unconfirmedupdates = string.Join("\n", s.UnconfirmedEvents);
+            if (this.UnconfirmedUpdates.Text != unconfirmedupdates)
+                this.UnconfirmedUpdates.Text = unconfirmedupdates;
+            var tentativestate = string.Join("\n", s.TentativeState);
+            if (this.TentativeState.Text != tentativestate)
+                this.TentativeState.Text = tentativestate;
         }
+
         private void DisplayError(Exception exc)
         {
             while (exc is AggregateException) exc = exc.InnerException;
@@ -107,8 +86,8 @@ namespace Orleans.Azure.Samples.Web
         {
             try
             {
-                IChatGrainInterface grainRef = GrainClient.GrainFactory.GetGrain<IChatGrainInterface>(0);
-                LocalState s = await grainRef.AppendMessage(NameTextBox.Text);
+                IChatGrain grainRef = GrainClient.GrainFactory.GetGrain<IChatGrain>(0);
+                LocalState s = await grainRef.AppendMessage(this.NameTextBox.Text);
                 UpdateText(s);
                 UpdateMessageText();
             }
@@ -122,7 +101,7 @@ namespace Orleans.Azure.Samples.Web
         {
             try
             {
-                IChatGrainInterface grainRef = GrainClient.GrainFactory.GetGrain<IChatGrainInterface>(0);
+                IChatGrain grainRef = GrainClient.GrainFactory.GetGrain<IChatGrain>(0);
                 LocalState s = await grainRef.ClearAll();
                 UpdateText(s);
             }
@@ -131,6 +110,5 @@ namespace Orleans.Azure.Samples.Web
                 DisplayError(exc);
             }
         }
-
     }
 }
