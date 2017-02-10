@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if !NETSTANDARD_TODO
 using System.Reflection.PortableExecutable;
+#endif
 using System.Text;
 
 namespace Orleans.Runtime
@@ -420,7 +422,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                complaints = new[] { ex.ToString() };
+                complaints = new[] { LogFormatter.PrintException(ex) };
                 return false;
             }
         }
