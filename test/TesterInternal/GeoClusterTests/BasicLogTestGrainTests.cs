@@ -28,12 +28,12 @@ namespace Tests.GeoClusterTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
 
-                //AdjustConfig = cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString,cfg)
                 options.ClusterConfiguration.AddAzureTableStorageProvider();
                 options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
                 options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
                 options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
-                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster");
+
+                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
 
                 options.ClusterConfiguration.ApplyToAllNodes(o=>o.TraceLevelOverrides.Add(new Tuple<string, Severity>("LogViews", Severity.Verbose2)));
 
