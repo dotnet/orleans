@@ -2,6 +2,9 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Orleans;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using UnitTests.GrainInterfaces;
 using Orleans.TestingHost;
 using Xunit;
@@ -10,27 +13,38 @@ using TestExtensions;
 
 namespace Tests.GeoClusterTests
 {
-    public class BasicLogTestGrainTests : TestingSiloHost
+    public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
+        private readonly Fixture fixture;
+        private Random random;
 
-
-        public BasicLogTestGrainTests() :
-            base(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString,cfg)
-                }
-            )
-
+        public class Fixture : BaseTestClusterFixture
         {
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(1);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
+
+                options.ClusterConfiguration.AddAzureTableStorageProvider();
+                options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
+                options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
+                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
+
+                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
+
+                options.ClusterConfiguration.ApplyToAllNodes(o=>o.TraceLevelOverrides.Add(new Tuple<string, Severity>("LogViews", Severity.Verbose2)));
+
+                return new TestCluster(options);
+            }
+        }
+        public BasicLogTestGrainTests(Fixture fixture)
+        {
+            this.fixture = fixture;
             this.random = new Random();
         }
-
-        private Random random;
 
         [Fact, TestCategory("GeoCluster")]
         public async Task DefaultStorage()
@@ -81,7 +95,7 @@ namespace Tests.GeoClusterTests
             Func<Task> checker1 = async () =>
             {
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetAGlobal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a); // value of A survive grain call
@@ -92,7 +106,7 @@ namespace Tests.GeoClusterTests
             Func<Task> checker2 = async () =>
             {
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 Assert.Equal(0, await grain.GetConfirmedVersion());
                 await grain.SetALocal(x);
                 int a = await grain.GetALocal();
@@ -104,7 +118,7 @@ namespace Tests.GeoClusterTests
             {
                 // Local then Global
                 int x = GetRandom();
-                var grain = GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetALocal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a);

@@ -52,7 +52,6 @@
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
-    <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\ClientIdPartitionDataRebuildTests.cs" />
     <Compile Include="StorageTests\CommonStorageTests.cs" />
     <Compile Include="StorageTests\CommonStorageUtilities.cs" />
