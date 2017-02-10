@@ -6,6 +6,7 @@ namespace Orleans.Runtime
     [Serializable]
     internal class GenericGrainTypeData : GrainTypeData
     {
+        private static readonly Type GenericGrainStateType = typeof(Grain<>);
         private readonly Type activationType;
         private readonly Type stateObjectType;
 
@@ -23,9 +24,26 @@ namespace Orleans.Runtime
         {
             // Need to make a non-generic instance of the class to access the static data field. The field itself is independent of the instantiated type.
             var concreteActivationType = activationType.MakeGenericType(typeArgs);
-            var concreteStateObjectType = (stateObjectType != null && stateObjectType.GetTypeInfo().IsGenericType) ? stateObjectType.GetGenericTypeDefinition().MakeGenericType(typeArgs) : stateObjectType;
+            var typeInfo = this.stateObjectType?.GetTypeInfo();
+            var concreteStateObjectType = typeInfo != null && (typeInfo.IsGenericType || typeInfo.IsGenericParameter)
+                ? GetGrainStateType(concreteActivationType.GetTypeInfo())
+                : this.stateObjectType;
 
             return new GrainTypeData(concreteActivationType, concreteStateObjectType);
+        }
+
+        private static Type GetGrainStateType(TypeInfo grainType)
+        {
+            while (true)
+            {
+                if (grainType == null) return null;
+                if (grainType.IsGenericType && grainType.GetGenericTypeDefinition() == GenericGrainStateType)
+                {
+                    return grainType.GetGenericArguments()[0];
+                }
+
+                grainType = grainType.BaseType?.GetTypeInfo();
+            }
         }
     }
 }
