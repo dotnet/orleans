@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);EXCLUDEFSHARP</DefineConstants>
+  </PropertyGroup>
+</Project>

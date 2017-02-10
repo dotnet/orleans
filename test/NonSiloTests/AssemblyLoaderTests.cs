@@ -21,6 +21,8 @@ namespace UnitTests
 
             var exclusionList = NewExclusionList();
             var loader = NewAssemblyLoader(exclusionList);
+
+            var t = typeof(Orleans.Providers.IMemoryMessageBodySerializer);
             DiscoverAssemblies(loader, exclusionList);
         }
 
@@ -101,6 +103,18 @@ namespace UnitTests
                         {Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), 
                             SearchOption.AllDirectories}
                     };
+
+            //
+            // We need to add current directory in case if xUnit is running an isolated copy of this test dll.
+            //
+
+            var currentDirectory = Path.GetDirectoryName(Environment.CurrentDirectory);
+
+            if (!directories.ContainsKey(currentDirectory))
+            {
+                directories.Add(currentDirectory, SearchOption.AllDirectories);
+            }
+
             var excludeCriteria =
                 new AssemblyLoaderPathNameCriterion[]
                     {

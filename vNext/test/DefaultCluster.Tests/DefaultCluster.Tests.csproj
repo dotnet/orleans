@@ -24,8 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\..\test\DefaultCluster.Tests\DefaultCluster.Tests..xunit.runner.json">
-      <Link>DefaultCluster.Tests..xunit.runner.json</Link>
+    <Content Include="..\..\..\test\DefaultCluster.Tests\DefaultCluster.Tests.xunit.runner.json">
+      <Link>DefaultCluster.Tests.xunit.runner.json</Link>
     </Content>
   </ItemGroup>
 

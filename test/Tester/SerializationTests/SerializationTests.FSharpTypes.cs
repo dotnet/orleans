@@ -1,3 +1,4 @@
+#if !EXCLUDEFSHARP
 using Microsoft.FSharp.Core;
 using Orleans.Serialization;
 using TestExtensions;
@@ -56,3 +57,4 @@ namespace UnitTests.Serialization
         }
     }
 }
+#endif
