@@ -743,9 +743,20 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal(result, "Hello!");
         }
+        
+        /// <summary>
+        /// Tests that generic grains can have generic state and that the parameters to the Grain{TState}
+        /// class do not have to match the parameters to the grain class itself.
+        /// </summary>
+        /// <returns></returns>
+        [Fact, TestCategory("BVT"), TestCategory("Generics")]
+        public async Task GenericGrainStateParameterMismatchTest()
+        {
+            var grain = this.GrainFactory.GetGrain<IGenericGrainWithGenericState<int, List<Guid>, string>>(Guid.NewGuid());
+            var result = await grain.GetStateType();
+            Assert.Equal(typeof(List<Guid>), result);
+        }
     }
-
-
 
     namespace Generic.EdgeCases
     {
