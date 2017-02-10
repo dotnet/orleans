@@ -5,6 +5,17 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
+    public interface IGenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> : IGrainWithGuidKey
+    {
+        Task<Type> GetStateType();
+    }
+
+    public class GenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> : Grain<TStateType>,
+        IGenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> where TStateType : new()
+    {
+        public Task<Type> GetStateType() => Task.FromResult(this.State.GetType());
+    }
+
     public interface IGenericGrain<T, U> : IGrainWithIntegerKey
     {
         Task SetT(T a);
