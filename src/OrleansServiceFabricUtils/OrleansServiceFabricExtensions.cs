@@ -31,12 +31,12 @@ namespace Microsoft.Orleans.ServiceFabric
             AddStandardServices(serviceCollection);
 
             // Use Service Fabric for cluster membership.
-            serviceCollection.AddSingleton(
+            serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
                 sp =>
-                new FabricServiceSiloResolver(
-                    service.Context.ServiceName,
-                    sp.GetService<IFabricQueryManager>(),
-                    sp.GetService<Func<string, Logger>>()));
+                    new FabricServiceSiloResolver(
+                        service.Context.ServiceName,
+                        sp.GetService<IFabricQueryManager>(),
+                        sp.GetService<Func<string, Logger>>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
 
@@ -60,12 +60,12 @@ namespace Microsoft.Orleans.ServiceFabric
             AddStandardServices(serviceCollection);
 
             // Use Service Fabric for cluster membership.
-            serviceCollection.AddSingleton(
+            serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
                 sp =>
-                new FabricServiceSiloResolver(
-                    service.Context.ServiceName,
-                    sp.GetService<IFabricQueryManager>(),
-                    sp.GetService<Func<string, Logger>>()));
+                    new FabricServiceSiloResolver(
+                        service.Context.ServiceName,
+                        sp.GetService<IFabricQueryManager>(),
+                        sp.GetService<Func<string, Logger>>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
@@ -90,8 +90,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 sp =>
                 new FabricServiceSiloResolver(
                     serviceName,
-                    sp.GetService<IFabricQueryManager>(),
-                    sp.GetService<Func<string, Logger>>()));
+                    sp.GetService<IFabricQueryManager>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             return serviceCollection;
         }
