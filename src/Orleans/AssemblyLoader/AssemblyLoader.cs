@@ -363,59 +363,56 @@ namespace Orleans.Runtime
         private static bool IsCompatibleWithCurrentProcess(string fileName, out string[] complaints)
         {
             complaints = null;
+            Stream peImage = null;
 
             try
             {
-                using (var peImage = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                peImage = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using (var peReader = new PEReader(peImage, PEStreamOptions.PrefetchMetadata))
                 {
-                    using (var peReader = new PEReader(peImage, PEStreamOptions.LeaveOpen | PEStreamOptions.PrefetchMetadata))
+                    peImage = null;
+                    if (peReader.HasMetadata)
                     {
-                        if (peReader.HasMetadata)
+                        var processorArchitecture = ProcessorArchitecture.MSIL;
+
+                        var isPureIL = (peReader.PEHeaders.CorHeader.Flags & CorFlags.ILOnly) != 0;
+
+                        if (peReader.PEHeaders.PEHeader.Magic == PEMagic.PE32Plus)
+                            processorArchitecture = ProcessorArchitecture.Amd64;
+                        else if ((peReader.PEHeaders.CorHeader.Flags & CorFlags.Requires32Bit) != 0 || !isPureIL)
+                            processorArchitecture = ProcessorArchitecture.X86;
+
+                        var isLoadable = (isPureIL && processorArchitecture == ProcessorArchitecture.MSIL) ||
+                                             (Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.Amd64) ||
+                                             (!Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.X86);
+
+                        if (!isLoadable)
                         {
-                            var processorArchitecture = ProcessorArchitecture.MSIL;
-
-                            var isPureIL = (peReader.PEHeaders.CorHeader.Flags & CorFlags.ILOnly) != 0;
-
-                            if (peReader.PEHeaders.PEHeader.Magic == PEMagic.PE32Plus)
-                                processorArchitecture = ProcessorArchitecture.Amd64;
-                            else if ((peReader.PEHeaders.CorHeader.Flags & CorFlags.Requires32Bit) != 0 || !isPureIL)
-                                processorArchitecture = ProcessorArchitecture.X86;
-
-                            var isManaged = isPureIL || processorArchitecture == ProcessorArchitecture.MSIL;
-
-
-                            var isLoadable = (isPureIL && processorArchitecture == ProcessorArchitecture.MSIL) ||
-                                                 (Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.Amd64) ||
-                                                 (!Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.X86);
-
-                            if (!isLoadable)
-                            {
-                                complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the compliled for a different processor architecture." };
-                            }
-
-                            return isLoadable;
+                            complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the compliled for a different processor architecture." };
                         }
-                        else
-                        {
-                            complaints = new[] { $"The file {fileName} does not contain any CLR metadata, probably it is a native file." };
-                            return false;
-                        }
+
+                        return isLoadable;
+                    }
+                    else
+                    {
+                        complaints = new[] { $"The file {fileName} does not contain any CLR metadata, probably it is a native file." };
+                        return false;
                     }
                 }
             }
-            catch (IOException ex)
+            catch (IOException)
             {
                 return false;
             }
-            catch (BadImageFormatException ex)
+            catch (BadImageFormatException)
             {
                 return false;
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
                 return false;
             }
-            catch (MissingMethodException ex)
+            catch (MissingMethodException)
             {
                 complaints = new[] { "MissingMethodException occured. Please try to add a BindingRedirect for System.Collections.ImmutableCollections to the App.config file to correct this error." };
                 return false;
@@ -424,6 +421,10 @@ namespace Orleans.Runtime
             {
                 complaints = new[] { LogFormatter.PrintException(ex) };
                 return false;
+            }
+            finally
+            {
+                peImage?.Dispose();
             }
         }
 
