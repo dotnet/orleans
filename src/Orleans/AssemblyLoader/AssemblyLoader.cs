@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using System.Text;
 
 namespace Orleans.Runtime
@@ -14,7 +15,6 @@ namespace Orleans.Runtime
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
         private readonly Logger logger;
-        private readonly Lazy<ExeImageInfo> exeInfo = new Lazy<ExeImageInfo>(LoadImageInformation);
 
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
@@ -322,34 +322,31 @@ namespace Orleans.Runtime
                 if (SimulateReflectionOnlyLoadFailure)
                     throw NewTestUnexpectedException();
 
-                assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
-                if (!IsCompatibleWithCurrentProcess(assembly, out complaints))
+                if (IsCompatibleWithCurrentProcess(pathName, out complaints))
+                {
+                    assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
+                }
+                else
                 {
                     assembly = null;
                     return false;
                 }
             }
-            catch (BadImageFormatException)
-            {
-                complaints = new[] { "The image was not a CLR image." };
-                assembly = null;
-                return false;
-            }
-            catch (FileLoadException e)
+            catch (FileLoadException ex)
             {
                 assembly = null;
                 if (!InterpretFileLoadException(pathName, out complaints))
-                    complaints = ReportUnexpectedException(e);
+                    complaints = ReportUnexpectedException(ex);
 
                 if (RethrowDiscoveryExceptions)
                     throw;
                 
                 return false;
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 assembly = null;
-                complaints = ReportUnexpectedException(e);
+                complaints = ReportUnexpectedException(ex);
 
                 if (RethrowDiscoveryExceptions)
                     throw;
@@ -361,40 +358,71 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private bool IsCompatibleWithCurrentProcess(Assembly assembly, out string[] complaints)
+        private static bool IsCompatibleWithCurrentProcess(string fileName, out string[] complaints)
         {
             complaints = null;
-            ImageFileMachine machine;
-            PortableExecutableKinds peKind;
-            assembly.Modules.First().GetPEKind(out peKind, out machine);
-            if (peKind == PortableExecutableKinds.ILOnly && machine == ImageFileMachine.I386)
-            {
-                // anycpu
-                return true;
-            }
 
-            if (peKind.HasFlag(PortableExecutableKinds.NotAPortableExecutableImage) ||
-                peKind.HasFlag(PortableExecutableKinds.Unmanaged32Bit))
+            try
             {
-                // this block of code should never run since the assembly was successfully loaded
-                throw new InvalidOperationException("Unexpected block of code reached");
-            }
+                using (var peImage = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    using (var peReader = new PEReader(peImage, PEStreamOptions.LeaveOpen | PEStreamOptions.PrefetchMetadata))
+                    {
+                        if (peReader.HasMetadata)
+                        {
+                            var processorArchitecture = ProcessorArchitecture.MSIL;
 
-            if ((peKind.HasFlag(PortableExecutableKinds.Required32Bit) && Environment.Is64BitProcess) || 
-                (peKind.HasFlag(PortableExecutableKinds.PE32Plus) && !Environment.Is64BitProcess))
+                            var isPureIL = (peReader.PEHeaders.CorHeader.Flags & CorFlags.ILOnly) != 0;
+
+                            if (peReader.PEHeaders.PEHeader.Magic == PEMagic.PE32Plus)
+                                processorArchitecture = ProcessorArchitecture.Amd64;
+                            else if ((peReader.PEHeaders.CorHeader.Flags & CorFlags.Requires32Bit) != 0 || !isPureIL)
+                                processorArchitecture = ProcessorArchitecture.X86;
+
+                            var isManaged = isPureIL || processorArchitecture == ProcessorArchitecture.MSIL;
+
+
+                            var isLoadable = (isPureIL && processorArchitecture == ProcessorArchitecture.MSIL) ||
+                                                 (Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.Amd64) ||
+                                                 (!Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.X86);
+
+                            if (!isLoadable)
+                            {
+                                complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the compliled for a different processor architecture." };
+                            }
+
+                            return isLoadable;
+                        }
+                        else
+                        {
+                            complaints = new[] { $"The file {fileName} does not contain any CLR metadata, probably it is a native file." };
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch (IOException ex)
             {
-                // targets wrong bitness
-                complaints = new[] { $"The assembly {assembly.FullName} is compiled for a different platform than the running process" };
                 return false;
             }
-
-            if (machine != this.exeInfo.Value.MachineType)
+            catch (BadImageFormatException ex)
             {
-                complaints = new[] { $"The assembly {assembly.FullName} was compiled for {machine} but the current exe was compiled for {this.exeInfo.Value.MachineType}" };
                 return false;
             }
-
-            return true;
+            catch (UnauthorizedAccessException ex)
+            {
+                return false;
+            }
+            catch (MissingMethodException ex)
+            {
+                complaints = new[] { "MissingMethodException occured. Please try to add a BindingRedirect for System.Collections.ImmutableCollections to the App.config file to correct this error." };
+                return false;
+            }
+            catch (Exception ex)
+            {
+                complaints = new[] { ex.ToString() };
+                return false;
+            }
         }
 
         private void LogComplaint(string pathName, string complaint)
@@ -421,15 +449,6 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException("No complaint provided for assembly.");
             // we can't use an error code here because we want each log message to be displayed.
             logger.Info(msg.ToString());
-        }
-
-        private static ExeImageInfo LoadImageInformation()
-        {
-            PortableExecutableKinds peKind;
-            ImageFileMachine machine;
-
-            Assembly.GetEntryAssembly().Modules.First().GetPEKind(out peKind, out machine);
-            return new ExeImageInfo {PEKind = peKind, MachineType = machine};
         }
 
         private static AggregateException NewTestUnexpectedException()
@@ -484,13 +503,6 @@ namespace Orleans.Runtime
         private bool AssemblyPassesLoadCriteria(string pathName)
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
-        }
-
-        private class ExeImageInfo
-        {
-            public PortableExecutableKinds PEKind;
-
-            public ImageFileMachine MachineType;
         }
 #endif
     }
