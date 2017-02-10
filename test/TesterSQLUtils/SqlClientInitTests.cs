@@ -5,6 +5,7 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -59,8 +60,8 @@ namespace Tester.SQLUtils
 
             Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
 
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient)RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
+            var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
+            Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
             Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 

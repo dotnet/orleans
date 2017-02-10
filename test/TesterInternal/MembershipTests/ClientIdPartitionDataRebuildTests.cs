@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -87,10 +88,11 @@ namespace UnitTests.MembershipTests
         {
             // Ensure the client entry is on Silo2 partition
             GrainId clientId = null;
+            var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
             for (var i = 0; i < 100; i++)
             {
                 CreateAndDeployTestCluster();
-                clientId = ((OutsideRuntimeClient) RuntimeClient.Current).CurrentActivationAddress.Grain;
+                clientId = client.CurrentActivationAddress.Grain;
                 var report = await TestUtils.GetDetailedGrainReport(clientId, hostedCluster.Primary);
                 if (this.hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
                 {

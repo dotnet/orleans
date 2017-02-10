@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -71,6 +72,11 @@ namespace Orleans.TestingHost
         /// </summary>
         internal IInternalGrainFactory InternalGrainFactory { get; private set; }
         
+        /// <summary>
+        /// Client-side <see cref="IServiceProvider"/> to use in the tests.
+        /// </summary>
+        public IServiceProvider ServiceProvider { get; private set; }
+
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -415,7 +421,8 @@ namespace Orleans.TestingHost
             GrainClient.Initialize(clientConfig);
             this.GrainFactory = GrainClient.GrainFactory;
             this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
-            this.StreamProviderManager = RuntimeClient.Current.CurrentStreamProviderManager;
+            this.ServiceProvider = GrainClient.ServiceProvider;
+            this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }
         
         private async Task InitializeAsync(IEnumerable<string> siloNames)

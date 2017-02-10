@@ -110,6 +110,7 @@ namespace Orleans
             services.AddSingleton<IServiceProvider>(sp => sp);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
+            services.AddSingleton(this);
             services.AddSingleton<IRuntimeClient>(this);
             services.AddSingleton<GrainFactory>();
             services.AddFromExisting<IGrainFactory, GrainFactory>();

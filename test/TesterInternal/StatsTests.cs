@@ -12,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using System.Collections;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.SqlServer;
 
 namespace UnitTests.Stats
@@ -54,8 +55,8 @@ namespace UnitTests.Stats
         {
             ClientConfiguration config = this.HostedCluster.ClientConfiguration;
 
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics);
+            var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
+            Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
             Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 

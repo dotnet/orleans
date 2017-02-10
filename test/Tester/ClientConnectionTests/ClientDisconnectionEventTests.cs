@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -23,7 +24,7 @@ namespace Tester.ClientConnectionTests
         [Fact, TestCategory("BVT")]
         public async Task EventSendWhenDisconnectedFromCluster()
         {
-            var runtime = (OutsideRuntimeClient) RuntimeClient.Current;
+            var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             var semaphore = new SemaphoreSlim(0, 1);
             GrainClient.ClusterConnectionLost += (sender, args) => semaphore.Release();
