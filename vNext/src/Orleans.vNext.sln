@@ -55,6 +55,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184
 		NuGet\Microsoft.Orleans.OrleansGoogleUtils.nuspec = NuGet\Microsoft.Orleans.OrleansGoogleUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
 		NuGet\Microsoft.Orleans.OrleansRuntime.nuspec = NuGet\Microsoft.Orleans.OrleansRuntime.nuspec
+		NuGet\Microsoft.Orleans.OrleansServiceBus.nuspec = NuGet\Microsoft.Orleans.OrleansServiceBus.nuspec
 		NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec = NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.AI.nuspec = NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.AI.nuspec
 		NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec = NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec
@@ -116,6 +117,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCodeGeneratorBuildMetaPackage", "OrleansCodeGeneratorBuildMetaPackage\OrleansCodeGeneratorBuildMetaPackage.csproj", "{35501066-738F-4DA1-9BBF-4D863FA55BBC}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansServerMetaPackage", "OrleansServerMetaPackage\OrleansServerMetaPackage.csproj", "{4345AFF3-8B57-472B-8934-EDE375D4DC1A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansServiceBus", "OrleansServiceBus\OrleansServiceBus.csproj", "{69C6C088-4485-440D-B2A6-183F610CBF0A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceBus.Tests", "..\test\ServiceBus.Tests\ServiceBus.Tests.csproj", "{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -571,6 +576,30 @@ Global
 		{4345AFF3-8B57-472B-8934-EDE375D4DC1A}.Release|x64.Build.0 = Release|x64
 		{4345AFF3-8B57-472B-8934-EDE375D4DC1A}.Release|x86.ActiveCfg = Release|x86
 		{4345AFF3-8B57-472B-8934-EDE375D4DC1A}.Release|x86.Build.0 = Release|x86
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|x64.ActiveCfg = Debug|x64
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|x64.Build.0 = Debug|x64
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|x86.ActiveCfg = Debug|x86
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Debug|x86.Build.0 = Debug|x86
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|x64.ActiveCfg = Release|x64
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|x64.Build.0 = Release|x64
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|x86.ActiveCfg = Release|x86
+		{69C6C088-4485-440D-B2A6-183F610CBF0A}.Release|x86.Build.0 = Release|x86
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|x64.ActiveCfg = Debug|x64
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|x64.Build.0 = Debug|x64
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|x86.ActiveCfg = Debug|x86
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Debug|x86.Build.0 = Debug|x86
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|x64.ActiveCfg = Release|x64
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|x64.Build.0 = Release|x64
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|x86.ActiveCfg = Release|x86
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -614,5 +643,7 @@ Global
 		{C2722CE8-7101-4E29-8123-20010FFBE83E} = {8ED4353E-6B58-4B2D-86D2-D96AD3A7EE6D}
 		{35501066-738F-4DA1-9BBF-4D863FA55BBC} = {8ED4353E-6B58-4B2D-86D2-D96AD3A7EE6D}
 		{4345AFF3-8B57-472B-8934-EDE375D4DC1A} = {8ED4353E-6B58-4B2D-86D2-D96AD3A7EE6D}
+		{69C6C088-4485-440D-B2A6-183F610CBF0A} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
+		{5D2FB41F-806F-4769-BC15-7BF08C1BD1D2} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal

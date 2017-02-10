@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -67,6 +67,9 @@
     </Compile>
     <Compile Include="..\..\..\test\Tester\StreamingTests\SubscriptionMultiplicityTestRunner.cs">
       <Link>StreamingTests\SubscriptionMultiplicityTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs">
+      <Link>StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\Tester\TestStreamProviders\FailureInjectionStreamProvider.cs">
       <Link>TestStreamProviders\FailureInjectionStreamProvider.cs</Link>

@@ -1,6 +1,4 @@
-﻿
-using Microsoft.ServiceBus.Messaging;
-using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 
 namespace Orleans.ServiceBus.Providers
@@ -11,7 +9,7 @@ namespace Orleans.ServiceBus.Providers
 
         public EventHubPartitionCheckpointEntity()
         {
-            Offset = EventHubConsumerGroup.StartOfStream;
+            Offset = EventHubConstants.StartOfStream;
         }
 
         public static EventHubPartitionCheckpointEntity Create(string streamProviderName, string checkpointNamespace, string partition)

@@ -1,0 +1,37 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansServiceBus</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans ServiceBus Utilities</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      ServiceBus Utilities Library of Microsoft Orleans - OrleansServiceBus.dll
+    </summary>
+    <description>
+      Library of utility types for Microsoft Azure ServiceBus of Microsoft Orleans.
+    </description>
+    <copyright>Copyright Microsoft 2016</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.5">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+		<dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+		<dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+		<dependency id="Microsoft.Orleans.OrleansServiceBus" version="$version$" />
+        <dependency id="Microsoft.Azure.EventHubs" version="1.0.0" />
+        <dependency id="Microsoft.Azure.EventHubs.Processor" version="1.0.0" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansServiceBus.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansServiceBus.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansServiceBus.xml" target="lib\netstandard1.5" />
+    <file src="$SRC_DIR$OrleansServiceBus\**\*.cs" exclude="$SRC_DIR$OrleansServiceBus\obj\**\*.*;$SRC_DIR$OrleansServiceBus\bin\**\*.*" target="src" />
+  </files>
+</package>
