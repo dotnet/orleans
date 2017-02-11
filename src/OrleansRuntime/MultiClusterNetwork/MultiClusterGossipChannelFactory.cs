@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -7,11 +8,13 @@ namespace Orleans.Runtime.MultiClusterNetwork
     internal class MultiClusterGossipChannelFactory
     {
         private readonly GlobalConfiguration globalConfig;
+        private readonly IServiceProvider serviceProvider;
         private readonly Logger logger;
 
-        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig)
+        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider)
         {
             this.globalConfig = globalConfig;
+            this.serviceProvider = serviceProvider;
             logger = LogManager.GetLogger("MultiClusterGossipChannelFactory", LoggerType.Runtime);
         }
 
@@ -28,7 +31,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     switch (channelConfiguration.ChannelType)
                     {
                         case GlobalConfiguration.GossipChannelType.AzureTable:
-                            var tableChannel = AssemblyLoader.LoadAndCreateInstance<IGossipChannel>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                            var tableChannel = AssemblyLoader.LoadAndCreateInstance<IGossipChannel>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
                             await tableChannel.Initialize(globalConfig.ServiceId, channelConfiguration.ConnectionString);
                             gossipChannels.Add(tableChannel);
                             break;
