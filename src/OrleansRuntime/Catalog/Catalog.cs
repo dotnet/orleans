@@ -209,12 +209,12 @@ namespace Orleans.Runtime
 
         public IList<SiloAddress> GetCompatibleSiloList(GrainId grain)
         {
-            // For test only: if we have silos taht are not yet in the Cluster TypeMap, we assume that they are compatible
+            // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-                var typeCode = grain.GetTypeCode();
+            var typeCode = grain.GetTypeCode();
             var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode).Intersect(AllActiveSilos).ToList();
             if (compatibleSilos.Count == 0)
                 throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
