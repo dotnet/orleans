@@ -88,10 +88,10 @@ namespace UnitTests.MembershipTests
         {
             // Ensure the client entry is on Silo2 partition
             GrainId clientId = null;
-            var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
             for (var i = 0; i < 100; i++)
             {
                 CreateAndDeployTestCluster();
+                var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
                 clientId = client.CurrentActivationAddress.Grain;
                 var report = await TestUtils.GetDetailedGrainReport(clientId, hostedCluster.Primary);
                 if (this.hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
