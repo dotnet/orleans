@@ -118,6 +118,7 @@ namespace Orleans
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<ClientStatisticsManager>();
             this.ServiceProvider = services.BuildServiceProvider();
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
@@ -271,7 +272,7 @@ namespace Orleans
             transport.Start();
             LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
-            ClientStatistics = new ClientStatisticsManager(config, this.ServiceProvider);
+            ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
 
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;

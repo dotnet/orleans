@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         private RuntimeStatisticsGroup runtimeStats;
         private readonly Logger logger;
 
-        internal ClientStatisticsManager(ClientConfiguration config, IServiceProvider serviceProvider)
+        public ClientStatisticsManager(ClientConfiguration config, IServiceProvider serviceProvider)
         {
             this.config = config;
             this.serviceProvider = serviceProvider;
