@@ -380,8 +380,7 @@ namespace Orleans.Runtime
         /// <param name="activation"></param>
         public void RegisterMessageTarget(ActivationData activation)
         {
-            var context = new SchedulingContext(activation);
-            scheduler.RegisterWorkContext(context);
+            scheduler.RegisterWorkContext(activation.SchedulingContext);
             activations.RecordNewTarget(activation);
             activationsCreated.Increment();
         }
@@ -398,7 +397,7 @@ namespace Orleans.Runtime
             ActivationCollector.TryCancelCollection(activation);
             activationsDestroyed.Increment();
 
-            scheduler.UnregisterWorkContext(new SchedulingContext(activation));
+            scheduler.UnregisterWorkContext(activation.SchedulingContext);
 
             if (activation.GrainInstance == null) return;
 
@@ -877,7 +876,7 @@ namespace Orleans.Runtime
 
                     await scheduler.RunOrQueueTask(() =>
                         result.StorageProvider.ReadStateAsync(grainType, grainRef, state),
-                        new SchedulingContext(result));
+                        result.SchedulingContext);
                     
                     sw.Stop();
                     StorageStatisticsGroup.OnStorageActivate(result.StorageProvider, grainType, result.GrainReference, sw.Elapsed);
@@ -1135,7 +1134,7 @@ namespace Orleans.Runtime
                 foreach (var activation in list)
                 {
                     var activationData = activation; // Capture loop variable
-                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData), new SchedulingContext(activationData));
+                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData), activationData.SchedulingContext);
                     tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
                 }
                 var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
@@ -1379,7 +1378,7 @@ namespace Orleans.Runtime
             {
                 activation.SetState(ActivationState.Activating);
             }
-            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), new SchedulingContext(activation)); // Target grain's scheduler context);
+            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation.SchedulingContext); // Target grain's scheduler context);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 #endregion

@@ -1008,7 +1008,7 @@ namespace Orleans.Runtime
                 Utils.SafeExecute(() =>
                 {
                     var activationData = enumerator.Current.Value;
-                    var workItemGroup = scheduler.GetWorkItemGroup(new SchedulingContext(activationData));
+                    var workItemGroup = scheduler.GetWorkItemGroup(activationData.SchedulingContext);
                     if (workItemGroup == null)
                     {
                         sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",
