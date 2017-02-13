@@ -138,9 +138,7 @@ namespace Orleans.ServiceBus.Providers
         public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken streamToken)
         {
             var realToken = (EventSequenceToken)streamToken;
-            return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                : 0 - realToken.EventIndex;
+            return (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber);
         }
 
         /// <summary>
@@ -237,7 +235,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public virtual StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
         {
-            return new EventSequenceTokenV2(cachedMessage.SequenceNumber, 0);
+            return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
         /// <summary>
@@ -257,9 +255,9 @@ namespace Orleans.ServiceBus.Providers
             IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
             StreamSequenceToken token =
 #if NETSTANDARD
-                new EventSequenceTokenV2(queueMessage.SystemProperties.SequenceNumber, 0);
+                new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
-                new EventSequenceTokenV2(queueMessage.SequenceNumber, 0); 
+                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
 #endif
             return new StreamPosition(stremIdentity, token);
         }

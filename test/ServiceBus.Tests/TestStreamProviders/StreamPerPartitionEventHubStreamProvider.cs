@@ -54,9 +54,9 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
                 StreamSequenceToken token =
 #if NETSTANDARD
-                new EventSequenceTokenV2(queueMessage.SystemProperties.SequenceNumber, 0);
+                new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
-                new EventSequenceTokenV2(queueMessage.SequenceNumber, 0); 
+                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
 #endif
                 return new StreamPosition(stremIdentity, token);
             }
