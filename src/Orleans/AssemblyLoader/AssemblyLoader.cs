@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.PortableExecutable;
 #endif
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
@@ -111,14 +112,14 @@ namespace Orleans.Runtime
             }
         }
 
-        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
+        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
         {
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(assemblyName));
                 var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
 
-                return (T)Activator.CreateInstance(foundType, true);
+                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
             }
             catch (Exception exc)
             {

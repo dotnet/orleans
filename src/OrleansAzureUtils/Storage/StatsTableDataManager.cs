@@ -63,7 +63,7 @@ namespace Orleans.AzureUtils
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private StatsTableDataManager()
+        public StatsTableDataManager()
         {
             logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             

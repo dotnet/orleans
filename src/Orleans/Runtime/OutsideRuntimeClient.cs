@@ -118,6 +118,7 @@ namespace Orleans
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<ClientStatisticsManager>();
             this.ServiceProvider = services.BuildServiceProvider();
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
@@ -184,7 +185,7 @@ namespace Orleans
                 config.CheckGatewayProviderSettings();
 
                 var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-                var gatewayListProvider = new GatewayProviderFactory(this.config).CreateGatewayListProvider();
+                var gatewayListProvider = new GatewayProviderFactory(this.config, this.ServiceProvider).CreateGatewayListProvider();
                 gatewayListProvider.InitializeGatewayListProvider(this.config, LogManager.GetLogger(gatewayListProvider.GetType().Name)).WaitWithThrow(initTimeout);
                 transport = new ProxiedMessageCenter(config, localAddress, generation, handshakeClientId, gatewayListProvider, this.messageFactory);
 
@@ -271,7 +272,7 @@ namespace Orleans
             transport.Start();
             LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
-            ClientStatistics = new ClientStatisticsManager(config);
+            ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
 
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;

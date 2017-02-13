@@ -25,7 +25,7 @@ namespace Orleans.Runtime
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
             var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
 
-            ReminderTable.Initialize(silo, grainFactory, silo.GlobalConfig.ReminderTableAssembly);
+            ReminderTable.Initialize(silo.GlobalConfig, grainFactory, runtimeClient.ServiceProvider);
             return new LocalReminderService(
                 silo,
                 grainId, 

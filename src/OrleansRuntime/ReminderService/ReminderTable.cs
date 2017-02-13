@@ -8,9 +8,8 @@ namespace Orleans.Runtime.ReminderService
     {
         internal static IReminderTable Singleton { get; private set; }
 
-        public static void Initialize(Silo silo, IGrainFactory grainFactory, string reminderTableAssembly = null)
+        public static void Initialize(GlobalConfiguration config, IGrainFactory grainFactory, IServiceProvider serviceProvider)
         {
-            var config = silo.GlobalConfig;
             var serviceType = config.ReminderServiceType;
             var logger = LogManager.GetLogger("ReminderTable");
 
@@ -23,11 +22,11 @@ namespace Orleans.Runtime.ReminderService
                             serviceType));
 
                 case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
-                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(Constants.ORLEANS_SQL_UTILS_DLL, logger, serviceProvider);
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
-                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, serviceProvider);
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
@@ -39,7 +38,7 @@ namespace Orleans.Runtime.ReminderService
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.Custom:
-                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(reminderTableAssembly, logger);
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(config.ReminderTableAssembly, logger, serviceProvider);
                     return;
             }
         }
