@@ -11,7 +11,6 @@ using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using OrleansServiceBus.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {
