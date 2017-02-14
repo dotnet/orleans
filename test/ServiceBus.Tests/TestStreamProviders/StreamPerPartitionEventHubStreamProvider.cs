@@ -45,7 +45,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             public override StreamPosition GetStreamPosition(EventData queueMessage)
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
-                StreamSequenceToken token = new EventSequenceTokenV2(queueMessage.SequenceNumber, 0);
+                StreamSequenceToken token = new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
+
                 return new StreamPosition(stremIdentity, token);
             }
         }
