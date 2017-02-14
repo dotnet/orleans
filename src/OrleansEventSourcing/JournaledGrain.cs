@@ -168,6 +168,16 @@ namespace Orleans.EventSourcing
 
 
         /// <summary>
+        /// By default, upon activation, the journaled grain waits until it has loaded the latest
+        /// view from storage. Subclasses can override this behavior,
+        /// and skip the wait if desired.
+        /// </summary>
+        public override Task OnActivateAsync()
+        {
+            return LogViewAdaptor.Synchronize();
+        }
+
+        /// <summary>
         /// Retrieves a segment of the confirmed event sequence, possibly from storage. 
         /// Throws <see cref="NotSupportedException"/> if the events are not available to read.
         /// Whether events are available, and for how long, depends on the providers used and how they are configured.

@@ -63,6 +63,12 @@ namespace TestGrains
     /// </summary>
     public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
+
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done; // do not wait for initial load
+        }
+
         public async Task SetAGlobal(int x)
         {
             RaiseEvent(new UpdateA() { Val = x });
