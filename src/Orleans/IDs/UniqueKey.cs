@@ -114,7 +114,7 @@ namespace Orleans.Runtime
             // in the string representation of a key, we grab the least significant half of n1.
             // therefore, if n0 is non-zero and n1 is 0, then the string representation will always be
             // 0x0 and not useful for identification of the grain.
-            if (n1 == 0 && n1 != 0)
+            if (n1 == 0 && n0 != 0)
                 throw new ArgumentException("n0 cannot be zero unless n1 is non-zero.", "n0");
             if (category != Category.KeyExtGrain && category != Category.GeoClient && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
