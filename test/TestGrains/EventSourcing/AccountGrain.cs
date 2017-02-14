@@ -47,12 +47,6 @@ namespace TestGrains
             }
         }
 
-        /// <summary> On activation, ensure we are fully caught up with the latest version</summary>
-        public override Task OnActivateAsync()
-        {
-            return RefreshNow();
-        }
-
         public Task<uint> Balance()
         {
             return Task.FromResult(State.Balance);

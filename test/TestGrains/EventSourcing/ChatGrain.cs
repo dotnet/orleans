@@ -35,7 +35,7 @@ namespace TestGrains
         public override async Task OnActivateAsync()
         {
             // first, wait for all events to be loaded from storage so we are caught up with the latest version
-            await RefreshNow();
+            await base.OnActivateAsync();
 
             // if the chat has not been initialized, do that now
             if (Version == 0)
