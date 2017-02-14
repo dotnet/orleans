@@ -479,6 +479,10 @@ namespace Orleans.Runtime
                 if (typeCode != 0)
                 {
                     GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
+                    if (string.IsNullOrEmpty(grainType))
+                    {
+                        grainType = actualGrainType;
+                    }
                 }
                 else
                 {
@@ -490,11 +494,6 @@ namespace Orleans.Runtime
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     // create a dummy activation that will queue up messages until the real data arrives
-                    if (string.IsNullOrEmpty(grainType))
-                    {
-                        grainType = actualGrainType;
-                    }
-
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.
                     result = new ActivationData(
                         address, 
