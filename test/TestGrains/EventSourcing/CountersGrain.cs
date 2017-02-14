@@ -90,7 +90,7 @@ namespace TestGrains
 
         public Task<int> GetTentativeCount(string key)
         {
-            return Task.FromResult(State.Counts[key]);
+            return Task.FromResult(TentativeState.Counts[key]);
         }
 
         public Task<IReadOnlyDictionary<string, int>> GetTentativeState()
