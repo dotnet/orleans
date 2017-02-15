@@ -28,7 +28,7 @@ namespace Orleans.Streams
         private readonly IStreamQueueBalancer queueBalancer;
         private readonly IQueueAdapterFactory adapterFactory;
         private PersistentStreamProviderState managerState;
-        private readonly IDisposable queuePrintTimer;
+        private IDisposable queuePrintTimer;
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
@@ -74,7 +74,6 @@ namespace Orleans.Streams
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
-            queuePrintTimer = base.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
         }
 
         public Task Initialize(Immutable<IQueueAdapter> qAdapter)
@@ -92,6 +91,7 @@ namespace Orleans.Streams
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
             Log(ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
 
+            queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
             managerState = PersistentStreamProviderState.Initialized;
             return TaskDone.Done;
         }

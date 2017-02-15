@@ -983,14 +983,8 @@ namespace Orleans.Runtime
 
         internal void RegisterSystemTarget(SystemTarget target)
         {
-            scheduler.RegisterWorkContext(target.SchedulingContext);
-            activationDirectory.RecordNewSystemTarget(target);
-        }
-
-        internal void UnregisterSystemTarget(SystemTarget target)
-        {
-            activationDirectory.RemoveSystemTarget(target);
-            scheduler.UnregisterWorkContext(target.SchedulingContext);
+            var providerRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
+            providerRuntime.RegisterSystemTarget(target);
         }
 
         /// <summary> Return dump of diagnostic data from this silo. </summary>

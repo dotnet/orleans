@@ -321,12 +321,9 @@ namespace Orleans.Runtime
 
         public ActivationAddress Address { get; private set; }
 
-        public IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public void OnTimerCreated(IGrainTimer timer)
         {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, activationData: this);
             AddTimer(timer);
-            timer.Start();
-            return timer;
         }
 
         #endregion

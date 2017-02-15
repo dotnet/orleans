@@ -319,7 +319,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal async Task Invoke(IAddressable target, IInvokable invokable, Message message)
+        public async Task Invoke(IAddressable target, IInvokable invokable, Message message)
         {
             try
             {
@@ -634,12 +634,7 @@ namespace Orleans.Runtime
         {
             get { return MySilo; }
         }
-
-        public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
-        {
-            // Schedule call back to grain context
-            await this.Scheduler.QueueNamedTask(asyncFunction, context, activityName);
-        }
+        
 
         public void Reset(bool cleanup)
         {

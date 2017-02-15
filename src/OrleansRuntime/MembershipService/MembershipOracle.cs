@@ -148,7 +148,12 @@ namespace Orleans.Runtime.MembershipService
                         timerGetTableUpdates.Dispose();
 
                     timerGetTableUpdates = GrainTimer.FromTimerCallback(
-                        OnGetTableUpdateTimer, null, randomTableOffset, orleansConfig.Globals.TableRefreshTimeout, "Membership.ReadTableTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnGetTableUpdateTimer,
+                        null,
+                        randomTableOffset,
+                        orleansConfig.Globals.TableRefreshTimeout,
+                        "Membership.ReadTableTimer");
                     
                     timerGetTableUpdates.Start();
 
@@ -156,7 +161,12 @@ namespace Orleans.Runtime.MembershipService
                         timerProbeOtherSilos.Dispose();
 
                     timerProbeOtherSilos = GrainTimer.FromTimerCallback(
-                        OnProbeOtherSilosTimer, null, randomProbeOffset, orleansConfig.Globals.ProbeTimeout, "Membership.ProbeTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnProbeOtherSilosTimer,
+                        null,
+                        randomProbeOffset,
+                        orleansConfig.Globals.ProbeTimeout,
+                        "Membership.ProbeTimer");
                     
                     timerProbeOtherSilos.Start();
                 };
@@ -181,7 +191,12 @@ namespace Orleans.Runtime.MembershipService
                 timerIAmAliveUpdateInTable.Dispose();
 
             timerIAmAliveUpdateInTable = GrainTimer.FromTimerCallback(
-                OnIAmAliveUpdateInTableTimer, null, TimeSpan.Zero, orleansConfig.Globals.IAmAliveTablePublishTimeout, "Membership.IAmAliveTimer");
+                this.RuntimeClient.Scheduler,
+                OnIAmAliveUpdateInTableTimer,
+                null,
+                TimeSpan.Zero,
+                orleansConfig.Globals.IAmAliveTablePublishTimeout,
+                "Membership.IAmAliveTimer");
 
             timerIAmAliveUpdateInTable.Start();
         }

@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.Scheduler;
 
 
 namespace Orleans.Runtime
@@ -16,16 +17,18 @@ namespace Orleans.Runtime
         private int totalNumTicks;
         private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
+        private readonly OrleansTaskScheduler scheduler;
         private readonly IActivationData activationData;
 
         public string Name { get; }
         
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
-        private GrainTimer(IActivationData activationData, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
-            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
+            scheduler.CheckSchedulingContextValidity(ctxt);
+            this.scheduler = scheduler;
             this.activationData = activationData;
 
             this.Name = name;
@@ -40,6 +43,7 @@ namespace Orleans.Runtime
         }
 
         internal static GrainTimer FromTimerCallback(
+            OrleansTaskScheduler scheduler,
             TimerCallback callback,
             object state,
             TimeSpan dueTime,
@@ -47,6 +51,7 @@ namespace Orleans.Runtime
             string name = null)
         {
             return new GrainTimer(
+                scheduler,
                 null,
                 ob =>
                 {
@@ -61,14 +66,15 @@ namespace Orleans.Runtime
         }
 
         internal static IGrainTimer FromTaskCallback(
-                Func<object, Task> asyncCallback,
-                object state,
-                TimeSpan dueTime,
-                TimeSpan period,
-                string name = null,
-                IActivationData activationData = null)
+            OrleansTaskScheduler scheduler,
+            Func<object, Task> asyncCallback,
+            object state,
+            TimeSpan dueTime,
+            TimeSpan period,
+            string name = null,
+            IActivationData activationData = null)
         {
-            return new GrainTimer(activationData, asyncCallback, state, dueTime, period, name);
+            return new GrainTimer(scheduler, activationData, asyncCallback, state, dueTime, period, name);
         }
 
         public void Start()
@@ -90,7 +96,8 @@ namespace Orleans.Runtime
                 return;
             try
             {
-                await RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(state), context, Name);
+                // Schedule call back to grain context
+                await this.scheduler.QueueNamedTask(() => ForwardToAsyncCallback(state), context, this.Name);
             }
             catch (InvalidSchedulingContextException exc)
             {

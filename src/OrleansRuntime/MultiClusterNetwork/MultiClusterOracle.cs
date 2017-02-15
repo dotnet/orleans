@@ -177,6 +177,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 timer.Dispose();
 
             timer = GrainTimer.FromTimerCallback(
+                this.RuntimeClient.Scheduler,
                 this.OnGossipTimerTick,
                 null,
                 this.backgroundGossipInterval,
