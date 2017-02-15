@@ -13,6 +13,9 @@ namespace Orleans.Runtime.TestHooks
         Task<ICollection<string>> GetStorageProviderNames();
         Task<ICollection<string>> GetStreamProviderNames();
         Task<ICollection<string>> GetAllSiloProviderNames();
+        Task<bool> CanGetStorageProvider(string providerName);
+        Task<bool> CanGetStreamProvider(string providerName);
+        Task<bool> CanGetBoostraperProvider(string providerName);
         Task<int> UnregisterGrainForTesting(GrainId grain);
         Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod);
     }
