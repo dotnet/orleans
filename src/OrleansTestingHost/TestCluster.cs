@@ -448,7 +448,7 @@ namespace Orleans.TestingHost
                 }
                 catch (Exception)
                 {
-                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception != null).Select(t => t.Result));
+                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
                     throw;
                 }
 
