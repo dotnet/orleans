@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -15,6 +16,11 @@ namespace Orleans.Serialization
         void RecordCopy(object original, object copy);
 
         object CheckObjectWhileCopying(object raw);
+
+        /// <summary>
+        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
     }
 
     public interface ISerializationContext
@@ -22,6 +28,11 @@ namespace Orleans.Serialization
         BinaryTokenStreamWriter StreamWriter { get; }
         void RecordObject(object original);
         int CheckObjectWhileSerializing(object raw);
+
+        /// <summary>
+        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
     }
 
     /// <summary>
@@ -55,11 +66,16 @@ namespace Orleans.Serialization
         public BinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
+        private IGrainFactory grainFactory;
 
-        public SerializationContext()
+        public SerializationContext(IGrainFactory grainFactory)
         {
+            this.grainFactory = grainFactory;
             processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
         }
+
+        /// <inheritdoc />
+        public IGrainFactory GrainFactory => this.grainFactory ?? (this.grainFactory = RuntimeClient.Current.InternalGrainFactory);
 
         internal void Reset()
         {

@@ -24,21 +24,21 @@ namespace Tester.AzureUtils.Streaming
     public class AzureQueueAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
         private string deploymentId;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
-        private readonly TestEnvironmentFixture fixture;
 
         public AzureQueueAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            this.fixture = fixture;
         }
         
         public void Dispose()
@@ -58,7 +58,7 @@ namespace Tester.AzureUtils.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 

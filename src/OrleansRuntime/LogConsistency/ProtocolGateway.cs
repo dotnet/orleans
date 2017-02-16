@@ -22,7 +22,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public async Task<ILogConsistencyProtocolMessage> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload)
         {
-            var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<ILogConsistencyProtocolParticipant>(GrainReference.FromGrainId(id));
+            var g = this.RuntimeClient.InternalGrainFactory.GetGrain<ILogConsistencyProtocolParticipant>(id);
             return await g.OnProtocolMessageReceived(payload);
         }
 

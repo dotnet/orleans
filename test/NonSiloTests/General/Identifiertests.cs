@@ -423,22 +423,22 @@ namespace UnitTests.General
         {
             Guid guid = Guid.NewGuid();
             GrainId regularGrainId = GrainId.GetGrainIdForTesting(guid);
-            GrainReference grainRef = GrainReference.FromGrainId(regularGrainId);
+            GrainReference grainRef = this.environment.InternalGrainFactory.GetGrain(regularGrainId);
             TestGrainReference(grainRef);
 
-            grainRef = GrainReference.FromGrainId(regularGrainId, "generic");
+            grainRef = GrainReference.FromGrainId(regularGrainId, null, "generic");
             TestGrainReference(grainRef);
 
             GrainId systemTragetGrainId = GrainId.NewSystemTargetGrainIdByTypeCode(2);
-            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, SiloAddress.NewLocalAddress(1));
+            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddress.NewLocalAddress(1));
             TestGrainReference(grainRef);
 
             GrainId observerGrainId = GrainId.NewClientId();
-            grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId());
+            grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId(), this.environment.RuntimeClient);
             TestGrainReference(grainRef);
 
             GrainId geoObserverGrainId = GrainId.NewClientId("clusterid");
-            grainRef = GrainReference.NewObserverGrainReference(geoObserverGrainId, GuidId.GetNewGuidId());
+            grainRef = GrainReference.NewObserverGrainReference(geoObserverGrainId, GuidId.GetNewGuidId(), this.environment.RuntimeClient);
             TestGrainReference(grainRef);
         }
 

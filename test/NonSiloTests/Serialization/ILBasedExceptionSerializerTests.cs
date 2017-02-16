@@ -32,16 +32,19 @@ namespace UnitTests.Serialization
             // Throw an exception so that is has a stack trace.
             var expected = GetNewException();
 
-            var writer = new SerializationContext
+            var writer = new SerializationContext(this.environment.GrainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
 
             // Deep copies should be reference-equal.
-            Assert.Equal(expected, SerializationManager.DeepCopyInner(expected, new SerializationContext()), ReferenceEqualsComparer.Instance);
+            Assert.Equal(
+                expected,
+                SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.GrainFactory)),
+                ReferenceEqualsComparer.Instance);
 
             SerializationManager.Serialize(expected, writer.StreamWriter);
-            var reader = new DeserializationContext
+            var reader = new DeserializationContext(this.environment.GrainFactory)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
@@ -90,17 +93,17 @@ namespace UnitTests.Serialization
 
             var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer());
             
-            var writer = new SerializationContext
+            var writer = new SerializationContext(this.environment.GrainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             knowsException.Serialize(expected, writer, null);
 
             // Deep copies should be reference-equal.
-            Assert.Equal(expected, knowsException.DeepCopy(expected, new SerializationContext()), ReferenceEqualsComparer.Instance);
+            Assert.Equal(expected, knowsException.DeepCopy(expected, new SerializationContext(this.environment.GrainFactory)), ReferenceEqualsComparer.Instance);
 
             // Create a deserializer which doesn't know about the expected exception type.
-            var reader = new DeserializationContext
+            var reader = new DeserializationContext(this.environment.GrainFactory)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
@@ -115,13 +118,13 @@ namespace UnitTests.Serialization
             Assert.Equal(typeof(ILExceptionSerializerTestException).AssemblyQualifiedName, actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
-            writer = new SerializationContext
+            writer = new SerializationContext(this.environment.GrainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             doesNotKnowException.Serialize(untypedActual, writer, null);
 
-            reader = new DeserializationContext
+            reader = new DeserializationContext(this.environment.GrainFactory)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };

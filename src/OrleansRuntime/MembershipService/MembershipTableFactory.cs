@@ -79,7 +79,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-            var result = grainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+            var result = grainFactory.GetGrain<IMembershipTableGrain>(Constants.SystemMembershipTableId);
 
             if (isPrimarySilo)
             {

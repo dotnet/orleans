@@ -510,7 +510,8 @@ namespace Orleans.Runtime
                         config.Application.GetCollectionAgeLimit(grainType),
                         this.nodeConfig,
                         this.maxWarningRequestProcessingTime,
-                        this.maxRequestProcessingTime);
+                        this.maxRequestProcessingTime,
+                        this.RuntimeClient);
                     RegisterMessageTarget(result);
                 }
             } // End lock

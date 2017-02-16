@@ -116,6 +116,7 @@ namespace Orleans
             services.AddFromExisting<IGrainFactory, GrainFactory>();
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
+            services.AddSingleton<ClientProviderRuntime>();
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
             services.AddSingleton<ClientStatisticsManager>();
@@ -156,7 +157,7 @@ namespace Orleans
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
-                clientProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, null);
+                clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);
@@ -820,7 +821,7 @@ namespace Orleans
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.");
 
-            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId());
+            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this);
             if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
             {
                 throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
