@@ -14,7 +14,7 @@ namespace Orleans.CodeGeneration
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
-        private static readonly RoslynCodeGenerator CodeGenerator = new RoslynCodeGenerator();
+        private readonly RoslynCodeGenerator codeGenerator = new RoslynCodeGenerator();
 
         [Serializable]
         internal class CodeGenOptions
@@ -113,7 +113,7 @@ namespace Orleans.CodeGeneration
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
                 DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine(CodeGenerator.GenerateSourceForAssembly(grainAssembly));
+                sourceWriter.WriteLine(codeGenerator.GenerateSourceForAssembly(grainAssembly));
                 RestoreWarnings(sourceWriter, suppressCompilerWarnings);
                 sourceWriter.WriteLine("#endif");
             }

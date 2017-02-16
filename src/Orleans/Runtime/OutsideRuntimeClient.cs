@@ -119,6 +119,7 @@ namespace Orleans
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
             services.AddSingleton<ClientStatisticsManager>();
+            services.AddSingleton<CodeGeneratorManager>();
             this.ServiceProvider = services.BuildServiceProvider();
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
