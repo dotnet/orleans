@@ -99,7 +99,7 @@ This guarantees that the given sequence of events is written to storage atomical
 
 ## Retrieving the Event Sequence
 
-The following method allows the application to retrieve a specified segment of the sequence of all confirmed events:
+The following method from the base `JournaledGrain` class allows the application to retrieve a specified segment of the sequence of all confirmed events:
 
 ```csharp
 Task<IReadOnlyList<EventType>> RetrieveConfirmedEvents(int fromVersion, int toVersion)
@@ -107,6 +107,15 @@ Task<IReadOnlyList<EventType>> RetrieveConfirmedEvents(int fromVersion, int toVe
 
 However, it is not supported by all log consistency providers. If not supported, or if the specified segment of the sequence is no longer available, a `NotSupportedException` is thrown. 
 
+To retrieve all events up to the latest confirmed version, one would call 
+```csharp
+await RetrieveConfirmedEvents(0, Version);
+```
+
+Only confirmed events can be retrieved: an exception is thrown if `toVersion` is larger than the current value of the property `Version`.
+
+Since confirmed events never change, there are no races to worry about, even in the presence of [multiple instances](MultiInstance.md) or [delayed confirmation](MultiVersion.md). However, in such situations, it is possible that the value of the property `Version` is larger by the time the `await` resumes than at the time `RetrieveConfirmedEvents` is called, so it may be advisable to save its value in a variable. See also the section on [Concurrency Guarantees](MultiVersion.md).
+ 
 
 
 

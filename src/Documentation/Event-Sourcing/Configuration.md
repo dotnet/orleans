@@ -31,11 +31,10 @@ For example, to include all three providers (of course, you probably won't need 
   <Provider Type="Orleans.EventSourcing.CustomStorage.LogConsistencyProvider" Name="CustomStorage" />
 </LogConsistencyProviders>
 ```
-
 The same can be achieved programmatically. Assuming the project contains the `Microsoft.Orleans.EventSourcing` package, and `config` is a `ClusterConfiguration` object:
 
 ```csharp
-using Orleans.Runtime.Configuration; \\ pick up the necessary extension methods
+using Orleans.Runtime.Configuration; // pick up the necessary extension methods
 
 config.AddLogStorageBasedLogConsistencyProvider("LogStorage");
 config.AddStateStorageBasedLogConsistencyProvider("StateStorage");
@@ -44,21 +43,21 @@ config.AddCustomStorageBasedLogConsistencyProvider("CustomStorage");
 
 ## Grain Class Attributes
 
-Each journaled grain class can be configured to use a log-consistency provider, and a storage provider of choice. These choices are independent.
+Each journaled grain class must have a `LogConsistencyProvider` attribute to specify the log-consistency provider. Some providers additionally require a `StorageProvider` attribute.
 
 
 ### LogConsistencyProvider Attributes
 
-By default, a journaled grain uses the built-in `StateStorage` provider. This provider persists the latest state snapshot, but not the events themselves. We can choose a different provider by adding a `[LogConsistencyProvider(ProviderName=...)]` attribute to the grain class, and give the name of the provider as configured by the Cluster Configuration. For example, the following attribute means that for `ChatGrain` instances, we use the `LogStorage` provider, which was configured to use `Orleans.EventSourcing.LogStorage.LogConsistencyProvider`. This provider always persists the entire event sequence (log).
+To specify the log-consistency provider, add a `[LogConsistencyProvider(ProviderName=...)]` attribute to the grain class, and give the name of the provider as configured by the Cluster Configuration. For example:
 
 ```csharp
-[LogConsistencyProvider(ProviderName = "LogStorage")]
-public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain { ... }
+[LogConsistencyProvider(ProviderName = "CustomStorage")]
+public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain, ICustomStorage { ... }
 ```
 
 ### StorageProvider Attributes
 
-Some consistency providers (including both the LogStorage and StateStorage providers) in turn rely on a StorageProvider to communicate with storage. As usual, a default storage provider is used if none is explicitly specified. But we can add one. For example, we could specify
+Some log-consistency providers (including `LogStorage` and `StateStorage`) use a standard StorageProvider to communicate with storage. This provider is specified using a separate `StorageProvider` attribute, as follows:
 
 ```csharp
 [LogConsistencyProvider(ProviderName = "LogStorage")]
@@ -66,4 +65,14 @@ Some consistency providers (including both the LogStorage and StateStorage provi
 public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain { ... }
 ```
 
+## Default Providers
 
+It is possible to omit the `LogConsistencyProvider` and/or the `StorageProvider` attributes, if a default is specified in the configuration. This is done by using the special name `Default` for the respective provider. For example:
+```xml
+<LogConsistencyProviders>
+  <Provider Type="Orleans.EventSourcing.LogStorage.LogConsistencyProvider" Name="Default" />
+</LogConsistencyProviders>
+<StorageProviders>
+  <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" />
+</StorageProviders>
+```

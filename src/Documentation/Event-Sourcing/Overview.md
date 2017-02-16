@@ -16,6 +16,8 @@ The documentation is structured as follows:
 
 * [Immediate/Delayed Confirmation](MultiVersion.md) explains how delayed confirmation of events, and reentrancy, can improve availability and throughput.
 
+* [Notifications](Subscribe.md) explains how to subscribe to notifications, allowing grains to react to new events.
+
 * [Configuration](Configuration.md) explains how to configure projects, clusters, and log-consistency providers.
 
 * [Built-In Log-Consistency Providers](LogConsistencyProviders.md) explains how the three currently included log-consistency providers work.
