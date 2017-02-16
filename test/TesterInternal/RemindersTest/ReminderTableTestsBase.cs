@@ -159,7 +159,7 @@ namespace UnitTests.RemindersTest
         private GrainReference MakeTestGrainReference()
         {
             GrainId regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
-            GrainReference grainRef = GrainReference.FromGrainId(regularGrainId);
+            GrainReference grainRef = this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
             return grainRef;
         }
     }

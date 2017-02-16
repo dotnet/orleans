@@ -36,7 +36,7 @@ namespace UnitTests.Serialization
         public void EventSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventSequenceToken(long.MaxValue, int.MaxValue);
-            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token);
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token, this.fixture.Environment.GrainFactory);
 
         }
 
@@ -44,7 +44,7 @@ namespace UnitTests.Serialization
         public void EventHubSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventHubSequenceToken("some offset", long.MaxValue, int.MaxValue);
-            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token);
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token, this.fixture.Environment.GrainFactory);
         }
 
         #region EventSequenceToken2

@@ -169,7 +169,8 @@ namespace Orleans.Runtime
             TimeSpan ageLimit,
             NodeConfiguration nodeConfiguration,
             TimeSpan maxWarningRequestProcessingTime,
-			TimeSpan maxRequestProcessingTime)
+			TimeSpan maxRequestProcessingTime,
+            IRuntimeClient runtimeClient)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
@@ -190,8 +191,7 @@ namespace Orleans.Runtime
             }
             CollectionAgeLimit = ageLimit;
 
-
-            GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
+            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
             this.SchedulingContext = new SchedulingContext(this);
         }
 

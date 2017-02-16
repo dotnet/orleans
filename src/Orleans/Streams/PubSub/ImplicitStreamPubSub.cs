@@ -7,15 +7,17 @@ namespace Orleans.Streams
 {
     internal class ImplicitStreamPubSub : IStreamPubSub
     {
+        private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitTable;
 
-        public ImplicitStreamPubSub(ImplicitStreamSubscriberTable implicitPubSubTable)
+        public ImplicitStreamPubSub(IInternalGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitPubSubTable)
         {
             if (implicitPubSubTable == null)
             {
                 throw new ArgumentNullException("implicitPubSubTable");
             }
 
+            this.grainFactory = grainFactory;
             this.implicitTable = implicitPubSubTable;
         }
 
@@ -24,7 +26,7 @@ namespace Orleans.Streams
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (String.IsNullOrWhiteSpace(streamId.Namespace)) return Task.FromResult(result);
 
-            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId);
+            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);

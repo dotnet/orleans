@@ -29,7 +29,7 @@ namespace Orleans
             }
 
             var systemTarget = grain as ISystemTargetBase;
-            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, null, systemTarget.Silo);
+            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, systemTarget.RuntimeClient, null, systemTarget.Silo);
 
             throw new ArgumentException(
                 $"AsWeaklyTypedReference has been called on an unexpected type: {grain.GetType().FullName}.",
@@ -60,6 +60,16 @@ namespace Orleans
         public static TGrainInterface Cast<TGrainInterface>(this IAddressable grain)
         {
             return RuntimeClient.Current.InternalGrainFactory.Cast<TGrainInterface>(grain);
+        }
+
+        /// <summary>
+        /// Binds the grain reference to the provided <see cref="IGrainFactory"/>.
+        /// </summary>
+        /// <param name="grain">The grain reference.</param>
+        /// <param name="grainFactory">The grain factory.</param>
+        public static void BindGrainReference(this IAddressable grain, IGrainFactory grainFactory)
+        {
+            grainFactory.BindGrainReference(grain);
         }
 
         internal static GrainId GetGrainId(IAddressable grain)

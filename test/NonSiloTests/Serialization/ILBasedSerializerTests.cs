@@ -35,7 +35,7 @@ namespace UnitTests.Serialization
 
             var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType(), f => f.Name != "One", f => f.Name != "Three");
-            var writer = new SerializationContext
+            var writer = new SerializationContext(this.fixture.GrainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
@@ -45,7 +45,7 @@ namespace UnitTests.Serialization
             Assert.Equal(0, copy.Three);
             
             serializers.Serialize(input, writer, input.GetType());
-            var reader = new DeserializationContext
+            var reader = new DeserializationContext(this.fixture.GrainFactory)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };

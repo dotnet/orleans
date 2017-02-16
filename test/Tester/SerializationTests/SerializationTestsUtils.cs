@@ -1,13 +1,14 @@
-﻿using Orleans.Serialization;
+﻿using Orleans;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Tester.SerializationTests
 {
     public class SerializationTestsUtils
     {
-        public static void VerifyUsingFallbackSerializer(object ob)
+        public static void VerifyUsingFallbackSerializer(object ob, IGrainFactory grainFactory)
         {
-            var writer = new SerializationContext
+            var writer = new SerializationContext(grainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };

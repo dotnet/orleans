@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
     public interface IDeserializationContext
     {
-
         /// <summary>
         /// The stream reader.
         /// </summary>
@@ -27,17 +27,23 @@ namespace Orleans.Serialization
         /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
         /// <returns>The object from the specified offset.</returns>
         object FetchReferencedObject(int offset);
+
+        /// <summary>
+        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
     }
 
     public class DeserializationContext : IDeserializationContext
     {
         private readonly Dictionary<int, object> taggedObjects;
+        private IGrainFactory grainFactory;
 
-        public DeserializationContext()
+        public DeserializationContext(IGrainFactory grainFactory)
         {
+            this.grainFactory = grainFactory;
             taggedObjects = new Dictionary<int, object>();
         }
-
 
         internal void Reset()
         {
@@ -55,6 +61,9 @@ namespace Orleans.Serialization
         {
             taggedObjects[CurrentObjectOffset] = obj;
         }
+
+        /// <inheritdoc />
+        public IGrainFactory GrainFactory => this.grainFactory ?? (this.grainFactory =  RuntimeClient.Current?.InternalGrainFactory);
 
         /// <inheritdoc />
         public object FetchReferencedObject(int offset)

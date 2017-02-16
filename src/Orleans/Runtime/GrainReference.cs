@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,11 +14,12 @@ namespace Orleans.Runtime
     [Serializable]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
-        private static readonly Action<Message, TaskCompletionSource<object>> ResponseCallbackDelegate = ResponseCallback;
-
         private readonly string genericArguments;
         private readonly GuidId observerId;
-        
+
+        [NonSerialized]
+        private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
+
         [NonSerialized]
         private static readonly Logger logger = LogManager.GetLogger("GrainReference", LoggerType.Runtime);
 
@@ -41,12 +41,29 @@ namespace Orleans.Runtime
         
         private bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
+        private IRuntimeClient RuntimeClient
+        {
+            get
+            {
+                if (this.runtimeClient == null) throw new GrainReferenceNotBoundException(this);
+                return this.runtimeClient;
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether this instance is bound to a runtime and hence valid for making requests.
+        /// </summary>
+        internal bool IsBound => this.runtimeClient != null;
+
         internal GrainId GrainId { get; private set; }
 
         /// <summary>
         /// Called from generated code.
         /// </summary>
         protected internal readonly SiloAddress SystemTargetSilo;
+
+        [NonSerialized]
+        private IRuntimeClient runtimeClient;
 
         /// <summary>
         /// Whether the runtime environment for system targets has been initialized yet.
@@ -63,12 +80,15 @@ namespace Orleans.Runtime
         /// <param name="genericArgument">Type arguments in case of a generic grain.</param>
         /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
         /// <param name="observerId">Observer ID in case of an observer reference.</param>
-        private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
+        /// <param name="runtimeClient">The runtime which this grain reference is bound to.</param>
+        private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId, IRuntimeClient runtimeClient)
         {
             GrainId = grainId;
+            this.responseCallbackDelegate = this.ResponseCallback;
             genericArguments = genericArgument;
             SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
+            this.runtimeClient = runtimeClient;
             if (String.IsNullOrEmpty(genericArgument))
             {
                 genericArguments = null; // always keep it null instead of empty.
@@ -118,7 +138,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId) { }
+            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtimeClient) { }
 
         #endregion
 
@@ -126,19 +146,29 @@ namespace Orleans.Runtime
 
         /// <summary>Constructs a reference to the grain with the specified ID.</summary>
         /// <param name="grainId">The ID of the grain to refer to.</param>
+        /// <param name="runtimeClient">The runtime client</param>
         /// <param name="genericArguments">Type arguments in case of a generic grain.</param>
         /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
-        internal static GrainReference FromGrainId(GrainId grainId, string genericArguments = null, SiloAddress systemTargetSilo = null)
+        internal static GrainReference FromGrainId(GrainId grainId, IRuntimeClient runtimeClient, string genericArguments = null, SiloAddress systemTargetSilo = null)
         {
-            return new GrainReference(grainId, genericArguments, systemTargetSilo, null);
+            return new GrainReference(grainId, genericArguments, systemTargetSilo, null, runtimeClient);
         }
 
-        internal static GrainReference NewObserverGrainReference(GrainId grainId, GuidId observerId)
+        internal static GrainReference NewObserverGrainReference(GrainId grainId, GuidId observerId, IRuntimeClient runtimeClient)
         {
-            return new GrainReference(grainId, null, null, observerId);
+            return new GrainReference(grainId, null, null, observerId, runtimeClient);
         }
 
         #endregion
+        
+        /// <summary>
+        /// Binds this instance to a runtime.
+        /// </summary>
+        /// <param name="runtime">The runtime.</param>
+        internal void Bind(IRuntimeClient runtime)
+        {
+            this.runtimeClient = runtime;
+        }
 
         /// <summary>
         /// Tests this reference for equality to another object.
@@ -349,7 +379,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallbackDelegate, debugContext, options, genericArguments);
+            this.RuntimeClient.SendRequest(this, request, resolver, this.responseCallbackDelegate, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -378,7 +408,7 @@ namespace Orleans.Runtime
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void ResponseCallback(Message message, TaskCompletionSource<object> context)
+        private void ResponseCallback(Message message, TaskCompletionSource<object> context)
         {
             Response response;
             if (message.Result != Message.ResponseTypes.Rejection)
@@ -431,9 +461,9 @@ namespace Orleans.Runtime
 
         private bool GetUnordered()
         {
-            if (RuntimeClient.Current == null) return false;
+            if (this.runtimeClient == null) return false;
 
-            return RuntimeClient.Current.GrainTypeResolver != null && RuntimeClient.Current.GrainTypeResolver.IsUnordered(GrainId.GetTypeCode());
+            return this.runtimeClient.GrainTypeResolver != null && this.runtimeClient.GrainTypeResolver.IsUnordered(GrainId.GetTypeCode());
         }
 
         #endregion
@@ -504,7 +534,7 @@ namespace Orleans.Runtime
             }
 
             // store as null, serialize as empty.
-            var genericArg = String.Empty;
+            var genericArg = string.Empty;
             if (input.HasGenericArgument)
                 genericArg = input.genericArguments;
             writer.Write(genericArg);
@@ -531,14 +561,21 @@ namespace Orleans.Runtime
             }
             // store as null, serialize as empty.
             var genericArg = reader.ReadString();
-            if (String.IsNullOrEmpty(genericArg))
+            if (string.IsNullOrEmpty(genericArg))
                 genericArg = null;
 
+            GrainReference result;
             if (expectObserverId)
             {
-                return NewObserverGrainReference(id, observerId);
+                result = NewObserverGrainReference(id, observerId, null);
             }
-            return FromGrainId(id, genericArg, silo);
+            else
+            {
+                result = FromGrainId(id, null, genericArg, silo);
+            }
+
+            context.GrainFactory?.BindGrainReference(result);
+            return result;
         }
 
         /// <summary> Copier function for grain reference. </summary>
@@ -601,8 +638,8 @@ namespace Orleans.Runtime
             }
             return String.Format("{0}={1}", GRAIN_REFERENCE_STR, GrainId.ToParsableString());
         }
-
-        public static GrainReference FromKeyString(string key)
+        
+        internal static GrainReference FromKeyString(string key, IRuntimeClient runtimeClient)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException("key", "GrainReference.FromKeyString cannot parse null key");
             
@@ -622,26 +659,26 @@ namespace Orleans.Runtime
                 {
                     genericStr = null;
                 }
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), genericStr);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtimeClient, genericStr);
             }
             else if (observerIndex >= 0)
             {
                 grainIdStr = trimmed.Substring(grainIdIndex, observerIndex - grainIdIndex).Trim();
                 string observerIdStr = trimmed.Substring(observerIndex + (OBSERVER_ID_STR + "=").Length);
                 GuidId observerId = GuidId.FromParsableString(observerIdStr);
-                return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId);
+                return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId, runtimeClient);
             }
             else if (systemTargetIndex >= 0)
             {
                 grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
                 SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), null, siloAddress);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtimeClient, null, siloAddress);
             }
             else
             {
                 grainIdStr = trimmed.Substring(grainIdIndex);
-                return FromGrainId(GrainId.FromParsableString(grainIdStr));
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtimeClient);
             }
             //return FromGrainId(GrainId.FromParsableString(grainIdStr), generic);
         }
@@ -670,6 +707,7 @@ namespace Orleans.Runtime
         // The special constructor is used to deserialize values. 
         protected GrainReference(SerializationInfo info, StreamingContext context)
         {
+            this.responseCallbackDelegate = this.ResponseCallback;
             // Reset the property value using the GetValue method.
             var grainIdStr = info.GetString("GrainId");
             GrainId = GrainId.FromParsableString(grainIdStr);
@@ -687,6 +725,11 @@ namespace Orleans.Runtime
             if (String.IsNullOrEmpty(genericArg))
                 genericArg = null;
             genericArguments = genericArg;
+
+#if !NETSTANDARD
+            var deserializationContext = context.Context as IDeserializationContext;
+            deserializationContext?.GrainFactory.BindGrainReference(this);
+#endif
         }
 
         #endregion

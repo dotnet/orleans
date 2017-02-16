@@ -110,6 +110,8 @@ namespace DefaultCluster.Tests.General
                 // Serialize + Deserialize through .NET serializer
                 other = DotNetSerializeRoundtrip(grain);
             }
+            
+            this.GrainFactory.BindGrainReference(other);
 
             if (!resolveBeforeSerialize)
             {

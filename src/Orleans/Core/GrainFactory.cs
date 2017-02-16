@@ -141,7 +141,16 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key);
+        public void BindGrainReference(IAddressable grain)
+        {
+            if (grain == null) throw new ArgumentNullException(nameof(grain));
+            var reference = grain as GrainReference;
+            if (reference == null) throw new ArgumentException("Provided grain must be a GrainReference.", nameof(grain));
+            reference.Bind(this.runtimeClient);
+        }
+
+        /// <inheritdoc />
+        public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key, this.runtimeClient);
 
         /// <summary>
         /// Creates a reference to the provided <paramref name="obj"/>.
@@ -209,6 +218,7 @@ namespace Orleans
             var typeInfo = interfaceType.GetTypeInfo();
             return GrainReference.FromGrainId(
                 grainId,
+                this.runtimeClient,
                 typeInfo.IsGenericType ? TypeUtils.GenericTypeArgsString(typeInfo.UnderlyingSystemType.FullName) : null);
         }
 
@@ -325,13 +335,23 @@ namespace Orleans
                 }
                 else
                 {
-                    reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
+                    reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.runtimeClient, null, destination));
                     cache[destination] = reference; // Store for next time
                 }
             }
 
             return (TGrainInterface)reference;
         }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
+        {
+            return this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.runtimeClient));
+        }
+
+        /// <inheritdoc />
+        public GrainReference GetGrain(GrainId grainId, string genericArguments)
+            => GrainReference.FromGrainId(grainId, this.runtimeClient, genericArguments);
 
         #endregion
     }

@@ -433,7 +433,7 @@ namespace Orleans.Runtime
         // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header)
         {
-            var context = new DeserializationContext
+            var context = new DeserializationContext(RuntimeClient.Current.InternalGrainFactory)
             {
                 StreamReader = new BinaryTokenStreamReader(header)
             };
@@ -501,7 +501,7 @@ namespace Orleans.Runtime
 
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
-            var context = new SerializationContext
+            var context = new SerializationContext(RuntimeClient.Current.InternalGrainFactory)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };

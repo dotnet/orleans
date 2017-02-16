@@ -34,6 +34,7 @@ namespace UnitTests.Serialization
     public class BuiltInSerializerTests
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture defaultFixture;
 
         public enum SerializerToUse
         {
@@ -52,7 +53,7 @@ namespace UnitTests.Serialization
             new object[] { SerializerToUse.IlBasedFallbackSerializer }
         };
 
-        private void InitializeSerializer(SerializerToUse serializerToUse)
+        private SerializationTestEnvironment InitializeSerializer(SerializerToUse serializerToUse)
         {
             List<TypeInfo> serializationProviders = null;
             TypeInfo fallback = null;
@@ -75,8 +76,9 @@ namespace UnitTests.Serialization
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }
 
-            SerializationTestEnvironment.Initialize(serializationProviders, fallback);
+            var result = SerializationTestEnvironment.Initialize(serializationProviders, fallback);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            return result;
         }
 
         public BuiltInSerializerTests(ITestOutputHelper output)
@@ -435,7 +437,7 @@ namespace UnitTests.Serialization
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ArrayOfArrays(SerializerToUse serializerToUse)
         {
-            InitializeSerializer(serializerToUse);
+            var environment = InitializeSerializer(serializerToUse);
 
             var source1 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 }, new[] { 17, 13, 11, 7, 5, 3, 2 } };
             object deserialized = OrleansSerializationLoop(source1);
@@ -474,12 +476,12 @@ namespace UnitTests.Serialization
             source4[0] = new GrainReference[2];
             source4[1] = new GrainReference[3];
             source4[2] = new GrainReference[1];
-            source4[0][0] = GrainReference.FromGrainId(GrainId.NewId());
-            source4[0][1] = GrainReference.FromGrainId(GrainId.NewId());
-            source4[1][0] = GrainReference.FromGrainId(GrainId.NewId());
-            source4[1][1] = GrainReference.FromGrainId(GrainId.NewId());
-            source4[1][2] = GrainReference.FromGrainId(GrainId.NewId());
-            source4[2][0] = GrainReference.FromGrainId(GrainId.NewId());
+            source4[0][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[0][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[1][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[1][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[1][2] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[2][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
             deserialized = OrleansSerializationLoop(source4);
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
@@ -489,7 +491,7 @@ namespace UnitTests.Serialization
                 source5[i] = new GrainReference[64];
                 for (int j = 0; j < source5[i].Length; j++)
                 {
-                    source5[i][j] = GrainReference.FromGrainId(GrainId.NewId());
+                    source5[i][j] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
                 }
             }
             deserialized = OrleansSerializationLoop(source5);
@@ -727,9 +729,9 @@ namespace UnitTests.Serialization
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainReference(SerializerToUse serializerToUse)
         {
-            InitializeSerializer(serializerToUse);
+            var environment = InitializeSerializer(serializerToUse);
             GrainId grainId = GrainId.NewId();
-            GrainReference input = GrainReference.FromGrainId(grainId);
+            GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
 
             object deserialized = OrleansSerializationLoop(input);
 
@@ -743,13 +745,14 @@ namespace UnitTests.Serialization
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
-            InitializeSerializer(serializerToUse);
+            var environment = InitializeSerializer(serializerToUse);
             GrainId grainId = GrainId.NewId();
-            GrainReference input = GrainReference.FromGrainId(grainId);
+            GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
+            Assert.True(input.IsBound);
 
             object deserialized = DotNetSerializationLoop(input);
-
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
+            Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
             Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input

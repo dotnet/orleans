@@ -32,8 +32,8 @@ namespace Tester.AzureUtils.Persistence
             this.fixture = fixture;
             storageProviderManager = new StorageProviderManager(
                 fixture.GrainFactory,
-                null,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, null));
+                fixture.Services,
+                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services));
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
             LocalDataStoreInstance.LocalDataStore = null;
@@ -260,7 +260,7 @@ namespace Tester.AzureUtils.Persistence
             var cfg = new ProviderConfiguration(providerCfgProps, null);
             await store.Init(testName, storageProviderManager, cfg);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -334,7 +334,7 @@ namespace Tester.AzureUtils.Persistence
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IStorageProvider store,
             GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
         {
-            var reference = GrainReference.FromGrainId(grainId ?? GrainId.NewId());
+            var reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
 
             if (grainState == null)
             {
@@ -359,7 +359,7 @@ namespace Tester.AzureUtils.Persistence
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
             IStorageProvider store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
         {
-            GrainReference reference = GrainReference.FromGrainId(grainId ?? GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
 
             if (grainState == null)
             {
@@ -391,7 +391,7 @@ namespace Tester.AzureUtils.Persistence
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
             IStorageProvider store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
         {
-            GrainReference reference = GrainReference.FromGrainId(grainId ?? GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
 
             if (grainState == null)
             {

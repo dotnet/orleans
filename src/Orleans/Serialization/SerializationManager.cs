@@ -137,13 +137,13 @@ namespace Orleans.Serialization
         private static SerializationContext serializationContext;
 
         private static SerializationContext CurrentSerializationContext
-            => serializationContext ?? (serializationContext = new SerializationContext());
+            => serializationContext ?? (serializationContext = new SerializationContext(null));
         
         [ThreadStatic]
         private static DeserializationContext deserializationContext;
 
         private static DeserializationContext CurrentDeserializationContext
-            => deserializationContext ?? (deserializationContext = new DeserializationContext());
+            => deserializationContext ?? (deserializationContext = new DeserializationContext(null));
 
         #endregion
 
