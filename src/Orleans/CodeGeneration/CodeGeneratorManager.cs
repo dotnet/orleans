@@ -121,7 +121,7 @@ namespace Orleans.CodeGeneration
             IRuntimeCodeGenerator result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log, this.serviceProvider);
             if (result == null)
             {
-                Log.Warn(
+                Log.Info(
                     ErrorCode.CodeGenDllMissing,
                     "Code generator assembly (" + CodeGenAssemblyName + ".dll) not present.");
             }
