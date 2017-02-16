@@ -54,6 +54,7 @@ namespace Orleans.Runtime
         /// </summary>
         protected internal readonly SiloAddress SystemTargetSilo;
 
+        [NonSerialized]
         private IRuntimeClient runtimeClient;
 
         /// <summary>
