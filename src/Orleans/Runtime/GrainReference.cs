@@ -16,7 +16,10 @@ namespace Orleans.Runtime
     {
         private readonly string genericArguments;
         private readonly GuidId observerId;
-        
+
+        [NonSerialized]
+        private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
+
         [NonSerialized]
         private static readonly Logger logger = LogManager.GetLogger("GrainReference", LoggerType.Runtime);
 
@@ -47,6 +50,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether this instance is bound to a runtime and hence valid for making requests.
+        /// </summary>
+        internal bool IsBound => this.runtimeClient != null;
+
         internal GrainId GrainId { get; private set; }
 
         /// <summary>
@@ -76,6 +84,7 @@ namespace Orleans.Runtime
         private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId, IRuntimeClient runtimeClient)
         {
             GrainId = grainId;
+            this.responseCallbackDelegate = this.ResponseCallback;
             genericArguments = genericArgument;
             SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
@@ -129,7 +138,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.RuntimeClient) { }
+            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtimeClient) { }
 
         #endregion
 
@@ -370,7 +379,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            this.RuntimeClient.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, genericArguments);
+            this.RuntimeClient.SendRequest(this, request, resolver, this.responseCallbackDelegate, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -698,6 +707,7 @@ namespace Orleans.Runtime
         // The special constructor is used to deserialize values. 
         protected GrainReference(SerializationInfo info, StreamingContext context)
         {
+            this.responseCallbackDelegate = this.ResponseCallback;
             // Reset the property value using the GetValue method.
             var grainIdStr = info.GetString("GrainId");
             GrainId = GrainId.FromParsableString(grainIdStr);

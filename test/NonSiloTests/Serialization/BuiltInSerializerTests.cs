@@ -748,10 +748,11 @@ namespace UnitTests.Serialization
             var environment = InitializeSerializer(serializerToUse);
             GrainId grainId = GrainId.NewId();
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
+            Assert.True(input.IsBound);
 
             object deserialized = DotNetSerializationLoop(input);
-
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
+            Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
             Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input

@@ -54,7 +54,7 @@ namespace Orleans
         /// <typeparam name="TGrainInterface">The grain reference interface type.</typeparam>
         /// <param name="grainId">The grain id.</param>
         /// <returns>A reference to the grain with the provided id.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(GrainId grainId);
+        TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
 
         /// <summary>
         /// Gets a reference to the grain with the provided id.

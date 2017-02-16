@@ -344,7 +344,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId)
+        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
         {
             return this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.runtimeClient));
         }

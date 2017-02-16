@@ -219,7 +219,7 @@ namespace Orleans.Runtime
         private static string CreateMessage(GrainReference grainReference)
         {
             return $"Attempted to use a GrainReference which has not been bound to the runtime: {grainReference.ToDetailedString()}." +
-                   " Use the Bind method to bind this reference to the runtime.";
+                   $" Use the {nameof(IGrainFactory)}.{nameof(IGrainFactory.BindGrainReference)} method to bind this reference to the runtime.";
         }
 
         internal GrainReferenceNotBoundException(string msg) : base(msg) { }
