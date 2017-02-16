@@ -126,6 +126,8 @@ namespace DefaultCluster.Tests.General
                 other = DotNetSerializeRoundtrip(grain, this.GrainFactory);
             }
 
+            this.GrainFactory.BindGrainReference(other);
+
             if (!resolveBeforeSerialize)
             {
                 grain.SetA(id).Wait(); //  Resolve GR

@@ -64,13 +64,13 @@ namespace DefaultCluster.Tests.General
             {
                 var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, context.StreamWriter);
+                context.SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
         }

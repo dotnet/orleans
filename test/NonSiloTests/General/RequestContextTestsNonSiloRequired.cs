@@ -64,7 +64,7 @@ namespace UnitTests.General
                 promises[i] = Task.Run(() =>
                 {
                     flag.Wait();
-                    msg.RequestContextData = RequestContext.Export();
+                    msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
                 });
                 flag.Set();
                 Thread.Sleep(1);
@@ -81,7 +81,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -95,7 +95,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -117,7 +117,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = nullActivityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -131,7 +131,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId2;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             foreach (var kvp in msg.RequestContextData)
             {
                 headers.Add(kvp.Key, kvp.Value);
@@ -156,7 +156,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             var actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -168,7 +168,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -193,7 +193,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = nullActivityId;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -206,7 +206,7 @@ namespace UnitTests.General
             RequestContext.ActivityId.Value = activityId2;
 #endif
             msg = new Message();
-            msg.RequestContextData = RequestContext.Export();
+            msg.RequestContextData = RequestContext.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);

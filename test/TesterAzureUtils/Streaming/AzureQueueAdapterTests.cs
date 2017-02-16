@@ -108,8 +108,8 @@ namespace Tester.AzureUtils.Streaming
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>(this.fixture.SerializationManager).Count());  // "Half the events were ints"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>(this.fixture.SerializationManager).Count());  // "Half the events were strings"
                         }
                         Interlocked.Add(ref receivedBatches, messages.Length);
                         qCache.AddToCache(messages);
@@ -125,7 +125,7 @@ namespace Tester.AzureUtils.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export()).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

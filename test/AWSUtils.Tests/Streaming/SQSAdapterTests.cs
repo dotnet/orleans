@@ -2,7 +2,6 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using Orleans.Streams;
 using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
@@ -56,7 +55,7 @@ namespace AWSUtils.Tests.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, LogManager.GetLogger("SQSAdapter", LoggerType.Application), null);
+            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, LogManager.GetLogger("SQSAdapter", LoggerType.Application), this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
@@ -106,8 +105,8 @@ namespace AWSUtils.Tests.Streaming
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>(this.fixture.SerializationManager).Count());  // "Half the events were ints"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>(this.fixture.SerializationManager).Count());  // "Half the events were strings"
                         }
                         Interlocked.Add(ref receivedBatches, messages.Length);
                         qCache.AddToCache(messages);
@@ -123,7 +122,7 @@ namespace AWSUtils.Tests.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export()).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

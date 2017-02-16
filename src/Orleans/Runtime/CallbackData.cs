@@ -96,7 +96,7 @@ namespace Orleans.Runtime
             string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
-            var error = msg.CreatePromptExceptionResponse(new TimeoutException(errorMsg));
+            var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
         }
 
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
                 $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
-            var error = msg.CreatePromptExceptionResponse(new SiloUnavailableException(errorMsg));
+            var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             OnFail(msg, error, "On silo fail - Resend {0} for {1}");
         }
 

@@ -322,7 +322,7 @@ namespace Orleans.Runtime
             {
                 CheckForGrainArguments(arguments);
                 SetGrainCancellationTokensTarget(arguments, this);
-                argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
+                argsDeepCopy = (object[])this.RuntimeClient.SerializationManager.DeepCopy(arguments);
             }
             
             var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
@@ -415,7 +415,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    response = (Response)message.BodyObject;
+                    response = (Response)message.GetBody(this.RuntimeClient.SerializationManager);
                 }
                 catch (Exception exc)
                 {
@@ -435,7 +435,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
                     
                     default:
-                        rejection = message.BodyObject as OrleansException;
+                        rejection = message.GetBody(this.RuntimeClient.SerializationManager) as OrleansException;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))
@@ -563,19 +563,13 @@ namespace Orleans.Runtime
             var genericArg = reader.ReadString();
             if (string.IsNullOrEmpty(genericArg))
                 genericArg = null;
-
-            GrainReference result;
+            
             if (expectObserverId)
             {
-                result = NewObserverGrainReference(id, observerId, null);
-            }
-            else
-            {
-                result = FromGrainId(id, null, genericArg, silo);
+                return NewObserverGrainReference(id, observerId, context.SerializationManager.RuntimeClient);
             }
 
-            context.GrainFactory?.BindGrainReference(result);
-            return result;
+            return FromGrainId(id, context.SerializationManager.RuntimeClient, genericArg, silo);
         }
 
         /// <summary> Copier function for grain reference. </summary>

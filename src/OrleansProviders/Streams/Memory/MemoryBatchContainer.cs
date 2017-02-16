@@ -1,18 +1,18 @@
-﻿
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
 {
     [Serializable]
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer
-        where TSerializer : IMemoryMessageBodySerializer, new()
+        where TSerializer : IMemoryMessageBodySerializer
     {
+        private readonly IMemoryMessageBodySerializer serializer;
         private readonly EventSequenceToken realToken;
         public Guid StreamGuid => MessageData.StreamGuid;
         public string StreamNamespace => MessageData.StreamNamespace;
@@ -22,32 +22,27 @@ namespace Orleans.Providers
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized] private MemoryMessageBody payload;
-        [NonSerialized] private IMemoryMessageBodySerializer serializer;
-
-        private MemoryMessageBody Payload()
+         
+        private MemoryMessageBody Payload(SerializationManager serializationManager)
         {
-            if (serializer == null)
-            {
-                serializer = new TSerializer();
-            }
-            return payload ?? (payload = serializer.Deserialize(MessageData.Payload));
+            return payload ?? (payload = serializer.Deserialize(serializationManager, MessageData.Payload));
         }
-
-        public MemoryBatchContainer(MemoryMessageData messageData)
+        
+        public MemoryBatchContainer(MemoryMessageData messageData, TSerializer serializer)
         {
-            serializer = new TSerializer();
+            this.serializer = serializer;
             MessageData = messageData;
             realToken = new EventSequenceToken(messageData.SequenceNumber);
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
         {
-            return Payload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
+            return Payload(serializationManager).Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
         }
 
-        public bool ImportRequestContext()
+        public bool ImportRequestContext(SerializationManager serializationManager)
         {
-            var context = Payload().RequestContext;
+            var context = Payload(serializationManager).RequestContext;
             if (context != null)
             {
                 RequestContext.Import(context);

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -57,7 +58,8 @@ namespace Orleans.Runtime
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainTypeResolver GrainTypeResolver { get; }
-        
+        SerializationManager SerializationManager { get; }
+
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
     }
 }

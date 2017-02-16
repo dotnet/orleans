@@ -644,9 +644,10 @@ namespace Orleans.Serialization
         }
 
         /// <summary> Read a <c>Type</c> value from the stream. </summary>
+        /// <param name="serializationManager">The serialization manager used to resolve type names.</param>
         /// <param name="expected">Expected Type, if known.</param>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        public Type ReadFullTypeHeader(Type expected = null)
+        private Type ReadFullTypeHeader(SerializationManager serializationManager, Type expected = null)
         {
             var token = ReadToken();
 
@@ -668,7 +669,7 @@ namespace Orleans.Serialization
                 Trace("--Read specified type header for type {0}", tt);
                 return tt;
 #else
-                return ReadSpecifiedTypeHeader();
+                return ReadSpecifiedTypeHeader(serializationManager);
 #endif
             }
 
@@ -761,7 +762,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary> Read a <c>Type</c> value from the stream. </summary>
-        internal Type ReadSpecifiedTypeHeader()
+        internal Type ReadSpecifiedTypeHeader(SerializationManager serializationManager)
         {
             // Assumes that the SpecifiedType token has already been read
 
@@ -826,69 +827,69 @@ namespace Orleans.Serialization
                     return typeof(Object);
                 case SerializationTokenType.Tuple + 1:
                     Trace("----Reading type info for a Tuple'1");
-                    return typeof(Tuple<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(Tuple<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.Tuple + 2:
                     Trace("----Reading type info for a Tuple'2");
-                    return typeof(Tuple<,>).MakeGenericType(ReadGenericArguments(2));
+                    return typeof(Tuple<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
                 case SerializationTokenType.Tuple + 3:
                     Trace("----Reading type info for a Tuple'3");
-                    return typeof(Tuple<,,>).MakeGenericType(ReadGenericArguments(3));
+                    return typeof(Tuple<,,>).MakeGenericType(ReadGenericArguments(serializationManager, 3));
                 case SerializationTokenType.Tuple + 4:
                     Trace("----Reading type info for a Tuple'4");
-                    return typeof(Tuple<,,,>).MakeGenericType(ReadGenericArguments(4));
+                    return typeof(Tuple<,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 4));
                 case SerializationTokenType.Tuple + 5:
                     Trace("----Reading type info for a Tuple'5");
-                    return typeof(Tuple<,,,,>).MakeGenericType(ReadGenericArguments(5));
+                    return typeof(Tuple<,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 5));
                 case SerializationTokenType.Tuple + 6:
                     Trace("----Reading type info for a Tuple'6");
-                    return typeof(Tuple<,,,,,>).MakeGenericType(ReadGenericArguments(6));
+                    return typeof(Tuple<,,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 6));
                 case SerializationTokenType.Tuple + 7:
                     Trace("----Reading type info for a Tuple'7");
-                    return typeof(Tuple<,,,,,,>).MakeGenericType(ReadGenericArguments(7));
+                    return typeof(Tuple<,,,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 7));
                 case SerializationTokenType.Array + 1:
-                    var et1 = ReadFullTypeHeader();
+                    var et1 = ReadFullTypeHeader(serializationManager);
                     return et1.MakeArrayType();
                 case SerializationTokenType.Array + 2:
-                    var et2 = ReadFullTypeHeader();
+                    var et2 = ReadFullTypeHeader(serializationManager);
                     return et2.MakeArrayType(2);
                 case SerializationTokenType.Array + 3:
-                    var et3 = ReadFullTypeHeader();
+                    var et3 = ReadFullTypeHeader(serializationManager);
                     return et3.MakeArrayType(3);
                 case SerializationTokenType.Array + 4:
-                    var et4 = ReadFullTypeHeader();
+                    var et4 = ReadFullTypeHeader(serializationManager);
                     return et4.MakeArrayType(4);
                 case SerializationTokenType.Array + 5:
-                    var et5 = ReadFullTypeHeader();
+                    var et5 = ReadFullTypeHeader(serializationManager);
                     return et5.MakeArrayType(5);
                 case SerializationTokenType.Array + 6:
-                    var et6 = ReadFullTypeHeader();
+                    var et6 = ReadFullTypeHeader(serializationManager);
                     return et6.MakeArrayType(6);
                 case SerializationTokenType.Array + 7:
-                    var et7 = ReadFullTypeHeader();
+                    var et7 = ReadFullTypeHeader(serializationManager);
                     return et7.MakeArrayType(7);
                 case SerializationTokenType.Array + 8:
-                    var et8 = ReadFullTypeHeader();
+                    var et8 = ReadFullTypeHeader(serializationManager);
                     return et8.MakeArrayType(8);
                 case SerializationTokenType.List:
-                    return typeof(List<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(List<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.Dictionary:
-                    return typeof(Dictionary<,>).MakeGenericType(ReadGenericArguments(2));
+                    return typeof(Dictionary<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
                 case SerializationTokenType.KeyValuePair:
-                    return typeof(KeyValuePair<,>).MakeGenericType(ReadGenericArguments(2));
+                    return typeof(KeyValuePair<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
                 case SerializationTokenType.Set:
-                    return typeof(HashSet<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(HashSet<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.SortedList:
-                    return typeof(SortedList<,>).MakeGenericType(ReadGenericArguments(2));
+                    return typeof(SortedList<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
                 case SerializationTokenType.SortedSet:
-                    return typeof(SortedSet<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(SortedSet<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.Stack:
-                    return typeof(Stack<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(Stack<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.Queue:
-                    return typeof(Queue<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(Queue<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.LinkedList:
-                    return typeof(LinkedList<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(LinkedList<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.Nullable:
-                    return typeof(Nullable<>).MakeGenericType(ReadGenericArguments(1));
+                    return typeof(Nullable<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
                 case SerializationTokenType.ByteArray:
                     return typeof(byte[]);
                 case SerializationTokenType.ShortArray:
@@ -917,7 +918,7 @@ namespace Orleans.Serialization
                     var typeName = ReadString();
                     try
                     {
-                        return SerializationManager.ResolveTypeName(typeName);
+                        return serializationManager.ResolveTypeName(typeName);
                     }
                     catch (TypeAccessException ex)
                     {
@@ -930,13 +931,13 @@ namespace Orleans.Serialization
             throw new SerializationException("Unexpected '" + token + "' found when expecting a type reference");
         }
 
-        private Type[] ReadGenericArguments(int n)
+        private Type[] ReadGenericArguments(SerializationManager serializationManager, int n)
         {
             Trace("About to read {0} generic arguments", n);
             var args = new Type[n];
             for (var i = 0; i < n; i++)
             {
-                args[i] = ReadFullTypeHeader();
+                args[i] = ReadFullTypeHeader(serializationManager);
             }
             Trace("Finished reading {0} generic arguments", n);
             return args;

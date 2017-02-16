@@ -390,7 +390,6 @@ namespace Orleans
                 throw new ArgumentNullException("name");
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
-
         public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
 
         public static event ConnectionToClusterLostHandler ClusterConnectionLost;
@@ -408,13 +407,5 @@ namespace Orleans
             }
         }
 
-        internal static IList<Uri> Gateways
-        {
-            get
-            {
-                CheckInitialized();
-                return outsideRuntimeClient.Gateways;
-            }
-        }
     }
 }

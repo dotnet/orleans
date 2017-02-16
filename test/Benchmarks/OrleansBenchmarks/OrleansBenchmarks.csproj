@@ -50,6 +50,10 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\TestExtensions\TestExtensions.csproj">
+      <Project>{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}</Project>
+      <Name>TestExtensions</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213F-189B-41D4-90FE-38D513C1106D}</Project>
       <Name>TestGrainInterfaces</Name>

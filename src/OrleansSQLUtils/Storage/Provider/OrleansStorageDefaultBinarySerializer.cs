@@ -12,6 +12,8 @@ namespace Orleans.Storage
     [DebuggerDisplay("CanStream = {CanStream}, Tag = {Tag}")]
     public class OrleansStorageDefaultBinarySerializer: IStorageSerializer
     {
+        private readonly SerializationManager serializationManager;
+
         /// <summary>
         /// <see cref="IStorageSerializer.CanStream"/>
         /// </summary>
@@ -26,9 +28,11 @@ namespace Orleans.Storage
         /// <summary>
         /// Constructs this serializer from the given parameters.
         /// </summary>
+        /// <param name="serializationManager"></param>
         /// <param name="tag"><see cref="IStorageSerializer.Tag"/>.</param>
-        public OrleansStorageDefaultBinarySerializer(string tag)
+        public OrleansStorageDefaultBinarySerializer(SerializationManager serializationManager, string tag)
         {
+            this.serializationManager = serializationManager;
             if(string.IsNullOrWhiteSpace(tag))
             {
                 throw new ArgumentException("The parameter should contain characters.", nameof(tag));
@@ -53,7 +57,7 @@ namespace Orleans.Storage
         /// </summary>
         public object Serialize(object data)
         {
-            return SerializationManager.SerializeToByteArray(data);
+            return this.serializationManager.SerializeToByteArray(data);
         }
 
 

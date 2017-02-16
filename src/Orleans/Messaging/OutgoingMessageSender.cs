@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 
 namespace Orleans.Messaging
@@ -17,9 +18,12 @@ namespace Orleans.Messaging
 
     internal abstract class OutgoingMessageSender : AsynchQueueAgent<Message>
     {
-        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config)
+        private readonly SerializationManager serializationManager;
+
+        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config, SerializationManager serializationManager)
             : base(nameSuffix, config)
         {
+            this.serializationManager = serializationManager;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -43,7 +47,7 @@ namespace Orleans.Messaging
             int headerLength = 0;
             try
             {
-                data = msg.Serialize(out headerLength);
+                data = msg.Serialize(this.serializationManager, out headerLength);
             }
             catch (Exception exc)
             {

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -27,11 +28,11 @@ namespace Orleans.Runtime.Messaging
 
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
-        internal OutboundMessageQueue(MessageCenter mc, IMessagingConfiguration config)
+        internal OutboundMessageQueue(MessageCenter mc, IMessagingConfiguration config, SerializationManager serializationManager)
         {
             messageCenter = mc;
-            pingSender = new SiloMessageSender("PingSender", messageCenter);
-            systemSender = new SiloMessageSender("SystemSender", messageCenter);
+            pingSender = new SiloMessageSender("PingSender", messageCenter, serializationManager);
+            systemSender = new SiloMessageSender("SystemSender", messageCenter, serializationManager);
             senders = new Lazy<SiloMessageSender>[config.SiloSenderQueues];
 
             for (int i = 0; i < senders.Length; i++)
@@ -39,7 +40,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<SiloMessageSender>(() =>
                 {
-                    var sender = new SiloMessageSender("AppMsgsSender_" + capture, messageCenter);
+                    var sender = new SiloMessageSender("AppMsgsSender_" + capture, messageCenter, serializationManager);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);

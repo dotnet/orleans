@@ -4,8 +4,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
@@ -16,9 +18,9 @@ namespace Orleans.Providers
     /// behaves as an event queue, this provider adapter is primarily used for testing
     /// </summary>
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
-        where TSerializer : IMemoryMessageBodySerializer, new()
+        where TSerializer : IMemoryMessageBodySerializer
     {
-        private readonly IMemoryMessageBodySerializer serializer;
+        private TSerializer serializer;
         private IStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
@@ -28,14 +30,7 @@ namespace Orleans.Providers
         private Logger logger;
         private String providerName;
         private IGrainFactory grainFactory;
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public MemoryAdapterFactory()
-        {
-            serializer = new TSerializer();
-        }
+        private SerializationManager serializationManager;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -76,9 +71,11 @@ namespace Orleans.Providers
             grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
+            this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
 
             // 10 meg buffer pool.  10 1 meg blocks
             bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+            this.serializer = ActivatorUtilities.CreateInstance<TSerializer>(this.serviceProvider);
         }
 
         /// <summary>
@@ -115,7 +112,7 @@ namespace Orleans.Providers
         /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), logger);
+            IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), logger, this.serializer);
             return receiver;
         }
 
@@ -134,7 +131,7 @@ namespace Orleans.Providers
             try
             {
                 var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
-                ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
+                ArraySegment<byte> bodyBytes = serializer.Serialize(this.serializationManager, new MemoryMessageBody(events.Cast<object>(), requestContext));
                 var messageData = MemoryMessageData.Create(streamGuid, streamNamespace, bodyBytes);
                 IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
                 await queueGrain.Enqueue(messageData);
@@ -152,7 +149,7 @@ namespace Orleans.Providers
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new MemoryPooledCache<TSerializer>(bufferPool, logger.GetSubLogger("messagecache", "-"));
+            return new MemoryPooledCache<TSerializer>(bufferPool, logger.GetSubLogger("messagecache", "-"), this.serializer);
         }
 
         /// <summary>

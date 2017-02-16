@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -22,7 +24,7 @@ namespace Orleans.Streams
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
         private readonly Logger logger;
-
+        
         public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, bool isRewindable)
         {
             if (stream == null) throw new ArgumentNullException("stream");
@@ -191,7 +193,7 @@ namespace Orleans.Streams
                     {
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
                         var tup = await providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                            () => new StreamConsumerExtension(providerRuntime, IsRewindable));
+                            () => new StreamConsumerExtension(providerRuntime, IsRewindable, this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>()));
                         myExtension = tup.Item1;
                         myGrainReference = tup.Item2;
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        

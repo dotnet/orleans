@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Net;
 using System.Reflection;
-using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Tester.Serialization;
 using TestExtensions;
@@ -12,9 +11,18 @@ namespace UnitTests.Serialization
     [TestCategory("Serialization")]
     public class ExternalSerializerTest
     {
+        private readonly SerializationTestEnvironment environment;
+
         public ExternalSerializerTest()
         {
-            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() }, null);
+            var config = new ClientConfiguration
+            {
+                SerializationProviders =
+                {
+                    typeof(FakeSerializer).GetTypeInfo()
+                }
+            };
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -27,7 +35,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_CustomSerializerIsSupportedType()
         {
             var data = new FakeSerialized { SomeData = "some data" };
-            SerializationManager.RoundTripSerializationForTesting(data);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(data);
 
             Assert.True(FakeSerializer.IsSupportedTypeCalled, "type discovery failed");
         }
@@ -36,7 +44,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_ThatSerializeAndDeserializeWereInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
-            SerializationManager.RoundTripSerializationForTesting(data);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(data);
             Assert.True(FakeSerializer.SerializeCalled);
             Assert.True(FakeSerializer.DeserializeCalled);
         }
@@ -45,7 +53,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_ThatCopyWasInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
-            SerializationManager.DeepCopy(data);
+            this.environment.SerializationManager.DeepCopy(data);
             Assert.True(FakeSerializer.DeepCopyCalled);
         }
 
@@ -53,7 +61,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_ExternalSerializerUsedEvenIfCodegenDidntGenerateSerializersForIt()
         {
             var data = new FakeSerializedWithNoCodegenSerializers { SomeData = "some data", SomeMoreData = "more data" };
-            SerializationManager.RoundTripSerializationForTesting(data);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(data);
             Assert.True(FakeSerializer.SerializeCalled);
             Assert.True(FakeSerializer.DeserializeCalled);
     }

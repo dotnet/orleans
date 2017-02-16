@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -18,6 +19,7 @@ namespace Orleans.Streams
         private readonly IStreamPubSub pubSub;
 
         private readonly PersistentStreamProviderConfig config;
+        private readonly SerializationManager serializationManager;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly LoggerImpl logger;
 
@@ -32,13 +34,14 @@ namespace Orleans.Streams
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
-            GrainId id, 
-            string strProviderName, 
+            GrainId id,
+            string strProviderName,
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
-            PersistentStreamProviderConfig config)
+            PersistentStreamProviderConfig config,
+            SerializationManager serializationManager)
             : base(id, runtime.ExecutingSiloAddress)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
@@ -55,14 +58,17 @@ namespace Orleans.Streams
             }
             if (streamQueueBalancer == null)
             {
-                throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
+                throw new ArgumentNullException(
+                    "streamQueueBalancer",
+                    "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             }
-
+            
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
             providerRuntime = runtime;
             pubSub = streamPubSub;
             this.config = config;
+            this.serializationManager = serializationManager;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             latestCommandNumber = 0;
@@ -73,7 +79,9 @@ namespace Orleans.Streams
             logger = LogManager.GetLogger(GetType().Name + "-" + streamProviderName, LoggerType.Provider);
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
-            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
+            IntValueStatistic.FindOrCreate(
+                new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName),
+                () => queuesToAgentsMap.Count);
         }
 
         public Task Initialize(Immutable<IQueueAdapter> qAdapter)
@@ -208,7 +216,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId, config);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId, config, this.serializationManager);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);

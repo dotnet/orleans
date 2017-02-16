@@ -36,7 +36,7 @@ namespace UnitTests.General
             output.WriteLine("Testing GrainID " + testGrain);
             Assert.True(testGrain.IsSystemTarget); // System grain ID is not flagged as a system ID
 
-            GrainId sGrain = (GrainId)SerializationManager.DeepCopy(testGrain);
+            GrainId sGrain = (GrainId)this.environment.SerializationManager.DeepCopy(testGrain);
             output.WriteLine("Testing GrainID " + sGrain);
             Assert.True(sGrain.IsSystemTarget); // String round-trip grain ID is not flagged as a system ID
             Assert.Equal(testGrain, sGrain); // Should be equivalent GrainId object
@@ -264,7 +264,7 @@ namespace UnitTests.General
             Assert.Same(gid1, gid2); // Should be same / intern'ed GrainId object
 
             // Round-trip through Serializer
-            GrainId gid3 = (GrainId)SerializationManager.RoundTripSerializationForTesting(gid1);
+            GrainId gid3 = (GrainId)this.environment.SerializationManager.RoundTripSerializationForTesting(gid1);
             Assert.Equal(gid1, gid3); // Should be equal GrainId's
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
             Assert.Same(gid1, gid3); // Should be same / intern'ed GrainId object
@@ -283,7 +283,7 @@ namespace UnitTests.General
             Assert.Same(r1, r2); // 2: Objects should be same / intern'ed
 
             // Round-trip through Serializer
-            string r3 = (string)SerializationManager.RoundTripSerializationForTesting(r1);
+            string r3 = (string)this.environment.SerializationManager.RoundTripSerializationForTesting(r1);
 
             Assert.Equal(r1, r3); // 3: Should be equal
             Assert.Equal(r2, r3); // 4: Should be equal
@@ -331,7 +331,7 @@ namespace UnitTests.General
             Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
             // Round-trip through Serializer
-            SiloAddress a3 = (SiloAddress)SerializationManager.RoundTripSerializationForTesting(a1);
+            SiloAddress a3 = (SiloAddress)this.environment.SerializationManager.RoundTripSerializationForTesting(a1);
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Equal(a2, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
@@ -353,7 +353,7 @@ namespace UnitTests.General
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
 
             // Round-trip through Serializer
-            SiloAddress a3 = (SiloAddress)SerializationManager.RoundTripSerializationForTesting(a1);
+            SiloAddress a3 = (SiloAddress)this.environment.SerializationManager.RoundTripSerializationForTesting(a1);
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
@@ -431,14 +431,17 @@ namespace UnitTests.General
 
             GrainId systemTragetGrainId = GrainId.NewSystemTargetGrainIdByTypeCode(2);
             grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddress.NewLocalAddress(1));
+            this.environment.GrainFactory.BindGrainReference(grainRef);
             TestGrainReference(grainRef);
 
             GrainId observerGrainId = GrainId.NewClientId();
             grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId(), this.environment.RuntimeClient);
+            this.environment.GrainFactory.BindGrainReference(grainRef);
             TestGrainReference(grainRef);
 
             GrainId geoObserverGrainId = GrainId.NewClientId("clusterid");
             grainRef = GrainReference.NewObserverGrainReference(geoObserverGrainId, GuidId.GetNewGuidId(), this.environment.RuntimeClient);
+            this.environment.GrainFactory.BindGrainReference(grainRef);
             TestGrainReference(grainRef);
         }
 
@@ -447,7 +450,7 @@ namespace UnitTests.General
             GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.ToKeyString
 
-            roundTripped = SerializationManager.RoundTripSerializationForTesting(grainRef);
+            roundTripped = this.environment.SerializationManager.RoundTripSerializationForTesting(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.OrleansSerializer
 
             roundTripped = TestingUtils.RoundTripDotNetSerializer(grainRef, this.environment.GrainFactory);

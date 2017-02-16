@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -16,7 +17,7 @@ namespace Orleans.Streams
         private IAsyncObserver<T> observer;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-
+        
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
@@ -69,7 +70,7 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken, SerializationManager serializationManager)
         {
             // we validate expectedToken only for ordered (rewindable) streams
             if (expectedToken != null)
@@ -78,7 +79,7 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            foreach (var itemTuple in batch.GetEvents<T>())
+            foreach (var itemTuple in batch.GetEvents<T>(serializationManager))
             {
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }

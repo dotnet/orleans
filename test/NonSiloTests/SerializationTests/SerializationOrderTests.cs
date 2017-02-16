@@ -1,3 +1,4 @@
+using Orleans.Runtime.Configuration;
 using TestExtensions;
 
 namespace UnitTests.Serialization
@@ -12,14 +13,23 @@ namespace UnitTests.Serialization
 
     public class SerializationOrderTests
     {
+        private readonly SerializationTestEnvironment environment;
+
         public SerializationOrderTests()
         {
             FakeTypeToSerialize.Reset();
             FakeSerializer1.Reset();
             FakeSerializer2.Reset();
-            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer1).GetTypeInfo(), typeof(FakeSerializer2).GetTypeInfo() }, null);
+            var config = new ClientConfiguration()
+            {
+                SerializationProviders =
+                {
+                    typeof(FakeSerializer1).GetTypeInfo(),
+                    typeof(FakeSerializer2).GetTypeInfo()
+                }
+            };
 
-            SerializationManager.Register(typeof(FakeTypeToSerialize), typeof(FakeTypeToSerialize));
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -27,7 +37,7 @@ namespace UnitTests.Serialization
         {
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = new[] { typeof(FakeTypeToSerialize) };
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
-            SerializationManager.RoundTripSerializationForTesting(serializationItem);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(serializationItem);
 
             Assert.True(
                 FakeSerializer1.SerializeCalled,
@@ -48,7 +58,7 @@ namespace UnitTests.Serialization
         {
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = null;
-            SerializationManager.RoundTripSerializationForTesting(serializationItem);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(serializationItem);
             Assert.True(FakeTypeToSerialize.SerializeWasCalled, "FakeTypeToSerialize.Serialize should have been called");
             Assert.True(FakeTypeToSerialize.DeserializeWasCalled, "FakeTypeToSerialize.Deserialize should have been called");
         }
@@ -58,7 +68,7 @@ namespace UnitTests.Serialization
         {
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = new[] { typeof(FakeTypeToSerialize) };
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
-            SerializationManager.RoundTripSerializationForTesting(serializationItem);
+            this.environment.SerializationManager.RoundTripSerializationForTesting(serializationItem);
             Assert.True(FakeSerializer1.SerializeCalled, "IExternalSerializer.Serialize should have been called on FakeSerializer1");
             Assert.True(FakeSerializer1.DeserializeCalled, "IExternalSerializer.Deserialize should have been called on FakeSerializer1");
             Assert.False(FakeSerializer2.SerializeCalled, "IExternalSerializer.Serialize should NOT have been called on FakeSerializer2");

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Orleans;
+using Orleans.Messaging;
 using Orleans.Runtime;
 
 namespace OrleansManager
@@ -132,7 +134,7 @@ namespace OrleansManager
         {
             var grainId = ConstructGrainId(args, "GrainReport");
 
-            var silos = GetSiloAddresses();
+            var silos = GetSiloAddresses().GetResult();
             if (silos == null || silos.Count == 0) return;
 
             var reports = new List<DetailedGrainReport>();
@@ -241,14 +243,15 @@ namespace OrleansManager
 
         private static SiloAddress GetSiloAddress()
         {
-            List<SiloAddress> silos = GetSiloAddresses();
+            List<SiloAddress> silos = GetSiloAddresses().GetResult();
             if (silos == null || silos.Count==0) return null;
             return silos.FirstOrDefault();
         }
 
-        private static List<SiloAddress> GetSiloAddresses()
+        private static async Task<List<SiloAddress>> GetSiloAddresses()
         {
-            IList<Uri> gateways = GrainClient.Gateways;
+            var gatewayProvider = (IGatewayListProvider) GrainClient.ServiceProvider.GetService(typeof(IGatewayListProvider));
+            IList<Uri> gateways = await gatewayProvider.GetGateways();
             if (gateways.Count >= 1) 
                 return gateways.Select(Utils.ToSiloAddress).ToList();
 

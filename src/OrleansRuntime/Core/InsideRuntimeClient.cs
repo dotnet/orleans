@@ -49,9 +49,11 @@ namespace Orleans.Runtime
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
+            SerializationManager serializationManager,
             MessageFactory messageFactory)
         {
             this.ServiceProvider = serviceProvider;
+            this.SerializationManager = serializationManager;
             this.dispatcher = dispatcher;
             MySilo = catalog.LocalSilo;
             this.directory = directory;
@@ -91,6 +93,7 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; private set; }
 
+        public SerializationManager SerializationManager { get; }
 
         #region Implementation of IRuntimeClient
 
@@ -341,7 +344,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest)message.BodyObject;
+                    var request = (InvokeMethodRequest) message.GetBody(this.SerializationManager);
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, logger, this);

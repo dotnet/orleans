@@ -11,6 +11,7 @@ using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -310,8 +311,8 @@ namespace Orleans.ServiceBus.Providers
                 SequenceToken = sequenceToken;
             }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
-            public bool ImportRequestContext() { throw new NotSupportedException(); }
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager) { throw new NotSupportedException(); }
+            public bool ImportRequestContext(SerializationManager serializationManager) { throw new NotSupportedException(); }
             public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc) { throw new NotSupportedException(); }
         }
 

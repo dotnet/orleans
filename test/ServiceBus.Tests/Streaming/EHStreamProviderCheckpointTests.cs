@@ -80,13 +80,13 @@ namespace ServiceBus.Tests.StreamingTests
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
             {
-                await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
+                await this.GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
+                await TestingUtils.WaitUntilAsync(assertIsTrue => this.CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
-                await RestartAgents();
+                await this.RestartAgents();
 
-                await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(90));
+                await this.GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
+                await TestingUtils.WaitUntilAsync(assertIsTrue => this.CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -100,14 +100,14 @@ namespace ServiceBus.Tests.StreamingTests
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
             {
-                await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
+                await this.GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
+                await TestingUtils.WaitUntilAsync(assertIsTrue => this.CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
-                HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
-                await HostedCluster.WaitForLivenessToStabilizeAsync();
+                this.HostedCluster.RestartSilo(this.HostedCluster.SecondarySilos[0]);
+                await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-                await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(90));
+                await this.GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
+                await TestingUtils.WaitUntilAsync(assertIsTrue => this.CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(90));
             }
             finally
             {

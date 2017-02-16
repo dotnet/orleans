@@ -14,15 +14,18 @@ namespace Orleans.Providers
         /// <summary>
         /// Serialize MemoryMessageBody to an array segment of bytes.
         /// </summary>
+        /// <param name="serializationManager"></param>
         /// <param name="body"></param>
         /// <returns></returns>
-        ArraySegment<byte> Serialize(MemoryMessageBody body);
+        ArraySegment<byte> Serialize(SerializationManager serializationManager, MemoryMessageBody body);
+
         /// <summary>
         /// Deserialize an array segment into a MemoryMessageBody
         /// </summary>
+        /// <param name="serializationManager"></param>
         /// <param name="bodyBytes"></param>
         /// <returns></returns>
-        MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes);
+        MemoryMessageBody Deserialize(SerializationManager serializationManager, ArraySegment<byte> bodyBytes);
     }
 
     /// <summary>
@@ -31,24 +34,16 @@ namespace Orleans.Providers
     [Serializable]
     public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer
     {
-        /// <summary>
-        /// Serialize MemoryMessageBody to an array segment of bytes.
-        /// </summary>
-        /// <param name="body"></param>
-        /// <returns></returns>
-        public ArraySegment<byte> Serialize(MemoryMessageBody body)
+        /// <inheritdoc />
+        public ArraySegment<byte> Serialize(SerializationManager serializationManager, MemoryMessageBody body)
         {
-            return new ArraySegment<byte>(SerializationManager.SerializeToByteArray(body));
+            return new ArraySegment<byte>(serializationManager.SerializeToByteArray(body));
         }
 
-        /// <summary>
-        /// Deserialize an array segment into a MemoryMessageBody
-        /// </summary>
-        /// <param name="bodyBytes"></param>
-        /// <returns></returns>
-        public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
+        /// <inheritdoc />
+        public MemoryMessageBody Deserialize(SerializationManager serializationManager, ArraySegment<byte> bodyBytes)
         {
-            return SerializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
+            return serializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
         }
     }
 

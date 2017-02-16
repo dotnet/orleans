@@ -64,6 +64,8 @@ namespace Orleans
         private readonly AssemblyProcessor assemblyProcessor;
         private readonly MessageFactory messageFactory;
 
+        public SerializationManager SerializationManager { get; }
+
         Logger IRuntimeClient.AppLogger
         {
             get { return appLogger; }
@@ -79,14 +81,9 @@ namespace Orleans
         {
             get { return CurrentActivationAddress.ToString(); }
         }
-        
-        internal IList<Uri> Gateways
-        {
-            get
-            {
-                return transport.GatewayManager.ListProvider.GetGateways().GetResult();
-            }
-        }
+
+        internal Task<IList<Uri>> GetGateways() =>
+            this.transport.GatewayManager.ListProvider.GetGateways();
 
         public IStreamProviderManager CurrentStreamProviderManager { get; private set; }
 
@@ -116,19 +113,28 @@ namespace Orleans
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.AddSingleton<ClientProviderRuntime>();
+            services.AddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+            services.AddSingleton<IGatewayListProvider>(
+                sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
+            services.AddSingleton<SerializationManager>();
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<StreamProviderManager>();
             services.AddSingleton<ClientStatisticsManager>();
+            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
             services.AddSingleton<CodeGeneratorManager>();
+
             this.ServiceProvider = services.BuildServiceProvider();
+
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+            this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
+            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
             this.config = cfg;
 
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
             StatisticsCollector.Initialize(config);
-            SerializationManager.Initialize(cfg.SerializationProviders, cfg.FallbackSerializationProvider);
             this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
@@ -153,9 +159,6 @@ namespace Orleans
                     UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnhandledException);
                 }
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-
-                // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
-                SerializationManager.GetDeserializer(typeof(String));
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
@@ -186,9 +189,10 @@ namespace Orleans
                 config.CheckGatewayProviderSettings();
 
                 var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-                var gatewayListProvider = new GatewayProviderFactory(this.config, this.ServiceProvider).CreateGatewayListProvider();
-                gatewayListProvider.InitializeGatewayListProvider(this.config, LogManager.GetLogger(gatewayListProvider.GetType().Name)).WaitWithThrow(initTimeout);
-                transport = new ProxiedMessageCenter(config, localAddress, generation, handshakeClientId, gatewayListProvider, this.messageFactory);
+                var gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
+                gatewayListProvider.InitializeGatewayListProvider(cfg, LogManager.GetLogger(gatewayListProvider.GetType().Name))
+                                   .WaitWithThrow(initTimeout);
+                transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
 
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
@@ -209,7 +213,7 @@ namespace Orleans
         {
             var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory).Result;
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
-            var streamProviderManager = new Streams.StreamProviderManager();
+            var streamProviderManager = this.ServiceProvider.GetRequiredService<StreamProviderManager>();
             streamProviderManager
                 .LoadStreamProviders(
                     this.config.ProviderConfigurations,
@@ -273,7 +277,6 @@ namespace Orleans
             transport.Start();
             LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
-            ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
 
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;
@@ -296,7 +299,6 @@ namespace Orleans
             
             ClientStatistics.Start(statisticsProviderManager, transport, clientId)
                 .WaitWithThrow(initTimeout);
-
             StreamingInitialize();
         }
 
@@ -463,7 +465,7 @@ namespace Orleans
                         continue;
 
                     RequestContext.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.BodyObject;
+                    var request = (InvokeMethodRequest)message.GetBody(this.SerializationManager);
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
                     Exception caught = null;
@@ -517,7 +519,7 @@ namespace Orleans
             try
             {
                 // we're expected to notify the caller if the deep copy failed.
-                deepCopy = SerializationManager.DeepCopy(resultObject);
+                deepCopy = this.SerializationManager.DeepCopy(resultObject);
             }
             catch (Exception exc2)
             {
@@ -536,7 +538,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void ReportException(Message message, Exception exception)
         {
-            var request = (InvokeMethodRequest)message.BodyObject;
+            var request = (InvokeMethodRequest)message.GetBody(this.SerializationManager);
             switch (message.Direction)
             {
                 default:
@@ -558,7 +560,7 @@ namespace Orleans
                         try
                         {
                             // we're expected to notify the caller if the deep copy failed.
-                            deepCopy = (Exception)SerializationManager.DeepCopy(exception);
+                            deepCopy = (Exception)this.SerializationManager.DeepCopy(exception);
                         }
                         catch (Exception ex2)
                         {

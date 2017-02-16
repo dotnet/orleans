@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using Orleans.Runtime;
@@ -7,6 +8,10 @@ namespace Orleans.Serialization
     public interface IDeserializationContext
     {
         /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        SerializationManager SerializationManager { get; }
+        /// <summary>
         /// The stream reader.
         /// </summary>
         BinaryTokenStreamReader StreamReader { get; }
@@ -15,6 +20,9 @@ namespace Orleans.Serialization
         /// The offset of the current object in <see cref="StreamReader"/>.
         /// </summary>
         int CurrentObjectOffset { get; set; }
+
+        IServiceProvider ServiceProvider { get; }
+
         /// <summary>
         /// Records deserialization of the provided object.
         /// </summary>
@@ -27,29 +35,21 @@ namespace Orleans.Serialization
         /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
         /// <returns>The object from the specified offset.</returns>
         object FetchReferencedObject(int offset);
-
-        /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
-        /// </summary>
-        IGrainFactory GrainFactory { get; }
     }
 
     public class DeserializationContext : IDeserializationContext
     {
         private readonly Dictionary<int, object> taggedObjects;
-        private IGrainFactory grainFactory;
 
-        public DeserializationContext(IGrainFactory grainFactory)
+        public DeserializationContext(SerializationManager serializationManager)
         {
-            this.grainFactory = grainFactory;
-            taggedObjects = new Dictionary<int, object>();
+            this.SerializationManager = serializationManager;
+            this.taggedObjects = new Dictionary<int, object>();
         }
 
-        internal void Reset()
-        {
-            taggedObjects.Clear();
-            CurrentObjectOffset = 0;
-        }
+        /// <inheritdoc />
+        public SerializationManager SerializationManager { get; }
+        
         /// <inheritdoc />
         public BinaryTokenStreamReader StreamReader { get; set; }
 
@@ -63,9 +63,6 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public IGrainFactory GrainFactory => this.grainFactory ?? (this.grainFactory =  RuntimeClient.Current?.InternalGrainFactory);
-
-        /// <inheritdoc />
         public object FetchReferencedObject(int offset)
         {
             object result;
@@ -75,5 +72,13 @@ namespace Orleans.Serialization
             }
             return result;
         }
+
+        internal void Reset()
+        {
+            this.taggedObjects.Clear();
+            this.CurrentObjectOffset = 0;
+        }
+
+        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
     }
 }

@@ -1,6 +1,6 @@
-
 using System;
 using System.Collections.Generic;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -23,12 +23,19 @@ namespace Orleans.Runtime
 
         private readonly bool supportForwarding;
         private Logger Log;
+        private readonly SerializationManager serializationManager;
 
         internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
 
-        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        public IncomingMessageBuffer(
+            Logger logger,
+            SerializationManager serializationManager,
+            bool supportForwarding = false,
+            int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
+            int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = logger;
+            this.serializationManager = serializationManager;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
@@ -154,7 +161,11 @@ namespace Orleans.Runtime
             List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
             
             // build message
-            msg = new Message(header);
+            var context = new DeserializationContext(this.serializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(header)
+            };
+            msg = new Message(context);
             try
             {
                 if (this.supportForwarding)
@@ -166,7 +177,7 @@ namespace Orleans.Runtime
                 else
                 {
                     // Attempt to deserialize the body immediately.
-                    msg.DeserializeBodyObject(body);
+                    msg.DeserializeBodyObject(this.serializationManager, body);
                 }
             }
             finally

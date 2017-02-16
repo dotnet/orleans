@@ -25,8 +25,8 @@ namespace UnitTests.Serialization
         {
             var v = new MyTypeWithAnInternalTypeField();
 
-            Assert.NotNull(SerializationManager.GetSerializer(typeof (MyTypeWithAnInternalTypeField)));
-            Assert.NotNull(SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
+            Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof (MyTypeWithAnInternalTypeField)));
+            Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
         }
     }
 }

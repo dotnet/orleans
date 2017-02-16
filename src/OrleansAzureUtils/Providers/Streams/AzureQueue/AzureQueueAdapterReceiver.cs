@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -14,6 +15,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal class AzureQueueAdapterReceiver: IQueueAdapterReceiver
     {
+        private readonly SerializationManager serializationManager;
         private AzureQueueDataManager queue;
         private long lastReadMessage;
         private Task outstandingTask;
@@ -23,24 +25,26 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public QueueId Id { get; }
 
-        public static IQueueAdapterReceiver Create(QueueId queueId, string dataConnectionString, string deploymentId, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, QueueId queueId, string dataConnectionString, string deploymentId, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
+            if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
             var queue = new AzureQueueDataManager(queueId.ToString(), deploymentId, dataConnectionString, messageVisibilityTimeout);
-            return new AzureQueueAdapterReceiver(queueId, queue, dataAdapter);
+            return new AzureQueueAdapterReceiver(serializationManager, queueId, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(QueueId queueId, AzureQueueDataManager queue, IAzureQueueDataAdapter dataAdapter)
+        private AzureQueueAdapterReceiver(SerializationManager serializationManager, QueueId queueId, AzureQueueDataManager queue, IAzureQueueDataAdapter dataAdapter)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (queue == null) throw new ArgumentNullException(nameof(queue));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(queue));
 
             Id = queueId;
+            this.serializationManager = serializationManager;
             this.queue = queue;
             this.dataAdapter = dataAdapter;
             this.logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
@@ -88,7 +92,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromCloudQueueMessage(message, lastReadMessage++);
+                    IBatchContainer container = this.dataAdapter.FromCloudQueueMessage(this.serializationManager, message, lastReadMessage++);
                     azureQueueMessages.Add(container);
                     this.pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }

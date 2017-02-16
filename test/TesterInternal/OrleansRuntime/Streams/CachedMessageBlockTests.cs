@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streams;
 using Xunit;
 
@@ -31,12 +32,12 @@ namespace UnitTests.OrleansRuntime.Streams
             public string StreamNamespace => null;
             public StreamSequenceToken SequenceToken { get; set; }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
             {
                 throw new NotImplementedException();
             }
 
-            public bool ImportRequestContext()
+            public bool ImportRequestContext(SerializationManager serializationManager)
             {
                 throw new NotImplementedException();
             }

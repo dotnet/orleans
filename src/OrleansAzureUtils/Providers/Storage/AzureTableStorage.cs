@@ -70,6 +70,7 @@ namespace Orleans.Storage
 
         private bool useJsonFormat;
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings;
+        private SerializationManager serializationManager;
 
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
@@ -92,6 +93,7 @@ namespace Orleans.Storage
         {
             Name = name;
             serviceId = providerRuntime.ServiceId.ToString();
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 
             if (!config.Properties.ContainsKey(DataConnectionStringPropertyName) || string.IsNullOrWhiteSpace(config.Properties[DataConnectionStringPropertyName]))
                 throw new ArgumentException("DataConnectionString property not set");
@@ -269,7 +271,7 @@ namespace Orleans.Storage
             {
                 // Convert to binary format
 
-                byte[] data = SerializationManager.SerializeToByteArray(grainState);
+                byte[] data = this.serializationManager.SerializeToByteArray(grainState);
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -417,7 +419,7 @@ namespace Orleans.Storage
                 if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = SerializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {

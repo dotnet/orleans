@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
@@ -22,12 +23,12 @@ namespace Orleans.Providers.Streams.Generator
             this.RealToken = token;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
         {
             return new[] { Tuple.Create((T)Payload, SequenceToken) };
         }
 
-        public bool ImportRequestContext()
+        public bool ImportRequestContext(SerializationManager serializationManager)
         {
             return false;
         }

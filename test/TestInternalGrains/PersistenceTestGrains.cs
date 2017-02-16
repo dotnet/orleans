@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Core;
@@ -151,8 +152,11 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceUserHandledErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceUserHandledErrorGrain
     {
+        private SerializationManager serializationManager;
+
         public override Task OnActivateAsync()
         {
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             return TaskDone.Done;
         }
 
@@ -163,7 +167,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = SerializationManager.DeepCopy(State);
+            var original = this.serializationManager.DeepCopy(State);
             try
             {
                 State.Field1 = val;
@@ -180,7 +184,7 @@ namespace UnitTests.Grains
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = SerializationManager.DeepCopy(State);
+            var original = this.serializationManager.DeepCopy(State);
             try
             {
                 await ReadStateAsync();
@@ -1036,9 +1040,11 @@ namespace UnitTests.Grains
         private readonly int _instanceFilterValue2 = _staticFilterValue2;
 
         private Logger logger;
+        private SerializationManager serializationManager;
 
         public override Task OnActivateAsync()
         {
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             logger = GetLogger("SerializationTestGrain-" + IdentityString);
             return base.OnActivateAsync();
         }
@@ -1104,7 +1110,7 @@ namespace UnitTests.Grains
 
         private void TestSerializeFuncPtr(string what, Func<int, bool> func1)
         {
-            object obj2 = SerializationManager.RoundTripSerializationForTesting(func1);
+            object obj2 = this.serializationManager.RoundTripSerializationForTesting(func1);
             var func2 = (Func<int, bool>) obj2;
 
             foreach (
@@ -1117,7 +1123,7 @@ namespace UnitTests.Grains
 
         private void TestSerializePredicate(string what, Predicate<int> pred1)
         {
-            object obj2 = SerializationManager.RoundTripSerializationForTesting(pred1);
+            object obj2 = this.serializationManager.RoundTripSerializationForTesting(pred1);
             var pred2 = (Predicate<int>) obj2;
 
             foreach (

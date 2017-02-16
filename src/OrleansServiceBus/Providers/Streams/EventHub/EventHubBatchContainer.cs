@@ -44,7 +44,8 @@ namespace Orleans.ServiceBus.Providers
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
         private Body payload;
-        private Body Payload => payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+        
+        private Body GetPayload(SerializationManager serializationManager) => payload ?? (payload = serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
 
         [Serializable]
         private class Body
@@ -68,9 +69,9 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
         {
-            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
+            return GetPayload(serializationManager).Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
         }
 
         /// <summary>
@@ -78,11 +79,11 @@ namespace Orleans.ServiceBus.Providers
         /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
         /// </summary>
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
-        public bool ImportRequestContext()
+        public bool ImportRequestContext(SerializationManager serializationManager)
         {
-            if (Payload.RequestContext != null)
+            if (GetPayload(serializationManager).RequestContext != null)
             {
-                RequestContext.Import(Payload.RequestContext);
+                RequestContext.Import(GetPayload(serializationManager).RequestContext);
                 return true;
             }
             return false;
@@ -96,14 +97,14 @@ namespace Orleans.ServiceBus.Providers
             return true;
         }
 
-        internal static EventData ToEventData<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        internal static EventData ToEventData<T>(SerializationManager serializationManager, Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {
                 Events = events.Cast<object>().ToList(),
                 RequestContext = requestContext
             };
-            var bytes = SerializationManager.SerializeToByteArray(payload);
+            var bytes = serializationManager.SerializeToByteArray(payload);
 #if NETSTANDARD
             var eventData = new EventData(bytes);
 #else

@@ -21,6 +21,7 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
+        private readonly SerializationManager serializationManager;
         private static readonly object lockable = new object();
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
@@ -40,15 +41,16 @@ namespace Orleans.Runtime
             Instance = null;
         }
 
-        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
-            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy)
+        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager)
+            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager)
         {
         }
 
-        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
+        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager)
         {
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
+            this.serializationManager = serializationManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
@@ -67,7 +69,7 @@ namespace Orleans.Runtime
             // 2. We load those assemblies into memory. In the official distribution of Orleans, this is usually 4 assemblies.
 
             // (no more assemblies should be loaded into memory, so now is a good time to log all types registered with the serialization manager)
-            SerializationManager.LogRegisteredTypes();
+            this.serializationManager.LogRegisteredTypes();
 
             // 3. We scan types in memory for GrainTypeData objects that describe grain classes and their corresponding grain state classes.
             InitializeGrainClassData(loader, strict);

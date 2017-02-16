@@ -61,6 +61,7 @@ namespace Orleans.Storage
         public Logger Log { get; private set; }
 
         private DynamoDBStorage storage;
+        private SerializationManager serializationManager;
 
         /// <summary>
         /// Default Constructor
@@ -77,6 +78,7 @@ namespace Orleans.Storage
         {
             Name = name;
             serviceId = providerRuntime.ServiceId.ToString();
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 
             if (config.Properties.ContainsKey(TABLE_NAME_PROPERTY_NAME))
                 tableName = config.Properties[TABLE_NAME_PROPERTY_NAME];
@@ -314,7 +316,7 @@ namespace Orleans.Storage
                 if (binaryData?.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = SerializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
@@ -361,7 +363,7 @@ namespace Orleans.Storage
             else
             {
                 // Convert to binary format
-                entity.BinaryState = SerializationManager.SerializeToByteArray(grainState);
+                entity.BinaryState = this.serializationManager.SerializeToByteArray(grainState);
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",

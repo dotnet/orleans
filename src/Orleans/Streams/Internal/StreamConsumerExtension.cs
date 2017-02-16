@@ -5,13 +5,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle
     {
         Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
-        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken, SerializationManager serializationManager);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
         StreamHandshakeToken GetSequenceToken();
@@ -31,14 +32,16 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
         private readonly bool isRewindable;
+        private readonly IRuntimeClient runtimeClient;
 
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable, IRuntimeClient runtimeClient)
         {
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             this.isRewindable = isRewindable;
+            this.runtimeClient = runtimeClient;
             logger = providerRuntime.GetLogger(GetType().Name);
         }
 
@@ -100,7 +103,7 @@ namespace Orleans.Streams
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                return observer.DeliverBatch(batch.Value, handshakeToken);
+                return observer.DeliverBatch(batch.Value, handshakeToken, this.runtimeClient.SerializationManager);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);

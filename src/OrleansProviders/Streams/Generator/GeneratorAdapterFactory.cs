@@ -3,8 +3,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
@@ -39,6 +41,7 @@ namespace Orleans.Providers.Streams.Generator
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private Logger logger;
+        private SerializationManager serializationManager;
 
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
@@ -66,6 +69,7 @@ namespace Orleans.Providers.Streams.Generator
             receivers = new ConcurrentDictionary<QueueId, Receiver>();
             adapterConfig = new GeneratorAdapterConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
+            this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
             if (adapterConfig.GeneratorConfigType != null)
             {
                 generatorConfig = (IStreamGeneratorConfig)(serviceProvider?.GetService(adapterConfig.GeneratorConfigType) ?? Activator.CreateInstance(adapterConfig.GeneratorConfigType));
@@ -232,7 +236,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new GeneratorPooledCache(bufferPool, logger);
+            return new GeneratorPooledCache(bufferPool, logger, serializationManager);
         }
     }
 }

@@ -7,6 +7,11 @@ namespace Orleans.Serialization
     public interface ICopyContext
     {
         /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        SerializationManager SerializationManager { get; }
+
+        /// <summary>
         /// Record an object-to-copy mapping into the current serialization context.
         /// Used for maintaining the .NET object graph during serialization operations.
         /// Used in generated code.
@@ -16,23 +21,20 @@ namespace Orleans.Serialization
         void RecordCopy(object original, object copy);
 
         object CheckObjectWhileCopying(object raw);
-
-        /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
-        /// </summary>
-        IGrainFactory GrainFactory { get; }
     }
 
     public interface ISerializationContext
     {
-        BinaryTokenStreamWriter StreamWriter { get; }
-        void RecordObject(object original);
-        int CheckObjectWhileSerializing(object raw);
-
         /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
+        /// Gets the serialization manager.
         /// </summary>
-        IGrainFactory GrainFactory { get; }
+        SerializationManager SerializationManager { get; }
+
+        BinaryTokenStreamWriter StreamWriter { get; }
+
+        void RecordObject(object original);
+
+        int CheckObjectWhileSerializing(object raw);
     }
 
     /// <summary>
@@ -63,19 +65,20 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        public SerializationManager SerializationManager { get; }
+
         public BinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
-        private IGrainFactory grainFactory;
 
-        public SerializationContext(IGrainFactory grainFactory)
+        public SerializationContext(SerializationManager serializationManager)
         {
-            this.grainFactory = grainFactory;
+            this.SerializationManager = serializationManager;
             processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
         }
-
-        /// <inheritdoc />
-        public IGrainFactory GrainFactory => this.grainFactory ?? (this.grainFactory = RuntimeClient.Current.InternalGrainFactory);
 
         internal void Reset()
         {
