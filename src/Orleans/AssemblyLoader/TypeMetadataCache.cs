@@ -11,6 +11,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal class TypeMetadataCache
     {
+        private readonly CodeGeneratorManager codeGeneratorManager;
+
         /// <summary>
         /// The mapping between grain types and the corresponding type for the <see cref="IGrainMethodInvoker"/> implementation.
         /// </summary>
@@ -20,6 +22,11 @@ namespace Orleans.Runtime
         /// The mapping between grain types and the corresponding type for the <see cref="GrainReference"/> implementation.
         /// </summary>
         private readonly ConcurrentDictionary<Type, Type> grainToReferenceMapping = new ConcurrentDictionary<Type, Type>();
+
+        public TypeMetadataCache(CodeGeneratorManager codeGeneratorManager)
+        {
+            this.codeGeneratorManager = codeGeneratorManager;
+        }
 
         public void FindSupportClasses(Type type)
         {
@@ -40,7 +47,7 @@ namespace Orleans.Runtime
         public Type GetGrainReferenceType(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo();
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
+            codeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
             var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
@@ -77,7 +84,7 @@ namespace Orleans.Runtime
         public Type GetGrainMethodInvokerType(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo();
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
+            codeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
             var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;

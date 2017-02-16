@@ -262,6 +262,7 @@ namespace Orleans.Runtime
             services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<MessageFactory>();
             services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<CodeGeneratorManager>();
 
             // Placement
             services.AddSingleton<PlacementDirectorsManager>();

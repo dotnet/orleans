@@ -82,7 +82,7 @@ namespace Orleans.Runtime
             return discoveredAssemblyLocations;
         }
 #endif
-        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
         {
             try
             {
@@ -90,19 +90,18 @@ namespace Orleans.Runtime
                 var foundType =
                     TypeUtils.GetTypes(
                         assembly,
-                        type =>
-                        typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
+                        type => typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface,
+                        logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
                 }
 
-                return (T)Activator.CreateInstance(foundType, true);
+                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
             }
-            catch (FileNotFoundException exception)
+            catch (FileNotFoundException)
             {
-                logger.Warn(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exception.Message, exception);
+                logger.Info(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, $"Failed to find assembly {assemblyName} to create instance of {typeof(T)}.");
                 return null;
             }
             catch (Exception exc)
