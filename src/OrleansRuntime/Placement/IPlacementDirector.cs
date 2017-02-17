@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, GrainId target, IPlacementContext context);
 
         Task<PlacementResult> OnAddActivation(
-            PlacementStrategy strategy, GrainId grain, IPlacementContext context);
+            PlacementStrategy strategy, PlacementTarget target, IPlacementContext context);
     }
 
     /// <summary>

@@ -38,10 +38,10 @@ namespace Orleans.Runtime.Placement
         }
 
         public virtual Task<PlacementResult> OnAddActivation(
-            PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+            PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var grainType = context.GetGrainTypeName(grain);
-            var allSilos = context.GetCompatibleSiloList(grain);
+            var grainType = context.GetGrainTypeName(target.GrainId);
+            var allSilos = context.GetCompatibleSiloList(target);
             return Task.FromResult(
                 PlacementResult.SpecifyCreation(allSilos[random.Next(allSilos.Count)], strategy, grainType));
         }

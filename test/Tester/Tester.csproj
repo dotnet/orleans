@@ -190,6 +190,7 @@
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
       <Project>{4682abc1-1a51-4794-8012-da8e59ebc72e}</Project>
       <Name>TestInternalGrains</Name>
+      <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
       <Project>{8fd242b4-eda9-42cd-ba39-e410b98add26}</Project>
