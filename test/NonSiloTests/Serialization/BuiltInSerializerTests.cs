@@ -34,7 +34,6 @@ namespace UnitTests.Serialization
     public class BuiltInSerializerTests
     {
         private readonly ITestOutputHelper output;
-        private readonly TestEnvironmentFixture defaultFixture;
 
         public enum SerializerToUse
         {
@@ -741,6 +740,7 @@ namespace UnitTests.Serialization
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
+#if !NETSTANDARD_TODO
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
@@ -750,7 +750,7 @@ namespace UnitTests.Serialization
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
             Assert.True(input.IsBound);
 
-            object deserialized = DotNetSerializationLoop(input);
+            object deserialized = DotNetSerializationLoop(input, environment.GrainFactory);
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
@@ -758,22 +758,22 @@ namespace UnitTests.Serialization
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
         
-
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainBase_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
-            InitializeSerializer(serializerToUse);
+            var environment = InitializeSerializer(serializerToUse);
             Grain input = new EchoTaskGrain();
 
             // Expected exception:
             // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.
 
-            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input));
+            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input, environment.GrainFactory));
 
             Assert.Contains("is not marked as serializable", exc.Message);
         }
-        
+#endif
+
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
@@ -877,22 +877,31 @@ namespace UnitTests.Serialization
             return copy;
         }
 
-        private object DotNetSerializationLoop(object input)
+        private object DotNetSerializationLoop(object input, IGrainFactory grainFactory)
         {
             byte[] bytes;
             object deserialized;
+            var formatter = new BinaryFormatter
+            {
+#if !NETSTANDARD_TODO
+                Context = new StreamingContext(StreamingContextStates.All, grainFactory)
+#endif
+            };
             using (var str = new MemoryStream())
             {
-                IFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(str, input);
                 str.Flush();
                 bytes = str.ToArray();
             }
             using (var inStream = new MemoryStream(bytes))
             {
-                IFormatter formatter = new BinaryFormatter();
                 deserialized = formatter.Deserialize(inStream);
             }
+#if NETSTANDARD_TODO
+                // On .NET Standard, currently we need to manually fixup grain references.
+                var grainRef = deserialized as GrainReference;
+                if (grainRef != null) grainFactory.BindGrainReference(grainRef);
+#endif
             return deserialized;
         }
 

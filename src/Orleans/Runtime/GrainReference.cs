@@ -726,12 +726,24 @@ namespace Orleans.Runtime
                 genericArg = null;
             genericArguments = genericArg;
 
-#if !NETSTANDARD
-            var deserializationContext = context.Context as IDeserializationContext;
-            deserializationContext?.GrainFactory.BindGrainReference(this);
+#if !NETSTANDARD_TODO
+            var grainFactory = context.Context as IGrainFactory;
+            grainFactory?.BindGrainReference(this);
 #endif
         }
 
-        #endregion
+#if !NETSTANDARD_TODO
+        /// <summary>
+        /// Called by BinaryFormatter after deserialization has completed.
+        /// </summary>
+        /// <param name="context">The context.</param>
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
+        {
+            var grainFactory = context.Context as IGrainFactory;
+            grainFactory?.BindGrainReference(this);
+        }
+#endif
+#endregion
     }
 }
