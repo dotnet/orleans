@@ -8,7 +8,7 @@
     <title>Debugging and Symbols | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Debugging and Symbols | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.10.2.0">
+    <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -76,7 +76,7 @@
 In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.
 Hence, in productions tracing is the primary &#39;debugging&#39; mechanism.</p>
 <h2 id="symbols">Symbols</h2>
-<p>Symbols for Orleans binaries are published to <a href="https://nuget.smbsrc.net"><a href="https://nuget.smbsrc.net">https://nuget.smbsrc.net</a></a> symbols server. Add it to the list of symbols server in the Visual Studio options under Debugging/Symbols for debugging Orleans code. Make sure there is traling slash in the URL. Visual Studio 2015 has a bug with parsing it.</p>
+<p>Symbols for Orleans binaries are published to <a href="https://nuget.smbsrc.net">https://nuget.smbsrc.net</a> symbols server. Add it to the list of symbols server in the Visual Studio options under Debugging/Symbols for debugging Orleans code. Make sure there is traling slash in the URL. Visual Studio 2015 has a bug with parsing it.</p>
 <h2 id="sources">Sources</h2>
 <p>You can download zipped sources for specific releases of Orleans from the <a href="https://github.com/dotnet/orleans/releases">Releases page</a>.</p>
 
