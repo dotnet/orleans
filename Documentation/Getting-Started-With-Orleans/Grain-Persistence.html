@@ -317,13 +317,13 @@ and some added implementation logic in ADO.NET specific storage provider that al
 </ol>
 <p>Both <code>1.</code> and <code>2.</code> can be applied on arbitrary decision parameters, such as <em>grain ID</em>, <em>grain type</em>, <em>payload data</em>.</p>
 <p>This happen so that one chooses a format, e.g. <a href="https://github.com/real-logic/simple-binary-encoding">Simple Binary Encoding (SBE)</a> and implements
-(IStorageDeserializer)[<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs">https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs</a>] and <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs">IStorageSerializer</a>.
+<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs">IStorageDeserializer</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs">IStorageSerializer</a>.
 The built-in (de)serializers have been built using this method. The <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils/Storage/Provider">OrleansStorageDefault<format>(De)Serializer</format></a> can be used as examples
 on how to implement other formats.</p>
 <p>When the (de)serializers have been implemented, they need to ba added to the <code>StorageSerializationPicker</code> property in <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a>.
 This is an implementation of <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs">IStorageSerializationPicker</a>. By default
 <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs">StorageSerializationPicker</a> will be used. And example of changing data storage format
-or using (de)serializers can be seen at [RelationalStorageTests]<a href="https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs">https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs</a>).</p>
+or using (de)serializers can be seen at <a href="https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs">RelationalStorageTests</a>.</p>
 <p>Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a> instance.</p>
 
             </article>

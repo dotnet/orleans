@@ -357,13 +357,13 @@ In addition to the usual storage provider capabilities, the ADO.NET provider has
 Both `1.` and `2.` can be applied on arbitrary decision parameters, such as *grain ID*, *grain type*, *payload data*.
 
 This happen so that one chooses a format, e.g. [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding) and implements
-(IStorageDeserializer)[https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs] and [IStorageSerializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs).
+[IStorageDeserializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs) and [IStorageSerializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs).
 The built-in (de)serializers have been built using this method. The [OrleansStorageDefault<format>(De)Serializer](https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils/Storage/Provider) can be used as examples
 on how to implement other formats.
 
 When the (de)serializers have been implemented, they need to ba added to the `StorageSerializationPicker` property in [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs).
 This is an implementation of [IStorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs). By default
 [StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
-or using (de)serializers can be seen at [RelationalStorageTests]https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs).
+or using (de)serializers can be seen at [RelationalStorageTests](https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs).
 
 Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
