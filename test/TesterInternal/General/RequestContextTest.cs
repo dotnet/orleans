@@ -41,13 +41,21 @@ namespace UnitTests.General
             this.output = output;
             this.fixture = fixture;
             RequestContext.PropagateActivityId = true; // Client-side setting
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             RequestContext.Clear();
         }
         
         public void Dispose()
         {
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             GrainClient.ClientInvokeCallback = null;
             RequestContext.Clear();
         }
@@ -57,7 +65,11 @@ namespace UnitTests.General
         {
             Guid activityId = Guid.NewGuid();
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
             Guid result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
@@ -169,13 +181,21 @@ namespace UnitTests.General
 
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             Guid result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = nullActivityId;
+#else
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
@@ -183,8 +203,11 @@ namespace UnitTests.General
                 Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
             Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
@@ -199,14 +222,21 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             Guid result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = nullActivityId;
+#else
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
@@ -215,7 +245,11 @@ namespace UnitTests.General
             }
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
             Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
@@ -263,14 +297,21 @@ namespace UnitTests.General
 
             Guid result = grain.E2EActivityId().Result;
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = nullActivityId;
+#else
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = nullActivityId;
+#else
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
@@ -279,7 +320,11 @@ namespace UnitTests.General
             }
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = nullActivityId;
+#else
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#endif
            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
@@ -294,28 +339,42 @@ namespace UnitTests.General
 
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
             Guid result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = false;
             output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
             result = await grain.E2EActivityId();
             Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 not not have been propagated"
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = true;
             output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
             result = await grain.E2EActivityId();
             Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
             result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
@@ -334,8 +393,11 @@ namespace UnitTests.General
             IManagementGrain mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
             Guid result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
@@ -344,7 +406,11 @@ namespace UnitTests.General
             output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
             result = await grain.E2EActivityId();
             Assert.NotEqual(activityId2, result);  // "E2E ActivityId #2 should not have been propagated"
             Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 should not have been propagated"
@@ -354,12 +420,20 @@ namespace UnitTests.General
             output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2;
+#endif
             result = await grain.E2EActivityId();
             Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
             RequestContext.Clear();
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId;
+#else
             Trace.CorrelationManager.ActivityId = activityId;
+#endif
             result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
@@ -372,7 +446,11 @@ namespace UnitTests.General
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             Guid activityId = await grain.E2EActivityId();
             Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#1"
             Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
@@ -388,9 +466,11 @@ namespace UnitTests.General
         {
             Guid setActivityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = activityId2;
+#else
             Trace.CorrelationManager.ActivityId = activityId2; // Set up initial value that will be overridden by the callback function
-
+#endif
             TestClientInvokeCallback callback = new TestClientInvokeCallback(output, setActivityId);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
@@ -398,8 +478,11 @@ namespace UnitTests.General
             Guid activityId = await grain.E2EActivityId();
             Assert.Equal(setActivityId,  activityId);  // "E2EActivityId Call#1"
             Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
-
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             RequestContext.Clear(); // Need this to clear out any old ActivityId value cached in RequestContext. Code optimization in RequestContext does not unset entry if Trace.CorrelationManager.ActivityId == Guid.Empty [which is the "normal" case]
             GrainClient.ClientInvokeCallback = null;
 
@@ -580,10 +663,19 @@ namespace UnitTests.General
 
             if (setActivityId != Guid.Empty)
             {
+#if NETSTANDARD
+                RequestContext.ActivityId.Value = setActivityId;
+#else
                 Trace.CorrelationManager.ActivityId = setActivityId;
+#endif
+
                 output.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
             }
+#if NETSTANDARD
+            output.WriteLine("OnInvoke Current ActivityId={0}", RequestContext.ActivityId.Value);
+#else
             output.WriteLine("OnInvoke Current ActivityId={0}", Trace.CorrelationManager.ActivityId);
+#endif
         }
     }
 }

@@ -29,7 +29,11 @@ namespace UnitTests.General
             this.fixture = fixture;
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             RequestContext.Clear();
             headers.Clear();
             GrainClient.ClientInvokeCallback = null;
@@ -42,7 +46,11 @@ namespace UnitTests.General
 
         private void TestCleanup()
         {
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = Guid.Empty;
+#else
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
             RequestContext.Clear();
             headers.Clear();
             GrainClient.ClientInvokeCallback = null;
