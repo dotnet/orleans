@@ -42,7 +42,7 @@ namespace UnitTests.Serialization
     public class BuiltInSerializerTests
     {
         private readonly ITestOutputHelper output;
-
+        private readonly TestEnvironmentFixture defaultFixture;
         private readonly BuiltInSerializerCollectionFixture serializerFixture;
 
         public enum SerializerToUse

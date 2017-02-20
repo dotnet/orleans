@@ -38,7 +38,14 @@ namespace Orleans.Streams
         private bool IsShutdown => timer == null;
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
-        internal PersistentStreamPullingAgent(GrainId id, string strProviderName, IStreamProviderRuntime runtime, IStreamPubSub streamPubSub, QueueId queueId, PersistentStreamProviderConfig config, SerializationManager serializationManager)
+        internal PersistentStreamPullingAgent(
+            GrainId id,
+            string strProviderName,
+            IStreamProviderRuntime runtime,
+            IStreamPubSub streamPubSub,
+            QueueId queueId,
+            PersistentStreamProviderConfig config,
+            SerializationManager serializationManager)
             : base(id, runtime.ExecutingSiloAddress, true)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");

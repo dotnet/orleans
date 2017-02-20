@@ -465,7 +465,7 @@ namespace Orleans
                         continue;
 
                     RequestContext.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.GetBody(this.SerializationManager);
+                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
                     Exception caught = null;
@@ -538,7 +538,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void ReportException(Message message, Exception exception)
         {
-            var request = (InvokeMethodRequest)message.GetBody(this.SerializationManager);
+            var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
             switch (message.Direction)
             {
                 default:

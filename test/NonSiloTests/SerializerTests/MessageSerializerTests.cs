@@ -81,7 +81,10 @@ namespace NonSiloTests.UnitTests.SerializerTests
             {
                 StreamReader = new BinaryTokenStreamReader(headerList)
             };
-            var resp1 = new Message(context);
+            var resp1 = new Message
+            {
+                Headers = SerializationManager.DeserializeMessageHeaders(context)
+            };
             resp1.SetBodyBytes(bodyList);
 
             //byte[] serialized = resp.FormatForSending();
@@ -95,7 +98,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
             Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
-            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetBody(this.fixture.SerializationManager));
+            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)
             {

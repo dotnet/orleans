@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {

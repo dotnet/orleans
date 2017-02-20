@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Resources;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -19,8 +20,8 @@ namespace Orleans.Serialization
     /// </summary>
     public class BinaryTokenStreamReader
     {
-        private readonly IList<ArraySegment<byte>> buffers;
-        private readonly int buffersCount;
+        private IList<ArraySegment<byte>> buffers;
+        private int buffersCount;
         private int currentSegmentIndex;
         private ArraySegment<byte> currentSegment;
         private byte[] currentBuffer;
@@ -29,7 +30,7 @@ namespace Orleans.Serialization
         private int currentSegmentCount;
         private int totalProcessedBytes;
         private int currentSegmentOffsetPlusCount;
-        private readonly int totalLength;
+        private int totalLength;
 
         private static readonly ArraySegment<byte> emptySegment = new ArraySegment<byte>(new byte[0]);
         private static readonly byte[] emptyByteArray = new byte[0];
@@ -49,13 +50,22 @@ namespace Orleans.Serialization
         /// <param name="buffs">The list of ArraySegments to use for the data.</param>
         public BinaryTokenStreamReader(IList<ArraySegment<byte>> buffs)
         {
+            this.Reset(buffs);
+            Trace("Starting new stream reader");
+        }
+
+        /// <summary>
+        /// Resets this instance with the provided data.
+        /// </summary>
+        /// <param name="buffs">The underlying buffers.</param>
+        public void Reset(IList<ArraySegment<byte>> buffs)
+        {
             buffers = buffs;
             totalProcessedBytes = 0;
             currentSegmentIndex = 0;
             InitializeCurrentSegment(0);
             totalLength = buffs.Sum(b => b.Count);
             buffersCount = buffs.Count;
-            Trace("Starting new stream reader");
         }
 
         private void InitializeCurrentSegment(int segmentIndex)
@@ -79,6 +89,11 @@ namespace Orleans.Serialization
 
         /// <summary> Current read position in the stream. </summary>
         public int CurrentPosition => currentOffset + totalProcessedBytes - currentSegmentOffset;
+
+        /// <summary>
+        /// Gets the total length.
+        /// </summary>
+        public int Length => this.totalLength;
 
         /// <summary>
         /// Creates a copy of the current stream reader.

@@ -415,7 +415,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    response = (Response)message.GetBody(this.RuntimeClient.SerializationManager);
+                    response = (Response)message.GetDeserializedBody(this.RuntimeClient.SerializationManager);
                 }
                 catch (Exception exc)
                 {
@@ -435,7 +435,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
                     
                     default:
-                        rejection = message.GetBody(this.RuntimeClient.SerializationManager) as OrleansException;
+                        rejection = message.GetDeserializedBody(this.RuntimeClient.SerializationManager) as OrleansException;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))

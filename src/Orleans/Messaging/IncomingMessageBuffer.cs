@@ -24,6 +24,7 @@ namespace Orleans.Runtime
         private readonly bool supportForwarding;
         private Logger Log;
         private readonly SerializationManager serializationManager;
+        private readonly DeserializationContext deserializationContext;
 
         internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
 
@@ -45,6 +46,7 @@ namespace Orleans.Runtime
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
+            deserializationContext = new DeserializationContext(this.serializationManager);
         }
 
         public List<ArraySegment<byte>> BuildReceiveBuffer()
@@ -161,11 +163,14 @@ namespace Orleans.Runtime
             List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
             
             // build message
-            var context = new DeserializationContext(this.serializationManager)
+
+            this.deserializationContext.Reset();
+            this.deserializationContext.StreamReader.Reset(header);
+
+            msg = new Message
             {
-                StreamReader = new BinaryTokenStreamReader(header)
+                Headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext)
             };
-            msg = new Message(context);
             try
             {
                 if (this.supportForwarding)

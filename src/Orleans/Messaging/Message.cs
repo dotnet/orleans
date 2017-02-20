@@ -363,7 +363,7 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetBody(SerializationManager serializationManager)
+        public object GetDeserializedBody(SerializationManager serializationManager)
         {
             if (this.bodyObject != null) return this.bodyObject;
             
@@ -420,13 +420,6 @@ namespace Orleans.Runtime
             headerBytes = null;
         }
         
-        // Initializes body and header but does not take ownership of byte.
-        // Caller must clean up bytes
-        public Message(IDeserializationContext context)
-        {
-            Headers = SerializationManager.DeserializeMessageHeaders(context);
-        }
-
         /// <summary>
         /// Clears the current body and sets the serialized body contents to the provided value.
         /// </summary>
