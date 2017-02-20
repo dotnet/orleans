@@ -66,12 +66,6 @@ Many Orleans services will be private and available only to front-end services t
 In some circumstances, what is needed is to put a thin HTTP layer in front of the backend service, essentially making the Orleans service itself publically available via HTTP.
 In this walk-through, the steps of producing a thin HTTP layer based on ASP.NET Web API is described.
 
-## [Unit Testing Grains](Unit-Testing-Grains.md)
-
-Writing tests is one of the essential parts of the software development process which allows you to maintain your code easily, refactor with ease and sleep well when a new team member is changing 3 years old code. Orleans makes it very easy to write different kinds of tests for your Orleans application.
-this tutorial describes how to write simple unit tests to check if each grain method is having the right behavior.
-More complex scenarios like load testing and object mocking are not described here.
-
 ## [Cloud Deployment](Cloud-Deployment.md)
 
 The next walkthrough demonstrates how to get your Orleans application deployed in the cloud using Azure.
@@ -86,3 +80,9 @@ In this walkthrough, you will see how to set up an on premise cluster and deploy
 Defining your own storage provider is the easiest way to extend the persistence choices of your Orleans application.
 While Orleans comes with a couple of storage providers in the box, they are not intended to be the only choices or constrain you unnecessarily.
 Therefore, the library offers a way to extend the set of storage providers to include This walkthrough demonstrates how to extend the choices by building a storage provider based on regular files.
+
+## [Unit Testing Grains](Unit-Testing-Grains.md)
+
+Writing tests is one of the essential parts of the software development process which allows you to maintain your code easily, refactor with ease and sleep well when a new team member is changing 3 years old code. Orleans makes it very easy to write different kinds of tests for your Orleans application.
+this tutorial describes how to write simple unit tests to check if each grain method is having the right behavior.
+More complex scenarios like load testing and object mocking are not described here.
