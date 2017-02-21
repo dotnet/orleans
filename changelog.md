@@ -6,11 +6,35 @@ All notable end-user facing changes are documented in this file.
 The idea is to track end-user facing changes as they occur.*
 - Several major performance improvements
 - Add streaming support for types that are serialized using IExternalSerializers
+- Replace CallContext.LogicalSetData with AsyncLocal #2200
+- Bug fixes:
+  - Remove registration of IServiceProvider to itself #2749
 
-### [v1.4.0-beta]
+### [v1.4.0]
+- Known issues
+  - When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac. This is bein addressed for 1.4.1, but there is a simple workaround for it at [#2747](https://github.com/dotnet/orleans/issues/2747)
+  - The build-time code generator required (and automatically added) a file named `Properties\orleans.codegen.cs` to the project where codegen was being ran. The new MSBuild targets no longer do that, so when upgrading a solution with a previous version of Orleans, you can safely delete this orleans.codegen.cs file from your grain projects.
+
 - Improvements
   - Support for grains with generic methods #2670
-  - IL-based fallback serializer #2162
+  - Do native PE files check before assembly loading to avoid misleading warnings on startup #2714
+  - Throw explicit exception when using streams not in Orleans Context #2683
+  - Several improvements to `JournaledGrain` API #2651 #2720
+  - Allow overriding MethodId using [MethodId(id)] on interface methods #2660
+- Bug fixes
+  - EventHubSequenceToken not used consistently #2724
+  - Support grains with generic state where the state param do not match the grain type params #2715
+  - Fix ServiceFabric IFabricServiceSiloResolver registration in DI container #2712
+  - Fix ConditionalCheckFailedException when updating silo 'IAmAlive' field in DynamoDB #2678
+  - Ensure DynamoDB Gateway Provider only returns silos with a proxy port configured #2679
+  - Fix e-Tag issue in AzureBlobStorage when calling ClearStateAsync (#2669)
+  - Other minor fixes: #2729 #2691
+
+### [v1.4.0-beta]
+- Noteworthy breaking changes:
+  - Azure table storage throws InconsistentStateException #2630
+- Improvements
+  - Optional IL-based fallback serializer #2162
   - IncomingMessageAcceptor sockets change from APM to EAP #2275
   - Show clearer error when ADO.NET provider fails to init #2303, #2306
   - In client, when a gateway connection close reroute not yet sent message to another gateway #2298
@@ -31,15 +55,14 @@ The idea is to track end-user facing changes as they occur.*
   - In config XML, when SystemStoreType is set to MembershipTableGrain, set ReminderServiceType to ReminderTableGrain #2590
   - Service Fabric cluster membership providers #2542
   - Adds optional native JSON support to MySQL #2288
-  - Azure table storage throws InconsistentStateException #2630
   - Allow serializers to have multiple [Serializer(...)] attributes #2611
   - Removed GrainStateStorageBridge from GrainCreator to allow better control of the IStorage used when using non-silo unit tests. #2243
   - Failsafe Exception serialization #2633
   - Added a data adapter to azure queue stream provider #2658
   - Client cluster disconnection #2628
+  - Tooling improvements in build-time codegen #2523
 - Performance
   - Several major performance improvements: #2220, #2221, #2170, #2218, #2312, #2524, #2510, #2481, #2579
-  - Replace CallContext.LogicalSetData with AsyncLocal #2200
   - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
 - Bug fixes
   - Empty deployment Id in Azure #2230
