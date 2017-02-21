@@ -135,6 +135,7 @@ namespace UnitTests.Serialization
             Assert.Equal(expected.Classes[1].Interfaces[0].Int, actual.Classes[1].Interfaces[0].Int);
             Assert.Equal(0, actual.NonSerializedInt);
             Assert.Equal(expected.GetObsoleteInt(), actual.GetObsoleteInt());
+            Assert.Null(actual.SomeGrainReference);
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]
@@ -169,6 +170,7 @@ namespace UnitTests.Serialization
             Assert.Equal(expected.ReadonlyField, actual.ReadonlyField);
             Assert.Equal(expected.PublicValue, actual.PublicValue);
             Assert.Equal(expected.ValueWithPrivateSetter, actual.ValueWithPrivateSetter);
+            Assert.Null(actual.SomeGrainReference);
             Assert.Equal(expected.GetPrivateValue(), actual.GetPrivateValue());
             Assert.Equal(expected.GetValueWithPrivateGetter(), actual.GetValueWithPrivateGetter());
         }

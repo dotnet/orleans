@@ -595,12 +595,12 @@ namespace Orleans.CodeGenerator
                     && this.FieldInfo.FieldType.GetTypeInfo().IsInterface
                     && !typeof(IGrainObserver).IsAssignableFrom(this.FieldInfo.FieldType))
                 {
-                    var getAsReference = getValueExpression.Member(
+                    var getAsReference = getValueExpression.ConditionalMember(
                         (IAddressable grain) => grain.AsReference<IGrain>(),
                         this.FieldInfo.FieldType);
 
                     // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
-                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    // C#: !(value is GrainReference) ? value?.AsReference<TInterface>() : value;
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
                             SF.PrefixUnaryExpression(

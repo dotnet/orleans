@@ -63,6 +63,19 @@ namespace DefaultCluster.Tests.General
             g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+        public async Task GrainReference_Pass_Null()
+        {
+            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+
+            // g1 will pass a null reference to g2
+            await g1.PassNullNested(new ChainGrainHolder { Next = g2 });
+            Assert.Null(await g2.GetNext());
+            await g1.PassNull(g2);
+            Assert.Null(await g2.GetNext());
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
         public void GrainReference_DotNet_Serialization()
         {
