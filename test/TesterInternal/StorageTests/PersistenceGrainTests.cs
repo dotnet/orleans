@@ -14,8 +14,8 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
 using Orleans.Runtime.Configuration;
+using TesterInternal;
 using TestExtensions;
 
 // ReSharper disable RedundantAssignment

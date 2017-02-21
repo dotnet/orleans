@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Tester
+namespace TesterInternal
 {
     [Serializable]
     public class GrainStateContainingGrainReferences

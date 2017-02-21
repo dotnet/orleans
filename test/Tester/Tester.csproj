@@ -45,7 +45,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
-    <Compile Include="GrainStateContainingGrainReferences.cs" />
     <Compile Include="ClientConnectionTests\ClientDisconnectionEventTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
