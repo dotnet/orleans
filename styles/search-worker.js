@@ -12,6 +12,9 @@
   var stopWordsRequest = new XMLHttpRequest();
   stopWordsRequest.open('GET', '../search-stopwords.json');
   stopWordsRequest.onload = function() {
+    if (this.status != 200) {
+      return;
+    }
     var stopWords = JSON.parse(this.responseText);
     var docfxStopWordFilter = lunr.generateStopWordFilter(stopWords);
     lunr.Pipeline.registerFunction(docfxStopWordFilter, 'docfxStopWordFilter');
@@ -24,6 +27,9 @@
 
   searchDataRequest.open('GET', '../index.json');
   searchDataRequest.onload = function() {
+    if (this.status != 200) {
+      return;
+    }
     searchData = JSON.parse(this.responseText);
     for (var prop in searchData) {
       lunrIndex.add(searchData[prop]);

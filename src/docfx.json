@@ -60,7 +60,8 @@
         "repo": "https://github.com/dotnet/orleans",
         "branch": "gh-pages",
       },
-	  "_gitUrlPattern": "github"
+	  "_gitUrlPattern": "github",
+    "_docfxVersion": "2"
     }
   }
 }

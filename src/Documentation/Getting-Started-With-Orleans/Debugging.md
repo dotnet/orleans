@@ -10,7 +10,13 @@ Hence, in productions tracing is the primary 'debugging' mechanism.
  
 
 ## Symbols
-Symbols for Orleans binaries are published to [https://nuget.smbsrc.net](https://nuget.smbsrc.net) symbols server. Add it to the list of symbols server in the Visual Studio options under Debugging/Symbols for debugging Orleans code. Make sure there is traling slash in the URL. Visual Studio 2015 has a bug with parsing it.
+Starting with 1.3.0 release, symbols for Orleans binaries are published to Microsoft symbol servers.
+Make sure you enable `Microsoft Symbol Servers` in Visual Studio in Tools/Options/Debugging/Symbols for debugging Orleans code.
+
+Prior to 1.3.0, symbols were published to [https://nuget.smbsrc.net/](https://nuget.smbsrc.net) symbol server.
+Add it to the list of symbol servers in Visual Studio in Tools/Options/Debugging/Symbols.
+Make sure there is a trailing slash in the URL.
+Visual Studio 2015 has a bug with parsing it.
 
 ## Sources
 

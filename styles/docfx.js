@@ -20,6 +20,15 @@ $(function () {
     $('.IMPORTANT, .CAUTION').addClass('alert alert-danger');
   })();  
 
+  // Enable anchors for headings.
+  (function () {
+    anchors.options = {
+      placement: 'left',
+      visible: 'touch'
+    };
+    anchors.add('article h2, article h3, article h4, article h5, article h6');
+  })();
+
   // Enable highlight.js
   (function () {
     $('pre code').each(function(i, block) {
@@ -89,11 +98,14 @@ $(function () {
   // Support full-text-search
   (function () {
     var query;
-    var relHref = $("meta[property='docfx\\:rel']").attr("content") || "";
-    var search = searchFactory();
-    search();
-    highlightKeywords();
-    addSearchEvent();
+    var relHref = $("meta[property='docfx\\:rel']").attr("content");
+
+    if (typeof relHref != 'undefined') {
+      var search = searchFactory();
+      search();
+      highlightKeywords();
+      addSearchEvent();
+    }
 
     // Search factory
     function searchFactory() {
@@ -116,6 +128,9 @@ $(function () {
         if (indexPath) {
           searchDataRequest.open('GET', indexPath);
           searchDataRequest.onload = function () {
+            if (this.status != 200) {
+              return;
+            }
             searchData = JSON.parse(this.responseText);
             for (var prop in searchData) {
               lunrIndex.add(searchData[prop]);
@@ -334,6 +349,9 @@ $(function () {
       var tocPath = $("meta[property='docfx\\:tocrel']").attr("content");
       if (tocPath) tocPath = tocPath.replace(/\\/g, '/');
       $('#sidetoc').load(tocPath + " #sidetoggle > div", function () {
+        if ($('footer').is(':visible')) {
+          $('.sidetoc').addClass('shiftup');
+        }
         registerTocEvents();
 
         var index = tocPath.lastIndexOf('/');
@@ -379,7 +397,7 @@ $(function () {
             // 50 is the size of the filter box
             $('.sidetoc').scrollTop(top - 50);
             if ($('footer').is(':visible')) {
-              $(".sidetoc").css("bottom", "70px");
+              $('.sidetoc').addClass('shiftup');
             }
           } else {
             $(e).parent().removeClass(active);
@@ -657,13 +675,13 @@ $(function () {
     }
 
     function resetBottomCss() {
-      $(".sidetoc").css("bottom", "0");
-      $(".sideaffix").css("bottom", "10px");
+      $(".sidetoc").removeClass("shiftup");
+      $(".sideaffix").removeClass("shiftup");
     }
 
     function shiftUpBottomCss() {
-      $(".sidetoc").css("bottom", "70px");
-      $(".sideaffix").css("bottom", "70px");
+      $(".sidetoc").addClass("shiftup");
+      $(".sideaffix").addClass("shiftup");
     }
   })();
 
