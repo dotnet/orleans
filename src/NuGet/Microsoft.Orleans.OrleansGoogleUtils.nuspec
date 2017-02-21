@@ -23,8 +23,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansConsulUtils.dll" target="lib\net451" />
-    <file src="OrleansConsulUtils.pdb" target="lib\net451" />
-    <file src="$SRC_DIR$OrleansConsulUtils\**\*.cs" target="src" />
+    <file src="OrleansGoogleUtils.dll" target="lib\net451" />
+    <file src="OrleansGoogleUtils.pdb" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansGoogleUtils\**\*.cs" target="src" />
   </files>
 </package>
