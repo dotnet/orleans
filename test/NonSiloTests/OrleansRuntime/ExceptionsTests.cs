@@ -27,7 +27,7 @@ namespace UnitTests.OrleansRuntime
             SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
            
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original);
+            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory);
 
             Assert.Equal(original.Message, output.Message);
             Assert.Equal(original.ActivationToUse, output.ActivationToUse);

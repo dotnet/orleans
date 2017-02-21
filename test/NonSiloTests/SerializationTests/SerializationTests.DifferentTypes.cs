@@ -127,7 +127,7 @@ namespace UnitTests.Serialization
             input.Collection = new HashSet<TestTypeA>();
             input.Collection.Add(input);
 
-            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input);
+            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input, this.fixture.GrainFactory);
 
             TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
         }

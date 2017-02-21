@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
@@ -111,7 +112,8 @@ namespace Orleans.Storage
             if (config.Properties.ContainsKey(UseJsonFormatPropertyName))
                 useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
 
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+            var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);

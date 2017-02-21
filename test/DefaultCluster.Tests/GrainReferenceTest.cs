@@ -1,7 +1,9 @@
 ﻿using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -103,15 +105,13 @@ namespace DefaultCluster.Tests.General
             if (useJson)
             {
                 // Serialize + Deserialize through Json serializer
-                other = NewtonsoftJsonSerializeRoundtrip(grain);
+                other = NewtonsoftJsonSerializeRoundtrip(grain, this.GrainFactory);
             }
             else
             {
                 // Serialize + Deserialize through .NET serializer
-                other = DotNetSerializeRoundtrip(grain);
+                other = DotNetSerializeRoundtrip(grain, this.GrainFactory);
             }
-            
-            this.GrainFactory.BindGrainReference(other);
 
             if (!resolveBeforeSerialize)
             {
@@ -125,25 +125,41 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
         }
 
-        private static T DotNetSerializeRoundtrip<T>(T obj)
+        private static T DotNetSerializeRoundtrip<T>(T obj, IGrainFactory grainFactory)
         {
             T other;
             using (var memoryStream = new MemoryStream())
             {
-                var formatter = new BinaryFormatter();
+                var formatter = new BinaryFormatter
+                {
+#if !NETSTANDARD_TODO
+                    Context = new StreamingContext(StreamingContextStates.All, grainFactory)
+#endif
+                };
                 formatter.Serialize(memoryStream, obj);
                 memoryStream.Flush();
                 memoryStream.Position = 0; // Reset to start
                 other = (T)formatter.Deserialize(memoryStream);
+#if NETSTANDARD_TODO
+                // On .NET Standard, currently we need to manually fixup grain references.
+                var otherAsRef = other as Orleans.Runtime.GrainReference;
+                if (otherAsRef != null) grainFactory.BindGrainReference(otherAsRef);
+#endif
             }
             return other;
         }
 
-        private static T NewtonsoftJsonSerializeRoundtrip<T>(T obj)
+        private static T NewtonsoftJsonSerializeRoundtrip<T>(T obj, IGrainFactory grainFactory)
         {
+            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
-            object other = Newtonsoft.Json.JsonConvert.DeserializeObject(json, obj.GetType());
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj, settings);
+            object other = Newtonsoft.Json.JsonConvert.DeserializeObject(json, obj.GetType(), settings);
+#if NETSTANDARD_TODO
+                // On .NET Standard, currently we need to manually fixup grain references.
+                var otherAsRef = other as Orleans.Runtime.GrainReference;
+                if (otherAsRef != null) grainFactory.BindGrainReference(otherAsRef);
+#endif
             return (T)other;
         }
     }

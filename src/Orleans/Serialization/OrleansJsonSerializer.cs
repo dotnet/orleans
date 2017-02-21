@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -8,24 +9,24 @@ using Orleans.Runtime;
 namespace Orleans.Serialization
 {
     using Orleans.Providers;
-
+    
     public class OrleansJsonSerializer : IExternalSerializer
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
-        private static JsonSerializerSettings defaultSettings;
+        private readonly JsonSerializerSettings settings;
         private Logger logger;
 
-        static OrleansJsonSerializer()
+        public OrleansJsonSerializer(IGrainFactory grainFactory)
         {
-            defaultSettings = GetDefaultSerializerSettings();
+            this.settings = GetDefaultSerializerSettings(grainFactory);
         }
 
         /// <summary>
         /// Returns the default serializer settings.
         /// </summary>
         /// <returns>The default serializer settings.</returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings()
+        public static JsonSerializerSettings GetDefaultSerializerSettings(IGrainFactory grainFactory)
         {
             var settings = new JsonSerializerSettings
             {
@@ -38,6 +39,9 @@ namespace Orleans.Serialization
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
 #if !NETSTANDARD_TODO
                 TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+
+                // Types such as GrainReference need context during deserialization, so provide that context now.
+                Context = new StreamingContext(StreamingContextStates.All, grainFactory),
 #endif
                 Formatting = Formatting.None
             };
@@ -128,7 +132,7 @@ namespace Orleans.Serialization
 
             var reader = context.StreamReader;
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
+            return JsonConvert.DeserializeObject(str, expectedType, this.settings);
         }
 
         /// <summary>
@@ -151,7 +155,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, defaultSettings);
+            var str = JsonConvert.SerializeObject(item, expectedType, this.settings);
             writer.Write(str);
         }
     }

@@ -73,7 +73,6 @@ namespace UnitTests.Serialization
             SerializationManager.Serialize(grainReference, writer);
             var deserialized = SerializationManager.Deserialize(new BinaryTokenStreamReader(writer.ToByteArray()));
             var copy = (GrainReference)SerializationManager.DeepCopy(deserialized);
-            this.fixture.GrainFactory.BindGrainReference(copy);
 
             // Get the final value of the fallback serialization counters.
             var final = counters.Select(_ => _.GetCurrentValue()).ToList();

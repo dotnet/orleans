@@ -12,6 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 
 namespace Orleans.Storage
@@ -167,7 +168,7 @@ namespace Orleans.Storage
             //NOTE: StorageSerializationPicker should be defined outside and given as a parameter in constructor or via Init in IProviderConfiguration perhaps.
             //Currently this limits one's options to much to the current situation of providing only one serializer for serialization and deserialization
             //with no regard to state update or serializer changes. Maybe have this serialized as a JSON in props and read via a key?
-            StorageSerializationPicker = new DefaultRelationalStoragePicker(this.ConfigureDeserializers(config), this.ConfigureSerializers(config));
+            StorageSerializationPicker = new DefaultRelationalStoragePicker(this.ConfigureDeserializers(config, providerRuntime), this.ConfigureSerializers(config, providerRuntime));
 
             //NOTE: Currently there should be only one pair of providers given. That is, only UseJsonFormatPropertyName, UseXmlFormatPropertyName or UseBinaryFormatPropertyName.
             if(StorageSerializationPicker.Deserializers.Count > 1 || StorageSerializationPicker.Serializers.Count > 1)
@@ -544,13 +545,14 @@ namespace Orleans.Storage
         }
 
 
-        private ICollection<IStorageDeserializer> ConfigureDeserializers(IProviderConfiguration config)
+        private ICollection<IStorageDeserializer> ConfigureDeserializers(IProviderConfiguration config, IProviderRuntime providerRuntime)
         {
             const string @true = "true";
             var deserializers = new List<IStorageDeserializer>();
             if(config.Properties.ContainsKey(UseJsonFormatPropertyName) && @true.Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase))
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+                var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
                 deserializers.Add(new OrleansStorageDefaultJsonDeserializer(jsonSettings, UseJsonFormatPropertyName));
             }
 
@@ -568,13 +570,14 @@ namespace Orleans.Storage
         }
 
 
-        private ICollection<IStorageSerializer> ConfigureSerializers(IProviderConfiguration config)
+        private ICollection<IStorageSerializer> ConfigureSerializers(IProviderConfiguration config, IProviderRuntime providerRuntime)
         {
             const string @true = "true";
             var serializers = new List<IStorageSerializer>();
             if(config.Properties.ContainsKey(UseJsonFormatPropertyName) && @true.Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase))
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+                var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
                 serializers.Add(new OrleansStorageDefaultJsonSerializer(jsonSettings, UseJsonFormatPropertyName));
             }
 

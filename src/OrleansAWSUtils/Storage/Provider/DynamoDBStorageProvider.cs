@@ -11,6 +11,7 @@ using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
 using OrleansAWSUtils;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using OrleansAWSUtils.Storage;
 
 namespace Orleans.Storage
@@ -91,7 +92,8 @@ namespace Orleans.Storage
             if (config.Properties.ContainsKey(USE_JSON_FORMAT_PROPERTY_NAME))
                 useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
 
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+            var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
 
             initMsg = string.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
