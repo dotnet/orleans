@@ -488,67 +488,6 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
-        /// Returns member access syntax.
-        /// </summary>
-        /// <typeparam name="TInstance">
-        /// The class type.
-        /// </typeparam>
-        /// <typeparam name="T">
-        /// The member return type.
-        /// </typeparam>
-        /// <param name="instance">
-        /// The instance.
-        /// </param>
-        /// <param name="member">
-        /// The member.
-        /// </param>
-        /// <param name="genericTypes">
-        /// The generic type parameters.
-        /// </param>
-        /// <returns>
-        /// The resulting <see cref="MemberAccessExpressionSyntax"/>.
-        /// </returns>
-        public static ConditionalAccessExpressionSyntax ConditionalMember<TInstance, T>(
-            this ExpressionSyntax instance,
-            Expression<Func<TInstance, T>> member,
-            params Type[] genericTypes)
-        {
-            // Determine the member name.
-            var methodCall = member.Body as MethodCallExpression;
-            var memberAccess = member.Body as MemberExpression;
-            string memberName;
-            if (methodCall != null)
-            {
-                memberName = methodCall.Method.Name;
-            }
-            else if (memberAccess != null)
-            {
-                memberName = memberAccess.Member.Name;
-            }
-            else
-            {
-                throw new ArgumentException("Expression type unsupported.");
-            }
-
-            // Create access syntax based upon whether it's generic.
-            SimpleNameSyntax memberSyntax;
-            if (genericTypes != null && genericTypes.Length > 0)
-            {
-                memberSyntax =
-                    memberName.ToGenericName()
-                              .AddTypeArgumentListArguments(genericTypes.Select(_ => _.GetTypeSyntax()).ToArray());
-            }
-            else
-            {
-                memberSyntax = memberName.ToIdentifierName();
-            }
-
-            return SyntaxFactory.ConditionalAccessExpression(
-                instance,
-                SyntaxFactory.MemberBindingExpression(memberSyntax));
-        }
-
-        /// <summary>
         /// Returns method invocation syntax.
         /// </summary>
         /// <typeparam name="T">
