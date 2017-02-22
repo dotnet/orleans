@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Moq;
 using Orleans;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Storage;
 
 namespace NonSiloTests
 {
@@ -15,17 +10,15 @@ namespace NonSiloTests
     {
         private static readonly GrainCreator GrainCreator;
 
-        private static readonly IStorageProvider StorageProvider;
+        private static readonly IStorage Storage;
 
         static TestGrainFactory()
         {
             var grainRuntime = Mock.Of<IGrainRuntime>();
 
-            var mockStorageProvider = new Mock<IStorageProvider>();
+            Storage = Mock.Of<IStorage>();
 
-            StorageProvider = mockStorageProvider.Object;
-
-            GrainCreator = new GrainCreator(grainRuntime);
+            GrainCreator = new GrainCreator(null, () => grainRuntime);
         }
 
         /// <summary>
@@ -58,7 +51,7 @@ namespace NonSiloTests
                 var stateType = grainGenericArgs[0];
 
                 //Create a new stateful grain
-                grain = GrainCreator.CreateGrainInstance(typeof(T), identity, stateType, StorageProvider);
+                grain = GrainCreator.CreateGrainInstance(typeof(T), identity, stateType, Storage);
             }
             else
             {
