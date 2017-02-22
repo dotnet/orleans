@@ -4,6 +4,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
@@ -71,10 +72,7 @@ namespace UnitTests.Grains
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
             var tup = await this.runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                () =>
-                    new StreamConsumerExtension(
-                        this.streamProviderRuntime,
-                        this._streamProvider.IsRewindable));
+                        () => new StreamConsumerExtension(this.streamProviderRuntime, _streamProvider.IsRewindable));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif

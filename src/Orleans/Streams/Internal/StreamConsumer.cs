@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -23,7 +22,7 @@ namespace Orleans.Streams
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
         private readonly Logger logger;
-        
+
         public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, bool isRewindable)
         {
             if (stream == null) throw new ArgumentNullException("stream");

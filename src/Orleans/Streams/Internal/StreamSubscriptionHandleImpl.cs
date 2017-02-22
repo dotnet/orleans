@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -17,7 +16,7 @@ namespace Orleans.Streams
         private IAsyncObserver<T> observer;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-        
+
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
