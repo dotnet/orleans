@@ -602,7 +602,7 @@ namespace Orleans.Streams
             StreamHandshakeToken prevToken = consumerData.LastToken;
             Task<StreamHandshakeToken> batchDeliveryTask;
 
-            bool isRequestContextSet = batch.ImportRequestContext(this.serializationManager);
+            bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
                 batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
@@ -623,7 +623,7 @@ namespace Orleans.Streams
         private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
             Task errorDeliveryTask;
-            bool isRequestContextSet = batch != null && batch.ImportRequestContext(this.serializationManager);
+            bool isRequestContextSet = batch != null && batch.ImportRequestContext();
             try
             {
                 errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);

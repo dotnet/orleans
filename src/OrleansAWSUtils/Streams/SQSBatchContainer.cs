@@ -61,7 +61,7 @@ namespace OrleansAWSUtils.Streams
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
@@ -102,7 +102,7 @@ namespace OrleansAWSUtils.Streams
             return sqsBatch;
         }
 
-        public bool ImportRequestContext(SerializationManager serializationManager)
+        public bool ImportRequestContext()
         {
             if (requestContext != null)
             {

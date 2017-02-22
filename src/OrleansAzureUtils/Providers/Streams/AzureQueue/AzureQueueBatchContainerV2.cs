@@ -5,7 +5,6 @@ using System.Linq;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -58,7 +57,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
@@ -73,7 +72,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false; // Consumer is not interested in any of these events, so don't send.
         }
 
-        public bool ImportRequestContext(SerializationManager serializationManager)
+        public bool ImportRequestContext()
         {
             if (requestContext != null)
             {

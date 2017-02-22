@@ -230,7 +230,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
         {
-            return new EventHubBatchContainer(eventHubMessage);
+            return new EventHubBatchContainer(eventHubMessage, this.serializationManager);
         }
 
         /// <summary>

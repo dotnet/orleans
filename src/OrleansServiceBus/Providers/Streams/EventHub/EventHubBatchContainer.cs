@@ -2,12 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 #if NETSTANDARD
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
 #endif
 using Newtonsoft.Json;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -22,6 +24,10 @@ namespace Orleans.ServiceBus.Providers
     {
         [JsonProperty]
         private readonly EventHubMessage eventHubMessage;
+
+        [JsonIgnore]
+        [NonSerialized]
+        private readonly SerializationManager serializationManager;
 
         [JsonProperty]
         private readonly EventHubSequenceToken token;
@@ -45,7 +51,7 @@ namespace Orleans.ServiceBus.Providers
         [NonSerialized]
         private Body payload;
         
-        private Body GetPayload(SerializationManager serializationManager) => payload ?? (payload = serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+        private Body GetPayload() => payload ?? (payload = this.serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
 
         [Serializable]
         private class Body
@@ -58,9 +64,11 @@ namespace Orleans.ServiceBus.Providers
         /// Batch container that deliveres events from cached EventHub data associated with an orleans stream
         /// </summary>
         /// <param name="eventHubMessage"></param>
-        public EventHubBatchContainer(EventHubMessage eventHubMessage)
+        /// <param name="serializationManager"></param>
+        public EventHubBatchContainer(EventHubMessage eventHubMessage, SerializationManager serializationManager)
         {
             this.eventHubMessage = eventHubMessage;
+            this.serializationManager = serializationManager;
             token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
@@ -69,9 +77,9 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return GetPayload(serializationManager).Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
+            return GetPayload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
         }
 
         /// <summary>
@@ -79,11 +87,11 @@ namespace Orleans.ServiceBus.Providers
         /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
         /// </summary>
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
-        public bool ImportRequestContext(SerializationManager serializationManager)
+        public bool ImportRequestContext()
         {
-            if (GetPayload(serializationManager).RequestContext != null)
+            if (GetPayload().RequestContext != null)
             {
-                RequestContext.Import(GetPayload(serializationManager).RequestContext);
+                RequestContext.Import(GetPayload().RequestContext);
                 return true;
             }
             return false;
@@ -116,6 +124,29 @@ namespace Orleans.ServiceBus.Providers
                 eventData.SetStreamNamespaceProperty(streamNamespace);
             }
             return eventData;
+        }
+
+        [SerializerMethod]
+        private static void Serialize(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (EventHubBatchContainer) obj;
+            SerializationManager.SerializeInner(input.eventHubMessage, context, typeof(EventHubMessage));
+        }
+
+        [DeserializerMethod]
+        private static object Deserialize(Type expected, IDeserializationContext context)
+        {
+            var message = SerializationManager.DeserializeInner<EventHubMessage>(context);
+            return new EventHubBatchContainer(message, context.SerializationManager);
+        }
+
+        [CopierMethod]
+        private static object Copy(object obj, ICopyContext context)
+        {
+            var result =
+                new EventHubBatchContainer(((EventHubBatchContainer) obj).eventHubMessage, context.SerializationManager);
+            context.RecordCopy(obj, result);
+            return result;
         }
     }
 }

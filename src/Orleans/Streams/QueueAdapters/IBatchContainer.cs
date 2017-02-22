@@ -23,9 +23,8 @@ namespace Orleans.Streams
         /// Gets events of a specific type from the batch.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="serializationManager"></param>
         /// <returns></returns>
-        IEnumerable<Tuple<T,StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager);
+        IEnumerable<Tuple<T,StreamSequenceToken>> GetEvents<T>();
 
         /// <summary>
         /// Stream Sequence Token for the start of this batch.
@@ -36,9 +35,8 @@ namespace Orleans.Streams
         /// Gives an opportunity to IBatchContainer to set any data in the RequestContext before this IBatchContainer is sent to consumers.
         /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
         /// </summary>
-        /// <param name="serializationManager"></param>
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
-        bool ImportRequestContext(SerializationManager serializationManager);
+        bool ImportRequestContext();
 
         /// <summary>
         /// Decide whether this batch should be sent to the specified target.

@@ -23,12 +23,12 @@ namespace Orleans.Providers.Streams.Generator
             this.RealToken = token;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             return new[] { Tuple.Create((T)Payload, SequenceToken) };
         }
 
-        public bool ImportRequestContext(SerializationManager serializationManager)
+        public bool ImportRequestContext()
         {
             return false;
         }

@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
 {
-    [Serializable]
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer
         where TSerializer : IMemoryMessageBodySerializer
     {
@@ -23,9 +21,9 @@ namespace Orleans.Providers
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized] private MemoryMessageBody payload;
          
-        private MemoryMessageBody Payload(SerializationManager serializationManager)
+        private MemoryMessageBody Payload()
         {
-            return payload ?? (payload = serializer.Deserialize(serializationManager, MessageData.Payload));
+            return payload ?? (payload = serializer.Deserialize(MessageData.Payload));
         }
         
         public MemoryBatchContainer(MemoryMessageData messageData, TSerializer serializer)
@@ -35,14 +33,14 @@ namespace Orleans.Providers
             realToken = new EventSequenceToken(messageData.SequenceNumber);
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return Payload(serializationManager).Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
+            return Payload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
         }
 
-        public bool ImportRequestContext(SerializationManager serializationManager)
+        public bool ImportRequestContext()
         {
-            var context = Payload(serializationManager).RequestContext;
+            var context = Payload().RequestContext;
             if (context != null)
             {
                 RequestContext.Import(context);

@@ -12,7 +12,7 @@ namespace Orleans.Streams
     internal interface IStreamSubscriptionHandle
     {
         Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
-        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken, SerializationManager serializationManager);
+        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
         StreamHandshakeToken GetSequenceToken();
@@ -103,7 +103,7 @@ namespace Orleans.Streams
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                return observer.DeliverBatch(batch.Value, handshakeToken, this.runtimeClient.SerializationManager);
+                return observer.DeliverBatch(batch.Value, handshakeToken);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);

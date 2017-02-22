@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
 namespace Orleans.Providers
@@ -14,37 +15,60 @@ namespace Orleans.Providers
         /// <summary>
         /// Serialize MemoryMessageBody to an array segment of bytes.
         /// </summary>
-        /// <param name="serializationManager"></param>
         /// <param name="body"></param>
         /// <returns></returns>
-        ArraySegment<byte> Serialize(SerializationManager serializationManager, MemoryMessageBody body);
+        ArraySegment<byte> Serialize(MemoryMessageBody body);
 
         /// <summary>
         /// Deserialize an array segment into a MemoryMessageBody
         /// </summary>
-        /// <param name="serializationManager"></param>
         /// <param name="bodyBytes"></param>
         /// <returns></returns>
-        MemoryMessageBody Deserialize(SerializationManager serializationManager, ArraySegment<byte> bodyBytes);
+        MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes);
     }
 
     /// <summary>
     /// Default IMemoryMessageBodySerializer
     /// </summary>
-    [Serializable]
     public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer
     {
+        [NonSerialized]
+        private readonly SerializationManager serializationManager;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DefaultMemoryMessageBodySerializer"/> class.
+        /// </summary>
+        /// <param name="serializationManager"></param>
+        public DefaultMemoryMessageBodySerializer(SerializationManager serializationManager)
+        {
+            this.serializationManager = serializationManager;
+        }
+
         /// <inheritdoc />
-        public ArraySegment<byte> Serialize(SerializationManager serializationManager, MemoryMessageBody body)
+        public ArraySegment<byte> Serialize(MemoryMessageBody body)
         {
             return new ArraySegment<byte>(serializationManager.SerializeToByteArray(body));
         }
 
         /// <inheritdoc />
-        public MemoryMessageBody Deserialize(SerializationManager serializationManager, ArraySegment<byte> bodyBytes)
+        public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
         {
             return serializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
         }
+
+        [SerializerMethod]
+        private static void Serialize(object obj, ISerializationContext context, Type expected)
+        {
+        }
+
+        [DeserializerMethod]
+        private static object Deserialize(Type expected, IDeserializationContext context)
+        {
+            return new DefaultMemoryMessageBodySerializer(context.SerializationManager);
+        }
+
+        [CopierMethod]
+        private static object Copy(object obj, ICopyContext context) => obj;
     }
 
     /// <summary>
@@ -69,6 +93,7 @@ namespace Orleans.Providers
         /// Events in message
         /// </summary>
         public List<object> Events { get; }
+
         /// <summary>
         /// Message context
         /// </summary>

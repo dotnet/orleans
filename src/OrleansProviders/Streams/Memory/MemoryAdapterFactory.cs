@@ -131,7 +131,7 @@ namespace Orleans.Providers
             try
             {
                 var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
-                ArraySegment<byte> bodyBytes = serializer.Serialize(this.serializationManager, new MemoryMessageBody(events.Cast<object>(), requestContext));
+                ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
                 var messageData = MemoryMessageData.Create(streamGuid, streamNamespace, bodyBytes);
                 IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
                 await queueGrain.Enqueue(messageData);

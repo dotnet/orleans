@@ -43,12 +43,12 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamSequenceToken SequenceToken { get; set; }
             public byte[] Data { get; set; }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>(SerializationManager serializationManager)
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
             {
                 throw new NotImplementedException();
             }
 
-            public bool ImportRequestContext(SerializationManager serializationManager)
+            public bool ImportRequestContext()
             {
                 throw new NotImplementedException();
             }

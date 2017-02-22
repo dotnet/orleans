@@ -70,7 +70,7 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken, SerializationManager serializationManager)
+        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
             // we validate expectedToken only for ordered (rewindable) streams
             if (expectedToken != null)
@@ -79,7 +79,7 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            foreach (var itemTuple in batch.GetEvents<T>(serializationManager))
+            foreach (var itemTuple in batch.GetEvents<T>())
             {
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
