@@ -327,7 +327,7 @@ namespace Orleans.Serialization
 
         private static GrainFactory.GrainReferenceCaster CreateCaster(Type grainReferenceType)
         {
-            var interfaceType = grainReferenceType.GetCustomAttribute<GrainReferenceAttribute>().TargetType;
+            var interfaceType = grainReferenceType.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>().TargetType;
             return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
         }
     }
