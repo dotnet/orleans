@@ -19,7 +19,6 @@ Here is how to use it:
 You can build from source the `OrleansPSUtils` project and just import it with:
 
 ``` powershell
-
 PS> Import-Module .\projectOutputDir\Orleans.psd1
 
 ```
@@ -33,7 +32,6 @@ Powershell modules today are easily shared just as Nuget packages but instead of
 * To install it on a specific folder just run:
 
 ``` powershell
-
 PS> Save-Module -Name Orleans -Path <path>
 
 ```
@@ -41,7 +39,6 @@ PS> Save-Module -Name Orleans -Path <path>
 * To install it on your PowerShell modules path (**the recommended way**), just run:
 
 ``` powershell
-
 PS> Install-Module -Name Orleans
 
 ```
@@ -122,7 +119,6 @@ This Cmdlet return a grain reference of the type passed by as parameter on `-Gra
 A simple example on calling `MyInterfacesNamespace.IMyGrain.SayHeloTo` grain method:
 
 ``` powershell
-
 PS> Import-Module "Orleans"
 
 PS> $configFilePath = Resolve-Path(".\ClientConfig.xml").Path
@@ -150,7 +146,7 @@ PS> Stop-GrainClient
 
 ```
 
-That is it for now. We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
+We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
 We hope that this help people as a starting point for automation. As always, this is a work-in-progress and we love contributions! :)
 
 Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.
