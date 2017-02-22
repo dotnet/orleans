@@ -32,16 +32,14 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
         private readonly bool isRewindable;
-        private readonly IRuntimeClient runtimeClient;
 
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable, IRuntimeClient runtimeClient)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable)
         {
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             this.isRewindable = isRewindable;
-            this.runtimeClient = runtimeClient;
             logger = providerRuntime.GetLogger(GetType().Name);
         }
 

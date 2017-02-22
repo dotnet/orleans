@@ -9,7 +9,7 @@ namespace Orleans.Runtime
         private const int Kb = 1024;
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
-        private static readonly ArraySegment<byte>[] EmptyBuffers = { new ArraySegment<byte>(new byte[0]), };
+        private static readonly ArraySegment<byte>[] EmptyBuffers = {new ArraySegment<byte>(new byte[0]), };
         private readonly List<ArraySegment<byte>> readBuffer;
         private readonly int maxSustainedBufferSize;
         private int currentBufferSize;

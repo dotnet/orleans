@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
@@ -241,8 +240,7 @@ namespace UnitTests.Grains
                 () =>
                     new StreamConsumerExtension(
                         this.streamProviderRuntime,
-                        this._streamProvider.IsRewindable,
-                        this.ServiceProvider.GetRequiredService<IRuntimeClient>()));
+                        this._streamProvider.IsRewindable));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
