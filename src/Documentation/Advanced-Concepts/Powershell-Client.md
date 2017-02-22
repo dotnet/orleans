@@ -19,7 +19,6 @@ Here is how to use it:
 You can build from source the `OrleansPSUtils` project and just import it with:
 
 ``` powershell
-
 PS> Import-Module .\projectOutputDir\Orleans.psd1
 
 ```
@@ -33,7 +32,6 @@ Powershell modules today are easily shared just as Nuget packages but instead of
 * To install it on a specific folder just run:
 
 ``` powershell
-
 PS> Save-Module -Name Orleans -Path <path>
 
 ```
@@ -41,7 +39,6 @@ PS> Save-Module -Name Orleans -Path <path>
 * To install it on your PowerShell modules path (**the recommended way**), just run:
 
 ``` powershell
-
 PS> Install-Module -Name Orleans
 
 ```
@@ -113,7 +110,7 @@ Takes no parameters and when called, if the `GrainClient` is initialized will gr
 
 Wrapper around `GrainClient.GrainFactory.GetGrain<T>()` and its overloads.
 
-The mandatory parameter is `-GrainType` and the `-XXXKey` for the current Grain key types supported by Orleans (`string`, `Guid`, `long`) and also the `-KeyExrension` that can be used on Grains with compound keys.
+The mandatory parameter is `-GrainType` and the `-XXXKey` for the current Grain key types supported by Orleans (`string`, `Guid`, `long`) and also the `-KeyExtension` that can be used on Grains with compound keys.
 
 This Cmdlet return a grain reference of the type passed by as parameter on `-GrainType`.
 
@@ -122,7 +119,6 @@ This Cmdlet return a grain reference of the type passed by as parameter on `-Gra
 A simple example on calling `MyInterfacesNamespace.IMyGrain.SayHeloTo` grain method:
 
 ``` powershell
-
 PS> Import-Module "Orleans"
 
 PS> $configFilePath = Resolve-Path(".\ClientConfig.xml").Path
@@ -137,7 +133,11 @@ PS> $grainId = [System.Guid]::Parse("A4CF7B5D-9606-446D-ACE9-C900AC6BA3AD")
 
 PS> $grain = Get-Grain -GrainType $grainInterfaceType -GuidKey $grainId
 
-PS> $message = $grain.SayHelloTo("Gutemberg").Result
+PS> $sayHelloTask = $grain.SayHelloTo("Gutemberg")
+
+PS> $sayHelloTask.Wait();
+
+PS> $message = $sayHelloTask.Result
 
 PS> Write-Output $message
 Hello Gutemberg!
@@ -146,7 +146,7 @@ PS> Stop-GrainClient
 
 ```
 
-Thats it for now. We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
+We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
 We hope that this help people as a starting point for automation. As always, this is a work-in-progress and we love contributions! :)
 
 Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.
