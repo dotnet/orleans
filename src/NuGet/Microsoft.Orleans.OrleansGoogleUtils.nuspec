@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansGoogleUtils</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Google Utilities</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Protocol Buffers serialization support for Microsoft Orleans.
+    </summary>
+    <description>
+      Library of utility types for Google of Microsoft Orleans.
+    </description>
+    <copyright>Copyright Microsoft 2017</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Google.Protobuf" version="3.0.0.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansGoogleUtils.dll" target="lib\net451" />
+    <file src="OrleansGoogleUtils.pdb" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansGoogleUtils\**\*.cs" target="src" />
+  </files>
+</package>

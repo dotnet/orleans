@@ -3,7 +3,7 @@
   <Metadata>
     <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.4.0" Language="en-US" Publisher="Microsoft" />
     <DisplayName>Microsoft Orleans Tools for Visual Studio</DisplayName>
-    <Description xml:space="preserve">Microsoft Orleans Tools for Visual Studio 2013, 2015, 2017 RC
+    <Description xml:space="preserve">Microsoft Orleans Tools for Visual Studio 2013, 2015, 2017
  C#, F#, VB Project templates and item templates
     </Description>
     <MoreInfo>htts://github.com/dotnet/orleans/</MoreInfo>
@@ -34,4 +34,7 @@
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceCSharp" d:TargetPath="|VSProjectTemplateGrainInterfaceCSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectSiloHostCSharp" d:TargetPath="|VSProjectSiloHostCSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
   </Assets>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[15.0,16.0)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
 </PackageManifest>

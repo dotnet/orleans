@@ -323,7 +323,7 @@ namespace Orleans.Runtime.Configuration
             UseNagleAlgorithm = other.UseNagleAlgorithm;
 
             StartupTypeName = other.StartupTypeName;
-            AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
+            AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>(other.AdditionalAssemblyDirectories);
             ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
         }
 

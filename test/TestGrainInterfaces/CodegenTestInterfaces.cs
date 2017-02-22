@@ -127,6 +127,8 @@ namespace UnitTests.GrainInterfaces
         private int PrivateValue { get; set; }
         public readonly int ReadonlyField;
 
+        public IEchoGrain SomeGrainReference { get; set; }
+
         public SomeStruct(int readonlyField)
             : this()
         {
@@ -173,9 +175,10 @@ namespace UnitTests.GrainInterfaces
 
         [Obsolete("This field should be serialized")]
         public int ObsoleteInt { get; set; }
-        
 
-        #pragma warning disable 618
+        public IEchoGrain SomeGrainReference { get; set; }
+        
+#pragma warning disable 618
         public int GetObsoleteInt() => this.ObsoleteInt;
         public void SetObsoleteInt(int value)
         {

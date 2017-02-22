@@ -600,18 +600,22 @@ namespace Orleans.CodeGenerator
                         this.FieldInfo.FieldType);
 
                     // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
-                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    // C#: (value == null || value is GrainReference) ? value : value.AsReference<TInterface>()
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
-                            SF.PrefixUnaryExpression(
-                                SyntaxKind.LogicalNotExpression,
-                                SF.ParenthesizedExpression(
+                            SF.ParenthesizedExpression(
+                                SF.BinaryExpression(
+                                    SyntaxKind.LogicalOrExpression,
+                                    SF.BinaryExpression(
+                                        SyntaxKind.EqualsExpression,
+                                        getValueExpression,
+                                        SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     SF.BinaryExpression(
                                         SyntaxKind.IsExpression,
                                         getValueExpression,
                                         typeof(GrainReference).GetTypeSyntax()))),
-                            SF.InvocationExpression(getAsReference),
-                            getValueExpression);
+                            getValueExpression,
+                            SF.InvocationExpression(getAsReference));
                 }
                 else
                 {

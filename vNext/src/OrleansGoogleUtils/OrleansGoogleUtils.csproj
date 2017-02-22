@@ -32,6 +32,5 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
   </ItemGroup>
 </Project>

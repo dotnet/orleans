@@ -85,9 +85,19 @@ namespace UnitTests.Grains
             return next.SetNext(this);
         }
 
+        public Task PassNull(IChainedGrain next)
+        {
+            return next.SetNext(null);
+        }
+
         public Task PassThisNested(ChainGrainHolder next)
         {
             return next.Next.SetNextNested(new ChainGrainHolder { Next = this });
+        }
+
+        public Task PassNullNested(ChainGrainHolder next)
+        {
+            return next.Next.SetNextNested(new ChainGrainHolder { Next = null });
         }
 
         #endregion
