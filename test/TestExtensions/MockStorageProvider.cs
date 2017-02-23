@@ -40,12 +40,6 @@ namespace UnitTests.StorageTests
 
         private int initCount, closeCount, readCount, writeCount, deleteCount;
 
-        public int InitCount { get { return initCount; } }
-        public int CloseCount { get { return closeCount; } }
-        public int ReadCount { get { return readCount; } }
-        public int WriteCount { get { return writeCount; } }
-        public int DeleteCount { get { return deleteCount; } }
-
         private readonly int numKeys;
         private ILocalDataStore StateStore;
         private const string stateStoreKey = "State";
@@ -87,7 +81,7 @@ namespace UnitTests.StorageTests
 
         }
 
-        public virtual void SetValue(SetValueArgs args)
+        public void SetValue(SetValueArgs args)
         {
             SetValue(args.StateType, args.GrainType, args.GrainReference, args.Name, args.Val);
         }

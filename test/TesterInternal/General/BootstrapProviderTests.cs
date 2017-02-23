@@ -132,7 +132,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                bool re = await siloHandle.TestHook.CanGetBoostraperProvider(providerName);
+                bool re = await siloHandle.TestHook.HasBoostraperProvider(providerName);
                 if (re)
                 {
                     return true;

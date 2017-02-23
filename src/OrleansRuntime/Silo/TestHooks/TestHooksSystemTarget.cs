@@ -40,13 +40,13 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<Guid> GetServiceId() => Task.FromResult(silo.GlobalConfig.ServiceId);
 
-        public Task<bool> CanGetStorageProvider(string providerName)
+        public Task<bool> HasStorageProvider(string providerName)
         {
             IStorageProvider tmp;
             return Task.FromResult(silo.StorageProviderManager.TryGetProvider(providerName, out tmp));
         }
 
-        public Task<bool> CanGetStreamProvider(string providerName)
+        public Task<bool> HasStreamProvider(string providerName)
         {
             try
             {
@@ -59,7 +59,7 @@ namespace Orleans.Runtime.TestHooks
             }
         }
 
-        public Task<bool> CanGetBoostraperProvider(string providerName)
+        public Task<bool> HasBoostraperProvider(string providerName)
         {
             foreach (var provider in silo.BootstrapProviders)
             {
