@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -20,7 +19,6 @@ namespace Orleans.Streams
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
         private readonly PersistentStreamProviderConfig config;
-        private readonly SerializationManager serializationManager;
         private readonly Logger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -44,8 +42,7 @@ namespace Orleans.Streams
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
             QueueId queueId,
-            PersistentStreamProviderConfig config,
-            SerializationManager serializationManager)
+            PersistentStreamProviderConfig config)
             : base(id, runtime.ExecutingSiloAddress, true)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
@@ -57,7 +54,6 @@ namespace Orleans.Streams
             pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.config = config;
-            this.serializationManager = serializationManager;
             numMessages = 0;
 
             logger = runtime.GetLogger(((ISystemTargetBase)this).GrainId + "-" + streamProviderName);

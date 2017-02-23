@@ -92,7 +92,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromCloudQueueMessage(this.serializationManager, message, lastReadMessage++);
+                    IBatchContainer container = this.dataAdapter.FromCloudQueueMessage(message, lastReadMessage++);
                     azureQueueMessages.Add(container);
                     this.pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }

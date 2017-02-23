@@ -11,7 +11,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory<TDataAdapter> : IQueueAdapterFactory
-        where TDataAdapter : IAzureQueueDataAdapter, new()
+        where TDataAdapter : IAzureQueueDataAdapter
     {
         private string deploymentId;
         private string dataConnectionString;
@@ -21,6 +21,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private TimeSpan? messageVisibilityTimeout;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
+        private Func<TDataAdapter> adaptorFactory;
 
         /// <summary>
         /// Gets the serialization manager.
@@ -77,12 +78,13 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
 
             this.SerializationManager = serviceProvider.GetRequiredService<SerializationManager>();
+            this.adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter<TDataAdapter>(this.SerializationManager, streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(this.adaptorFactory(), this.SerializationManager, streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

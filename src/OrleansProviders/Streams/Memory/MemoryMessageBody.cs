@@ -75,7 +75,9 @@ namespace Orleans.Providers
         [OnDeserialized]
         private void OnDeserialized(StreamingContext streamingContext)
         {
+#if !NETSTANDARD_TODO
             this.serializationManager = (streamingContext.Context as ISerializerContext)?.SerializationManager;
+#endif
         }
     }
 
