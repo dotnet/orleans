@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -19,10 +18,6 @@ namespace Orleans.Providers
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-        private static readonly Lazy<ObjectFactory> ObjectFactory = new Lazy<ObjectFactory>(
-            () => ActivatorUtilities.CreateFactory(
-                typeof(TSerializer),
-                null));
 
         private TSerializer serializer;
         private IStreamQueueMapper streamQueueMapper;
@@ -78,8 +73,7 @@ namespace Orleans.Providers
             // 10 meg buffer pool.  10 1 meg blocks
             bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
 
-            this.serializer = this.serviceProvider.GetService<TSerializer>() ??
-                              (TSerializer)ObjectFactory.Value(this.serviceProvider, null);
+            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }
 
         /// <summary>

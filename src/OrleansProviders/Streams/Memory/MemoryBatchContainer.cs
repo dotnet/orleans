@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -13,11 +12,6 @@ namespace Orleans.Providers
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-        private static readonly Lazy<ObjectFactory> ObjectFactory = new Lazy<ObjectFactory>(
-            () => ActivatorUtilities.CreateFactory(
-                typeof(TSerializer),
-                null));
-
         [NonSerialized]
         private TSerializer serializer;
 
@@ -67,8 +61,7 @@ namespace Orleans.Providers
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            this.serializer = context.ServiceProvider.GetService<TSerializer>() ??
-                              (TSerializer) ObjectFactory.Value(context.ServiceProvider, null);
+            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);
         }
     }
 }
