@@ -95,7 +95,7 @@ namespace Orleans.Storage
                 useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
 
             var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
 
             initMsg = string.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 

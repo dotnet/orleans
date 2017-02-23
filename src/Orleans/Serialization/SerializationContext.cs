@@ -1,16 +1,25 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    public interface ICopyContext
+    public interface ISerializerContext
     {
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
         SerializationManager SerializationManager { get; }
 
+        /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+
+        object AdditionalContext { get; }
+    }
+
+    public interface ICopyContext : ISerializerContext
+    {
         /// <summary>
         /// Record an object-to-copy mapping into the current serialization context.
         /// Used for maintaining the .NET object graph during serialization operations.
@@ -23,13 +32,8 @@ namespace Orleans.Serialization
         object CheckObjectWhileCopying(object raw);
     }
 
-    public interface ISerializationContext
+    public interface ISerializationContext : ISerializerContext
     {
-        /// <summary>
-        /// Gets the serialization manager.
-        /// </summary>
-        SerializationManager SerializationManager { get; }
-
         BinaryTokenStreamWriter StreamWriter { get; }
 
         void RecordObject(object original);
@@ -130,5 +134,9 @@ namespace Orleans.Serialization
 
             return -1;
         }
+
+        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
+
+        public object AdditionalContext => this.SerializationManager.RuntimeClient;
     }
 }

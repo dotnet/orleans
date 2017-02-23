@@ -32,7 +32,7 @@ namespace Orleans.Serialization
 
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context.SerializationManager.RuntimeClient.InternalGrainFactory)
+                Context = new StreamingContext(StreamingContextStates.All, context)
             };
             object ret = null;
             using (var memoryStream = new MemoryStream())
@@ -63,7 +63,7 @@ namespace Orleans.Serialization
 
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context.SerializationManager.RuntimeClient.InternalGrainFactory)
+                Context = new StreamingContext(StreamingContextStates.All, context)
             };
             byte[] bytes;
             using (var memoryStream = new MemoryStream())
@@ -89,7 +89,7 @@ namespace Orleans.Serialization
             var bytes = reader.ReadBytes(n);
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, context.SerializationManager.RuntimeClient.InternalGrainFactory)
+                Context = new StreamingContext(StreamingContextStates.All, context)
             };
 
             object retVal = null;

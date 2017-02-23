@@ -779,7 +779,7 @@ namespace UnitTests.Serialization
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
             Assert.True(input.IsBound);
 
-            object deserialized = DotNetSerializationLoop(input, environment.GrainFactory);
+            object deserialized = DotNetSerializationLoop(input, environment.SerializationManager, environment.GrainFactory);
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
@@ -797,7 +797,7 @@ namespace UnitTests.Serialization
             // Expected exception:
             // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.
 
-            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input, environment.GrainFactory));
+            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input, environment.SerializationManager, environment.GrainFactory));
 
             Assert.Contains("is not marked as serializable", exc.Message);
         }
@@ -906,14 +906,14 @@ namespace UnitTests.Serialization
             return copy;
         }
 
-        private object DotNetSerializationLoop(object input, IGrainFactory grainFactory)
+        private object DotNetSerializationLoop(object input, SerializationManager serializationManager, IGrainFactory grainFactory)
         {
             byte[] bytes;
             object deserialized;
             var formatter = new BinaryFormatter
             {
 #if !NETSTANDARD_TODO
-                Context = new StreamingContext(StreamingContextStates.All, grainFactory)
+                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager))
 #endif
             };
             using (var str = new MemoryStream())

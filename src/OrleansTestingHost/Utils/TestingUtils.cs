@@ -92,13 +92,14 @@ namespace Orleans.TestingHost.Utils
         /// <typeparam name="T">The type of the input</typeparam>
         /// <param name="input">The input to serialize and deserialize</param>
         /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="serializationManager">The serialization manager.</param>
         /// <returns>Input that have been serialized and then deserialized</returns>
-        public static T RoundTripDotNetSerializer<T>(T input, IGrainFactory grainFactory)
+        public static T RoundTripDotNetSerializer<T>(T input, IGrainFactory grainFactory, SerializationManager serializationManager)
         {
             IFormatter formatter = new BinaryFormatter();
             MemoryStream stream = new MemoryStream(new byte[100000], true);
 #if !NETSTANDARD_TODO
-            formatter.Context = new StreamingContext(StreamingContextStates.All, grainFactory);
+            formatter.Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager));
 #endif
             formatter.Serialize(stream, input);
             stream.Position = 0;

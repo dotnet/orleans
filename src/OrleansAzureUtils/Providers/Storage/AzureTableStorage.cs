@@ -115,7 +115,7 @@ namespace Orleans.Storage
                 useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
 
             var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);

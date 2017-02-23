@@ -721,8 +721,7 @@ namespace Orleans.Runtime
             genericArguments = genericArg;
 
 #if !NETSTANDARD_TODO
-            var grainFactory = context.Context as IGrainFactory;
-            grainFactory?.BindGrainReference(this);
+            this.OnDeserialized(context);
 #endif
         }
 
@@ -734,8 +733,8 @@ namespace Orleans.Runtime
         [OnDeserialized]
         private void OnDeserialized(StreamingContext context)
         {
-            var grainFactory = context.Context as IGrainFactory;
-            grainFactory?.BindGrainReference(this);
+            var serializerContext = context.Context as ISerializerContext;
+            this.runtimeClient = serializerContext?.AdditionalContext as IRuntimeClient; ;
         }
 #endif
 #endregion

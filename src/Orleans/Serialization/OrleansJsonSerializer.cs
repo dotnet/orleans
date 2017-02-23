@@ -20,16 +20,16 @@ namespace Orleans.Serialization
         private readonly JsonSerializerSettings settings;
         private Logger logger;
 
-        public OrleansJsonSerializer(IGrainFactory grainFactory)
+        public OrleansJsonSerializer(SerializationManager serializationManager, IGrainFactory grainFactory)
         {
-            this.settings = GetDefaultSerializerSettings(grainFactory);
+            this.settings = GetDefaultSerializerSettings(serializationManager, grainFactory);
         }
 
         /// <summary>
         /// Returns the default serializer settings.
         /// </summary>
         /// <returns>The default serializer settings.</returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings(IGrainFactory grainFactory)
+        public static JsonSerializerSettings GetDefaultSerializerSettings(SerializationManager serializationManager, IGrainFactory grainFactory)
         {
             var settings = new JsonSerializerSettings
             {
@@ -44,7 +44,7 @@ namespace Orleans.Serialization
                 TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
 
                 // Types such as GrainReference need context during deserialization, so provide that context now.
-                Context = new StreamingContext(StreamingContextStates.All, grainFactory),
+                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
 #endif
                 Formatting = Formatting.None
             };

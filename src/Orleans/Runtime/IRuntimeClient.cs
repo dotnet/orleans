@@ -58,6 +58,7 @@ namespace Orleans.Runtime
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainTypeResolver GrainTypeResolver { get; }
+
         SerializationManager SerializationManager { get; }
 
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);

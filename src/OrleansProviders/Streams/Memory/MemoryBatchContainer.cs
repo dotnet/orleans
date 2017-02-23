@@ -7,6 +7,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers
 {
+    [Serializable]
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer
         where TSerializer : IMemoryMessageBodySerializer
     {

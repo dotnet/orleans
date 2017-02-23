@@ -4,12 +4,8 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    public interface IDeserializationContext
+    public interface IDeserializationContext : ISerializerContext
     {
-        /// <summary>
-        /// Gets the serialization manager.
-        /// </summary>
-        SerializationManager SerializationManager { get; }
         /// <summary>
         /// The stream reader.
         /// </summary>
@@ -19,8 +15,6 @@ namespace Orleans.Serialization
         /// The offset of the current object in <see cref="StreamReader"/>.
         /// </summary>
         int CurrentObjectOffset { get; set; }
-
-        IServiceProvider ServiceProvider { get; }
 
         /// <summary>
         /// Records deserialization of the provided object.
@@ -79,5 +73,7 @@ namespace Orleans.Serialization
         }
 
         public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
+
+        public object AdditionalContext => this.SerializationManager.RuntimeClient;
     }
 }

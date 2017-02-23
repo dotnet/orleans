@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
@@ -30,10 +31,11 @@ namespace Orleans.Providers
     /// <summary>
     /// Default IMemoryMessageBodySerializer
     /// </summary>
+    [Serializable]
     public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer
     {
         [NonSerialized]
-        private readonly SerializationManager serializationManager;
+        private SerializationManager serializationManager;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DefaultMemoryMessageBodySerializer"/> class.
@@ -69,6 +71,12 @@ namespace Orleans.Providers
 
         [CopierMethod]
         private static object Copy(object obj, ICopyContext context) => obj;
+
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext streamingContext)
+        {
+            this.serializationManager = (streamingContext.Context as ISerializerContext)?.SerializationManager;
+        }
     }
 
     /// <summary>
