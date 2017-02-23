@@ -22,7 +22,7 @@ namespace Orleans.Streams
         [JsonProperty]
         public StreamId Stream;
         [JsonProperty]
-        public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public GrainReference consumerReference => consumerExtension as GrainReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         [JsonProperty]
         public object filterWrapper; // Serialized func info
         [JsonProperty]
@@ -30,12 +30,13 @@ namespace Orleans.Streams
 
         // This property does not need to be Json serialized, since we already have producerReference.
         [JsonIgnore]
-        public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
+        public IStreamConsumerExtension Consumer { get { return consumerExtension; } }
         [JsonIgnore]
-        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
+        public IStreamFilterPredicateWrapper Filter { get { return consumerExtension as IStreamFilterPredicateWrapper; } }
         [JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
+        private IStreamConsumerExtension consumerExtension;
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
         public PubSubSubscriptionState(
@@ -45,7 +46,7 @@ namespace Orleans.Streams
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
-            consumerReference = streamConsumer as GrainReference;
+            consumerExtension = streamConsumer;
             state = SubscriptionStates.Active;
         }
 

@@ -14,6 +14,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace Orleans
 {
@@ -103,6 +104,7 @@ namespace Orleans
             }
             
             var services = new ServiceCollection();
+            services.AddSingleton<MemoryPubSub>();
             services.AddSingleton(cfg);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();

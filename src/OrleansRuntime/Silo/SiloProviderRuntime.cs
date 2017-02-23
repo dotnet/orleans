@@ -1,12 +1,13 @@
 using System;
 using System.Threading.Tasks;
-
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace Orleans.Runtime.Providers
 {
@@ -21,6 +22,7 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub grainBasedPubSub;
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        private readonly IStreamPubSub memoryBasedPubSub;
         
         private InvokeInterceptor invokeInterceptor;
 
@@ -48,7 +50,7 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.ServiceId = config.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-
+            this.memoryBasedPubSub = this.ServiceProvider.GetService<MemoryPubSub>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
@@ -99,6 +101,8 @@ namespace Orleans.Runtime.Providers
                     return grainBasedPubSub;
                 case StreamPubSubType.ImplicitOnly:
                     return implictPubSub;
+                case StreamPubSubType.MemoryBaseOnly:
+                    return memoryBasedPubSub;
                 default:
                     return null;
             }

@@ -164,6 +164,8 @@
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
+    <Compile Include="Streams\PubSub\MemoryPubSub.cs" />
+    <Compile Include="Streams\PubSub\MemoryPubSubStore.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />

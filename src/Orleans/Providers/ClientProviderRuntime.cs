@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace Orleans.Providers
 {
@@ -12,6 +13,7 @@ namespace Orleans.Providers
         private IStreamPubSub grainBasedPubSub;
         private IStreamPubSub implictPubSub;
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        private IStreamPubSub memoryPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
@@ -24,6 +26,7 @@ namespace Orleans.Providers
             this.grainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
+            memoryPubSub = serviceProvider.GetService<MemoryPubSub>();
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
         }
@@ -170,6 +173,8 @@ namespace Orleans.Providers
                     return grainBasedPubSub;
                 case StreamPubSubType.ImplicitOnly:
                     return implictPubSub;
+                case StreamPubSubType.MemoryBaseOnly:
+                    return memoryPubSub;
                 default:
                     return null;
             }
