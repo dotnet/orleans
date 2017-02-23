@@ -37,7 +37,7 @@ namespace Orleans.Streams
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
-            GrainId id,
+            GrainId id, 
             string strProviderName,
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
@@ -616,7 +616,7 @@ namespace Orleans.Streams
             return newToken;
         }
 
-        private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
+        private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
             Task errorDeliveryTask;
             bool isRequestContextSet = batch != null && batch.ImportRequestContext();

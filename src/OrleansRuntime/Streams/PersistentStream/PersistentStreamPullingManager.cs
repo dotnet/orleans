@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -33,8 +32,8 @@ namespace Orleans.Streams
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
-            GrainId id,
-            string strProviderName,
+            GrainId id, 
+            string strProviderName, 
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
@@ -56,11 +55,9 @@ namespace Orleans.Streams
             }
             if (streamQueueBalancer == null)
             {
-                throw new ArgumentNullException(
-                    "streamQueueBalancer",
-                    "IStreamQueueBalancer streamQueueBalancer reference should not be null");
+                throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             }
-            
+
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
             providerRuntime = runtime;
@@ -76,9 +73,7 @@ namespace Orleans.Streams
             logger = LogManager.GetLogger(GetType().Name + "-" + streamProviderName, LoggerType.Provider);
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
-            IntValueStatistic.FindOrCreate(
-                new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName),
-                () => queuesToAgentsMap.Count);
+            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
         }
 
         public Task Initialize(Immutable<IQueueAdapter> qAdapter)
