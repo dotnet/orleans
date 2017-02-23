@@ -539,12 +539,22 @@ namespace Orleans.Serialization
                     MethodInfo serializer;
                     MethodInfo deserializer;
                     GetSerializationMethods(serializerType, out copier, out serializer, out deserializer);
-                    Register(
-                        type,
-                        (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)),
-                        (Serializer)serializer.CreateDelegate(typeof(Serializer)),
-                        (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)),
-                        true);
+                    if (serializer != null && deserializer != null && copier != null)
+                    {
+                        Register(
+                            type,
+                            (DeepCopier) copier.CreateDelegate(typeof(DeepCopier)),
+                            (Serializer) serializer.CreateDelegate(typeof(Serializer)),
+                            (Deserializer) deserializer.CreateDelegate(typeof(Deserializer)),
+                            true);
+                    }
+                    else
+                    {
+                        logger.Warn(
+                            ErrorCode.SerMgr_SerializationMethodsMissing,
+                            "Serialization methods not found on type {0}.",
+                            serializerType.GetParseableName());
+                    }
                 }
             }
             catch (ArgumentException)
@@ -552,7 +562,7 @@ namespace Orleans.Serialization
                 logger.Warn(
                     ErrorCode.SerMgr_ErrorBindingMethods,
                     "Error binding serialization methods for type {0}",
-                    type.OrleansTypeName());
+                    type.GetParseableName());
                 throw;
             }
         }
