@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -14,7 +13,7 @@ namespace Orleans.Providers
     /// Pooled cache for memory stream provider
     /// </summary>
     public class MemoryPooledCache<TSerializer> : IQueueCache
-        where TSerializer : IMemoryMessageBodySerializer
+        where TSerializer : class, IMemoryMessageBodySerializer
     {
         private readonly PooledQueueCache<MemoryMessageData, MemoryMessageData> cache;
 

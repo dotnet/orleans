@@ -15,7 +15,7 @@ namespace Orleans.Providers
     /// This is primarily for test purposes.
     /// </summary> 
     public class MemoryStreamProvider<TSerializer> : PersistentStreamProvider<MemoryAdapterFactory<TSerializer>>
-        where TSerializer : IMemoryMessageBodySerializer
+        where TSerializer : class, IMemoryMessageBodySerializer
     {
     }
 }

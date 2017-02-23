@@ -9,7 +9,7 @@ using Orleans.Streams;
 namespace Orleans.Providers
 {
     internal class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
-        where TSerializer : IMemoryMessageBodySerializer
+        where TSerializer : class, IMemoryMessageBodySerializer
     { 
         private readonly IMemoryStreamQueueGrain queueGrain;
         private readonly List<Task> awaitingTasks;

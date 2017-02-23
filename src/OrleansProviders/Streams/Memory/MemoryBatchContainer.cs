@@ -11,11 +11,18 @@ namespace Orleans.Providers
 {
     [Serializable]
     internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
-        where TSerializer : IMemoryMessageBodySerializer
+        where TSerializer : class, IMemoryMessageBodySerializer
     {
+        private static readonly Lazy<ObjectFactory> ObjectFactory = new Lazy<ObjectFactory>(
+            () => ActivatorUtilities.CreateFactory(
+                typeof(TSerializer),
+                null));
+
         [NonSerialized]
         private TSerializer serializer;
+
         private readonly EventSequenceToken realToken;
+
         public Guid StreamGuid => MessageData.StreamGuid;
         public string StreamNamespace => MessageData.StreamNamespace;
         public StreamSequenceToken SequenceToken => realToken;
@@ -60,7 +67,8 @@ namespace Orleans.Providers
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            this.serializer = ActivatorUtilities.GetServiceOrCreateInstance<TSerializer>(context.ServiceProvider);
+            this.serializer = context.ServiceProvider.GetService<TSerializer>() ??
+                              (TSerializer) ObjectFactory.Value(context.ServiceProvider, null);
         }
     }
 }

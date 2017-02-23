@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
@@ -18,7 +17,7 @@ namespace Orleans.Providers
     /// behaves as an event queue, this provider adapter is primarily used for testing
     /// </summary>
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
-        where TSerializer : IMemoryMessageBodySerializer
+        where TSerializer : class, IMemoryMessageBodySerializer
     {
         private TSerializer serializer;
         private IStreamQueueMapper streamQueueMapper;
@@ -30,7 +29,6 @@ namespace Orleans.Providers
         private Logger logger;
         private String providerName;
         private IGrainFactory grainFactory;
-        private SerializationManager serializationManager;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -71,7 +69,6 @@ namespace Orleans.Providers
             grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
-            this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
 
             // 10 meg buffer pool.  10 1 meg blocks
             bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
