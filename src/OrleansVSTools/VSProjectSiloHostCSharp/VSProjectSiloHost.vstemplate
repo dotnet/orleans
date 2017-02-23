@@ -39,7 +39,7 @@
       <package id="Microsoft.Orleans.OrleansProviders" version="1.4.0" targetFramework="net451" />
       <package id="Microsoft.Orleans.OrleansRuntime" version="1.4.0" targetFramework="net451" />
       <package id="Microsoft.Orleans.Server" version="1.4.0" targetFramework="net451" />
-      <package id="Newtonsoft.Json" version="7.0.1" targetFramework="net451" />
+      <package id="Newtonsoft.Json" version="9.0.1" targetFramework="net451" />
       <package id="System.Collections" version="4.0.11" targetFramework="net451" />
       <package id="System.Collections.Concurrent" version="4.0.12" targetFramework="net451" />
       <package id="System.Collections.Immutable" version="1.1.37" targetFramework="net451" />
@@ -82,7 +82,7 @@
       <Asset Type="Microsoft.Orleans.OrleansProviders.1.4.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansProviders.1.4.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.OrleansRuntime.1.4.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansRuntime.1.4.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.Server.1.4.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Server.1.4.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Newtonsoft.Json.9.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.9.0.1.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.4.0.11.nupkg" d:Source="File" Path="Packages\System.Collections.4.0.11.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.Concurrent.4.0.12.nupkg" d:Source="File" Path="Packages\System.Collections.Concurrent.4.0.12.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.Immutable.1.1.37.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.37.nupkg" d:VsixSubPath="Packages" />
