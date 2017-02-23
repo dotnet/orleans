@@ -19,6 +19,11 @@ namespace Orleans.Providers
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
+        private static readonly Lazy<ObjectFactory> ObjectFactory = new Lazy<ObjectFactory>(
+            () => ActivatorUtilities.CreateFactory(
+                typeof(TSerializer),
+                null));
+
         private TSerializer serializer;
         private IStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
@@ -72,7 +77,9 @@ namespace Orleans.Providers
 
             // 10 meg buffer pool.  10 1 meg blocks
             bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-            this.serializer = ActivatorUtilities.CreateInstance<TSerializer>(this.serviceProvider);
+
+            this.serializer = this.serviceProvider.GetService<TSerializer>() ??
+                              (TSerializer)ObjectFactory.Value(this.serviceProvider, null);
         }
 
         /// <summary>
