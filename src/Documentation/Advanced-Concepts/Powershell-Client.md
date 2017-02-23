@@ -48,16 +48,12 @@ PS> Install-Module -Name Orleans
 	<img src="https://www.powershellgallery.com/Content/Images/DeployToAzureAutomationButton.png">
 </button>
 
-
-
 ## Using the module
 
 Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:
 
 ``` powershell
-
 PS> Import-Module "Orleans"
-
 ```
 
 **Note**:
@@ -70,13 +66,11 @@ After the module is imported (which means it is loaded on PowerShell session), y
 * `Stop-GrainClient`
 * `Get-Grain`
 
-#### `Start-GrainClient`
+#### Start-GrainClient
 
 This module is a wrapper around `GrainClient.Initialize()` and its overloads.
 
 **Usage**:     
-
-
 
 * __`Start-GrainClient`__
 
@@ -102,11 +96,11 @@ This module is a wrapper around `GrainClient.Initialize()` and its overloads.
 **Note**:
 The `Timeout` parameter is optional and if it is informed and greater than `System.TimeSpan.Zero`, it will call `Orleans.GrainClient.SetResponseTimeout(Timeout)` internally.
 
-#### `Stop-GrainClient`
+#### Stop-GrainClient
 
 Takes no parameters and when called, if the `GrainClient` is initialized will gracefuly uninitialize.
 
-#### `Get-Grain`
+#### Get-Grain
 
 Wrapper around `GrainClient.GrainFactory.GetGrain<T>()` and its overloads.
 
@@ -120,30 +114,16 @@ A simple example on calling `MyInterfacesNamespace.IMyGrain.SayHeloTo` grain met
 
 ``` powershell
 PS> Import-Module "Orleans"
-
 PS> $configFilePath = Resolve-Path(".\ClientConfig.xml").Path
-
 PS> Start-GrainClient -ConfigFilePath $configFilePath
-
 PS> Add-Type -Path .\MyGrainInterfaceAssembly.dll
-
 PS> $grainInterfaceType = [MyInterfacesNamespace.IMyGrain]
-
 PS> $grainId = [System.Guid]::Parse("A4CF7B5D-9606-446D-ACE9-C900AC6BA3AD")
-
 PS> $grain = Get-Grain -GrainType $grainInterfaceType -GuidKey $grainId
-
-PS> $sayHelloTask = $grain.SayHelloTo("Gutemberg")
-
-PS> $sayHelloTask.Wait();
-
-PS> $message = $sayHelloTask.Result
-
+PS> $message = $grain.SayHelloTo("Gutemberg").Result
 PS> Write-Output $message
 Hello Gutemberg!
-
 PS> Stop-GrainClient
-
 ```
 
 We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
