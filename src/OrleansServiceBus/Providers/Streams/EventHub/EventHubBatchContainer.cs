@@ -9,7 +9,6 @@ using Microsoft.Azure.EventHubs;
 using Microsoft.ServiceBus.Messaging;
 #endif
 using Newtonsoft.Json;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -20,14 +19,14 @@ namespace Orleans.ServiceBus.Providers
     /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
     /// </summary>
     [Serializable]
-    public class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer, IOnDeserialized
     {
         [JsonProperty]
         private readonly EventHubMessage eventHubMessage;
 
         [JsonIgnore]
         [NonSerialized]
-        private readonly SerializationManager serializationManager;
+        private SerializationManager serializationManager;
 
         [JsonProperty]
         private readonly EventHubSequenceToken token;
@@ -125,28 +124,10 @@ namespace Orleans.ServiceBus.Providers
             }
             return eventData;
         }
-
-        [SerializerMethod]
-        private static void Serialize(object obj, ISerializationContext context, Type expected)
+       
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            var input = (EventHubBatchContainer) obj;
-            SerializationManager.SerializeInner(input.eventHubMessage, context, typeof(EventHubMessage));
-        }
-
-        [DeserializerMethod]
-        private static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            var message = SerializationManager.DeserializeInner<EventHubMessage>(context);
-            return new EventHubBatchContainer(message, context.SerializationManager);
-        }
-
-        [CopierMethod]
-        private static object Copy(object obj, ICopyContext context)
-        {
-            var result =
-                new EventHubBatchContainer(((EventHubBatchContainer) obj).eventHubMessage, context.SerializationManager);
-            context.RecordCopy(obj, result);
-            return result;
+            this.serializationManager = context.SerializationManager;
         }
     }
 }

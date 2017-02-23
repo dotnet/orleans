@@ -417,6 +417,28 @@ namespace UnitTests.Serialization
             }
         }
 
+        /// <summary>
+        /// Tests that the <see cref="IOnDeserialized"/> callback is invoked after deserialization.
+        /// </summary>
+        /// <param name="serializerToUse"></param>
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+        [InlineData(SerializerToUse.NoFallback)]
+        public void Serialize_TypeWithOnDeserializedHook(SerializerToUse serializerToUse)
+        {
+            var environment = InitializeSerializer(serializerToUse);
+
+            var input = new TypeWithOnDeserializedHook
+            {
+                Int = 5
+            };
+            var deserialized = OrleansSerializationLoop(environment.SerializationManager, input);
+            var result = Assert.IsType<TypeWithOnDeserializedHook>(deserialized);
+            Assert.Equal(input.Int, result.Int);
+            Assert.Null(input.Context);
+            Assert.NotNull(result.Context);
+            Assert.Equal(environment.SerializationManager, result.Context.SerializationManager);
+        }
+
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_SortedSetWithComparer(SerializerToUse serializerToUse)

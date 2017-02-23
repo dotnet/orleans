@@ -23,7 +23,12 @@ namespace Orleans.Serialization
         private static readonly SerializationManager.DeepCopier ImmutableTypeCopier = (obj, context) => obj;
 
         private static readonly ILFieldBuilder FieldBuilder = new ILFieldBuilder();
-        
+
+        private static readonly Type OnDeserializedLifecycleType = typeof(IOnDeserialized);
+
+        private static readonly MethodInfo OnDeserializedMethod =
+            TypeUtils.Method((IOnDeserialized i) => i.OnDeserialized(default(ISerializerContext)));
+
         static ILSerializerGenerator()
         {
             DirectSerializers = new Dictionary<RuntimeTypeHandle, SimpleTypeSerializer>
@@ -276,6 +281,14 @@ namespace Orleans.Serialization
                     il.CastOrUnbox(field.FieldType);
                     il.StoreField(field);
                 }
+            }
+
+            // If the type implements the IOnDeserialized lifecycle handler, call that method now.
+            if (OnDeserializedLifecycleType.IsAssignableFrom(type))
+            {
+                il.LoadLocal(result);
+                il.LoadArgument(1);
+                il.Call(OnDeserializedMethod);
             }
 
             il.LoadLocal(result);

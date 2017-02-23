@@ -2,8 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
-using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
 namespace Orleans.Providers
@@ -32,7 +30,7 @@ namespace Orleans.Providers
     /// Default IMemoryMessageBodySerializer
     /// </summary>
     [Serializable]
-    public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer
+    public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
     {
         [NonSerialized]
         private SerializationManager serializationManager;
@@ -58,26 +56,9 @@ namespace Orleans.Providers
             return serializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
         }
 
-        [SerializerMethod]
-        private static void Serialize(object obj, ISerializationContext context, Type expected)
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-        }
-
-        [DeserializerMethod]
-        private static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            return new DefaultMemoryMessageBodySerializer(context.SerializationManager);
-        }
-
-        [CopierMethod]
-        private static object Copy(object obj, ICopyContext context) => obj;
-
-        [OnDeserialized]
-        private void OnDeserialized(StreamingContext streamingContext)
-        {
-#if !NETSTANDARD_TODO
-            this.serializationManager = (streamingContext.Context as ISerializerContext)?.SerializationManager;
-#endif
+            this.serializationManager = context.SerializationManager;
         }
     }
 

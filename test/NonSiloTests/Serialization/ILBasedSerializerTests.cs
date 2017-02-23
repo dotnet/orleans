@@ -1,3 +1,4 @@
+using System;
 using TestExtensions;
 
 namespace UnitTests.Serialization
@@ -56,13 +57,46 @@ namespace UnitTests.Serialization
             Assert.Equal(3, deserialized.Three);
         }
 
+        /// <summary>
+        /// Tests that <see cref="ILSerializerGenerator"/> supports the <see cref="IOnDeserialized"/> lifecycle hook.
+        /// </summary>
+        [Fact]
+        public void ILSerializer_LifecycleHooksAreCalled()
+        {
+            var input = new FieldTest();
+            var generator = new ILSerializerGenerator();
+            var serializers = generator.GenerateSerializer(input.GetType());
+            var writer = new SerializationContext(this.fixture.SerializationManager)
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            serializers.Serialize(input, writer, input.GetType());
+            var reader = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
+            var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
+            
+            Assert.Null(input.Context);
+            Assert.NotNull(deserialized.Context);
+            Assert.Equal(this.fixture.SerializationManager, deserialized.Context.SerializationManager);
+        }
+
         [SuppressMessage("ReSharper", "StyleCop.SA1401", Justification = "This is for testing purposes.")]
-        private class FieldTest
+        private class FieldTest : IOnDeserialized
         {
 #pragma warning disable 169
             public int One;
             public int Two;
             public int Three;
+
+            [NonSerialized]
+            public ISerializerContext Context;
+
+            public void OnDeserialized(ISerializerContext context)
+            {
+                this.Context = context;
+            }
 #pragma warning restore 169
         }
     }

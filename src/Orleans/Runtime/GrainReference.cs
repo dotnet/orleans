@@ -563,13 +563,14 @@ namespace Orleans.Runtime
             var genericArg = reader.ReadString();
             if (string.IsNullOrEmpty(genericArg))
                 genericArg = null;
-            
+
+            var runtimeClient = context.AdditionalContext as IRuntimeClient;
             if (expectObserverId)
             {
-                return NewObserverGrainReference(id, observerId, context.SerializationManager.RuntimeClient);
+                return NewObserverGrainReference(id, observerId, runtimeClient);
             }
 
-            return FromGrainId(id, context.SerializationManager.RuntimeClient, genericArg, silo);
+            return FromGrainId(id, runtimeClient, genericArg, silo);
         }
 
         /// <summary> Copier function for grain reference. </summary>
@@ -734,7 +735,7 @@ namespace Orleans.Runtime
         private void OnDeserialized(StreamingContext context)
         {
             var serializerContext = context.Context as ISerializerContext;
-            this.runtimeClient = serializerContext?.AdditionalContext as IRuntimeClient; ;
+            this.runtimeClient = serializerContext?.AdditionalContext as IRuntimeClient;
         }
 #endif
 #endregion

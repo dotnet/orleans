@@ -1,17 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
 {
     [Serializable]
-    internal class MemoryBatchContainer<TSerializer> : IBatchContainer
+    internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
         where TSerializer : IMemoryMessageBodySerializer
     {
-        private readonly IMemoryMessageBodySerializer serializer;
+        [NonSerialized]
+        private TSerializer serializer;
         private readonly EventSequenceToken realToken;
         public Guid StreamGuid => MessageData.StreamGuid;
         public string StreamNamespace => MessageData.StreamNamespace;
@@ -53,6 +56,11 @@ namespace Orleans.Providers
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
             return true;
+        }
+
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        {
+            this.serializer = ActivatorUtilities.GetServiceOrCreateInstance<TSerializer>(context.ServiceProvider);
         }
     }
 }

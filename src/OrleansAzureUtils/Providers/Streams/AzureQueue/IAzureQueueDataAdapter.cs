@@ -1,10 +1,7 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Orleans.CodeGeneration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -30,7 +27,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary>
     /// Original data adapter.  Here to maintain backwards compatablity, but does not support json and other custom serializers
     /// </summary>
-    public class AzureQueueDataAdapterV1 : IAzureQueueDataAdapter
+    public class AzureQueueDataAdapterV1 : IAzureQueueDataAdapter, IOnDeserialized
     {
         private SerializationManager serializationManager;
 
@@ -67,25 +64,16 @@ namespace Orleans.Providers.Streams.AzureQueue
             return azureQueueBatch;
         }
 
-        [SerializerMethod]
-        private static void Serialize(object obj, ISerializationContext context, Type expected)
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
+            this.serializationManager = context.SerializationManager;
         }
-
-        [DeserializerMethod]
-        private static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            return new DefaultMemoryMessageBodySerializer(context.SerializationManager);
-        }
-
-        [CopierMethod]
-        private static object Copy(object obj, ICopyContext context) => obj;
     }
 
     /// <summary>
     /// Data adapter that uses types that support custom serializers (like json).
     /// </summary>
-    public class AzureQueueDataAdapterV2 : IAzureQueueDataAdapter
+    public class AzureQueueDataAdapterV2 : IAzureQueueDataAdapter, IOnDeserialized
     {
         private SerializationManager serializationManager;
         
@@ -122,18 +110,9 @@ namespace Orleans.Providers.Streams.AzureQueue
             return azureQueueBatch;
         }
 
-        [SerializerMethod]
-        private static void Serialize(object obj, ISerializationContext context, Type expected)
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
+            this.serializationManager = context.SerializationManager;
         }
-
-        [DeserializerMethod]
-        private static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            return new DefaultMemoryMessageBodySerializer(context.SerializationManager);
-        }
-
-        [CopierMethod]
-        private static object Copy(object obj, ICopyContext context) => obj;
     }
 }
