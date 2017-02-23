@@ -246,16 +246,19 @@ In this method you write a new class annotated with an attribute `[SerializerAtt
 [Orleans.CodeGeneration.SerializerAttribute(typeof(SomeOtherType))]
 internal class MyObjectSerializationExample
 {
+    [CopierMethod]
     public static object DeepCopier(object original, ICopyContext context)
     {
         ...
     }
 
+    [SerializerMethod]
     public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
     {
         ...
     }
 
+    [DeserializerMethod]
     public static object Deserializer(Type expected, IDeserializationContext context)
     {
         ...
