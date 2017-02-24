@@ -239,7 +239,7 @@ namespace UnitTests.StorageTests
         /// </summary>
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument</param>
-        public Task<object> ExecuteCommand(int command, object arg)
+        public virtual Task<object> ExecuteCommand(int command, object arg)
         {
             switch ((Commands)command)
             {
