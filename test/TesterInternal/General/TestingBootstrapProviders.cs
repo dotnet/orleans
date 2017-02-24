@@ -16,8 +16,13 @@ namespace UnitTests.General
         public const long GrainId = 12345;
     }
 
-    public class MockBootstrapProvider : MarshalByRefObject, IBootstrapProvider
+    public class MockBootstrapProvider : IControllable, IBootstrapProvider
     {
+        public enum Commands
+        {
+            InitCount = 1
+        }
+
         private int initCount;
 
         public string Name { get; private set; }
@@ -49,6 +54,17 @@ namespace UnitTests.General
         {
             logger.Info("Close Name={0}", Name);
             return TaskDone.Done;
+        }
+
+        public virtual Task<object> ExecuteCommand(int command, object arg)
+        {
+            switch ((Commands) command)
+            {
+                case Commands.InitCount:
+                    return Task.FromResult<object>(this.InitCount);
+                default:
+                    return Task.FromResult<object>(true);
+            }
         }
     }
 
@@ -124,6 +140,11 @@ namespace UnitTests.General
 
     public class ControllableBootstrapProvider : MockBootstrapProvider, IControllable
     {
+        public new enum Commands
+        {
+            EchoArg = 2
+        }
+
         private Guid serviceId;
         private string siloId;
 
@@ -147,18 +168,28 @@ namespace UnitTests.General
             logger.Info("Finished Init instance id {0} on silo {1} in service {2}", myId, siloId, serviceId);
         }
 
+        private object EchoArg(object arg)
+        {
+            logger.Info("ExecuteCommand {0} for instance id {1} on silo {2} with arg={3}", "EchoArg", myId, siloId, arg);
+            logger.Info("Finished ExecuteCommand {0} for instance id {1} on silo {2}", "EchoArg", myId, siloId);
+            return arg;
+        }
+
         #region IControllable interface methods
         /// <summary>
         /// A function to execute a control command.
         /// </summary>
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument</param>
-        public async Task<object> ExecuteCommand(int command, object arg)
+        public override Task<object> ExecuteCommand(int command, object arg)
         {
-            logger.Info("ExecuteCommand {0} for instance id {1} on silo {2} with arg={3}", command, myId, siloId, arg);
-            await Task.Delay(1);
-            logger.Info("Finished ExecuteCommand {0} for instance id {1} on silo {2}", command, myId, siloId);
-            return command;
+            switch ((Commands) command)
+            {
+                case Commands.EchoArg:
+                    return Task.FromResult(EchoArg(arg));
+                default:
+                    return base.ExecuteCommand(command, arg);
+            }
         }
         #endregion
     }
