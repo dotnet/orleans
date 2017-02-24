@@ -48,10 +48,7 @@
   </ItemGroup>
 
     <ItemGroup>
-    <Compile Include="..\..\..\test\TesterAzureUtils\**\*.cs" Exclude="
-    ..\..\..\test\TesterAzureUtils\obj\**\*.cs;
-    ..\..\..\test\TesterAzureUtils\bin\**\*.cs;
-    ..\..\..\test\TesterAzureUtils\Properties\*.cs" />
+    <Compile Include="..\..\..\test\TesterAzureUtils\**\*.cs" Exclude="..\..\..\test\TesterAzureUtils\obj\**\*.cs;..\..\..\test\TesterAzureUtils\bin\**\*.cs;..\..\..\test\TesterAzureUtils\Properties\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

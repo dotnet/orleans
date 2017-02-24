@@ -15,11 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\DefaultCluster.Tests\**\*.cs" Exclude="
-    ..\..\..\test\DefaultCluster.Tests\FSharpGrainTests.cs;
-    ..\..\..\test\DefaultCluster.Tests\obj\**\*.cs;
-    ..\..\..\test\DefaultCluster.Tests\bin\**\*.cs;
-    ..\..\..\test\DefaultCluster.Tests\Properties\*.cs" />
+    <Compile Include="..\..\..\test\DefaultCluster.Tests\**\*.cs" Exclude="..\..\..\test\DefaultCluster.Tests\FSharpGrainTests.cs;..\..\..\test\DefaultCluster.Tests\obj\**\*.cs;..\..\..\test\DefaultCluster.Tests\bin\**\*.cs;..\..\..\test\DefaultCluster.Tests\Properties\*.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">

@@ -41,11 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\NonSiloTests\**\*.cs" Exclude="
-    ..\..\..\test\NonSiloTests\obj\**\*.cs;
-    ..\..\..\test\NonSiloTests\bin\**\*.cs;
-    ..\..\..\test\NonSiloTests\Properties\*.cs;
-    ..\..\..\test\NonSiloTests\AssemblyLoaderTests.cs" />
+    <Compile Include="..\..\..\test\NonSiloTests\**\*.cs" Exclude="..\..\..\test\NonSiloTests\obj\**\*.cs;..\..\..\test\NonSiloTests\bin\**\*.cs;..\..\..\test\NonSiloTests\Properties\*.cs;..\..\..\test\NonSiloTests\AssemblyLoaderTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

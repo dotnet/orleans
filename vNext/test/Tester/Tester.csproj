@@ -46,9 +46,7 @@
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\Tester\**\*.cs" Exclude="..\..\..\test\Tester\obj\**\*.cs;..\..\..\test\Tester\bin\**\*.cs;..\..\..\test\Tester\Properties\*.cs;
-    ..\..\..\test\Tester\SerializationTests\SerializationTests.FSharpTypes.cs;
-    ..\..\..\test\Tester\SiloInitializationTests.cs" />
+    <Compile Include="..\..\..\test\Tester\**\*.cs" Exclude="..\..\..\test\Tester\obj\**\*.cs;..\..\..\test\Tester\bin\**\*.cs;..\..\..\test\Tester\Properties\*.cs;..\..\..\test\Tester\SerializationTests\SerializationTests.FSharpTypes.cs;..\..\..\test\Tester\SiloInitializationTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

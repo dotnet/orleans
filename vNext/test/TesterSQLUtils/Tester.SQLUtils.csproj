@@ -48,10 +48,7 @@
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
    <ItemGroup>
-    <Compile Include="..\..\..\test\TesterSQLUtils\**\*.cs" Exclude="
-    ..\..\..\test\TesterSQLUtils\obj\**\*.cs;
-    ..\..\..\test\TesterSQLUtils\bin\**\*.cs;
-    ..\..\..\test\TesterSQLUtils\Properties\*.cs" />
+    <Compile Include="..\..\..\test\TesterSQLUtils\**\*.cs" Exclude="..\..\..\test\TesterSQLUtils\obj\**\*.cs;..\..\..\test\TesterSQLUtils\bin\**\*.cs;..\..\..\test\TesterSQLUtils\Properties\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">

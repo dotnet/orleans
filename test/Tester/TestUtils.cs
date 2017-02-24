@@ -105,4 +105,25 @@ namespace Tester
             return result;
         }
     }
+
+    public static class RequestContextTestUtils
+    {
+        public static void SetActivityId(Guid id)
+        {
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = id;
+#else
+            Trace.CorrelationManager.ActivityId = id;
+#endif
+        }
+
+        public static Guid GetActivityId()
+        {
+#if NETSTANDARD
+            return RequestContext.ActivityId.Value;
+#else
+            return Trace.CorrelationManager.ActivityId;
+#endif
+        }
+    }
 }
