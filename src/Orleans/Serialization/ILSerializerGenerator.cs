@@ -313,7 +313,8 @@ namespace Orleans.Serialization
                 type.GetAllFields()
                     .Where(
                         field =>
-                            field.GetCustomAttribute<NonSerializedAttribute>() == null && !field.IsStatic
+                            !field.IsNotSerialized()
+                            && !field.IsStatic
                             && IsSupportedFieldType(field.FieldType.GetTypeInfo())
                             && (fieldFilter == null || fieldFilter(field)))
                     .ToList();

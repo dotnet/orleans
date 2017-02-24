@@ -122,7 +122,11 @@ namespace Orleans.CodeGenerator
 
         private bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
         {
-            return field.GetCustomAttributes().All(attr => attr.GetType().Name != "NonSerializedAttribute")
+            // A field is inaccessible for serialization if:
+            // * It needs to be serialized,
+            // * There is not already a serializer available for it, and
+            // * The field type is not accessible for the purpose of serialization.
+            return !field.IsNotSerialized()
                    && !this.serializationManager.HasSerializer(field.FieldType)
                    && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }

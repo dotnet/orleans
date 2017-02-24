@@ -165,6 +165,53 @@ namespace UnitTests.Serialization
             Assert.Null(actual.SomeGrainReference);
         }
 
+        /// <summary>
+        /// Tests that the default (non-fallback) serializer can handle complex classes.
+        /// </summary>
+        /// <param name="serializerToUse"></param>
+        [Theory, TestCategory("BVT"), TestCategory("Serialization")]
+        [InlineData(SerializerToUse.NoFallback)]
+        public void Serialize_ComplexAccessibleClass(SerializerToUse serializerToUse)
+        {
+            var environment = InitializeSerializer(serializerToUse);
+            var expected = new AnotherConcreteClass
+            {
+                Int = 89,
+                AnotherString = Guid.NewGuid().ToString(),
+                NonSerializedInt = 39,
+                Enum = SomeAbstractClass.SomeEnum.Something,
+            };
+
+            expected.Classes = new SomeAbstractClass[]
+            {
+                expected,
+                new AnotherConcreteClass
+                {
+                    AnotherString = "hi",
+                    Interfaces = new List<ISomeInterface> { expected }
+                }
+            };
+            expected.Interfaces = new List<ISomeInterface>
+            {
+                expected.Classes[1]
+            };
+            expected.SetObsoleteInt(38);
+
+            var actual = (AnotherConcreteClass)OrleansSerializationLoop(environment.SerializationManager, expected);
+
+            Assert.Equal(expected.Int, actual.Int);
+            Assert.Equal(expected.Enum, actual.Enum);
+            Assert.Equal(expected.AnotherString, actual.AnotherString);
+            Assert.Equal(expected.Classes.Length, actual.Classes.Length);
+            Assert.Equal(expected.Classes[1].Interfaces[0].Int, actual.Classes[1].Interfaces[0].Int);
+            Assert.Equal(expected.Interfaces[0].Int, actual.Interfaces[0].Int);
+            Assert.Equal(actual.Interfaces[0], actual.Classes[1]);
+            Assert.NotEqual(expected.NonSerializedInt, actual.NonSerializedInt);
+            Assert.Equal(0, actual.NonSerializedInt);
+            Assert.Equal(expected.GetObsoleteInt(), actual.GetObsoleteInt());
+            Assert.Null(actual.SomeGrainReference);
+        }
+
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_Type(SerializerToUse serializerToUse)
