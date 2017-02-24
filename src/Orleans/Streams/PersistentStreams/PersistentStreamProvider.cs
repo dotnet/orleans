@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -52,6 +53,8 @@ namespace Orleans.Providers.Streams.Common
 
         public string Name { get; private set; }
 
+        public IStreamSubscriptionManager StreamSubscriptionManager { get; private set; }
+
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
         // this is a workaround until an IServiceProvider instance is used in the Orleans client
@@ -96,7 +99,8 @@ namespace Orleans.Providers.Streams.Common
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
-            this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
+			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            this.StreamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(this.myConfig.PubSubType), this.Name);
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {

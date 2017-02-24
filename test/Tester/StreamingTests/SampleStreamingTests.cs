@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -11,6 +12,10 @@ using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using System.Collections.Generic;
+using Orleans.Streams.Core;
+using UnitTests.Grains;
+using Tester.StreamingTests;
 
 namespace UnitTests.StreamingTests
 {
@@ -93,7 +98,7 @@ namespace UnitTests.StreamingTests
 
     public class SampleStreamingTests
     {
-        private const string StreamNamespace = "SampleStreamNamespace";
+        public const string StreamNamespace = "SampleStreamNamespace";
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private readonly string streamProvider;
@@ -122,7 +127,7 @@ namespace UnitTests.StreamingTests
 
             await producer.StopPeriodicProducing();
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -143,7 +148,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -164,12 +169,12 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
 
             await consumer.StopConsuming();
         }
 
-        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
+        public static async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue, Logger logger)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();

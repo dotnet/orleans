@@ -116,11 +116,11 @@ namespace UnitTests.Grains
 
     public class SampleStreaming_ConsumerGrain : Grain, ISampleStreaming_ConsumerGrain
     {
-        private IAsyncObservable<int> consumer;
+        protected IAsyncObservable<int> consumer;
         internal int numConsumedItems;
         internal Logger logger;
-        private IAsyncObserver<int> consumerObserver;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        protected IAsyncObserver<int> consumerObserver;
+        protected StreamSubscriptionHandle<int> consumerHandle;
 
         public override Task OnActivateAsync()
         {

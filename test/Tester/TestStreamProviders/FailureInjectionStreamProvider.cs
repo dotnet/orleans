@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Async;
 using Orleans.Streams;
 using Orleans.Providers;
+using Orleans.Streams.Core;
 
 namespace Tester.TestStreamProviders
 {
@@ -24,6 +25,8 @@ namespace Tester.TestStreamProviders
         public static string FailureInjectionModeString => "FAILURE_INJECTION_STREAM_PROVIDER_MODE";
 
         public string Name { get; set; }
+
+        public IStreamSubscriptionManager StreamSubscriptionManager { get { throw new NotImplementedException("StreamSubscriptionManager getter is not implemeted"); }}
 
         public IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace)
         {

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -26,6 +27,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
         internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
 
+        public IStreamSubscriptionManager StreamSubscriptionManager { get; private set; }
         public bool IsRewindable { get { return false; } }
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
@@ -41,7 +43,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
                 ? DEFAULT_STREAM_PUBSUB_TYPE
                 : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
-
+            this.StreamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(pubSubType), this.Name);
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);

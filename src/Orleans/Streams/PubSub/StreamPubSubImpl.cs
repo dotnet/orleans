@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -63,7 +64,7 @@ namespace Orleans.Streams
             return explicitPubSub.ConsumerCount(streamId, streamProvider, streamNamespace); 
         }
 
-        public async Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public async Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
                 ? await implicitPubSub.GetAllSubscriptions(streamId, streamConsumer)

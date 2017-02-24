@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -384,12 +385,30 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
-            List<GuidId> subscriptionIds = State.Consumers.Where(c => !c.IsFaulted && c.Consumer.Equals(streamConsumer))
-                                                          .Select(c => c.SubscriptionId)
-                                                          .ToList();
-            return Task.FromResult(subscriptionIds);
+            if (streamConsumer != null)
+            {
+                var grainRef = streamConsumer as GrainReference;
+                List<StreamSubscription> subscriptions =
+                    State.Consumers.Where(c => !c.IsFaulted && c.Consumer.Equals(streamConsumer))
+                        .Select(
+                            c =>
+                                new StreamSubscription(c.SubscriptionId.Guid, streamId.ProviderName, streamId,
+                                    grainRef.GrainId)).ToList();
+                return Task.FromResult(subscriptions);
+            }
+            else
+            {
+                List<StreamSubscription> subscriptions =
+                    State.Consumers.Where(c => !c.IsFaulted)
+                        .Select(
+                            c =>
+                                new StreamSubscription(c.SubscriptionId.Guid, streamId.ProviderName, streamId,
+                                    c.consumerReference.GrainId)).ToList();
+                return Task.FromResult(subscriptions);
+            }
+
         }
 
         public async Task FaultSubscription(GuidId subscriptionId)
