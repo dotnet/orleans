@@ -9,7 +9,7 @@ using Xunit;
 using Tester.Serialization;
 using TestExtensions;
 
-namespace UnitTests.Serialization
+namespace ServiceBus.Tests.Serialization
 {
     public class FakeSerializerFixture
     {

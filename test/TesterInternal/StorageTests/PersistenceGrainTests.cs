@@ -14,8 +14,8 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
 using Orleans.Runtime.Configuration;
+using TesterInternal;
 using TestExtensions;
 
 // ReSharper disable RedundantAssignment
@@ -1233,20 +1233,6 @@ namespace UnitTests.StorageTests
             }
         }
         #endregion
-    }
-
-    [Serializable]
-    public class GrainStateContainingGrainReferences
-    {
-        public IAddressable Grain { get; set; }
-        public List<IAddressable> GrainList { get; set; }
-        public Dictionary<string, IAddressable> GrainDict { get; set; }
-
-        public GrainStateContainingGrainReferences()
-        {
-            GrainList = new List<IAddressable>();
-            GrainDict = new Dictionary<string, IAddressable>();
-        }
     }
 }
 

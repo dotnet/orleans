@@ -8,7 +8,6 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using Tester;
 using UnitTests;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
@@ -20,6 +19,7 @@ using Orleans.Providers;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using TestExtensions;
+using TesterInternal;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable

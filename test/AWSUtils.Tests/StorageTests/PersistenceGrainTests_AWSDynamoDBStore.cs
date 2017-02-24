@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using TesterInternal;
 using UnitTests;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
