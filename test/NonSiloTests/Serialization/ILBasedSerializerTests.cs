@@ -76,10 +76,41 @@ namespace UnitTests.Serialization
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
             var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
-            
+
             Assert.Null(input.Context);
             Assert.NotNull(deserialized.Context);
             Assert.Equal(this.fixture.SerializationManager, deserialized.Context.SerializationManager);
+        }
+
+        /// <summary>
+        /// Tests that <see cref="ILSerializerGenerator"/> does not serialize fields marked as [NonSerialized].
+        /// </summary>
+        [Fact]
+        public void ILSerialized_NonSerializedFields()
+        {
+            var input = new FieldTest
+            {
+                One = 1,
+                Two = 2,
+                NonSerializedInt = 1098
+            };
+            var generator = new ILSerializerGenerator();
+            var serializers = generator.GenerateSerializer(input.GetType());
+            var writer = new SerializationContext(this.fixture.SerializationManager)
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            serializers.Serialize(input, writer, input.GetType());
+            var reader = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
+            var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
+
+            Assert.Equal(input.One, deserialized.One);
+            Assert.Equal(input.Two, deserialized.Two);
+            Assert.NotEqual(input.NonSerializedInt, deserialized.NonSerializedInt);
+            Assert.Equal(default(int), deserialized.NonSerializedInt);
         }
 
         [SuppressMessage("ReSharper", "StyleCop.SA1401", Justification = "This is for testing purposes.")]
@@ -89,6 +120,9 @@ namespace UnitTests.Serialization
             public int One;
             public int Two;
             public int Three;
+
+            [NonSerialized]
+            public int NonSerializedInt;
 
             [NonSerialized]
             public ISerializerContext Context;
