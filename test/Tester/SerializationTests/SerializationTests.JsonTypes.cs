@@ -34,7 +34,7 @@ namespace UnitTests.Serialization
                    }"; 
  
             JObject input = JObject.Parse(json);
-            JObject output = SerializationManager.RoundTripSerializationForTesting(input);
+            JObject output = fixture.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.Equal(input.ToString(), output.ToString());
         }
 
@@ -44,7 +44,6 @@ namespace UnitTests.Serialization
         public class JObjectSerializationExample1
         {
             public static bool RegisterWasCalled;
-
             public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
@@ -56,19 +55,19 @@ namespace UnitTests.Serialization
             {
                 var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, context.StreamWriter);
+                context.SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
 
-            public static void Register()
+            public static void Register(SerializationManager serializationManager)
             {
                 RegisterWasCalled = true;
-                SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
+                serializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }
 
@@ -90,7 +89,7 @@ namespace UnitTests.Serialization
             Assert.Equal(original, jsonDeser);
 
             // Orleans's SerializationManager also deserializes everything correctly, but it serializes it into its own binary format
-            var orleansDeser = SerializationManager.RoundTripSerializationForTesting(original);
+            var orleansDeser = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
             Assert.Equal(typeof(InnerType), jsonDeser.MyDictionary["obj1"].GetType());
             Assert.Equal(original, orleansDeser);
         }
@@ -118,7 +117,7 @@ namespace UnitTests.Serialization
             // in GrainInterfaces assembly and markled as [Serializable].
             // JObject that is referenced from RootType will be serialized with JsonSerialization_Example2 below.
 
-            var orleansJsonDeser = SerializationManager.RoundTripSerializationForTesting(jsonDeser);
+            var orleansJsonDeser = this.fixture.SerializationManager.RoundTripSerializationForTesting(jsonDeser);
             Assert.Equal(typeof(JObject), orleansJsonDeser.MyDictionary["obj1"].GetType());
             // The below assert fails, but only since JObject does not correctly implement Equals.
             //Assert.Equal(jsonDeser, orleansJsonDeser);
@@ -128,7 +127,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_Json_POCO()
         {
             var obj = new SimplePOCO();
-            var deepCopied = SerializationManager.RoundTripSerializationForTesting(obj);
+            var deepCopied = this.fixture.SerializationManager.RoundTripSerializationForTesting(obj);
             Assert.Equal(typeof(SimplePOCO), deepCopied.GetType());
         }
 
@@ -168,13 +167,13 @@ namespace UnitTests.Serialization
             public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
-                SerializationManager.Serialize(str, context.StreamWriter);
+                context.SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             [DeserializerMethod]
             public static object Deserialize(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
             }
         }

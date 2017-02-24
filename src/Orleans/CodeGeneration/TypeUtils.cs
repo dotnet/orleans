@@ -372,6 +372,18 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Returns <see langword="true"/> if <paramref name="field"/> is marked as
+        /// <see cref="FieldAttributes.NotSerialized"/>, <see langword="false"/> otherwise.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <returns>
+        /// <see langword="true"/> if <paramref name="field"/> is marked as
+        /// <see cref="FieldAttributes.NotSerialized"/>, <see langword="false"/> otherwise.
+        /// </returns>
+        public static bool IsNotSerialized(this FieldInfo field)
+            => (field.Attributes & FieldAttributes.NotSerialized) == FieldAttributes.NotSerialized;
+
+        /// <summary>
         /// decide whether the class is derived from Grain
         /// </summary>
         public static bool IsGrainClass(Type type)

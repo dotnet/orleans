@@ -20,7 +20,7 @@ namespace Tester.SerializationTests
 
         void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
         {
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
+            var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.Equal<T>(input,output);
         }
 

@@ -6,6 +6,7 @@ using Orleans.LogConsistency;
 using Orleans.Storage;
 using Orleans.Runtime.LogConsistency;
 using Orleans.GrainDirectory;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -22,16 +23,18 @@ namespace Orleans.Runtime
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
+        private readonly SerializationManager serializationManager;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainCreator"/> class.
         /// </summary>
         /// <param name="services">Service provider used to create new grains</param>
-        /// <param name="getGrainRuntime">
-        /// The delegate used to get the grain runtime.
-        /// </param>
-        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime)
+        /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
+        /// <param name="serializationManager">The serialization manager.</param>
+        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime, SerializationManager serializationManager)
         {
             this.services = services;
+            this.serializationManager = serializationManager;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
             this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
@@ -98,7 +101,7 @@ namespace Orleans.Runtime
             var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
            
             // encapsulate runtime services used by consistency adaptors
-            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy);
+            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy, this.serializationManager);
 
             var state = Activator.CreateInstance(stateType);
 

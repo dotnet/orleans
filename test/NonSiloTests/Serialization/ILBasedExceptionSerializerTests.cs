@@ -32,24 +32,21 @@ namespace UnitTests.Serialization
             // Throw an exception so that is has a stack trace.
             var expected = GetNewException();
 
-            var writer = new SerializationContext(this.environment.GrainFactory)
+            var writer = new SerializationContext(this.environment.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
 
             // Deep copies should be reference-equal.
-            Assert.Equal(
-                expected,
-                SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.GrainFactory)),
-                ReferenceEqualsComparer.Instance);
+            Assert.Equal(expected, SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.SerializationManager)), ReferenceEqualsComparer.Instance);
 
-            SerializationManager.Serialize(expected, writer.StreamWriter);
-            var reader = new DeserializationContext(this.environment.GrainFactory)
+            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            var reader = new DeserializationContext(this.environment.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
 
-            var actual = (ILExceptionSerializerTestException)SerializationManager.Deserialize(null, reader.StreamReader);
+            var actual = (ILExceptionSerializerTestException)this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
             Assert.Equal(expected.BaseField.Value, actual.BaseField.Value, StringComparer.Ordinal);
             Assert.Equal(expected.SubClassField, actual.SubClassField, StringComparer.Ordinal);
             Assert.Equal(expected.OtherField.Value, actual.OtherField.Value, StringComparer.Ordinal);
@@ -93,17 +90,18 @@ namespace UnitTests.Serialization
 
             var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer());
             
-            var writer = new SerializationContext(this.environment.GrainFactory)
+            var writer = new SerializationContext(this.environment.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             knowsException.Serialize(expected, writer, null);
 
             // Deep copies should be reference-equal.
-            Assert.Equal(expected, knowsException.DeepCopy(expected, new SerializationContext(this.environment.GrainFactory)), ReferenceEqualsComparer.Instance);
+            var copyContext = new SerializationContext(this.environment.SerializationManager);
+            Assert.Equal(expected, knowsException.DeepCopy(expected, copyContext), ReferenceEqualsComparer.Instance);
 
             // Create a deserializer which doesn't know about the expected exception type.
-            var reader = new DeserializationContext(this.environment.GrainFactory)
+            var reader = new DeserializationContext(this.environment.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
@@ -118,13 +116,13 @@ namespace UnitTests.Serialization
             Assert.Equal(typeof(ILExceptionSerializerTestException).AssemblyQualifiedName, actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
-            writer = new SerializationContext(this.environment.GrainFactory)
+            writer = new SerializationContext(this.environment.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             doesNotKnowException.Serialize(untypedActual, writer, null);
 
-            reader = new DeserializationContext(this.environment.GrainFactory)
+            reader = new DeserializationContext(this.environment.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };

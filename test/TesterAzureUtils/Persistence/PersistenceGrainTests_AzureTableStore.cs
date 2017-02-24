@@ -17,6 +17,7 @@ using Orleans.Runtime.Configuration;
 using System.Collections.Generic;
 using Orleans.Providers;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using TestExtensions;
 using TesterInternal;
 
@@ -31,6 +32,10 @@ namespace Tester.AzureUtils.Persistence
     /// </summary>
     public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableStore.Fixture>
     {
+        private readonly Dictionary<string, string> providerProperties = new Dictionary<string, string>
+        {
+            {"DataConnectionString", TestDefaultConfiguration.DataConnectionString}
+        };
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -39,6 +44,7 @@ namespace Tester.AzureUtils.Persistence
 
                 Guid serviceId = Guid.NewGuid();
                 var options = new TestClusterOptions(initialSilosCount: 4);
+                options.ClientConfiguration.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
                 options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
                 options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
@@ -161,7 +167,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void AzureTableStore_ConvertToFromStorageFormat_GrainReference()
+        public async Task AzureTableStore_ConvertToFromStorageFormat_GrainReference()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid id = Guid.NewGuid();
@@ -171,6 +177,7 @@ namespace Tester.AzureUtils.Persistence
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
+            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
@@ -179,7 +186,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void AzureTableStore_ConvertToFromStorageFormat_GrainReference_List()
+        public async Task AzureTableStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
@@ -197,6 +204,7 @@ namespace Tester.AzureUtils.Persistence
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
+            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.NotNull(convertedState);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Google.Protobuf;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
@@ -11,9 +12,18 @@ namespace GoogleUtils.Tests.Serialization
 {
     public class ProtobufSerializationTests
     {
+        private readonly SerializationTestEnvironment environment;
+
         public ProtobufSerializationTests()
         {
-            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(ProtobufSerializer).GetTypeInfo() }, null);
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(
+                new ClientConfiguration
+                {
+                    SerializationProviders =
+                    {
+                        typeof(ProtobufSerializer).GetTypeInfo()
+                    }
+                });
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
@@ -38,7 +48,7 @@ namespace GoogleUtils.Tests.Serialization
         public void ProtobufSerializationTest_2_RegularOrleansSerializationStillWorks()
         {
             var input = new OrleansType();
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
+            var output = this.environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
             Assert.Equal(input, output); //The serialization didn't preserve the proper value
         }
@@ -47,7 +57,7 @@ namespace GoogleUtils.Tests.Serialization
         public void ProtobufSerializationTest_3_ProtoSerialization()
         {
             var input = CreateAddressBook();
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
+            var output = this.environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
             Assert.Equal(input, output); //The serialization didn't preserve the proper value
         }
@@ -56,7 +66,7 @@ namespace GoogleUtils.Tests.Serialization
         public void ProtobufSerializationTest_4_ProtoSerialization()
         {
             var input = CreateCounter();
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
+            var output = this.environment.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
             Assert.Equal(input, output); //The serialization didn't preserve the proper value
         }
@@ -65,7 +75,7 @@ namespace GoogleUtils.Tests.Serialization
         public void ProtobufSerializationTest_5_DeepCopy()
         {
             var input = CreateAddressBook();
-            var output = SerializationManager.DeepCopy(input);
+            var output = this.environment.SerializationManager.DeepCopy(input);
             Assert.NotSame(input, output); //The serializer returned an instance of the same object
             Assert.Equal(input, output); //The serialization didn't preserve the proper value
         }
@@ -74,7 +84,7 @@ namespace GoogleUtils.Tests.Serialization
 		public void ProtobufSerializationTest_6_DefaultMessageSerialization()
 		{
 			var input = CreateDefaultCounter();
-			var output = SerializationManager.RoundTripSerializationForTesting(input);
+			var output = this.environment.SerializationManager.RoundTripSerializationForTesting(input);
 			Assert.NotSame(input, output); //The serializer returned an instance of the same object
 			Assert.Equal(input, output); //The serialization didn't preserve the proper value
 		}

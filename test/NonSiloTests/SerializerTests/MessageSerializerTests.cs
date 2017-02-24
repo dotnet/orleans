@@ -5,7 +5,6 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
@@ -56,7 +55,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
             output.WriteLine(s);
 
             int dummy = 0;
-            var serialized = resp.Serialize(out dummy);
+            var serialized = resp.Serialize(this.fixture.SerializationManager, out dummy);
             int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
             byte[] data = new byte[length];
             int n = 0;
@@ -78,7 +77,14 @@ namespace NonSiloTests.UnitTests.SerializerTests
             headerList.Add(new ArraySegment<byte>(header));
             var bodyList = new List<ArraySegment<byte>>();
             bodyList.Add(new ArraySegment<byte>(body));
-            var resp1 = new Message(headerList);
+            var context = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(headerList)
+            };
+            var resp1 = new Message
+            {
+                Headers = SerializationManager.DeserializeMessageHeaders(context)
+            };
             resp1.SetBodyBytes(bodyList);
 
             //byte[] serialized = resp.FormatForSending();
@@ -92,7 +98,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
             Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
-            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
+            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)
             {

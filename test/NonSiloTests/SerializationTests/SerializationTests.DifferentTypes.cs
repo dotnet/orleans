@@ -27,21 +27,21 @@ namespace UnitTests.Serialization
             // Local Kind
             DateTime inputLocal = DateTime.Now;
 
-            DateTime outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
+            DateTime outputLocal = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputLocal);
             Assert.Equal(inputLocal.ToString(CultureInfo.InvariantCulture), outputLocal.ToString(CultureInfo.InvariantCulture));
             Assert.Equal(inputLocal.Kind, outputLocal.Kind);
 
             // UTC Kind
             DateTime inputUtc = DateTime.UtcNow;
 
-            DateTime outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
+            DateTime outputUtc = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputUtc);
             Assert.Equal(inputUtc.ToString(CultureInfo.InvariantCulture), outputUtc.ToString(CultureInfo.InvariantCulture));
             Assert.Equal(inputUtc.Kind, outputUtc.Kind);
 
             // Unspecified Kind
             DateTime inputUnspecified = new DateTime(0x08d27e2c0cc7dfb9);
 
-            DateTime outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
+            DateTime outputUnspecified = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
             Assert.Equal(inputUnspecified.ToString(CultureInfo.InvariantCulture), outputUnspecified.ToString(CultureInfo.InvariantCulture));
             Assert.Equal(inputUnspecified.Kind, outputUnspecified.Kind);
         }
@@ -53,7 +53,7 @@ namespace UnitTests.Serialization
             DateTime inputLocalDateTime = DateTime.Now;
             DateTimeOffset inputLocal = new DateTimeOffset(inputLocalDateTime);
 
-            DateTimeOffset outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
+            DateTimeOffset outputLocal = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputLocal);
             Assert.Equal(inputLocal, outputLocal);
             Assert.Equal(
                 inputLocal.ToString(CultureInfo.InvariantCulture),
@@ -64,7 +64,7 @@ namespace UnitTests.Serialization
             DateTime inputUtcDateTime = DateTime.UtcNow;
             DateTimeOffset inputUtc = new DateTimeOffset(inputUtcDateTime);
 
-            DateTimeOffset outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
+            DateTimeOffset outputUtc = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputUtc);
             Assert.Equal(inputUtc, outputUtc);
             Assert.Equal(
                 inputUtc.ToString(CultureInfo.InvariantCulture),
@@ -75,7 +75,7 @@ namespace UnitTests.Serialization
             DateTime inputUnspecifiedDateTime = new DateTime(0x08d27e2c0cc7dfb9);
             DateTimeOffset inputUnspecified = new DateTimeOffset(inputUnspecifiedDateTime);
 
-            DateTimeOffset outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
+            DateTimeOffset outputUnspecified = this.fixture.SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
             Assert.Equal(inputUnspecified, outputUnspecified);
             Assert.Equal(
                 inputUnspecified.ToString(CultureInfo.InvariantCulture),
@@ -127,9 +127,9 @@ namespace UnitTests.Serialization
             input.Collection = new HashSet<TestTypeA>();
             input.Collection.Add(input);
 
-            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input, this.fixture.GrainFactory);
+            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input, this.fixture.GrainFactory, this.fixture.SerializationManager);
 
-            TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
+            TestTypeA output2 = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
         }
 #endif
     }

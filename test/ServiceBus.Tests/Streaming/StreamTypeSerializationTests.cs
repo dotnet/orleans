@@ -32,19 +32,20 @@ namespace ServiceBus.Tests.Serialization
             this.fixture = fixture;
         }
 
+        public SerializationManager SerializationManager => this.fixture.Environment.SerializationManager;
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventSequenceToken(long.MaxValue, int.MaxValue);
-            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token, this.fixture.Environment.GrainFactory);
-
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(this.SerializationManager, token);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventHubSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventHubSequenceToken("some offset", long.MaxValue, int.MaxValue);
-            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token, this.fixture.Environment.GrainFactory);
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(this.SerializationManager, token);
         }
 
         #region EventSequenceToken2
@@ -53,7 +54,7 @@ namespace ServiceBus.Tests.Serialization
         public void EventSequenceTokenV2_DeepCopy_IfNotNull()
         {
             var token = new EventSequenceTokenV2(long.MaxValue, int.MaxValue);
-            var copy = EventSequenceTokenV2.DeepCopy(token, new SerializationContext()) as EventSequenceToken;
+            var copy = EventSequenceTokenV2.DeepCopy(token, new SerializationContext(this.SerializationManager)) as EventSequenceToken;
             Assert.NotNull(copy);
             Assert.NotSame(token, copy);
             Assert.Equal(token.EventIndex, copy.EventIndex);
@@ -74,13 +75,13 @@ namespace ServiceBus.Tests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventSequenceTokenV2_Serialize_IfNotNull()
         {
-            var writer = new SerializationContext
+            var writer = new SerializationContext(this.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             var token = new EventSequenceTokenV2(long.MaxValue, int.MaxValue);
             EventSequenceTokenV2.Serialize(token, writer, null);
-            var reader = new DeserializationContext
+            var reader = new DeserializationContext(this.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
@@ -100,7 +101,7 @@ namespace ServiceBus.Tests.Serialization
         public void EventHubSequenceTokenV2_DeepCopy_IfNotNull()
         {
             var token = new EventHubSequenceTokenV2("name", long.MaxValue, int.MaxValue);
-            var copy = EventHubSequenceTokenV2.DeepCopy(token, new SerializationContext()) as EventSequenceToken;
+            var copy = EventHubSequenceTokenV2.DeepCopy(token, new SerializationContext(this.SerializationManager)) as EventSequenceToken;
             Assert.NotNull(copy);
             Assert.NotSame(token, copy);
             Assert.Equal(token.EventIndex, copy.EventIndex);
@@ -121,14 +122,14 @@ namespace ServiceBus.Tests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventHubSequenceTokenV2_Serialize_IfNotNull()
         {
-            var writer = new SerializationContext
+            var writer = new SerializationContext(this.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
 
             var token = new EventHubSequenceTokenV2("name", long.MaxValue, int.MaxValue);
             EventHubSequenceTokenV2.Serialize(token, writer, null);
-            var reader = new DeserializationContext
+            var reader = new DeserializationContext(this.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };

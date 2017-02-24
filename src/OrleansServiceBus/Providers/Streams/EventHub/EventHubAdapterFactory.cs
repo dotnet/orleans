@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 #if NETSTANDARD
 using Microsoft.Azure.EventHubs;
 #else
@@ -12,6 +13,7 @@ using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -49,6 +51,11 @@ namespace Orleans.ServiceBus.Providers
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
+
+        /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        public SerializationManager SerializationManager { get; private set; }
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -108,6 +115,7 @@ namespace Orleans.ServiceBus.Providers
             providerConfig = providerCfg;
             serviceProvider = svcProvider;
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
+            this.SerializationManager = this.serviceProvider.GetRequiredService<SerializationManager>();
 
             adapterSettings = new EventHubStreamProviderSettings(providerName);
             adapterSettings.PopulateFromProviderConfig(providerConfig);
@@ -132,7 +140,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
-                CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger);
+                CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
             }
 
             if (StreamFailureHandlerFactory == null)
@@ -214,7 +222,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
             }
-            EventData eventData = EventHubBatchContainer.ToEventData(streamGuid, streamNamespace, events, requestContext);
+            EventData eventData = EventHubBatchContainer.ToEventData(this.SerializationManager, streamGuid, streamNamespace, events, requestContext);
 #if NETSTANDARD
             return client.SendAsync(eventData, streamGuid.ToString());
 #else

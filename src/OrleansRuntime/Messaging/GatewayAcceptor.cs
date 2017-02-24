@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Orleans.Messaging;
-using Orleans;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -15,14 +15,15 @@ namespace Orleans.Runtime.Messaging
             MessageCenter msgCtr,
             Gateway gateway,
             IPEndPoint gatewayAddress,
-            MessageFactory messageFactory)
-            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory)
+            MessageFactory messageFactory,
+            SerializationManager serializationManager)
+            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager)
         {
             this.gateway = gateway;
             loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
         }
-        
+
         protected override bool RecordOpenedSocket(Socket sock)
         {
             ThreadTrackingStatistic.FirstClientConnectedStartTracking();

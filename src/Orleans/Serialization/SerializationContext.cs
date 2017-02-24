@@ -1,10 +1,27 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    public interface ICopyContext
+    public interface ISerializerContext
+    {
+        /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        SerializationManager SerializationManager { get; }
+
+        /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+        
+        /// <summary>
+        /// Gets additional context associated with this instance.
+        /// </summary>
+        object AdditionalContext { get; }
+    }
+
+    public interface ICopyContext : ISerializerContext
     {
         /// <summary>
         /// Record an object-to-copy mapping into the current serialization context.
@@ -16,23 +33,15 @@ namespace Orleans.Serialization
         void RecordCopy(object original, object copy);
 
         object CheckObjectWhileCopying(object raw);
-
-        /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
-        /// </summary>
-        IGrainFactory GrainFactory { get; }
     }
 
-    public interface ISerializationContext
+    public interface ISerializationContext : ISerializerContext
     {
         BinaryTokenStreamWriter StreamWriter { get; }
-        void RecordObject(object original);
-        int CheckObjectWhileSerializing(object raw);
 
-        /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> associated with this instance.
-        /// </summary>
-        IGrainFactory GrainFactory { get; }
+        void RecordObject(object original);
+
+        int CheckObjectWhileSerializing(object raw);
     }
 
     /// <summary>
@@ -63,19 +72,20 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        public SerializationManager SerializationManager { get; }
+
         public BinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
-        private IGrainFactory grainFactory;
 
-        public SerializationContext(IGrainFactory grainFactory)
+        public SerializationContext(SerializationManager serializationManager)
         {
-            this.grainFactory = grainFactory;
+            this.SerializationManager = serializationManager;
             processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
         }
-
-        /// <inheritdoc />
-        public IGrainFactory GrainFactory => this.grainFactory ?? (this.grainFactory = RuntimeClient.Current.InternalGrainFactory);
 
         internal void Reset()
         {
@@ -127,5 +137,9 @@ namespace Orleans.Serialization
 
             return -1;
         }
+
+        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
+
+        public object AdditionalContext => this.SerializationManager.RuntimeClient;
     }
 }

@@ -1,19 +1,22 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Counters
 {
     internal class SiloStatisticsManager
     {
+        private readonly IServiceProvider serviceProvider;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
         private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
-        public SiloStatisticsManager(SiloInitializationParameters initializationParams)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, IServiceProvider serviceProvider)
         {
+            this.serviceProvider = serviceProvider;
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
@@ -21,7 +24,7 @@ namespace Orleans.Runtime.Counters
             SchedulerStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
             runtimeStats = new RuntimeStatisticsGroup();
-            this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true);
+            this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager);
             this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, initializationParams.NodeConfig);
             this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval);
 

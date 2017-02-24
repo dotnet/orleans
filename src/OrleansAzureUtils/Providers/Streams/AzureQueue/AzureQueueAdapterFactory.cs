@@ -1,15 +1,17 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory<TDataAdapter> : IQueueAdapterFactory
-        where TDataAdapter : IAzureQueueDataAdapter, new()
+        where TDataAdapter : IAzureQueueDataAdapter
     {
         private string deploymentId;
         private string dataConnectionString;
@@ -19,6 +21,12 @@ namespace Orleans.Providers.Streams.AzureQueue
         private TimeSpan? messageVisibilityTimeout;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
+        private Func<TDataAdapter> adaptorFactory;
+
+        /// <summary>
+        /// Gets the serialization manager.
+        /// </summary>
+        public SerializationManager SerializationManager { get; private set; }
 
         /// <summary>
         /// Application level failure handler override.
@@ -68,12 +76,15 @@ namespace Orleans.Providers.Streams.AzureQueue
                 StreamFailureHandlerFactory =
                     qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
             }
+
+            this.SerializationManager = serviceProvider.GetRequiredService<SerializationManager>();
+            this.adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter<TDataAdapter>(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(this.adaptorFactory(), this.SerializationManager, streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

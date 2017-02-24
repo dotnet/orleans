@@ -550,7 +550,7 @@ namespace Orleans.TestingHost
 
                 GrainClient.Initialize(clientConfig);
                 this.GrainFactory = GrainClient.GrainFactory;
-                this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
+                this.InternalGrainFactory = GrainClient.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             }
         }
 

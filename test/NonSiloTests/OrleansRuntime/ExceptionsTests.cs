@@ -1,7 +1,6 @@
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
@@ -27,7 +26,7 @@ namespace UnitTests.OrleansRuntime
             SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
            
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory);
+            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory, this.fixture.SerializationManager);
 
             Assert.Equal(original.Message, output.Message);
             Assert.Equal(original.ActivationToUse, output.ActivationToUse);
@@ -42,7 +41,7 @@ namespace UnitTests.OrleansRuntime
             SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
 
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = SerializationManager.RoundTripSerializationForTesting(original);
+            Catalog.DuplicateActivationException output = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
 
             Assert.Equal(original.Message, output.Message);
             Assert.Equal(original.ActivationToUse, output.ActivationToUse);

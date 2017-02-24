@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 
@@ -76,6 +77,11 @@ namespace Orleans.TestingHost
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
         /// </summary>
         public IServiceProvider ServiceProvider { get; private set; }
+        
+        /// <summary>
+        /// SerializationManager to use in the tests
+        /// </summary>
+        public SerializationManager SerializationManager { get; private set; }
 
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
@@ -422,6 +428,7 @@ namespace Orleans.TestingHost
             this.GrainFactory = GrainClient.GrainFactory;
             this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
             this.ServiceProvider = GrainClient.ServiceProvider;
+            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }
         

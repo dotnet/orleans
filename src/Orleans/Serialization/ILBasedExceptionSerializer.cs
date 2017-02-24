@@ -93,7 +93,7 @@ namespace Orleans.Serialization
             // Write the concrete type directly.
             this.typeSerializer.WriteNamedType(actualType, outerWriter);
 
-            var innerContext = new SerializationContext(outerContext.GrainFactory)
+            var innerContext = new SerializationContext(outerContext.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
@@ -117,7 +117,7 @@ namespace Orleans.Serialization
             var length = outerReader.ReadInt();
             var innerBytes = outerReader.ReadBytes(length);
             
-            var innerContext = new DeserializationContext(outerContext.GrainFactory)
+            var innerContext = new DeserializationContext(outerContext.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(innerBytes)
             };
@@ -183,7 +183,7 @@ namespace Orleans.Serialization
             TypeSerializer.WriteTypeKey(key, outerWriter);
             
             // Serialize the only accepted fields from the base Exception class.
-            var innerContext = new SerializationContext(outerContext.GrainFactory)
+            var innerContext = new SerializationContext(outerContext.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };

@@ -7,6 +7,7 @@ namespace Orleans.CodeGeneration
     using Orleans.CodeGenerator;
     using Orleans.Runtime;
     using Orleans.Serialization;
+    using Orleans.Runtime.Configuration;
 
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.
@@ -14,8 +15,6 @@ namespace Orleans.CodeGeneration
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
-        private readonly RoslynCodeGenerator codeGenerator = new RoslynCodeGenerator();
-
         [Serializable]
         internal class CodeGenOptions
         {
@@ -104,11 +103,12 @@ namespace Orleans.CodeGeneration
             {
                 Directory.CreateDirectory(outputFileDirectory);
             }
+            
+            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, new GlobalConfiguration()));
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);
-
-            SerializationManager.RegisterBuiltInSerializers();
+            
             using (var sourceWriter = new StreamWriter(options.OutputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");

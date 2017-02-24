@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -14,12 +15,12 @@ namespace Orleans.Runtime
         private RuntimeStatisticsGroup runtimeStats;
         private readonly Logger logger;
 
-        public ClientStatisticsManager(ClientConfiguration config, IServiceProvider serviceProvider)
+        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider)
         {
             this.config = config;
             this.serviceProvider = serviceProvider;
             runtimeStats = new RuntimeStatisticsGroup();
-            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
+            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager);
             logger = LogManager.GetLogger(GetType().Name);
 
             MessagingStatisticsGroup.Init(false);

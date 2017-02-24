@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Messaging
 {
@@ -59,6 +60,8 @@ namespace Orleans.Messaging
     // </summary>
     internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
+        internal readonly SerializationManager SerializationManager;
+
         #region Constants
 
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
@@ -66,6 +69,7 @@ namespace Orleans.Messaging
 
         #endregion
         internal GrainId ClientId { get; private set; }
+        public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
@@ -92,11 +96,15 @@ namespace Orleans.Messaging
             int gen,
             GrainId clientId,
             IGatewayListProvider gatewayListProvider,
+            SerializationManager serializationManager,
+            IRuntimeClient runtimeClient,
             MessageFactory messageFactory)
         {
+            this.SerializationManager = serializationManager;
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
+            this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
             Running = false;
             MessagingConfiguration = config;
@@ -107,7 +115,9 @@ namespace Orleans.Messaging
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
             logger = LogManager.GetLogger("Messaging.ProxiedMessageCenter", LoggerType.Runtime);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
-            IntValueStatistic.FindOrCreate(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, () =>
+            IntValueStatistic.FindOrCreate(
+                StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
+                () =>
                 {
                     lock (gatewayConnections)
                     {

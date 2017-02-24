@@ -4,6 +4,7 @@ using System.Net;
 using System.Reflection;
 using Orleans;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace TestExtensions
 {
@@ -55,6 +56,8 @@ namespace TestExtensions
 
         internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
 
+        public SerializationManager SerializationManager => this.RuntimeClient.SerializationManager;
+        
         public void Dispose()
         {
             this.RuntimeClient?.Dispose();

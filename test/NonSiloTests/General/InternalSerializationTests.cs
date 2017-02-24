@@ -70,9 +70,9 @@ namespace UnitTests.Serialization
 
             // Serialize and deserialize the grain reference.
             var writer = new BinaryTokenStreamWriter();
-            SerializationManager.Serialize(grainReference, writer);
-            var deserialized = SerializationManager.Deserialize(new BinaryTokenStreamReader(writer.ToByteArray()));
-            var copy = (GrainReference)SerializationManager.DeepCopy(deserialized);
+            this.fixture.SerializationManager.Serialize(grainReference, writer);
+            var deserialized = this.fixture.SerializationManager.Deserialize(new BinaryTokenStreamReader(writer.ToByteArray()));
+            var copy = (GrainReference)this.fixture.SerializationManager.DeepCopy(deserialized);
 
             // Get the final value of the fallback serialization counters.
             var final = counters.Select(_ => _.GetCurrentValue()).ToList();

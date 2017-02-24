@@ -8,6 +8,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.MultiCluster;
 using Orleans.GrainDirectory;
+using Orleans.Serialization;
 
 namespace Orleans.LogConsistency
 {
@@ -31,6 +32,10 @@ namespace Orleans.LogConsistency
         /// </summary>
         GrainReference GrainReference { get;  }
 
+        /// <summary>
+        /// The serialization manager.
+        /// </summary>
+        SerializationManager SerializationManager { get; }
         
         /// <summary>
         /// The multicluster registration strategy for this grain.

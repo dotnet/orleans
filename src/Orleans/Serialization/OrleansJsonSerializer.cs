@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Net;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
@@ -17,16 +20,16 @@ namespace Orleans.Serialization
         private readonly JsonSerializerSettings settings;
         private Logger logger;
 
-        public OrleansJsonSerializer(IGrainFactory grainFactory)
+        public OrleansJsonSerializer(SerializationManager serializationManager, IGrainFactory grainFactory)
         {
-            this.settings = GetDefaultSerializerSettings(grainFactory);
+            this.settings = GetDefaultSerializerSettings(serializationManager, grainFactory);
         }
 
         /// <summary>
         /// Returns the default serializer settings.
         /// </summary>
         /// <returns>The default serializer settings.</returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings(IGrainFactory grainFactory)
+        public static JsonSerializerSettings GetDefaultSerializerSettings(SerializationManager serializationManager, IGrainFactory grainFactory)
         {
             var settings = new JsonSerializerSettings
             {
@@ -41,7 +44,7 @@ namespace Orleans.Serialization
                 TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
 
                 // Types such as GrainReference need context during deserialization, so provide that context now.
-                Context = new StreamingContext(StreamingContextStates.All, grainFactory),
+                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
 #endif
                 Formatting = Formatting.None
             };
@@ -51,6 +54,7 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
+            settings.Converters.Add(new GrainReferenceConverter(grainFactory));
 
             return settings;
         }
@@ -106,13 +110,13 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            var serializationContext = new SerializationContext(context.GrainFactory)
+            var serializationContext = new SerializationContext(context.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             
             Serialize(source, serializationContext, source.GetType());
-            var deserializationContext = new DeserializationContext(context.GrainFactory)
+            var deserializationContext = new DeserializationContext(context.SerializationManager)
             {
                 StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
             };
@@ -280,5 +284,52 @@ namespace Orleans.Serialization
             return new IPEndPoint(address, port);
         }
     }
-#endregion
+
+    internal class GrainReferenceConverter : JsonConverter
+    {
+        private static readonly Type GrainReferenceType;
+
+        private static readonly ConcurrentDictionary<Type, GrainFactory.GrainReferenceCaster> Casters =
+            new ConcurrentDictionary<Type, GrainFactory.GrainReferenceCaster>();
+        private static readonly Func<Type, GrainFactory.GrainReferenceCaster> CreateCasterDelegate = CreateCaster;
+        private readonly IGrainFactory grainFactory;
+
+        public GrainReferenceConverter(IGrainFactory grainFactory)
+        {
+            this.grainFactory = grainFactory;
+        }
+
+        static GrainReferenceConverter()
+        {
+            GrainReferenceType = typeof(GrainReference);
+        }
+
+        public override bool CanConvert(Type objectType)
+        {
+            return GrainReferenceType.IsAssignableFrom(objectType);
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            var key = (value as GrainReference)?.ToKeyString();
+            serializer.Serialize(writer, key);
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            var key = serializer.Deserialize<string>(reader);
+            if (string.IsNullOrWhiteSpace(key)) return null;
+
+            var result = GrainReference.FromKeyString(key, null);
+            this.grainFactory.BindGrainReference(result);
+            return Casters.GetOrAdd(objectType, CreateCasterDelegate)(result);
+        }
+
+        private static GrainFactory.GrainReferenceCaster CreateCaster(Type grainReferenceType)
+        {
+            var interfaceType = grainReferenceType.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>().TargetType;
+            return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
+        }
+    }
+    #endregion
 }

@@ -129,6 +129,7 @@
     <Compile Include="IConsiderForCodeGenerationGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerializerExclusions.cs" />
+    <Compile Include="SerializerTestTypes.cs" />
     <Compile Include="SQLAdapter\ICustomerGrain.cs" />
     <Compile Include="SQLAdapter\IDeviceGrain.cs" />
     <Compile Include="UnitTestGrainInterfaces.cs" />
