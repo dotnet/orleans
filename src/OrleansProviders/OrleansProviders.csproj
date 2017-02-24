@@ -83,6 +83,7 @@
     <Compile Include="Streams\Memory\MemoryAdapterReceiver.cs" />
     <Compile Include="Streams\Memory\MemoryBatchContainer.cs" />
     <Compile Include="Streams\Memory\MemoryMessageBody.cs" />
+    <Compile Include="Streams\Memory\MemoryMessageBodySerializerFactory.cs" />
     <Compile Include="Streams\Memory\MemoryMessageData.cs" />
     <Compile Include="Streams\Memory\MemoryPooledCache.cs" />
     <Compile Include="Streams\Memory\MemoryStreamProvider.cs" />

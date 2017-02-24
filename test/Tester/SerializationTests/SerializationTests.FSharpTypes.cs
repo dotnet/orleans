@@ -22,7 +22,7 @@ namespace UnitTests.Serialization
 
         void RoundtripSerializationTest<T>(T input)
         {
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
+            var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.Equal(input, output);
         }
 

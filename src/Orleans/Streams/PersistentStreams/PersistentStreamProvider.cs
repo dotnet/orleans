@@ -47,6 +47,7 @@ namespace Orleans.Providers.Streams.Common
         internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
         private PersistentStreamProviderState startupState;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
+        private SerializationManager serializationManager;
 
         public string Name { get; private set; }
 
@@ -93,6 +94,7 @@ namespace Orleans.Providers.Streams.Common
             adapterFactory.Init(config, Name, logger, new GrainFactoryServiceProvider(providerRuntime));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
+            this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {
@@ -155,7 +157,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
             }
-            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
+            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable, this.serializationManager);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)

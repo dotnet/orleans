@@ -186,7 +186,6 @@ namespace Orleans.Runtime
             MultiClusterRegistrationStrategy.Initialize(config.Globals);
             StatisticsCollector.Initialize(LocalConfig);
             
-            SerializationManager.Initialize(GlobalConfig.SerializationProviders, this.GlobalConfig.FallbackSerializationProvider);
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
@@ -218,6 +217,8 @@ namespace Orleans.Runtime
             services.AddSingleton(initializationParams.ClusterConfig);
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
+            services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
+            services.AddSingleton<SerializationManager>();
             services.AddSingleton<ITimerRegistry, TimerRegistry>();
             services.AddSingleton<IReminderRegistry, ReminderRegistry>();
             services.AddSingleton<IStreamProviderManager, StreamProviderManager>();

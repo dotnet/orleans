@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using UnitTests.GrainInterfaces;
 
 namespace TestGrains
@@ -93,6 +94,13 @@ namespace TestGrains
         private MyGrainState state;
         private int version;
 
+        private readonly SerializationManager serializationManager;
+
+        public LogTestGrainCustomStoragePrimaryCluster(SerializationManager serializationManager)
+        {
+            this.serializationManager = serializationManager;
+        }
+
         // simulate an async call during activation. This caused deadlock in earlier version,
         // so I add it here to catch regressions.
         public override async Task OnActivateAsync()
@@ -131,7 +139,7 @@ namespace TestGrains
                 state = new MyGrainState();
                 version = 0;
             }
-            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, (MyGrainState)SerializationManager.DeepCopy(state)));
+            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, (MyGrainState)this.serializationManager.DeepCopy(state)));
         }
     }
 

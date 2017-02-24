@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Tester;
 using TestExtensions;
 using Xunit;
@@ -324,7 +325,7 @@ namespace UnitTests
                     createdCounters.Add(name);
                 }
 
-                LogStatistics statsLogger = new LogStatistics(TimeSpan.Zero, true);
+                LogStatistics statsLogger = new LogStatistics(TimeSpan.Zero, true, this.fixture.HostedCluster.SerializationManager);
                 statsLogger.DumpCounters().Wait();
 
                 int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);

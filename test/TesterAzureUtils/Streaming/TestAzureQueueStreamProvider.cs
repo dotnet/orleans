@@ -11,7 +11,7 @@ namespace Tester.AzureUtils.Streaming
         {
             public AdapterFactory()
             {
-                StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create();
+                StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.SerializationManager);
             }
         }
     }

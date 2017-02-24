@@ -29,7 +29,7 @@ namespace OrleansAWSUtils.Streams
         // Need to store reference to the original SQS Message to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
         internal SQSMessage Message;
-
+        
         public Guid StreamGuid { get; private set; }
 
         public string StreamNamespace { get; private set; }
@@ -76,19 +76,27 @@ namespace OrleansAWSUtils.Streams
             return false; // Consumer is not interested in any of these events, so don't send.
         }
 
-        internal static SendMessageRequest ToSQSMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        internal static SendMessageRequest ToSQSMessage<T>(
+            SerializationManager serializationManager,
+            Guid streamGuid,
+            string streamNamespace,
+            IEnumerable<T> events,
+            Dictionary<string, object> requestContext)
         {
             var sqsBatchMessage = new SQSBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
-            var rawBytes = SerializationManager.SerializeToByteArray(sqsBatchMessage);
+            var rawBytes = serializationManager.SerializeToByteArray(sqsBatchMessage);
             var payload = new JObject();
             payload.Add("payload", JToken.FromObject(rawBytes));
-            return new SendMessageRequest { MessageBody = payload.ToString() };
+            return new SendMessageRequest
+            {
+                MessageBody = payload.ToString()
+            };
         }
 
-        internal static SQSBatchContainer FromSQSMessage(SQSMessage msg, long sequenceId)
+        internal static SQSBatchContainer FromSQSMessage(SerializationManager serializationManager, SQSMessage msg, long sequenceId)
         {
             var json = JObject.Parse(msg.Body);
-            var sqsBatch = SerializationManager.DeserializeFromByteArray<SQSBatchContainer>(json["payload"].ToObject<byte[]>());
+            var sqsBatch = serializationManager.DeserializeFromByteArray<SQSBatchContainer>(json["payload"].ToObject<byte[]>());
             sqsBatch.Message = msg;
             sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
             return sqsBatch;

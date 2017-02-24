@@ -1,4 +1,7 @@
-﻿namespace OrleansBenchmarks.Serialization
+﻿using TestExtensions;
+using Xunit;
+
+namespace OrleansBenchmarks.Serialization
 {
     using System;
     using System.Collections.Generic;
@@ -20,11 +23,12 @@
     }
 
     [Config(typeof(SerializationBenchmarkConfig))]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationBenchmarks
     {
+        private SerializationTestEnvironment environment;
         private void InitializeSerializer(SerializerToUse serializerToUse)
         {
-            List<TypeInfo> serializationProviders = null;
             TypeInfo fallback = null;
             switch (serializerToUse)
             {
@@ -42,8 +46,12 @@
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }
 
-            SerializationManager.Initialize(serializationProviders, fallback);
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            var config = new ClientConfiguration
+            {
+                FallbackSerializationProvider = fallback
+            };
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            this.serializationManager = this.environment.SerializationManager;
         }
         
         [Params(SerializerToUse.IlBasedFallbackSerializer, SerializerToUse.Default)]
@@ -54,6 +62,7 @@
         private byte[] serializedBytes;
 
         private LargeTestData largeTestData;
+        private SerializationManager serializationManager;
 
         [Setup]
         public void BenchmarkSetup()
@@ -101,19 +110,19 @@
             largeTestData.SetBit(13);
             largeTestData.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
-            this.serializedBytes = SerializationManager.SerializeToByteArray(this.largeTestData);
+            this.serializedBytes = this.serializationManager.SerializeToByteArray(this.largeTestData);
         }
 
         [Benchmark]
         public byte[] SerializerBenchmark()
         {
-            return SerializationManager.SerializeToByteArray(this.largeTestData);
+            return this.serializationManager.SerializeToByteArray(this.largeTestData);
         }
 
         [Benchmark]
         public object DeserializerBenchmark()
         {
-            return SerializationManager.DeserializeFromByteArray<LargeTestData>(this.serializedBytes);
+            return this.serializationManager.DeserializeFromByteArray<LargeTestData>(this.serializedBytes);
         }
 
         /// <summary>
@@ -126,12 +135,12 @@
             return OrleansSerializationLoop(this.complexClass);
         }
 
-        internal static object OrleansSerializationLoop(object input, bool includeWire = true)
+        internal object OrleansSerializationLoop(object input, bool includeWire = true)
         {
-            var copy = SerializationManager.DeepCopy(input);
+            var copy = this.serializationManager.DeepCopy(input);
             if (includeWire)
             {
-                copy = SerializationManager.RoundTripSerializationForTesting(copy);
+                copy = this.serializationManager.RoundTripSerializationForTesting(copy);
             }
             return copy;
         }

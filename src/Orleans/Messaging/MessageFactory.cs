@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     internal class MessageFactory
     {
+        private readonly SerializationManager serializationManager;
         private readonly Logger logger;
 
-        public MessageFactory()
+        public MessageFactory(SerializationManager serializationManager)
         {
+            this.serializationManager = serializationManager;
             this.logger = LogManager.GetLogger(nameof(MessageFactory), LoggerType.Runtime);
         }
 
@@ -29,7 +32,7 @@ namespace Orleans.Runtime
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
 
-            message.RequestContextData = RequestContext.Export();
+            message.RequestContextData = RequestContext.Export(this.serializationManager);
             return message;
         }
 
@@ -76,7 +79,7 @@ namespace Orleans.Runtime
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
             response.Expiration = request.Expiration;
 
-            var contextData = RequestContext.Export();
+            var contextData = RequestContext.Export(this.serializationManager);
             if (contextData != null)
             {
                 response.RequestContextData = contextData;

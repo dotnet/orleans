@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 using Orleans.Runtime;
@@ -36,12 +35,12 @@ namespace Orleans.Messaging
         private DateTime lastConnect;
 
         internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory)
-            : base("GatewayClientSender_" + address, mc.MessagingConfiguration)
+            : base("GatewayClientSender_" + address, mc.MessagingConfiguration, mc.SerializationManager)
         {
             this.messageFactory = messageFactory;
             Address = address;
             MsgCenter = mc;
-            receiver = new GatewayClientReceiver(this);
+            receiver = new GatewayClientReceiver(this, mc.SerializationManager);
             lastConnect = new DateTime();
             IsLive = true;
         }
@@ -70,7 +69,7 @@ namespace Orleans.Messaging
             receiver.Stop();
             base.Stop();
             DrainQueue(RerouteMessage);
-            RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(Silo);
+            MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
             {

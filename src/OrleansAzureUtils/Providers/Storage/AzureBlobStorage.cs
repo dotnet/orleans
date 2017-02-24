@@ -70,8 +70,8 @@ namespace Orleans.Storage
             try
             {
                 this.Name = name;
-                var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
-                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(grainFactory), config);
+                var serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(serializationManager, providerRuntime.GrainFactory), config);
 
                 if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
 

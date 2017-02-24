@@ -32,6 +32,7 @@ namespace Orleans.Runtime
         /// </summary>
         private readonly TypeMetadataCache typeCache;
         
+        private readonly SerializationManager serializationManager;
         private readonly CodeGeneratorManager codeGeneratorManager;
 
         /// <summary>
@@ -45,13 +46,17 @@ namespace Orleans.Runtime
         /// <param name="typeCache">
         /// The type cache.
         /// </param>
+        /// <param name="serializationManager">
+        /// The serialization manager.
+        /// </param>
         /// <param name="codeGeneratorManager">
         /// The code generator.
         /// </param>
-        public AssemblyProcessor(TypeMetadataCache typeCache, CodeGeneratorManager codeGeneratorManager)
+        public AssemblyProcessor(TypeMetadataCache typeCache, SerializationManager serializationManager, CodeGeneratorManager codeGeneratorManager)
         {
             this.logger = LogManager.GetLogger("AssemblyProcessor");
             this.typeCache = typeCache;
+            this.serializationManager = serializationManager;
             this.codeGeneratorManager = codeGeneratorManager;
         }
 
@@ -168,7 +173,7 @@ namespace Orleans.Runtime
                         this.logger.Verbose3("Processing type {0}", typeName);
                     }
 
-                    SerializationManager.FindSerializationInfo(type);
+                    this.serializationManager.FindSerializationInfo(type);
                     this.typeCache.FindSupportClasses(type);
                 }
                 catch (Exception exception)

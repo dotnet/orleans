@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -28,6 +29,7 @@ namespace UnitTests.StorageTests
 
         private readonly int numKeys;
         private ILocalDataStore StateStore;
+        private SerializationManager serializationManager;
         private const string stateStoreKey = "State";
 
         public string LastId { get; private set; }
@@ -96,6 +98,7 @@ namespace UnitTests.StorageTests
             Log = providerRuntime.GetLogger(loggerName);
 
             Log.Info(0, "Init Name={0} Config={1}", name, config);
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
             Interlocked.Increment(ref initCount);
 
             if (LocalDataStoreInstance.LocalDataStore != null)
@@ -130,7 +133,7 @@ namespace UnitTests.StorageTests
             lock (StateStore)
             {
                 var storedState = GetLastState(grainType, grainReference, grainState);
-                grainState.State = SerializationManager.DeepCopy(storedState); // Read current state data
+                grainState.State = this.serializationManager.DeepCopy(storedState); // Read current state data
             }
             return TaskDone.Done;
         }
@@ -141,7 +144,7 @@ namespace UnitTests.StorageTests
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
-                var storedState = SerializationManager.DeepCopy(grainState.State); // Store current state data
+                var storedState = this.serializationManager.DeepCopy(grainState.State); // Store current state data
                 var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainReference), stateStore, grainState.ETag);
 

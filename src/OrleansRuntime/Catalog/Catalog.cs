@@ -18,6 +18,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using Orleans.Storage;
 
 namespace Orleans.Runtime
@@ -147,6 +148,7 @@ namespace Orleans.Runtime
         private readonly NodeConfiguration nodeConfig;
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
+        private readonly SerializationManager serializationManager;
 
         public Catalog(
             SiloInitializationParameters siloInitializationParameters,
@@ -159,7 +161,8 @@ namespace Orleans.Runtime
             NodeConfiguration nodeConfig,
             ISiloMessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
-            MessageFactory messageFactory)
+            MessageFactory messageFactory,
+            SerializationManager serializationManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = siloInitializationParameters.SiloAddress;
@@ -172,6 +175,7 @@ namespace Orleans.Runtime
             destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
             this.nodeConfig = nodeConfig;
+            this.serializationManager = serializationManager;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
@@ -432,7 +436,7 @@ namespace Orleans.Runtime
             return TryGetActivationData(running, out target) &&
                 target.GrainInstance != null &&
                 GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
-                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
+                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager)));
         }
 
         public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
@@ -1478,7 +1482,7 @@ namespace Orleans.Runtime
             if (!status.IsTerminating()) return;
             if (status == SiloStatus.Dead)
             {
-                RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+                this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
             }
 
             var activationsToShutdown = new List<ActivationData>();

@@ -9,16 +9,18 @@ using Orleans.Streams;
 namespace Orleans.Providers
 {
     internal class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
-        where TSerializer : IMemoryMessageBodySerializer, new()
+        where TSerializer : class, IMemoryMessageBodySerializer
     { 
         private readonly IMemoryStreamQueueGrain queueGrain;
         private readonly List<Task> awaitingTasks;
         private readonly Logger logger;
+        private readonly TSerializer serializer;
 
-        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, Logger logger)
+        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, Logger logger, TSerializer serializer)
         {
             this.queueGrain = queueGrain;
             this.logger = logger;
+            this.serializer = serializer;
             awaitingTasks = new List<Task>();
         }
 
@@ -36,7 +38,7 @@ namespace Orleans.Providers
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
                 IEnumerable<MemoryMessageData> eventData = await task;
-                batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data)).ToList<IBatchContainer>();
+                batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
             }
             catch (Exception exc)
             {

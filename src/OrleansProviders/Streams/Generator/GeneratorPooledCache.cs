@@ -22,9 +22,10 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <param name="bufferPool"></param>
         /// <param name="logger"></param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
+        /// <param name="serializationManager"></param>
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger, SerializationManager serializationManager)
         {
-            var dataAdapter = new CacheDataAdapter(bufferPool);
+            var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
             dataAdapter.PurgeAction = cache.Purge;
         }
@@ -60,17 +61,19 @@ namespace Orleans.Providers.Streams.Generator
         private class CacheDataAdapter : ICacheDataAdapter<GeneratedBatchContainer, CachedMessage>
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
+            private readonly SerializationManager serializationManager;
             private FixedSizeBuffer currentBuffer;
 
             public Action<IDisposable> PurgeAction { private get; set; }
 
-            public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
+            public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager)
             {
                 if (bufferPool == null)
                 {
                     throw new ArgumentNullException(nameof(bufferPool));
                 }
                 this.bufferPool = bufferPool;
+                this.serializationManager = serializationManager;
             }
 
             public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
@@ -87,7 +90,7 @@ namespace Orleans.Providers.Streams.Generator
             private ArraySegment<byte> SerializeMessageIntoPooledSegment(GeneratedBatchContainer queueMessage)
             {
                 // serialize payload
-                byte[] serializedPayload = SerializationManager.SerializeToByteArray(queueMessage.Payload);
+                byte[] serializedPayload = this.serializationManager.SerializeToByteArray(queueMessage.Payload);
                 int size = serializedPayload.Length;
 
                 // get segment from current block
@@ -113,7 +116,7 @@ namespace Orleans.Providers.Streams.Generator
             {
                 //Deserialize payload
                 var stream = new BinaryTokenStreamReader(cachedMessage.Payload);
-                object payloadObject = SerializationManager.Deserialize(stream);
+                object payloadObject = this.serializationManager.Deserialize(stream);
                 return new GeneratedBatchContainer(cachedMessage.StreamGuid, cachedMessage.StreamNamespace,
                     payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
             }

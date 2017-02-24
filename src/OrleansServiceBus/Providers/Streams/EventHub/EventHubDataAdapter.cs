@@ -9,6 +9,7 @@ using Microsoft.Azure.EventHubs;
 using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -75,7 +76,8 @@ namespace Orleans.ServiceBus.Providers
         /// Duplicate of EventHub's EventData class.
         /// </summary>
         /// <param name="cachedMessage"></param>
-        public EventHubMessage(CachedEventHubMessage cachedMessage)
+        /// <param name="serializationManager"></param>
+        public EventHubMessage(CachedEventHubMessage cachedMessage, SerializationManager serializationManager)
         {
             int readOffset = 0;
             StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset));
@@ -84,7 +86,7 @@ namespace Orleans.ServiceBus.Providers
             SequenceNumber = cachedMessage.SequenceNumber;
             EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
             DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
-            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties();
+            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties(serializationManager);
             Payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).ToArray();
         }
 
@@ -160,6 +162,7 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
     {
+        private readonly SerializationManager serializationManager;
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimePurgePredicate timePurage;
         private FixedSizeBuffer currentBuffer;
@@ -172,14 +175,16 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
         /// </summary>
+        /// <param name="serializationManager"></param>
         /// <param name="bufferPool"></param>
         /// <param name="timePurage"></param>
-        public EventHubDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurage = null)
+        public EventHubDataAdapter(SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurage = null)
         {
             if (bufferPool == null)
             {
                 throw new ArgumentNullException(nameof(bufferPool));
             }
+            this.serializationManager = serializationManager;
             this.bufferPool = bufferPool;
             this.timePurage = timePurage ?? TimePurgePredicate.Default;
         }
@@ -214,7 +219,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public IBatchContainer GetBatchContainer(ref CachedEventHubMessage cachedMessage)
         {
-            var evenHubMessage = new EventHubMessage(cachedMessage);
+            var evenHubMessage = new EventHubMessage(cachedMessage, this.serializationManager);
             return GetBatchContainer(evenHubMessage);
         }
 
@@ -225,7 +230,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
         {
-            return new EventHubBatchContainer(eventHubMessage);
+            return new EventHubBatchContainer(eventHubMessage, this.serializationManager);
         }
 
         /// <summary>
@@ -315,7 +320,7 @@ namespace Orleans.ServiceBus.Providers
         // Placed object message payload into a segment.
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
-            byte[] propertiesBytes = queueMessage.SerializeProperties();
+            byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
 #if NETSTANDARD
             byte[] payload = queueMessage.Body.Array;
 #else

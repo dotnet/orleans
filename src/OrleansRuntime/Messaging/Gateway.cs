@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Threading;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -29,18 +30,17 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
+        private readonly SerializationManager serializationManager;
         private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
-
-        internal Gateway(
-            MessageCenter msgCtr,
-            IPEndPoint gatewayAddress,
-            MessageFactory messageFactory)
+        
+        internal Gateway(MessageCenter msgCtr, IPEndPoint gatewayAddress, MessageFactory messageFactory, SerializationManager serializationManager)
         {
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
-            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress, this.messageFactory);
+            this.serializationManager = serializationManager;
+            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress, this.messageFactory, this.serializationManager);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<GatewaySender>(() =>
                 {
-                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory);
+                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory, this.serializationManager);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -356,12 +356,14 @@ namespace Orleans.Runtime.Messaging
             private readonly Gateway gateway;
             private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
+            private readonly SerializationManager serializationManager;
 
-            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory)
+            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager)
                 : base(name, gateway.MessagingConfiguration)
             {
                 this.gateway = gateway;
                 this.messageFactory = messageFactory;
+                this.serializationManager = serializationManager;
                 gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
                 OnFault = FaultBehavior.RestartOnFault;
             }
@@ -471,7 +473,7 @@ namespace Orleans.Runtime.Messaging
                 int headerLength;
                 try
                 {
-                    data = msg.Serialize(out headerLength);
+                    data = msg.Serialize(serializationManager, out headerLength);
                 }
                 catch (Exception exc)
                 {

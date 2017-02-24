@@ -23,6 +23,7 @@ namespace Orleans.Runtime.Messaging
             = CounterStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_ALLOCATED_SOCKET_EVENT_ARGS, false);
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
+        private readonly SerializationManager serializationManager;
 
         public Action<Message> SniffIncomingMessage
         {
@@ -40,12 +41,13 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory)
+        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager)
         {
             MessageCenter = msgCtr;
             listenAddress = here;
             this.MessageFactory = messageFactory;
             this.receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(() => this.CreateSocketReceiveAsyncEventArgsPoolWrapper());
+            this.serializationManager = serializationManager;
             if (here == null)
                 listenAddress = MessageCenter.MyAddress.Endpoint;
 
@@ -411,7 +413,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -614,11 +616,11 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory)
+            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager)
             {
                 this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;
-                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime));
+                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime), serializationManager);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)

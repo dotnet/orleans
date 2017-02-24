@@ -8,6 +8,7 @@ using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using TestExtensions;
@@ -34,7 +35,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
                     timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 }
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.SerializationManager);
                 return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, log);
             }
         }
@@ -43,8 +44,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             private readonly Guid partitionStreamGuid;
 
-            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
-                : base(bufferPool, timePurge)
+            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
+                : base(serializationManager, bufferPool, timePurge)
             {
                 partitionStreamGuid = GetPartitionGuid(partitionKey);
             }

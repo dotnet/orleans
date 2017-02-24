@@ -143,6 +143,17 @@ namespace Orleans.CodeGenerator
                             SF.CastExpression(field.Type, deserialized))));
             }
 
+            // If the type implements the internal IOnDeserialized lifecycle method, invoke it's method now.
+            if (typeof(IOnDeserialized).IsAssignableFrom(type))
+            {
+                Expression<Action<IOnDeserialized>> onDeserializedMethod = _ => _.OnDeserialized(default(ISerializerContext));
+
+                // C#: ((IOnDeserialized)result).OnDeserialized(context);
+                var typedResult = SF.ParenthesizedExpression(SF.CastExpression(typeof(IOnDeserialized).GetTypeSyntax(), resultVariable));
+                var invokeOnDeserialized = onDeserializedMethod.Invoke(typedResult).AddArgumentListArguments(SF.Argument(contextParameter));
+                body.Add(SF.ExpressionStatement(invokeOnDeserialized));
+            }
+
             body.Add(SF.ReturnStatement(SF.CastExpression(type.GetTypeSyntax(), resultVariable)));
             return
                 SF.MethodDeclaration(typeof(object).GetTypeSyntax(), "Deserializer")

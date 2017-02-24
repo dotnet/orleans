@@ -41,9 +41,10 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Initializes a new instance of the <see cref="RoslynCodeGenerator"/> class.
         /// </summary>
-        public RoslynCodeGenerator()
+        /// <param name="serializationManager">The serialization manager.</param>
+        public RoslynCodeGenerator(SerializationManager serializationManager)
         {
-            this.serializerGenerationManager = new SerializerGenerationManager();
+            this.serializerGenerationManager = new SerializerGenerationManager(serializationManager);
         }
 
         /// <summary>

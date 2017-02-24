@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 #if NETSTANDARD
 using Microsoft.Azure.EventHubs;
 #else
@@ -18,10 +19,14 @@ namespace Orleans.ServiceBus.Providers
     /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
     /// </summary>
     [Serializable]
-    public class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer, IOnDeserialized
     {
         [JsonProperty]
         private readonly EventHubMessage eventHubMessage;
+
+        [JsonIgnore]
+        [NonSerialized]
+        private SerializationManager serializationManager;
 
         [JsonProperty]
         private readonly EventHubSequenceToken token;
@@ -44,7 +49,8 @@ namespace Orleans.ServiceBus.Providers
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
         private Body payload;
-        private Body Payload => payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+        
+        private Body GetPayload() => payload ?? (payload = this.serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
 
         [Serializable]
         private class Body
@@ -57,9 +63,11 @@ namespace Orleans.ServiceBus.Providers
         /// Batch container that deliveres events from cached EventHub data associated with an orleans stream
         /// </summary>
         /// <param name="eventHubMessage"></param>
-        public EventHubBatchContainer(EventHubMessage eventHubMessage)
+        /// <param name="serializationManager"></param>
+        public EventHubBatchContainer(EventHubMessage eventHubMessage, SerializationManager serializationManager)
         {
             this.eventHubMessage = eventHubMessage;
+            this.serializationManager = serializationManager;
             token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
@@ -70,7 +78,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
+            return GetPayload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
         }
 
         /// <summary>
@@ -80,9 +88,9 @@ namespace Orleans.ServiceBus.Providers
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
         public bool ImportRequestContext()
         {
-            if (Payload.RequestContext != null)
+            if (GetPayload().RequestContext != null)
             {
-                RequestContext.Import(Payload.RequestContext);
+                RequestContext.Import(GetPayload().RequestContext);
                 return true;
             }
             return false;
@@ -96,14 +104,14 @@ namespace Orleans.ServiceBus.Providers
             return true;
         }
 
-        internal static EventData ToEventData<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        internal static EventData ToEventData<T>(SerializationManager serializationManager, Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {
                 Events = events.Cast<object>().ToList(),
                 RequestContext = requestContext
             };
-            var bytes = SerializationManager.SerializeToByteArray(payload);
+            var bytes = serializationManager.SerializeToByteArray(payload);
 #if NETSTANDARD
             var eventData = new EventData(bytes);
 #else
@@ -115,6 +123,11 @@ namespace Orleans.ServiceBus.Providers
                 eventData.SetStreamNamespaceProperty(streamNamespace);
             }
             return eventData;
+        }
+       
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        {
+            this.serializationManager = context.SerializationManager;
         }
     }
 }

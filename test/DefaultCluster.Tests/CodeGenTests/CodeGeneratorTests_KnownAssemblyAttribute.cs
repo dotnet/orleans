@@ -29,7 +29,7 @@ namespace DefaultCluster.Tests.General
 
         private void ClientSerializerExists(Type t)
         {
-            Assert.True(SerializationManager.HasSerializer(t));
+            Assert.True(this.HostedCluster.SerializationManager.HasSerializer(t));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]

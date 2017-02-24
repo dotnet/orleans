@@ -10,5 +10,5 @@ namespace Orleans.NonSiloTests
 
 
     [CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
-    public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }
+    public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture>, ICollectionFixture<BuiltInSerializerCollectionFixture> { }
 }

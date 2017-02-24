@@ -4,14 +4,16 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.AzureUtils;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
     internal class AzureQueueAdapter<TDataAdapter> : IQueueAdapter
-        where TDataAdapter : IAzureQueueDataAdapter, new()
+        where TDataAdapter : IAzureQueueDataAdapter
     {
         protected readonly string DeploymentId;
+        private readonly SerializationManager serializationManager;
         protected readonly string DataConnectionString;
         protected readonly TimeSpan? MessageVisibilityTimeout;
         private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
@@ -23,22 +25,30 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
-        public AzureQueueAdapter(HashRingBasedStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName, TimeSpan? messageVisibilityTimeout = null)
+        public AzureQueueAdapter(
+            TDataAdapter dataAdapter,
+            SerializationManager serializationManager,
+            HashRingBasedStreamQueueMapper streamQueueMapper,
+            string dataConnectionString,
+            string deploymentId,
+            string providerName,
+            TimeSpan? messageVisibilityTimeout = null)
         {
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
-            
+
+            this.serializationManager = serializationManager;
             DataConnectionString = dataConnectionString;
             DeploymentId = deploymentId;
             Name = providerName;
             MessageVisibilityTimeout = messageVisibilityTimeout;
             this.streamQueueMapper = streamQueueMapper;
-            this.dataAdapter = new TDataAdapter();
+            this.dataAdapter = dataAdapter;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, this.dataAdapter, MessageVisibilityTimeout);
+            return AzureQueueAdapterReceiver.Create(this.serializationManager, queueId, DataConnectionString, DeploymentId, this.dataAdapter, MessageVisibilityTimeout);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
