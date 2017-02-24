@@ -213,7 +213,7 @@ namespace Orleans.Runtime
             // Register system services.
             var services = new ServiceCollection();
             services.AddSingleton(this);
-            services.AddSingleton<MemoryPubSub>();
+            services.AddTransient<MemoryPubSub>();
             services.AddSingleton(initializationParams);
             services.AddSingleton<ILocalSiloDetails>(initializationParams);
             services.AddSingleton(initializationParams.ClusterConfig);

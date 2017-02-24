@@ -14,7 +14,7 @@ namespace Orleans.Streams
         [JsonProperty]
         public StreamId Stream;
         [JsonProperty]
-        public GrainReference producerReference => producerExtension as GrainReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public GrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         // This property does not need to be Json serialized, since we already have producerReference.
         [JsonIgnore]
         public IStreamProducerExtension Producer { get { return producerExtension; } }
@@ -26,6 +26,7 @@ namespace Orleans.Streams
         {
             Stream = streamId;
             producerExtension = streamProducer;
+            producerReference = producerExtension as GrainReference;
         }
 
         #region IEquatable<PubSubPublisherState> methods

@@ -104,7 +104,6 @@ namespace Orleans
             }
             
             var services = new ServiceCollection();
-            services.AddSingleton<MemoryPubSub>();
             services.AddSingleton(cfg);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
