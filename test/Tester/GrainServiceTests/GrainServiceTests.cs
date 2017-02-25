@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -10,17 +11,27 @@ using Xunit;
 
 namespace Tester
 {
-    public class GrainServiceTests : TestClusterPerTest
+    public class GrainServiceTests : OrleansTestingBase, IClassFixture<GrainServiceTests.Fixture>
     {
-        public override TestCluster CreateTestCluster()
+        public class Fixture : BaseTestClusterFixture
         {
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.UseStartupType<GrainServiceStartup>();
-            options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainService, Tester", 
-                new Dictionary<string,string> {{"test-property", "xyz"}});
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(1);
+                options.ClusterConfiguration.UseStartupType<GrainServiceStartup>();
+                options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainService, Tester",
+                    new Dictionary<string, string> { { "test-property", "xyz" } });
 
-            return new TestCluster(options);
+                return new TestCluster(options);
+            }
         }
+
+        public GrainServiceTests(Fixture fixture)
+        {
+            this.GrainFactory = fixture.GrainFactory;
+        }
+
+        public IGrainFactory GrainFactory { get; set; }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
