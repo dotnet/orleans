@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BenchmarkGrainInterfaces.MapReduce;
 using Orleans;
-using OrleansGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarkGrains.MapReduce
+namespace BenchmarkGrains.MapReduce
 {
     public class BufferGrain<T> : DataflowGrain, IBufferGrain<T>
     {
@@ -17,7 +17,7 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         public Task SendAsync(T t)
         {
-            _items.Add(t);
+            this._items.Add(t);
             return TaskDone.Done;
         }
 
@@ -38,8 +38,8 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         public Task<List<T>> ReceiveAll()
         {
-            var items = _items.ToList();
-            _items.Clear();
+            var items = this._items.ToList();
+            this._items.Clear();
             return Task.FromResult(items);
         }
     }

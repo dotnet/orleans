@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using Orleans;
+using BenchmarkGrainInterfaces.MapReduce;
+using BenchmarkGrains.MapReduce;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using OrleansBenchmarkGrains.MapReduce;
-using OrleansGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarks.MapReduce
+namespace Benchmarks.MapReduce
 {
     public class MapReduceBenchmark
     {
@@ -36,7 +34,7 @@ namespace OrleansBenchmarks.MapReduce
         public async Task Bench()
         {
             var pipelines = Enumerable
-                .Range(0, _pipelineParallelization)
+                .Range(0, this._pipelineParallelization)
                 .AsParallel()
                 .WithDegreeOfParallelism(4)
                 .Select(async i =>
@@ -97,9 +95,9 @@ namespace OrleansBenchmarks.MapReduce
 
             List<Dictionary<string, int>> resultList = new List<Dictionary<string, int>>();
 
-            while (Interlocked.Increment(ref _currentRepeat) < _repeats)
+            while (Interlocked.Increment(ref this._currentRepeat) < this._repeats)
             {
-                await mapper.SendAsync(_text);
+                await mapper.SendAsync(this._text);
                 while (!resultList.Any() || resultList.First().Count < 84) // rough way of checking of pipeline completition.
                 {
                     resultList = await collector.ReceiveAll();

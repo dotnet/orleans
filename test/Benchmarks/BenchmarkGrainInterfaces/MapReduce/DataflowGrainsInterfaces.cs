@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Orleans;
 
-namespace OrleansGrainInterfaces.MapReduce
+namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain
     {

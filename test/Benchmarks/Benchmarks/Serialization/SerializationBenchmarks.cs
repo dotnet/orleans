@@ -1,20 +1,15 @@
-﻿using TestExtensions;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using BenchmarkDotNet.Attributes;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace OrleansBenchmarks.Serialization
+namespace Benchmarks.Serialization
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Reflection;
-
-    using BenchmarkDotNet.Attributes;
-
-    using Orleans.Runtime;
-    using Orleans.Runtime.Configuration;
-    using Orleans.Serialization;
-
-    using UnitTests.GrainInterfaces;
-
     public enum SerializerToUse
     {
         Default,
@@ -107,8 +102,8 @@ namespace OrleansBenchmarks.Serialization
                 Description = "This is a test. This is only a test. In the event of a real execution, this would contain actual data.",
                 EnumValue = TestEnum.First
             };
-            largeTestData.SetBit(13);
-            largeTestData.SetEnemy(17, CampaignEnemyTestType.Enemy1);
+            this.largeTestData.SetBit(13);
+            this.largeTestData.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
             this.serializedBytes = this.serializationManager.SerializeToByteArray(this.largeTestData);
         }
@@ -291,8 +286,8 @@ namespace OrleansBenchmarks.Serialization
     {
         public InnerType()
         {
-            Id = Guid.NewGuid();
-            Something = Id.ToString();
+            this.Id = Guid.NewGuid();
+            this.Something = this.Id.ToString();
         }
         public Guid Id { get; set; }
         public string Something { get; set; }

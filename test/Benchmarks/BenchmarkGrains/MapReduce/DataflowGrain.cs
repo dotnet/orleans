@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using BenchmarkGrainInterfaces.MapReduce;
 using Orleans;
-using OrleansGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarkGrains.MapReduce
+namespace BenchmarkGrains.MapReduce
 {
     public abstract class DataflowGrain : Grain, IDataflowGrain
     {

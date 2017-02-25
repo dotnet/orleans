@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using BenchmarkGrainInterfaces.MapReduce;
 using Orleans;
-using OrleansGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarkGrains.MapReduce
+namespace BenchmarkGrains.MapReduce
 {
     public class TargetGrain<TInput> : DataflowGrain, ITargetGrain<TInput>
     {
@@ -11,7 +11,7 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         public Task Init(ITargetProcessor<TInput> processor)
         {
-            _processor = processor;
+            this._processor = processor;
             return TaskDone.Done;
         }
 

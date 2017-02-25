@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 
-namespace OrleansBenchmarks.MapReduce
+namespace Benchmarks.MapReduce
 {
     public class MapReduceBenchmarkConfig : ManualConfig
     {

@@ -7,8 +7,8 @@
     <ProjectGuid>{071CB148-EAA3-4F85-A1F7-52D1B7FDAF82}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>OrleansBenchmarkGrains</RootNamespace>
-    <AssemblyName>OrleansBenchmarkGrains</AssemblyName>
+    <RootNamespace>BenchmarkGrains</RootNamespace>
+    <AssemblyName>BenchmarkGrains</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -49,9 +49,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OrleansBenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.csproj">
+    <ProjectReference Include="..\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj">
       <Project>{936397df-8d11-4244-a493-767d31f9d727}</Project>
-      <Name>OrleansBenchmarkGrainInterfaces</Name>
+      <Name>BenchmarkGrainInterfaces</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\..\src\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>

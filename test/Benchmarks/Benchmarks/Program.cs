@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using BenchmarkDotNet.Running;
-using OrleansBenchmarks.MapReduce;
+using Benchmarks.MapReduce;
+using Benchmarks.Serialization;
 
-namespace OrleansBenchmarks
+namespace Benchmarks
 {
-    using OrleansBenchmarks.Serialization;
-
     class Program
     {
         private static readonly Dictionary<string, Action> _benchmarks = new Dictionary<string, Action>

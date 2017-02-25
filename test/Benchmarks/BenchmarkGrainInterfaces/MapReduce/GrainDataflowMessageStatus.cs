@@ -1,4 +1,4 @@
-﻿namespace OrleansGrainInterfaces.MapReduce
+﻿namespace BenchmarkGrainInterfaces.MapReduce
 {
     public enum GrainDataflowMessageStatus
     {

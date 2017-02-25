@@ -3,10 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using BenchmarkGrainInterfaces.MapReduce;
 using Orleans;
-using OrleansGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarkGrains.MapReduce
+namespace BenchmarkGrains.MapReduce
 {
     public class TransformGrain<TInput, TOutput> : DataflowGrain, ITransformGrain<TInput, TOutput>
     {
@@ -27,7 +27,7 @@ namespace OrleansBenchmarkGrains.MapReduce
         public Task Initialize(ITransformProcessor<TInput, TOutput> processor)
         {
             if (processor == null) throw new ArgumentNullException(nameof(processor));
-            _processor = processor;
+            this._processor = processor;
             return TaskDone.Done;
         }
 
@@ -38,7 +38,7 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         public Task LinkTo(ITargetGrain<TOutput> t)
         {
-            _target = t;
+            this._target = t;
             return TaskDone.Done;
         }
 
@@ -49,7 +49,7 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         public Task SendAsync(TInput t)
         {
-            _input.Enqueue(t);
+            this._input.Enqueue(t);
             NotifyOfPendingWork();
             return TaskDone.Done;
         }
@@ -61,25 +61,25 @@ namespace OrleansBenchmarkGrains.MapReduce
 
         private void NotifyOfPendingWork()
         {
-            if (_processingStarted) return;
+            if (this._processingStarted) return;
 
             var orleansTs = TaskScheduler.Current;
             if (ProcessOnThreadPool)
             {
                 Task.Run(async () =>
                 {
-                    while (!_proccessingStopped)
+                    while (!this._proccessingStopped)
                     {
                         TInput itemToProcess;
-                        if (!_input.TryDequeue(out itemToProcess))
+                        if (!this._input.TryDequeue(out itemToProcess))
                         {
                             await Task.Delay(7);
                             continue;
                         }
 
-                        var processed = _processor.Process(itemToProcess);
+                        var processed = this._processor.Process(itemToProcess);
                         await Task.Factory.StartNew(
-                            async () => await _target.SendAsync(processed), CancellationToken.None, TaskCreationOptions.None, orleansTs);
+                            async () => await this._target.SendAsync(processed), CancellationToken.None, TaskCreationOptions.None, orleansTs);
                     }
                 });
             }
@@ -88,13 +88,13 @@ namespace OrleansBenchmarkGrains.MapReduce
                 throw new NotImplementedException();
             }
 
-            _processingStarted = true;
+            this._processingStarted = true;
         }
 
         public override Task OnDeactivateAsync()
         {
-            _proccessingStopped = true;
-            _processingStarted = false;
+            this._proccessingStopped = true;
+            this._processingStarted = false;
             return base.OnDeactivateAsync();
         }
 

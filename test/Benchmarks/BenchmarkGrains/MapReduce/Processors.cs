@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using OrleansGrainInterfaces.MapReduce;
+using BenchmarkGrainInterfaces.MapReduce;
 
-namespace OrleansBenchmarkGrains.MapReduce
+namespace BenchmarkGrains.MapReduce
 {
     [Serializable]
     public class MapProcessor : ITransformProcessor<string, List<string>>
