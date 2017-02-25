@@ -41,13 +41,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\NonSiloTests\**\*.cs" Exclude="..\..\..\test\NonSiloTests\obj\**\*.cs;..\..\..\test\NonSiloTests\bin\**\*.cs;..\..\..\test\NonSiloTests\Properties\*.cs;..\..\..\test\NonSiloTests\AssemblyLoaderTests.cs" />
+    <Compile Include="..\..\..\test\NonSilo.Tests\**\*.cs" Exclude="..\..\..\test\NonSilo.Tests\obj\**\*.cs;..\..\..\test\NonSilo.Tests\bin\**\*.cs;..\..\..\test\NonSilo.Tests\Properties\*.cs;..\..\..\test\NonSilo.Tests\AssemblyLoaderTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="..\..\..\test\NonSiloTests\Orleans.NonSiloTests.xunit.runner.json">
-      <Link>Orleans.NonSiloTests.xunit.runner.json</Link>
+    <None Include="..\..\..\test\NonSilo.Tests\NonSilo.Tests.xunit.runner.json">
+      <Link>NonSilo.Tests.xunit.runner.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -57,111 +57,111 @@
       <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\ClientConfig_NewAzure.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\ClientConfig_NewAzure.xml">
       <Link>ClientConfig_NewAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_AdditionalAssemblies.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_AdditionalAssemblies.xml">
       <Link>Config_AdditionalAssemblies.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_Azure_Default.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_Azure_Default.xml">
       <Link>Config_Azure_Default.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_BootstrapProviders.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_BootstrapProviders.xml">
       <Link>Config_BootstrapProviders.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_Different_Membership_Reminders.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_Different_Membership_Reminders.xml">
       <Link>Config_Different_Membership_Reminders.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_LogConsumers-ClientConfiguration.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_LogConsumers-ClientConfiguration.xml">
       <Link>Config_LogConsumers-ClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_LogConsumers-OrleansConfiguration.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_LogConsumers-OrleansConfiguration.xml">
       <Link>Config_LogConsumers-OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_NewAzure.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_NewAzure.xml">
       <Link>Config_NewAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_NonTimestampedLogFileNames.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_NonTimestampedLogFileNames.xml">
       <Link>Config_NonTimestampedLogFileNames.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_OldAzure.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_OldAzure.xml">
       <Link>Config_OldAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_StorageProvider_Azure1.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_StorageProvider_Azure1.xml">
       <Link>Config_StorageProvider_Azure1.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_StorageProvider_Azure2.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_StorageProvider_Azure2.xml">
       <Link>Config_StorageProvider_Azure2.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_StorageProvider_Memory2.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_StorageProvider_Memory2.xml">
       <Link>Config_StorageProvider_Memory2.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_StorageProvider_SomeConfig.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_StorageProvider_SomeConfig.xml">
       <Link>Config_StorageProvider_SomeConfig.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_TestSiloConfig.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_TestSiloConfig.xml">
       <Link>Config_TestSiloConfig.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-        <Content Include="..\..\..\test\NonSiloTests\Config_TableGrain.xml">
+        <Content Include="..\..\..\test\NonSilo.Tests\Config_TableGrain.xml">
       <Link>Config_TableGrain.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\Config_Custom_Membership_No_Reminders.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\Config_Custom_Membership_No_Reminders.xml">
       <Link>Config_Custom_Membership_No_Reminders.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DevTestClientConfiguration.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\DevTestClientConfiguration.xml">
       <Link>DevTestClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DevTestServerConfiguration.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\DevTestServerConfiguration.xml">
       <Link>DevTestServerConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
+    <Content Include="..\..\..\test\NonSilo.Tests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

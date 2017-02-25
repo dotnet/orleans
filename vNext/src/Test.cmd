@@ -12,8 +12,8 @@ pushd "%CMDHOME%"
 
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-REM set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\Orleans.NonSiloTests.dll,%OutDir%\Tester.AzureUtils.dll
-set TESTS=%OutDir%\net462\Tester.dll,%OutDir%\net462\Orleans.NonSiloTests.dll,%OutDir%\net462\Tester.AzureUtils.dll,%OutDir%\net462\TesterInternal.dll,%OutDir%\net462\Tester.SQLUtils.dll,%OutDir%\net462\DefaultCluster.Tests.dll,%OutDir%\net462\Consul.Tests.dll,%OutDir%\net462\BondUtils.Tests.dll,%OutDir%\net462\AWSUtils.Tests.dll,%OutDir%\net462\GoogleUtils.Tests.dll,%OutDir%\net462\ServiceBus.Tests.dll
+REM set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\NonSilo.Tests.dll,%OutDir%\Tester.AzureUtils.dll
+set TESTS=%OutDir%\net462\Tester.dll,%OutDir%\net462\NonSilo.Tests.dll,%OutDir%\net462\Tester.AzureUtils.dll,%OutDir%\net462\TesterInternal.dll,%OutDir%\net462\Tester.SQLUtils.dll,%OutDir%\net462\DefaultCluster.Tests.dll,%OutDir%\net462\Consul.Tests.dll,%OutDir%\net462\BondUtils.Tests.dll,%OutDir%\net462\AWSUtils.Tests.dll,%OutDir%\net462\GoogleUtils.Tests.dll,%OutDir%\net462\ServiceBus.Tests.dll
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=SlowBVT'
 
 @Echo Test assemblies = %TESTS%

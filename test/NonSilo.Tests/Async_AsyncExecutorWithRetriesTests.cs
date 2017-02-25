@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 // ReSharper disable ConvertToLambdaExpression
 
-namespace UnitTests
+namespace NonSilo.Tests
 {
     /// <summary>
     /// Summary description for UnitTest1
@@ -30,7 +30,7 @@ namespace UnitTests
             {
                 // ReSharper disable AccessToModifiedClosure
                 Assert.Equal(counter, funcCounter);
-                output.WriteLine("Running for {0} time.", counter);
+                this.output.WriteLine("Running for {0} time.", counter);
                 counter++;
                 if (counter == 5)
                     return Task.FromResult(28);
@@ -45,13 +45,13 @@ namespace UnitTests
 
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 10, 10, null, errorFilter);
             int value = promise.Result;
-            output.WriteLine("Value is {0}.", value);
+            this.output.WriteLine("Value is {0}.", value);
             counter = 0;
             try
             {
                 promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 3, 3, null, errorFilter);
                 value = promise.Result;
-                output.WriteLine("Value is {0}.", value);
+                this.output.WriteLine("Value is {0}.", value);
             }
             catch (Exception)
             {
@@ -69,7 +69,7 @@ namespace UnitTests
             {
 // ReSharper disable AccessToModifiedClosure
                 Assert.Equal(counter, funcCounter);
-                output.WriteLine("Running for {0} time.", counter);
+                this.output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
 // ReSharper restore AccessToModifiedClosure
             });
@@ -79,7 +79,7 @@ namespace UnitTests
             int expectedRetries = countLimit;
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Constants.INFINITE_TIMESPAN);
             int value = promise.Result;
-            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
+            this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
             Assert.Equal(counter, value); // "Counter == Returned value"
 
@@ -88,7 +88,7 @@ namespace UnitTests
             expectedRetries = maxRetries;
             promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null);
             value = promise.Result;
-            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
+            this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
             Assert.Equal(counter, value); // "Counter == Returned value"
         }
@@ -102,7 +102,7 @@ namespace UnitTests
             {
                 lastIteration = funcCounter;
                 Assert.Equal(counter, funcCounter);
-                output.WriteLine("Running for {0} time.", counter);
+                this.output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
             });
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
@@ -121,7 +121,7 @@ namespace UnitTests
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
 
             int value = promise.Result;
-            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
+            this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
             Assert.Equal(counter, value);
             Assert.Equal(counter, 1);
         }
@@ -135,13 +135,13 @@ namespace UnitTests
             {
                 lastIteration = funcCounter;
                 Assert.Equal(counter, funcCounter);
-                output.WriteLine("Running FUNC for {0} time.", counter);
+                this.output.WriteLine("Running FUNC for {0} time.", counter);
                 ++counter;
                 throw new ArgumentException(counter.ToString(CultureInfo.InvariantCulture));
             });
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
-                output.WriteLine("Running ERROR FILTER for {0} time.", i);
+                this.output.WriteLine("Running ERROR FILTER for {0} time.", i);
                 Assert.Equal(lastIteration, i);
                 if (i==0 || i==1)
                     return true;
@@ -167,7 +167,7 @@ namespace UnitTests
             {
                 Exception baseExc = exc.GetBaseException();
                 Assert.Equal(baseExc.GetType(), typeof(ArgumentException));
-                output.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
+                this.output.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
                 Assert.Equal(counter, 3); // "Counter == Returned value"
             }
         }

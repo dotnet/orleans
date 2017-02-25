@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTestingHost", "Orlea
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{A03DFE72-F1CA-4E79-8A84-EDF5D277EB1A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NonSilo.Tests", "..\test\NonSilo.Tests\NonSilo.Tests.csproj", "{A03DFE72-F1CA-4E79-8A84-EDF5D277EB1A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "..\test\TestExtensions\TestExtensions.csproj", "{AFD242B4-EDA9-42CD-BA39-E410B98ADD2A}"
 EndProject

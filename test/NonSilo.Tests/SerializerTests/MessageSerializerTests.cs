@@ -10,7 +10,7 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace NonSiloTests.UnitTests.SerializerTests
+namespace NonSilo.Tests.UnitTests.SerializerTests
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class MessageSerializerTests

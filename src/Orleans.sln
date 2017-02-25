@@ -207,7 +207,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmarks", "..\test\Bench
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestServiceFabric", "..\test\TestServiceFabric\TestServiceFabric.csproj", "{B93B3853-FD54-4615-891A-9AFA3D9D32A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NonSilo.Tests", "..\test\NonSilo.Tests\NonSilo.Tests.csproj", "{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterAzureUtils", "..\test\TesterAzureUtils\TesterAzureUtils.csproj", "{DEE80624-685B-4C84-99EC-C0A637B6FB34}"
 EndProject

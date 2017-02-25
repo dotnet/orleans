@@ -7,8 +7,8 @@
     <ProjectGuid>{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Orleans.NonSiloTests</RootNamespace>
-    <AssemblyName>Orleans.NonSiloTests</AssemblyName>
+    <RootNamespace>NonSilo.Tests</RootNamespace>
+    <AssemblyName>NonSilo.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -226,7 +226,7 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="project.json" />
-    <None Include="Orleans.NonSiloTests.xunit.runner.json">
+    <None Include="NonSilo.Tests.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

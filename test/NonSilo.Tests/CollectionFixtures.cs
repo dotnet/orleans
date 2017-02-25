@@ -2,7 +2,7 @@
 using UnitTests.Serialization;
 using Xunit;
 
-namespace Orleans.NonSiloTests
+namespace NonSilo.Tests
 {
     // Assembly collections must be defined once in each assembly
     [CollectionDefinition("DefaultCluster")]

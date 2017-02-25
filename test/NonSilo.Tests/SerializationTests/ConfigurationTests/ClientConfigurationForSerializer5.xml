@@ -9,7 +9,7 @@
   <Messaging ResponseTimeout="30s" ClientSenderBuckets="8192" MaxResendCount="0">
     <SerializationProviders>
       <Provider type="Tester.Serialization.FakeSerializer, Tester"/>
-      <Provider type="UnitTests.Serialization.FakeSerializer2, Orleans.NonSiloTests"/>
+      <Provider type="UnitTests.Serialization.FakeSerializer2, NonSilo.Tests"/>
     </SerializationProviders>
   </Messaging>
 </ClientConfiguration>
