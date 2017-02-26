@@ -1,9 +1,12 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Storage;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -13,13 +16,14 @@ namespace DefaultCluster.Tests.General
     /// <summary>
     /// Summary description for GrainReferenceTest
     /// </summary>
+    [TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
         public GrainReferenceTest(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
             ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
@@ -45,7 +49,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(str, tcs.Task.Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact]
         public void GrainReference_Pass_this()
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -54,7 +58,7 @@ namespace DefaultCluster.Tests.General
             g1.PassThis(g2).Wait();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact]
         public void GrainReference_Pass_this_Nested()
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -63,7 +67,7 @@ namespace DefaultCluster.Tests.General
             g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact]
         public async Task GrainReference_Pass_Null()
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -76,32 +80,81 @@ namespace DefaultCluster.Tests.General
             Assert.Null(await g2.GetNext());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Serialization")]
         public void GrainReference_DotNet_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Serialization")]
         public void GrainReference_DotNet_Serialization_Unresolved()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, true);
+        }
+
+        [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
+        public void GrainReference_Interning()
+        {
+            var grainId = GrainId.GetGrainIdForTesting(new Guid());
+            var g1 = GrainReference.FromGrainId(grainId, null);
+            var g2 = GrainReference.FromGrainId(grainId, null);
+            Assert.Equal(g1, g2); // Should be equal GrainReferences
+            Assert.Same(g1, g2); // Should be same / interned GrainReference object
+
+            // Round-trip through Serializer
+            var g3 = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(g1);
+            Assert.Equal(g3, g1);
+            Assert.Equal(g3, g2);
+            Assert.Same(g3, g1);
+            Assert.Same(g3, g2);
+        }
+
+        [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
+        public void GrainReference_Interning_Sys_DirectoryGrain()
+        {
+            var g1 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
+            var g2 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
+            Assert.Equal(g1, g2); // Should be equal GrainReferences.
+            Assert.Same(g1, g2); // Should be same / interned GrainReference object
+
+            // Round-trip through Serializer
+            var g3 = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(g1);
+            Assert.Equal(g3, g1);
+            Assert.Equal(g3, g2);
+            Assert.Same(g3, g1);
+            Assert.Same(g3, g2);
+        }
+
+        [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
+        public void GrainReference_Interning_Sys_StoreGrain()
+        {
+            var g1 = (GrainReference)this.GrainFactory.GetGrain<IMemoryStorageGrain>(0);
+            var g2 = (GrainReference)this.GrainFactory.GetGrain<IMemoryStorageGrain>(0);
+            Assert.Equal(g1, g2); // Should be equal GrainReferences.
+            Assert.Same(g1, g2); // Should be same / interned GrainReference object
+
+            // Round-trip through Serializer
+            var g3 = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(g1);
+            Assert.Equal(g3, g1);
+            Assert.Equal(g3, g2);
+            Assert.Same(g3, g1);
+            Assert.Same(g3, g2);
         }
 
         private void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize, bool useJson)
