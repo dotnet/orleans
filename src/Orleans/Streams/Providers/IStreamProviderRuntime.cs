@@ -72,6 +72,7 @@ namespace Orleans.Streams
         ExplicitGrainBasedAndImplicit,
         ExplicitGrainBasedOnly,
         ImplicitOnly,
+        MemoryBaseOnly
     }
 
     [Serializable]

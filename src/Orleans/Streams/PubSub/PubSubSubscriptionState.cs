@@ -30,12 +30,13 @@ namespace Orleans.Streams
 
         // This property does not need to be Json serialized, since we already have producerReference.
         [JsonIgnore]
-        public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
+        public IStreamConsumerExtension Consumer { get { return consumerExtension; } }
         [JsonIgnore]
         public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
         [JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
+        private IStreamConsumerExtension consumerExtension;
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
         public PubSubSubscriptionState(
@@ -45,6 +46,7 @@ namespace Orleans.Streams
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
+            consumerExtension = streamConsumer;
             consumerReference = streamConsumer as GrainReference;
             state = SubscriptionStates.Active;
         }

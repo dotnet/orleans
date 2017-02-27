@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace Orleans.Providers
 {
@@ -170,6 +171,8 @@ namespace Orleans.Providers
                     return grainBasedPubSub;
                 case StreamPubSubType.ImplicitOnly:
                     return implictPubSub;
+                case StreamPubSubType.MemoryBaseOnly:
+                    throw new OrleansException("MemoryBasedPubsub is not available in client side");
                 default:
                     return null;
             }

@@ -80,6 +80,7 @@
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="SerializerTests\CustomSerializerTests.cs" />
     <Compile Include="SerializerTests\MessageSerializerTests.cs" />
+    <Compile Include="Streaming\MemoryPubSubTests.cs" />
     <Compile Include="TestInternalHelper.cs" />
   </ItemGroup>
   <ItemGroup>

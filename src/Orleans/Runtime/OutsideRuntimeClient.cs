@@ -14,6 +14,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Streams.PubSub;
 
 namespace Orleans
 {
