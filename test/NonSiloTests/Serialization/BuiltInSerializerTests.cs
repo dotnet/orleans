@@ -369,31 +369,6 @@ namespace UnitTests.Serialization
             Enemy4,
         }
 
-
-        /*[Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        public void Serialize_Enums()
-        {
-            var result = OrleansSerializationLoop(environment.SerializationManager, IntEnum.Value2);
-            Assert.IsAssignableFrom<>(result, typeof(IntEnum), "Serialization round-trip resulted in incorrect type, " + result.GetType().Name + ", for int enum");
-            Assert.Equal(IntEnum.Value2, (IntEnum)result, "Serialization round-trip resulted in incorrect value for int enum");
-
-            var result2 = OrleansSerializationLoop(environment.SerializationManager, UShortEnum.Value3);
-            Assert.IsAssignableFrom<>(result2, typeof(UShortEnum), "Serialization round-trip resulted in incorrect type, " + result2.GetType().Name + ", for ushort enum");
-            Assert.Equal(UShortEnum.Value3, (UShortEnum)result2, "Serialization round-trip resulted in incorrect value for ushort enum");
-
-            var test = new ClassWithEnumTestData { EnumValue = TestEnum.Third, Enemy = CampaignEnemyTestType.Enemy3 };
-            var result3 = OrleansSerializationLoop(environment.SerializationManager, test);
-            Assert.IsAssignableFrom<>(result3, typeof(ClassWithEnumTestData), "Serialization round-trip resulted in incorrect type, " + result3.GetType().Name +
-                ", for enum-containing class");
-            var r3 = (ClassWithEnumTestData) result3;
-            Assert.Equal(TestEnum.Third, r3.EnumValue, "Serialization round-trip resulted in incorrect value for enum-containing class (Third)");
-            Assert.Equal(CampaignEnemyTestType.Enemy3, r3.Enemy, "Serialization round-trip resulted in incorrect value for enum-containing class (Enemy)");
-
-            var result4 = OrleansSerializationLoop(environment.SerializationManager, CampaignEnemyType.Enemy3);
-            Assert.IsAssignableFrom<>(result4, typeof(CampaignEnemyType), "Serialization round-trip resulted in incorrect type, " + result4.GetType().Name + ", for sbyte enum");
-            Assert.Equal(CampaignEnemyType.Enemy3, (CampaignEnemyType)result4, "Serialization round-trip resulted in incorrect value for sbyte enum");
-        }*/
-
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_SortedDictionaryWithComparer(SerializerToUse serializerToUse)
@@ -1125,6 +1100,31 @@ namespace UnitTests.Serialization
             deserialized = (CircularTest1)OrleansSerializationLoop(environment.SerializationManager, c1, true);
             Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
             Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+        }
+        
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+        [InlineData(SerializerToUse.NoFallback)]
+        public void Serialize_Enums(SerializerToUse serializerToUse)
+        {
+            var environment = InitializeSerializer(serializerToUse);
+            var result = OrleansSerializationLoop(environment.SerializationManager, IntEnum.Value2);
+            var typedResult = Assert.IsType<IntEnum>(result);
+            Assert.Equal(IntEnum.Value2, typedResult);
+
+            var result2 = OrleansSerializationLoop(environment.SerializationManager, UShortEnum.Value3);
+            var typedResult2 = Assert.IsType<UShortEnum>(result2);
+            Assert.Equal(UShortEnum.Value3, typedResult2);
+
+            var test = new ClassWithEnumTestData { EnumValue = TestEnum.Third, Enemy = CampaignEnemyTestType.Enemy3 };
+            var result3 = OrleansSerializationLoop(environment.SerializationManager, test);
+            var typedResult3 = Assert.IsType<ClassWithEnumTestData>(result3);
+
+            Assert.Equal(TestEnum.Third, typedResult3.EnumValue);
+            Assert.Equal(CampaignEnemyTestType.Enemy3, typedResult3.Enemy);
+
+            var result4 = OrleansSerializationLoop(environment.SerializationManager, CampaignEnemyType.Enemy3);
+            var typedResult4 = Assert.IsType<CampaignEnemyType>(result4);
+            Assert.Equal(CampaignEnemyType.Enemy3, typedResult4);
         }
 
         public class SupportsNothingSerializer : IExternalSerializer
