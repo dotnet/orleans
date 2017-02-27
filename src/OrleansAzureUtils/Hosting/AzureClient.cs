@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using Orleans.Runtime.Configuration;
-
+#if !NETSTANDARD
+using Microsoft.Azure;
+#endif
 
 namespace Orleans.Runtime.Host
 {
@@ -148,7 +150,11 @@ namespace Orleans.Runtime.Host
         {
             return GrainClient.TestOnlyNoConnect
                 ? "FakeConnectionString"
+#if !NETSTANDARD
+                : CloudConfigurationManager.GetSetting(AzureConstants.DataConnectionConfigurationSettingName, false, false);
+#else
                 : serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+#endif
         }
 
         private static void InitializeImpl_FromConfig(ClientConfiguration config)

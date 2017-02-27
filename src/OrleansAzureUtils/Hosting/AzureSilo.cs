@@ -6,6 +6,9 @@ using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
+#if !NETSTANDARD
+using Microsoft.Azure;
+#endif
 
 namespace Orleans.Runtime.Host
 {
@@ -79,7 +82,11 @@ namespace Orleans.Runtime.Host
             {
                 string deploymentId = config.Globals.DeploymentId ?? serviceRuntimeWrapper.DeploymentId;
                 string connectionString = config.Globals.DataConnectionString ??
-                                          serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+#if !NETSTANDARD
+                                            CloudConfigurationManager.GetSetting(DataConnectionConfigurationSettingName, false, false);
+#else
+                                            serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+#endif
 
                 try
                 {
@@ -114,21 +121,13 @@ namespace Orleans.Runtime.Host
 
             config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             config.Globals.DeploymentId = serviceRuntimeWrapper.DeploymentId;
-            try
-            {
-                config.Globals.DataConnectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
-            }
-            catch (Exception exc)
-            {
-                if (exc.GetType().Name.Contains("RoleEnvironmentException"))
-                {
-                    config.Globals.DataConnectionString = null;
-                }
-                else
-                {
-                    throw;
-                }
-            }
+
+#if !NETSTANDARD
+            config.Globals.DataConnectionString = CloudConfigurationManager.GetSetting(AzureConstants.DataConnectionConfigurationSettingName, false, false);
+#else
+            config.Globals.DataConnectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+#endif
+
             
             return config;
         }
@@ -226,7 +225,13 @@ namespace Orleans.Runtime.Host
             };
 
 			if (connectionString == null)
-				connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+            {
+#if !NETSTANDARD
+            connectionString = CloudConfigurationManager.GetSetting(DataConnectionConfigurationSettingName, false, false);
+#else
+            connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+#endif
+            }
 
             try
             {

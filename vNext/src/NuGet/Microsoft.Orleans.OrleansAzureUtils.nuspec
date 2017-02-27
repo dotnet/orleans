@@ -20,8 +20,8 @@
     <dependencies>
       <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
-        <dependency id="WindowsAzure.Storage" version="7.2.1" />
         <dependency id="System.Net.Requests" version="4.3.0" />
+        <dependency id="WindowsAzure.Storage" version="7.2.1" />
       </group>
     </dependencies>
   </metadata>
