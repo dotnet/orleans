@@ -171,6 +171,23 @@ namespace Orleans.Runtime
             cache.Clear();
         }
 
+        /// <summary>
+        /// Connect the socket to the target endpoint
+        /// </summary>
+        /// <param name="s">The socket</param>
+        /// <param name="endPoint">The target endpoint</param>
+        /// <param name="connectionTimeout">The timeout value to use when opening the connection</param>
+        /// <exception cref="TimeoutException">When the connection could not be established in time</exception>
+        internal static void Connect(Socket s, IPEndPoint endPoint, TimeSpan connectionTimeout)
+        {
+            var ar = s.BeginConnect(endPoint, null, null);
+
+            if (!ar.AsyncWaitHandle.WaitOne(connectionTimeout))
+                throw new TimeoutException($"Connection to {endPoint} could not be established in {connectionTimeout}");
+
+            s.EndConnect(ar);
+        }
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal static void CloseSocket(Socket s)
         {
