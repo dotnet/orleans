@@ -9,11 +9,13 @@ namespace Orleans.Runtime
     internal class SocketManager
     {
         private readonly LRU<IPEndPoint, Socket> cache;
+        private TimeSpan connectionTimeout;
 
         private const int MAX_SOCKETS = 200;
 
         internal SocketManager(IMessagingConfiguration config)
         {
+            connectionTimeout = config.OpenConnectionTimeout;
             cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
             cache.RaiseFlushEvent += FlushHandler;
         }
@@ -60,7 +62,7 @@ namespace Orleans.Runtime
             var s = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
             {
-                s.Connect(target);
+                Connect(s, target, connectionTimeout);
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
