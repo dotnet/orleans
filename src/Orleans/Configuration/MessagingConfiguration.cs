@@ -13,6 +13,10 @@ namespace Orleans.Runtime.Configuration
     public interface IMessagingConfiguration
     {
         /// <summary>
+        /// The OpenConnectionTimeout attribute specifies the timeout before a connection open is assumed to have failed
+        /// </summary>
+        TimeSpan OpenConnectionTimeout { get; set; }
+        /// <summary>
         /// The ResponseTimeout attribute specifies the default timeout before a request is assumed to have failed.
         /// </summary>
         TimeSpan ResponseTimeout { get; set; }
@@ -92,6 +96,7 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class MessagingConfiguration : IMessagingConfiguration
     {
+        public TimeSpan OpenConnectionTimeout { get; set; }
         public TimeSpan ResponseTimeout { get; set; }
         public int MaxResendCount { get; set; }
         public bool ResendOnTimeout { get; set; }
@@ -138,6 +143,7 @@ namespace Orleans.Runtime.Configuration
         {
             isSiloConfig = isSilo;
 
+            OpenConnectionTimeout = Constants.DEFAULT_OPENCONNECTION_TIMEOUT;
             ResponseTimeout = Constants.DEFAULT_RESPONSE_TIMEOUT;
             MaxResendCount = 0;
             ResendOnTimeout = DEFAULT_RESEND_ON_TIMEOUT;
