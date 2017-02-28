@@ -192,11 +192,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.C
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Benchmarks", "Benchmarks", "{24596567-5805-4493-B4F0-46BA4811C0AA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansBenchmarkGrainInterfaces", "test\Benchmarks\OrleansBenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.2017.csproj", "{936397DF-8D11-4244-A493-767D31F9D727}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BenchmarkGrainInterfaces", "test\Benchmarks\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.2017.csproj", "{936397DF-8D11-4244-A493-767D31F9D727}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansBenchmarkGrains", "test\Benchmarks\OrleansBenchmarkGrains\OrleansBenchmarkGrains.2017.csproj", "{071CB148-EAA3-4F85-A1F7-52D1B7FDAF82}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BenchmarkGrains", "test\Benchmarks\BenchmarkGrains\BenchmarkGrains.2017.csproj", "{071CB148-EAA3-4F85-A1F7-52D1B7FDAF82}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansBenchmarks", "test\Benchmarks\OrleansBenchmarks\OrleansBenchmarks.2017.csproj", "{29A8C5E0-8129-40B9-B57B-5B9A8C6D004E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmarks", "test\Benchmarks\Benchmarks\Benchmarks.2017.csproj", "{29A8C5E0-8129-40B9-B57B-5B9A8C6D004E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestServiceFabric", "test\TestServiceFabric\TestServiceFabric.2017.csproj", "{B93B3853-FD54-4615-891A-9AFA3D9D32A2}"
 EndProject

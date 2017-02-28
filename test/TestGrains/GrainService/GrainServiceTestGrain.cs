@@ -9,6 +9,11 @@ namespace UnitTests.Grains
     {
         private readonly ICustomGrainServiceClient customGrainServiceClient;
 
+        public GrainServiceTestGrain(ICustomGrainServiceClient customGrainServiceClient)
+        {
+            this.customGrainServiceClient = customGrainServiceClient;
+        }
+
         public Task<string> GetHelloWorldUsingCustomService()
         {
             return this.customGrainServiceClient.GetHelloWorldUsingCustomService();
@@ -17,11 +22,6 @@ namespace UnitTests.Grains
         public Task<string> GetServiceConfigProperty(string propertyName)
         {
             return this.customGrainServiceClient.GetServiceConfigProperty(propertyName);
-        }
-
-        public GrainServiceTestGrain(ICustomGrainServiceClient customGrainServiceClient)
-        {
-            this.customGrainServiceClient = customGrainServiceClient;
         }
 
         public Task<bool> CallHasStarted()

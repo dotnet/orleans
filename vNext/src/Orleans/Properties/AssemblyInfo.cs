@@ -17,7 +17,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansCodeGenerator")]
 [assembly: InternalsVisibleTo("OrleansRuntime")]
 [assembly: InternalsVisibleTo("OrleansTestingHost")]
-[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]

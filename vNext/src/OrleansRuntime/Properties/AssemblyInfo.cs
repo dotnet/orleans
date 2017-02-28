@@ -14,7 +14,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 [assembly: InternalsVisibleTo("OrleansTestingHost")]
-[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
