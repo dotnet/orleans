@@ -4,12 +4,13 @@ using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable
+    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
     {
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;
@@ -21,6 +22,9 @@ namespace Orleans.Streams
         private IInternalAsyncObservable<T>                     consumerInterface;
         [NonSerialized]
         private readonly object                                 initLock; // need the lock since the same code runs in the provider on the client and in the silo.
+
+        [NonSerialized]
+        private IRuntimeClient                                  runtimeClient;
         
         internal StreamId StreamId                              { get { return streamId; } }
 
@@ -35,12 +39,14 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable)
+        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             if (null == streamId)
-                throw new ArgumentNullException("streamId");
+                throw new ArgumentNullException(nameof(streamId));
             if (null == provider)
-                throw new ArgumentNullException("provider");
+                throw new ArgumentNullException(nameof(provider));
+            if (null == runtimeClient)
+                throw new ArgumentNullException(nameof(runtimeClient));
 
             this.streamId = streamId;
             this.provider = provider;
@@ -48,6 +54,7 @@ namespace Orleans.Streams
             consumerInterface = null;
             initLock = new object();
             this.isRewindable = isRewindable;
+            this.runtimeClient = runtimeClient;
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
@@ -153,7 +160,7 @@ namespace Orleans.Streams
 
         private IInternalStreamProvider GetStreamProvider()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
+            return this.runtimeClient.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         #region IComparable<IAsyncStream<T>> Members
@@ -208,8 +215,28 @@ namespace Orleans.Streams
             streamId = (StreamId)info.GetValue("StreamId", typeof(StreamId));
             isRewindable = info.GetBoolean("IsRewindable");
             initLock = new object();
+#if !NETSTANDARD_TODO
+            this.OnDeserialized(context);
+#endif
         }
 
+#if !NETSTANDARD_TODO
+        /// <summary>
+        /// Called by BinaryFormatter after deserialization has completed.
+        /// </summary>
+        /// <param name="context">The context.</param>
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
+        {
+            var serializerContext = context.Context as ISerializerContext;
+            ((IOnDeserialized)this).OnDeserialized(serializerContext);
+        }
+#endif
+
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        {
+            this.runtimeClient = context?.AdditionalContext as IRuntimeClient;
+        }
         #endregion
     }
 }
