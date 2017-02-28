@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -182,12 +183,17 @@ namespace Orleans.Runtime
         /// <exception cref="TimeoutException">When the connection could not be established in time</exception>
         internal static void Connect(Socket s, IPEndPoint endPoint, TimeSpan connectionTimeout)
         {
-            var ar = s.BeginConnect(endPoint, null, null);
+            var signal = new AutoResetEvent(false);
+            var e = new SocketAsyncEventArgs();
+            e.RemoteEndPoint = endPoint;
+            e.Completed += (sender, eventArgs) => signal.Set();
+            s.ConnectAsync(e);
 
-            if (!ar.AsyncWaitHandle.WaitOne(connectionTimeout))
+            if (!signal.WaitOne(connectionTimeout))
                 throw new TimeoutException($"Connection to {endPoint} could not be established in {connectionTimeout}");
 
-            s.EndConnect(ar);
+            if (e.SocketError != SocketError.Success || !s.Connected)
+                throw new OrleansException($"Could not connect to {endPoint}: {e.SocketError}");
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
