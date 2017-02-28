@@ -52,7 +52,9 @@ namespace Orleans.Runtime
         public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
 
         internal const long ReminderTableGrainId = 12345;
-         
+
+        public static TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
+
         /// <summary>
         /// The default timeout before a request is assumed to have failed.
         /// </summary>

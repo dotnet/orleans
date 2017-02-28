@@ -159,16 +159,16 @@ namespace Orleans.Messaging
                         }
                         lastConnect = DateTime.UtcNow;
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                        Socket.Connect(Silo.Endpoint);
+                        SocketManager.Connect(Socket, Silo.Endpoint, MsgCenter.MessagingConfiguration.OpenConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
                         MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
                         return;
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        Log.Warn(ErrorCode.ProxyClient_CannotConnect, "Unable to connect to gateway at address {0} on trial {1}.", Address, i);
+                        Log.Warn(ErrorCode.ProxyClient_CannotConnect, $"Unable to connect to gateway at address {Address} on trial {i} (Exception: {ex.Message})");
                         MarkAsDisconnected(Socket);
                     }
                 }
