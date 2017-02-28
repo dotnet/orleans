@@ -149,6 +149,13 @@ namespace Orleans.Messaging
                         }
                         if (lastConnect != new DateTime())
                         {
+                            // We already tried at least once in the past to connect to this GW.
+                            // If we are no longer connected to this GW and it is no longer in the list returned
+                            // from the GatewayProvider, consider directly this connection dead.
+                            if (!MsgCenter.GatewayManager.GetLiveGateways().Contains(Address))
+                                break;
+
+                            // Wait at least ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY before reconnection tries
                             var millisecondsSinceLastAttempt = DateTime.UtcNow - lastConnect;
                             if (millisecondsSinceLastAttempt < ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY)
                             {
