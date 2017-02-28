@@ -134,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
             return Instances.Count == 0;
         }
 
-        public bool Merge(GrainId grain, IGrainInfo other, IInternalGrainFactory grainFactory)
+        public Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainId grain, IGrainInfo other)
         {
             bool modified = false;
             foreach (var pair in other.Instances)
@@ -159,18 +159,24 @@ namespace Orleans.Runtime.GrainDirectory
                 var activationsToDrop = orderedActivations.Skip(1);
                 Instances.Clear();
                 Instances.Add(activationToKeep.Key, activationToKeep.Value);
-                var list = new List<ActivationAddress>(1);
-                foreach (var activation in activationsToDrop.Select(keyValuePair => ActivationAddress.GetAddress(keyValuePair.Value.SiloAddress, grain, keyValuePair.Key)))
+                var mapping = new Dictionary<SiloAddress, List<ActivationAddress>>();
+                foreach (var activationPair in activationsToDrop)
                 {
-                    list.Add(activation);
-                    grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, activation.Silo).
-                        DeleteActivations(list).Ignore();
+                    var activation = ActivationAddress.GetAddress(activationPair.Value.SiloAddress, grain, activationPair.Key);
 
-                    list.Clear();
+                    List<ActivationAddress> activationsToRemoveOnSilo;
+                    if (!mapping.TryGetValue(activation.Silo, out activationsToRemoveOnSilo))
+                    {
+                        activationsToRemoveOnSilo = mapping[activation.Silo] = new List<ActivationAddress>(1);
+                    }
+
+                    activationsToRemoveOnSilo.Add(activation);
                 }
-                return true;
+
+                return mapping;
             }
-            return false;
+
+            return null;
         }
 
         public void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo)
@@ -492,7 +498,14 @@ namespace Orleans.Runtime.GrainDirectory
                     if (partitionData.ContainsKey(pair.Key))
                     {
                         if (log.IsVerbose) log.Verbose("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
-                        partitionData[pair.Key].Merge(pair.Key, pair.Value, grainFactory);
+                        var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
+                        if (activationsToDrop == null) continue;
+
+                        foreach (var siloActivations in activationsToDrop)
+                        {
+                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, siloActivations.Key);
+                            remoteCatalog.DeleteActivations(siloActivations.Value).Ignore();
+                        }
                     }
                     else
                     {
