@@ -136,7 +136,7 @@ namespace Orleans.Runtime
             } 
         }
 
-        private const string CLUSTER_ID_DEFAULT = "A"; // if no id is configured, we pick a nonempty default.
+        private const string CLUSTER_ID_DEFAULT = "DefaultClusterID"; // if no id is configured, we pick a nonempty default.
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => this.initializationParams.SiloAddress;
