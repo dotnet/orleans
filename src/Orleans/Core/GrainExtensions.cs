@@ -9,10 +9,12 @@ namespace Orleans
     /// </summary>
     public static class GrainExtensions
     {
-        private const string WRONG_GRAIN_ERROR_MSG = "Passing a half baked grain as an argument. It is possible that you instantiated a grain class explicitely, as a regular object and not via Orleans runtime or via proper test mocking";
+        private const string WRONG_GRAIN_ERROR_MSG = "Passing a half baked grain as an argument. It is possible that you instantiated a grain class explicitly, as a regular object and not via Orleans runtime or via proper test mocking";
 
         internal static GrainReference AsWeaklyTypedReference(this IAddressable grain)
         {
+            ThrowIfNullGrain(grain);
+
             // When called against an instance of a grain reference class, do nothing
             var reference = grain as GrainReference;
             if (reference != null) return reference;
@@ -44,12 +46,9 @@ namespace Orleans
         /// <returns>A strongly typed <c>GrainReference</c> of grain interface type TGrainInterface.</returns>
         public static TGrainInterface AsReference<TGrainInterface>(this IAddressable grain)
         {
-            if (grain == null)
-            {
-                throw new ArgumentNullException("grain", "Cannot pass null as an argument to AsReference");
-            }
-
-            return RuntimeClient.Current.InternalGrainFactory.Cast<TGrainInterface>(grain.AsWeaklyTypedReference());
+            ThrowIfNullGrain(grain);
+            var grainReference = grain.AsWeaklyTypedReference();
+            return grainReference.RuntimeClient.InternalGrainFactory.Cast<TGrainInterface>(grainReference);
         }
 
         /// <summary>
@@ -59,7 +58,7 @@ namespace Orleans
         /// <param name="grain">The grain to cast.</param>
         public static TGrainInterface Cast<TGrainInterface>(this IAddressable grain)
         {
-            return RuntimeClient.Current.InternalGrainFactory.Cast<TGrainInterface>(grain);
+            return grain.AsReference<TGrainInterface>();
         }
 
         /// <summary>
@@ -203,6 +202,14 @@ namespace Orleans
         public static string GetPrimaryKeyString(this IGrainWithStringKey grain)
         {
             return GetGrainIdentity(grain).PrimaryKeyString;
+        }
+
+        private static void ThrowIfNullGrain(IAddressable grain)
+        {
+            if (grain == null)
+            {
+                throw new ArgumentNullException(nameof(grain));
+            }
         }
     }
 }
