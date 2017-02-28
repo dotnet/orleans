@@ -7,12 +7,15 @@ The idea is to track end-user facing changes as they occur.*
 - Several major performance improvements
 - Add streaming support for types that are serialized using IExternalSerializers
 - Replace CallContext.LogicalSetData with AsyncLocal #2200
+- Providers are now constructed using Dependency Injection. The result is that all providers must have a single public constructor with either no arguments or arguments which can all be injected. The default container is used if no container is configured. [#2721](https://github.com/dotnet/orleans/pull/2721)
 - Bug fixes:
   - Remove registration of IServiceProvider to itself #2749
 
 ### [v1.4.0]
+- Breaking changes
+  - All grain instances and providers are constructed using the configured Dependency Injection container. The result is that all grains must have a single parameterless public constructor or single constructor with arguments which can all be injected. If no container is configured, the default container will be used. [#2485](https://github.com/dotnet/orleans/pull/2485)
 - Known issues
-  - When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac. This is bein addressed for 1.4.1, but there is a simple workaround for it at [#2747](https://github.com/dotnet/orleans/issues/2747)
+  - When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac. This is being addressed for 1.4.1, but there is a simple workaround for it at [#2747](https://github.com/dotnet/orleans/issues/2747)
   - The build-time code generator required (and automatically added) a file named `Properties\orleans.codegen.cs` to the project where codegen was being ran. The new MSBuild targets no longer do that, so when upgrading a solution with a previous version of Orleans, you can safely delete this orleans.codegen.cs file from your grain projects.
 
 - Improvements
