@@ -1,11 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
+    <IsPackable Condition="'$(Bootstrap)' != 'true'">true</IsPackable>
     <PackageId>Microsoft.Orleans.Core</PackageId>
     <Title>Microsoft Orleans Core Library</Title>
-    <Description>
-      Core library of Microsoft Orleans used both on the client and server.
-    </Description>
+    <Description>Core library of Microsoft Orleans used both on the client and server.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,23 +12,16 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\Orleans\**\*.cs" Exclude="        ..\..\..\src\Orleans\obj\**\*.cs;        ..\..\..\src\Orleans\bin\**\*.cs;        ..\..\..\src\Orleans\Properties\**\*.cs;        ..\..\..\src\Orleans\Statistics\RuntimeStatisticsGroup.cs" />
     <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
       <Link>Configuration\OrleansConfiguration.xsd</Link>
       <SubType>Designer</SubType>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>false</Pack>
-    </Content>
-    <Content Include="..\Build\Version.txt">
-      <Link>Version.txt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>false</Pack>
     </Content>
@@ -66,23 +57,12 @@
 
   <PropertyGroup>
     <OrleansBootstrapSteps>
-      GenerateVersionNumber;
       LogBuildProperties;
       OrleansDllBootstrapUsingCodeGen
     </OrleansBootstrapSteps>
   </PropertyGroup>
 
   <Target Name="OrleansBootstrap" AfterTargets="BeforeCompile" DependsOnTargets="$(OrleansBootstrapSteps)" Condition="'$(Bootstrap)' != 'true'" />
-
-  <Target Name="GenerateVersionNumber" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
-    <Message Text="GenerateVersionNumber" />
-    <PropertyGroup>
-      <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(BuildNumber)' == ''">
-      <BuildNumber>1</BuildNumber>
-    </PropertyGroup>
-  </Target>
 
   <Target Name="LogBuildProperties">
     <Message Importance="high" Text="[Build Properties]" />

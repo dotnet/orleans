@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.EventSourcing</PackageId>
     <Title>Microsoft Orleans Event-Sourcing</Title>
-    <Description>
-      Base types for creating Microsoft Orleans grains with event-sourced state.
-    </Description>
+    <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
   </PropertyGroup>
 	
   <PropertyGroup Label="Configuration">
@@ -14,14 +12,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansEventSourcing\**\*.cs" Exclude="..\..\..\src\OrleansEventSourcing\obj\**\*.cs;..\..\..\src\OrleansEventSourcing\bin\**\*.cs;..\..\..\src\OrleansEventSourcing\Properties\*.cs" />
   </ItemGroup>
 

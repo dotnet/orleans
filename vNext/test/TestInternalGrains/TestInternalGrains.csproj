@@ -5,14 +5,11 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="      ..\..\..\test\TestInternalGrains\obj\**\*.cs;       ..\..\..\test\TestInternalGrains\bin\**\*.cs;       ..\..\..\test\TestInternalGrains\Properties\*.cs" />
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">

@@ -15,27 +15,13 @@ if NOT [%ERRORLEVEL%]==[0] exit /b 1
 set _toolRuntime=%~dp0Tools
 set _dotnet=%_toolRuntime%\dotnetcli\dotnet.exe
 
-SET VERSION_FILE=%CMDHOME%\Build\Version.txt
-
-if EXIST "%VERSION_FILE%" (
-    @Echo Using version number from file %VERSION_FILE%
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION_FILE%"`) do set PRODUCT_VERSION=%%i.%%j.%%k
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION_FILE%"`) do set VERSION_SUFFIX=%%l
-) else (
-    @Echo ERROR: Unable to read version number from file %VERSION_FILE%
-    SET PRODUCT_VERSION=1.0
-)
-@Echo PRODUCT_VERSION=%PRODUCT_VERSION%
-@Echo VERSION_SUFFIX=%VERSION_SUFFIX%
-
 if "%builduri%" == "" set builduri=Build.cmd
 
-SET BINARIES_PATH=%CMDHOME%\..\Binaries
+SET BINARIES_PATH=%CMDHOME%\Binaries
 SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 
-SET PACK_FLAGS=--no-build --include-symbols /p:VersionPrefix=%PRODUCT_VERSION%;VersionSuffix=%VERSION_SUFFIX%
-
-set SOLUTION=%CMDHOME%\Orleans.vNext.sln
+SET SOLUTION=%CMDHOME%\Orleans.vNext.sln
+SET CodeGenProject=%CMDHOME%\src\OrleansCodeGeneratorBuildMetaPackage\OrleansCodeGeneratorBuildMetaPackage.csproj
 
 @echo ===== Building %SOLUTION% =====
 call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES_PATH%
@@ -52,9 +38,13 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack %PACK_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
+call %_dotnet% restore "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo PACK ok for %CONFIGURATION% %SOLUTION%
+@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
+
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
 
 @echo Build Release ============================
 
@@ -65,9 +55,13 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack %PACK_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
+call %_dotnet% restore "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo PACK ok for %CONFIGURATION% %SOLUTION%
+@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
+
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
 
 REM set STEP=VSIX
 

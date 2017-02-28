@@ -5,13 +5,7 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\TestInternalDtosRefOrleans\**\*.cs" Exclude="..\..\..\test\TestInternalDtosRefOrleans\obj\**\*.cs;..\..\..\test\TestInternalDtosRefOrleans\bin\**\*.cs;..\..\..\test\TestInternalDtosRefOrleans\Properties\*.cs" />

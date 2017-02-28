@@ -5,8 +5,6 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
@@ -19,10 +17,6 @@
         ..\..\..\test\TestGrainInterfaces\Properties\*.cs;
         ..\..\..\test\TestGrainInterfaces\obj\**\*.cs;
         ..\..\..\test\TestGrainInterfaces\bin\**\*.cs"/>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
