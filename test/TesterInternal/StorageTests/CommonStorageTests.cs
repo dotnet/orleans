@@ -44,7 +44,7 @@ namespace UnitTests.StorageTests.Relational
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             int StartOfRange = 33900;
             int CountOfRange = countOfGrains;
-            string grainIdTemplate = $"{prefix}-" + "{0}";
+            string grainIdTemplate = $"{prefix}-{{0}}";
 
             //The purpose of this Task.Run is to ensure the storage provider will be tested from
             //multiple threads concurrently, as would happen in running system also.
@@ -55,7 +55,7 @@ namespace UnitTests.StorageTests.Relational
                 //and the storage provider throws. Essentially it means either this range
                 //is ill chosen or the test failed due another problem.
                 var grainId = string.Format(grainIdTemplate, i);
-                var grainData = this.GetTestReferenceAndState(i, null);
+                var grainData = this.GetTestReferenceAndState(grainId, null);
 
                 //A sanity checker that the first version really has null as its state. Then it is stored
                 //to the database and a new version is acquired.
