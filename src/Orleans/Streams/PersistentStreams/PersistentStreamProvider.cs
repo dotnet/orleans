@@ -48,6 +48,7 @@ namespace Orleans.Providers.Streams.Common
         private PersistentStreamProviderState startupState;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
         private SerializationManager serializationManager;
+        private IRuntimeClient runtimeClient;
 
         public string Name { get; private set; }
 
@@ -95,6 +96,7 @@ namespace Orleans.Providers.Streams.Common
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
+            this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {
@@ -148,7 +150,7 @@ namespace Orleans.Providers.Streams.Common
         {
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
-                streamId, () => new StreamImpl<T>(streamId, this, IsRewindable));
+                streamId, () => new StreamImpl<T>(streamId, this, IsRewindable, this.runtimeClient));
         }
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
