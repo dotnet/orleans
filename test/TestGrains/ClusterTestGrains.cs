@@ -95,7 +95,7 @@ namespace UnitTests.Grains
 
         public Task EnableStreamNotifications()
         {
-            IStreamProvider streamProvider = GrainClient.GetStreamProvider("SMSProvider");
+            IStreamProvider streamProvider = this.GetStreamProvider("SMSProvider");
             Guid guid = new Guid((int) this.GetPrimaryKeyLong(), 0, 0, new byte[8]);
             stream = streamProvider.GetStream<int>(guid, "notificationtest");
             return TaskDone.Done;

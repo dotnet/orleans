@@ -496,7 +496,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             if (cluster == null) throw new ArgumentNullException("cluster");
             SiloGossipWorker worker;
             if (!this.clusterWorkers.TryGetValue(cluster, out worker))
-                this.clusterWorkers[cluster] = worker = new SiloGossipWorker(this, cluster);
+                this.clusterWorkers[cluster] = worker = new SiloGossipWorker(this, cluster, this.grainFactory);
             return worker;
         }
         private ChannelGossipWorker GetChannelWorker(IGossipChannel channel)
@@ -593,12 +593,13 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 this.grainFactory = grainFactory;
             }
 
-            public SiloGossipWorker(MultiClusterOracle oracle, string cluster)
+            public SiloGossipWorker(MultiClusterOracle oracle, string cluster, IInternalGrainFactory grainFactory)
                : base(oracle)
             {
 
                 this.Cluster = cluster;
                 this.Silo = null;
+                this.grainFactory = grainFactory;
             }
 
             protected override void LogQueuedPublish(MultiClusterData data)
