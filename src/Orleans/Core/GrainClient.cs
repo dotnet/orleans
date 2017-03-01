@@ -14,6 +14,13 @@ using Orleans.Streams;
 namespace Orleans
 {
     /// <summary>
+    /// Handler for client disconnection from a cluster.
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="e">The event arguments.</param>
+    public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
+
+    /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
     /// TODO: Make this class non-static and inject it where it is needed.
@@ -30,13 +37,15 @@ namespace Orleans
 
         private static bool isFullyInitialized = false;
 
-        private static OutsideRuntimeClient outsideRuntimeClient;
+        private static IInternalClusterClient client;
 
         private static readonly object initLock = new Object();
         
         // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
         // That means we are running in side a silo.
         private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+
+        public static IClusterClient Instance => client;
 
         //TODO: prevent client code from using this from inside a Grain or provider
         public static IGrainFactory GrainFactory
@@ -73,7 +82,7 @@ namespace Orleans
                 throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
             }
 
-            return outsideRuntimeClient.InternalGrainFactory;
+            return client.GrainFactory;
         }
 
         internal static IInternalGrainFactory InternalGrainFactory
@@ -85,7 +94,7 @@ namespace Orleans
                     throw new OrleansException("You must initialize the Grain Client before accessing the InternalGrainFactory");
                 }
 
-                return outsideRuntimeClient.InternalGrainFactory;
+                return client.InternalGrainFactory;
             }
         }
 
@@ -94,7 +103,7 @@ namespace Orleans
             get
             {
                 CheckInitialized();
-                return outsideRuntimeClient.ServiceProvider;
+                return client.ServiceProvider;
             }
         }
 
@@ -110,7 +119,8 @@ namespace Orleans
                 Console.WriteLine("Error loading standard client configuration file.");
                 throw new ArgumentException("Error loading standard client configuration file");
             }
-            InternalInitialize(config);
+            var orleansClient = ClusterClient.Create(config);
+            InternalInitialize(orleansClient);
         }
 
         /// <summary>
@@ -144,9 +154,10 @@ namespace Orleans
             if (config == null)
             {
                 Console.WriteLine("Error loading client configuration file {0}:", configFile.FullName);
-                throw new ArgumentException(String.Format("Error loading client configuration file {0}:", configFile.FullName), "configFile");
+                throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
-            InternalInitialize(config);
+            var orleansClient = ClusterClient.Create(config);
+            InternalInitialize(orleansClient);
         }
 
         /// <summary>
@@ -159,9 +170,10 @@ namespace Orleans
             if (config == null)
             {
                 Console.WriteLine("Initialize was called with null ClientConfiguration object.");
-                throw new ArgumentException("Initialize was called with null ClientConfiguration object.", "config");
+                throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
-            InternalInitialize(config);
+            var orleansClient = ClusterClient.Create(config);
+            InternalInitialize(orleansClient);
         }
 
         /// <summary>
@@ -187,11 +199,12 @@ namespace Orleans
                 config.Gateways.Add(gatewayAddress);
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
-            InternalInitialize(config);
+            var orleansClient = ClusterClient.Create(config);
+            InternalInitialize(orleansClient);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void InternalInitialize(ClientConfiguration config)
+        private static void InternalInitialize(IInternalClusterClient clusterClient)
         {
             // We deliberately want to run this initialization code on .NET thread pool thread to escape any
             // TPL execution environment and avoid any conflicts with client's synchronization context
@@ -207,9 +220,9 @@ namespace Orleans
                     else
                     {
                         // Finish initializing this client connection to the Orleans cluster
-                        DoInternalInitialize(config);
+                        DoInternalInitialize(clusterClient);
                     }
-                    tcs.SetResult(config); // Resolve promise
+                    tcs.SetResult(clusterClient.Configuration); // Resolve promise
                 }
                 catch (Exception exc)
                 {
@@ -239,7 +252,7 @@ namespace Orleans
         /// <summary>
         /// Initializes client runtime from client configuration object.
         /// </summary>
-        private static void DoInternalInitialize(ClientConfiguration config)
+        private static void DoInternalInitialize(IInternalClusterClient clusterClient)
         {
             if (IsInitialized)
                 return;
@@ -253,8 +266,8 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
-                        outsideRuntimeClient = new OutsideRuntimeClient(config);  // Keep reference, to avoid GC problems
-                        outsideRuntimeClient.Start();
+                        client = clusterClient;  // Keep reference, to avoid GC problems
+                        client.Start();
 
                         // this needs to be the last successful step inside the lock so
                         // IsInitialized doesn't return true until we're fully initialized
@@ -305,19 +318,25 @@ namespace Orleans
             // a lock(initLock) we should be able to reset everything else
             // before the next init attempt.
             isFullyInitialized = false;
-
-            if (RuntimeClient.Current != null)
+            
+            try
             {
-                try
+                if (cleanup)
                 {
-                    RuntimeClient.Current.Reset(cleanup);
+                    client?.Stop();
                 }
-                catch (Exception) { }
+                else
+                {
+                    client?.Abort();
+                }
 
-                RuntimeClient.Current = null;
+                client?.Dispose();
             }
-            outsideRuntimeClient = null;
-            ClientInvokeCallback = null;
+            catch (Exception) { }
+
+            RuntimeClient.Current = null;
+            
+            client = null;
         }
 
         /// <summary>
@@ -339,7 +358,7 @@ namespace Orleans
             get
             {
                 CheckInitialized();
-                return ((IRuntimeClient)outsideRuntimeClient).AppLogger;
+                return client.Logger;
             }
         }
 
@@ -351,7 +370,7 @@ namespace Orleans
         public static void SetResponseTimeout(TimeSpan timeout)
         {
             CheckInitialized();
-            outsideRuntimeClient.SetResponseTimeout(timeout);
+            client.ResponseTimeout = timeout;
         }
 
         /// <summary>
@@ -362,7 +381,7 @@ namespace Orleans
         public static TimeSpan GetResponseTimeout()
         {
             CheckInitialized();
-            return outsideRuntimeClient.GetResponseTimeout();
+            return client.ResponseTimeout;
         }
 
         /// <summary>
@@ -374,12 +393,22 @@ namespace Orleans
         /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
         /// </summary>
         /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        public static Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
+        public static Action<InvokeMethodRequest, IGrain> ClientInvokeCallback
+        {
+            get
+            {
+                return client.ClientInvokeCallback;
+            }
+            set
+            {
+                client.ClientInvokeCallback = value;
+            }
+        }
 
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
         {
             CheckInitialized();
-            return outsideRuntimeClient.CurrentStreamProviderManager.GetStreamProviders();
+            return client.GetStreamProviders();
         }
 
         internal static IStreamProviderRuntime CurrentStreamProviderRuntime
@@ -387,32 +416,35 @@ namespace Orleans
             get
             {
                 CheckInitialized();
-                return outsideRuntimeClient.CurrentStreamProviderRuntime;
+                return client.StreamProviderRuntime;
             }
         }
 
-        public static Streams.IStreamProvider GetStreamProvider(string name)
+        public static IStreamProvider GetStreamProvider(string name)
         {
             CheckInitialized();
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentNullException("name");
-            return outsideRuntimeClient.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
+            return client.GetStreamProvider(name);
         }
-        public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
 
-        public static event ConnectionToClusterLostHandler ClusterConnectionLost;
+        public static event ConnectionToClusterLostHandler ClusterConnectionLost
+        {
+            add
+            {
+                CheckInitialized();
+                client.ClusterConnectionLost += value;
+            }
+
+            remove
+            {
+                CheckInitialized();
+                client.ClusterConnectionLost -= value;
+            }
+        }
 
         internal static void NotifyClusterConnectionLost()
         {
-            try
-            {
-                // TODO: first argument should be 'this' when this class will no longer be static
-                ClusterConnectionLost?.Invoke(null, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
-            }
+            CheckInitialized();
+            client.NotifyClusterConnectionLost();
         }
     }
 }

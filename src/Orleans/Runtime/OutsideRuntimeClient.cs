@@ -22,7 +22,6 @@ namespace Orleans
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private readonly Logger logger;
-        private readonly Logger appLogger;
 
         private readonly ClientConfiguration config;
 
@@ -66,10 +65,7 @@ namespace Orleans
 
         public SerializationManager SerializationManager { get; }
 
-        Logger IRuntimeClient.AppLogger
-        {
-            get { return appLogger; }
-        }
+        public Logger AppLogger { get; }
 
         public ActivationAddress CurrentActivationAddress
         {
@@ -140,7 +136,7 @@ namespace Orleans
             this.assemblyProcessor.Initialize();
 
             logger = LogManager.GetLogger("OutsideRuntimeClient", LoggerType.Runtime);
-            appLogger = LogManager.GetLogger("Application", LoggerType.Application);
+            this.AppLogger = LogManager.GetLogger("Application", LoggerType.Application);
 
             BufferPool.InitGlobalBufferPool(config);
             this.handshakeClientId = GrainId.NewClientId();
@@ -920,5 +916,8 @@ namespace Orleans
                 }
             }
         }
+
+        /// <inheritdoc />
+        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
     }
 }
