@@ -237,7 +237,7 @@ namespace Orleans.Runtime
             cpuUsageTimer = null;
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", MessageId = "cpuUsageTimer")]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed")]
         public void Dispose()
         {
             cpuCounterPF?.Dispose();
