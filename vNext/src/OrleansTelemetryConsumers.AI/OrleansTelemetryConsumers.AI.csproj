@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
-    <Description>
-      Microsoft Azure Application Insights implementation of Orleans Telemetry API.
-    </Description>
+    <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,7 +12,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -22,7 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansTelemetryConsumers.AI\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.AI\Properties\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\bin\**\*.cs" />
   </ItemGroup>
 

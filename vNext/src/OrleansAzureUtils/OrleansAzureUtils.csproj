@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
     <Title>Microsoft Orleans Azure Utilities</Title>
-    <Description>
-      Support library for hosting Orleans on Microsoft Azure.
-    </Description>
+    <Description>Support library for hosting Orleans on Microsoft Azure.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,7 +12,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -26,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansAzureUtils\**\*.cs" Exclude="..\..\..\src\OrleansAzureUtils\Properties\*.cs;..\..\..\src\OrleansAzureUtils\obj\**\*.cs;..\..\..\src\OrleansAzureUtils\bin\**\*.cs" />
   </ItemGroup>
 

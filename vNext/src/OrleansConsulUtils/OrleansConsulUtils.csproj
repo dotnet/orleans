@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansConsulUtils</PackageId>
     <Title>Microsoft Orleans Consul Utilities</Title>
-    <Description>
-      Library of utility types for Consul of Microsoft Orleans.
-    </Description>
+    <Description>Library of utility types for Consul of Microsoft Orleans.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,14 +12,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>    
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansConsulUtils\**\*.cs" Exclude="..\..\..\src\OrleansConsulUtils\Properties\*.cs;..\..\..\src\OrleansConsulUtils\obj\**\*.cs;..\..\..\src\OrleansConsulUtils\bin\**\*.cs;" />
   </ItemGroup>
 

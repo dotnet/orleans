@@ -5,14 +5,8 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\DefaultCluster.Tests\**\*.cs" Exclude="..\..\..\test\DefaultCluster.Tests\FSharpGrainTests.cs;..\..\..\test\DefaultCluster.Tests\obj\**\*.cs;..\..\..\test\DefaultCluster.Tests\bin\**\*.cs;..\..\..\test\DefaultCluster.Tests\Properties\*.cs" />

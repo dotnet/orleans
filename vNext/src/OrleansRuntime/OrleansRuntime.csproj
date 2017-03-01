@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
     <Title>Microsoft Orleans Runtime</Title>
-    <Description>
-      Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.
-    </Description>
+    <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,14 +12,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile
       Include="..\..\..\src\OrleansRuntime\**\*.cs"
       Exclude="

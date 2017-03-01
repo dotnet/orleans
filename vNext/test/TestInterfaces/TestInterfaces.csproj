@@ -5,16 +5,11 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestInterfaces\**\*.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+    <Compile Include="..\..\..\test\TestInterfaces\**\*.cs" Exclude="..\..\..\test\TestInterfaces\obj\**\*.cs;..\..\..\TestInterfaces\bin\**\*.cs;..\..\..\test\TestInterfaces\Properties\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

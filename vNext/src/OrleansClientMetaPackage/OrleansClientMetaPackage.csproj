@@ -1,12 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.Client</PackageId>
     <Title>Microsoft Orleans Client Libraries</Title>
-    <Description>
-      Collection of Microsoft Orleans libraries and files needed on the client.
-    </Description>
+    <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
   </PropertyGroup>
 

@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansAWSUtils</PackageId>
     <Title>Microsoft Orleans AWS Utilities</Title>
-    <Description>
-      Library of utility types for Amazon AWS of Microsoft Orleans.
-    </Description>
+    <Description>Library of utility types for Amazon AWS of Microsoft Orleans.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,7 +12,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -22,7 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansAWSUtils\**\*.cs" Exclude="..\..\..\src\OrleansAWSUtils\Properties\*.cs;..\..\..\src\OrleansAWSUtils\obj\**\*.cs;..\..\..\src\OrleansAWSUtils\bin\**\*.cs" />
   </ItemGroup>
 

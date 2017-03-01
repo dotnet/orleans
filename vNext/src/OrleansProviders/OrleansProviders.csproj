@@ -3,9 +3,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansProviders</PackageId>
     <Title>Microsoft Orleans Providers</Title>
-    <Description>
-      Library of built-in persistence and stream providers included in Microsoft Orleans.
-    </Description>
+    <Description>Library of built-in persistence and stream providers included in Microsoft Orleans.</Description>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -14,14 +12,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile
       Include="..\..\..\src\OrleansProviders\**\*.cs"
       Exclude="

@@ -1,12 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
     <Title>Microsoft Orleans Build-time Code Generation</Title>
-    <Description>
-      Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.
-    </Description>
+    <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IsTool>true</IsTool>
   </PropertyGroup>
@@ -75,11 +72,5 @@
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
-      <TreatAsPackageReference>false</TreatAsPackageReference>
-    </ProjectReference>
   </ItemGroup>
 </Project>

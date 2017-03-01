@@ -10,7 +10,6 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <OutputType>Exe</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -18,12 +17,7 @@
     <AssemblyName>ClientGenerator</AssemblyName>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net462'">
-    <RuntimeIdentifier>win</RuntimeIdentifier>
-  </PropertyGroup>
-
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile
       Include="..\..\..\src\ClientGenerator\**\*.cs"
       Exclude="
