@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansProviders</PackageId>
     <Title>Microsoft Orleans Providers</Title>
     <Description>Library of built-in persistence and stream providers included in Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">

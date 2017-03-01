@@ -3,7 +3,8 @@
     <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansAWSUtils</PackageId>
     <Title>Microsoft Orleans AWS Utilities</Title>
-    <Description>Library of utility types for Amazon AWS of Microsoft Orleans.</Description>
+    <Description>Support library for hosting Orleans on Amazon AWS.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET AWS Amazon DynamoDB</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -12,7 +13,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.3.2" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.3.1.6" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.3.3" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.3.1.7" />
   </ItemGroup>
 
   <ItemGroup>

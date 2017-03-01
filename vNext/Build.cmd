@@ -34,15 +34,18 @@ call %_dotnet% restore "%SOLUTION%"
 SET Configuration=Debug
 SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
+:: Set DateTime suffix for debug builds
+for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%i
+
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
 call %_dotnet% restore "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
+@echo RESTORE ok for %CONFIGURATION% %CodeGenProject%
 
-call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %CodeGenProject%
 
@@ -57,7 +60,7 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 
 call %_dotnet% restore "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
+@echo RESTORE ok for %CONFIGURATION% %CodeGenProject%
 
 call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop

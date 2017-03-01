@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
     <Title>Microsoft Orleans Azure Utilities</Title>
     <Description>Support library for hosting Orleans on Microsoft Azure.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Azure</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -12,7 +13,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>
@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Net.Requests" Version="4.3.0" />
-    <PackageReference Include="WindowsAzure.Storage" Version="7.2.1" />
+    <PackageReference Include="WindowsAzure.Storage" Version="8.1.1" />
   </ItemGroup>
 
   <ItemGroup>

@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
     <Title>Microsoft Orleans ServiceBus Utilities</Title>
     <Description>Library of utility types for Microsoft Azure ServiceBus of Microsoft Orleans.</Description>
-    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Azure ServiceBus EventHubs</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -13,7 +13,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>

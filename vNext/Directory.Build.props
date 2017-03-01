@@ -6,7 +6,7 @@
 
   <PropertyGroup Label="NuGet">
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <IncludeSource>true</IncludeSource>
+    <IncludeSymbols>true</IncludeSymbols>
     <IsPackable>false</IsPackable>
 
     <Authors>Microsoft</Authors>
@@ -24,7 +24,7 @@
   <!-- For Debug builds generated a date/time dependent version suffix -->
   <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
-    <VersionSuffix>$(VersionSuffix)-$([System.DateTime]::Now.ToString(yyyyMMddmmss))</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
