@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
     <IsPackable>true</IsPackable>
-    <PackageId>Microsoft.Orleans.OrleansSqlUtils</PackageId>
-    <Title>Microsoft Orleans Sql Utilities</Title>
+    <PackageId>Microsoft.Orleans.OrleansSQLUtils</PackageId>
+    <Title>Microsoft Orleans SQL Utilities</Title>
     <Description>Library of utility types for relational storage of Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET SQL</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -12,7 +13,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NoWarn>1591</NoWarn>

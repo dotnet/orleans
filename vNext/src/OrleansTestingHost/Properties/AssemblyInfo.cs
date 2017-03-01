@@ -1,7 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
-
-[assembly: CLSCompliant(false)]
+﻿using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]

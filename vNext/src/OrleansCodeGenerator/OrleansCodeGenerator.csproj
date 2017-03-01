@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator</PackageId>
     <Title>Microsoft Orleans Code Generation</Title>
     <Description>Runtime and compile-time code generation support for Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">

@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansConsulUtils</PackageId>
     <Title>Microsoft Orleans Consul Utilities</Title>
     <Description>Library of utility types for Consul of Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Consul</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">

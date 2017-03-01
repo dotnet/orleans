@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.EventSourcing</PackageId>
     <Title>Microsoft Orleans Event-Sourcing</Title>
     <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Event-Sourcing</PackageTags>
   </PropertyGroup>
 	
   <PropertyGroup Label="Configuration">

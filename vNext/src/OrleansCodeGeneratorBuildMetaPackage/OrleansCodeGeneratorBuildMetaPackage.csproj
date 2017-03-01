@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
     <Title>Microsoft Orleans Build-time Code Generation</Title>
     <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IsTool>true</IsTool>
   </PropertyGroup>

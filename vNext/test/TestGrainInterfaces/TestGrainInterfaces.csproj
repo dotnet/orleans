@@ -9,14 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\..\test\TestGrainInterfaces\**\*.cs"
-      Exclude="
-        ..\..\..\test\TestGrainInterfaces\IFSharpParametersGrain.cs;
-        ..\..\..\test\TestGrainInterfaces\IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;
-        ..\..\..\test\TestGrainInterfaces\Properties\*.cs;
-        ..\..\..\test\TestGrainInterfaces\obj\**\*.cs;
-        ..\..\..\test\TestGrainInterfaces\bin\**\*.cs"/>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\**\*.cs" Exclude="..\..\..\test\TestGrainInterfaces\IFSharpParametersGrain.cs;..\..\..\test\TestGrainInterfaces\IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;..\..\..\test\TestGrainInterfaces\Properties\*.cs;..\..\..\test\TestGrainInterfaces\obj\**\*.cs;..\..\..\test\TestGrainInterfaces\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
@@ -25,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" Version="4.0.0.1" />
+    <PackageReference Include="FSharp.Core" Version="4.1.0" />
   </ItemGroup>
 
   <ItemGroup>

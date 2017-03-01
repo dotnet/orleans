@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.assert" Version="2.1.0" />
+    <PackageReference Include="xunit.assert" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>
