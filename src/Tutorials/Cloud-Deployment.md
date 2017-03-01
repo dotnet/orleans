@@ -309,6 +309,6 @@ The normal Azure deployment tools are used to deploy the application to Windows 
 
 ## Next
 
-We'll write our own storage provider, to save grain state to alternative to file instead of Microsoft Azure:
+Let's look at the steps required to run Orleans on Windows Server:
 
-[Custom Storage Providers](Custom-Storage-Providers.md)
+[On-Premise Deployment](On-Premise-Deployment.md)

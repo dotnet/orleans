@@ -44,3 +44,6 @@ In _OrleansConfiguration.xml_, the `ProxyingGateway` element specifies the gatew
     </Defaults>
 </OrleansConfiguration>
 ```
+## Next
+
+[Silos](Silos.md)

@@ -109,4 +109,4 @@ Now whenever our grain on the server calls the `SendUpdateMessage` method, all s
 
 ## Next
 
-Next we look at [Developing a Grain](Developing-a-Grain.md)
+Next we look at [Running the Application](Running-the-Application.md)

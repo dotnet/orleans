@@ -303,6 +303,6 @@ When it is time to remove an Orleans deployment, use the _UndeployOrleansSilos.p
 
 ## Next
 
-We'll look at how you can deploy Orleans in the Azure Cloud
+We'll write our own storage provider, to save grain state to alternative to file instead of Microsoft Azure:
 
-[Cloud Deployment](Cloud-Deployment.md)
+[Custom Storage Providers](Custom-Storage-Providers.md)
