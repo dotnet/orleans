@@ -21,7 +21,7 @@ if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=
 @echo on
 REM call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ../src/Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%OutDir%'"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%OutDir%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%
