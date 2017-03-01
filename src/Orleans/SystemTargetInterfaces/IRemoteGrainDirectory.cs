@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
@@ -22,7 +23,14 @@ namespace Orleans.Runtime
         bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
         bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo entry, out bool wasRemoved);
-        bool Merge(GrainId grain, IGrainInfo other);
+
+        /// <summary>
+        /// Merges two grain directory infos, returning a map of activations which must be deactivated, grouped by silo.
+        /// </summary>
+        /// <param name="grain"></param>
+        /// <param name="other"></param>
+        /// <returns>A map of activations which must be deactivated, grouped by silo.</returns>
+        Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
         bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null);
     }

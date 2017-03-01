@@ -53,16 +53,18 @@ namespace Orleans
             {
                 // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
                 bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
-                    && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
+                                          && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
                 if (runningInsideGrain)
                 {
-                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
-                             "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+                    throw new OrleansException(
+                        "You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                        "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
                 }
                 else // running inside provider or else where
                 {
-                    throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
-                            "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
+                    throw new OrleansException(
+                        "You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
+                        "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
                 }
             }
 
@@ -71,7 +73,7 @@ namespace Orleans
                 throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
             }
 
-                return outsideRuntimeClient.InternalGrainFactory;
+            return outsideRuntimeClient.InternalGrainFactory;
         }
 
         internal static IInternalGrainFactory InternalGrainFactory
@@ -337,7 +339,7 @@ namespace Orleans
             get
             {
                 CheckInitialized();
-                return RuntimeClient.Current.AppLogger;
+                return ((IRuntimeClient)outsideRuntimeClient).AppLogger;
             }
         }
 
@@ -349,7 +351,7 @@ namespace Orleans
         public static void SetResponseTimeout(TimeSpan timeout)
         {
             CheckInitialized();
-            RuntimeClient.Current.SetResponseTimeout(timeout);
+            outsideRuntimeClient.SetResponseTimeout(timeout);
         }
 
         /// <summary>
@@ -360,7 +362,7 @@ namespace Orleans
         public static TimeSpan GetResponseTimeout()
         {
             CheckInitialized();
-            return RuntimeClient.Current.GetResponseTimeout();
+            return outsideRuntimeClient.GetResponseTimeout();
         }
 
         /// <summary>
@@ -376,19 +378,25 @@ namespace Orleans
 
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
+            CheckInitialized();
+            return outsideRuntimeClient.CurrentStreamProviderManager.GetStreamProviders();
         }
 
         internal static IStreamProviderRuntime CurrentStreamProviderRuntime
         {
-            get { return RuntimeClient.Current.CurrentStreamProviderRuntime; }
+            get
+            {
+                CheckInitialized();
+                return outsideRuntimeClient.CurrentStreamProviderRuntime;
+            }
         }
 
         public static Streams.IStreamProvider GetStreamProvider(string name)
         {
+            CheckInitialized();
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
+            return outsideRuntimeClient.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
         public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
 
@@ -406,6 +414,5 @@ namespace Orleans
                 Logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
             }
         }
-
     }
 }

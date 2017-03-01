@@ -836,7 +836,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainBase_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            Grain input = new EchoTaskGrain();
+            Grain input = new EchoTaskGrain(null);
 
             // Expected exception:
             // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.

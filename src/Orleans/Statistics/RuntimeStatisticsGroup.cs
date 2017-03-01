@@ -240,20 +240,20 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", MessageId = "cpuUsageTimer")]
         public void Dispose()
         {
-            cpuCounterPF.Dispose();
-            availableMemoryCounterPF.Dispose();
+            cpuCounterPF?.Dispose();
+            availableMemoryCounterPF?.Dispose();
 
-            timeInGCPF.Dispose();
+            timeInGCPF?.Dispose();
             if (genSizesPF != null)
                 foreach (var item in genSizesPF)
                 {
                     item?.Dispose();
                 }
-            allocatedBytesPerSecPF.Dispose();
-            promotedMemoryFromGen1PF.Dispose();
-            numberOfInducedGCsPF.Dispose();
-            largeObjectHeapSizePF.Dispose();
-            promotedFinalizationMemoryFromGen0PF.Dispose();
+            allocatedBytesPerSecPF?.Dispose();
+            promotedMemoryFromGen1PF?.Dispose();
+            numberOfInducedGCsPF?.Dispose();
+            largeObjectHeapSizePF?.Dispose();
+            promotedFinalizationMemoryFromGen0PF?.Dispose();
             cpuUsageTimer?.Dispose();
         }
     }

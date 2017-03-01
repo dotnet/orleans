@@ -12,7 +12,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly Dictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
         
-        public RegistrarManager(GrainDirectoryPartition directoryPartition, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, GlobalConfiguration globalConfig, Logger logger)
+        public RegistrarManager(GrainDirectoryPartition directoryPartition, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, GlobalConfiguration globalConfig, Logger logger, IInternalGrainFactory grainFactory)
         {
             this.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(directoryPartition));
             this.Register<GlobalSingleInstanceRegistration>(
@@ -20,7 +20,8 @@ namespace Orleans.Runtime.GrainDirectory
                     directoryPartition,
                     logger,
                     gsiActivationMaintainer,
-                    globalConfig.GlobalSingleInstanceNumberRetries));
+                    globalConfig.GlobalSingleInstanceNumberRetries,
+                    grainFactory));
         }
 
         private void Register<TStrategy>(IGrainRegistrar directory)

@@ -6,9 +6,9 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
@@ -25,26 +25,23 @@ namespace Orleans.Runtime
         private static readonly Logger invokeExceptionLogger = LogManager.GetLogger("Grain.InvokeException", LoggerType.Application);
         private static readonly Logger appLogger = LogManager.GetLogger("Application", LoggerType.Application);
 
-        private readonly Dispatcher dispatcher;
-        private readonly ILocalGrainDirectory directory;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
+
+        private ILocalGrainDirectory directory;
+        private Catalog catalog;
+        private Dispatcher dispatcher;
 
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
 
-        internal readonly IConsistentRingProvider ConsistentRingProvider;
-
         public InsideRuntimeClient(
-            Dispatcher dispatcher,
-            Catalog catalog,
-            ILocalGrainDirectory directory,
+            ILocalSiloDetails siloDetails,
             ClusterConfiguration config,
-            IConsistentRingProvider ring,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
@@ -54,46 +51,44 @@ namespace Orleans.Runtime
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
-            this.dispatcher = dispatcher;
-            MySilo = catalog.LocalSilo;
-            this.directory = directory;
-            ConsistentRingProvider = ring;
-            Catalog = catalog;
+            MySilo = siloDetails.SiloAddress;
             disposables = new List<IDisposable>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             Config = config;
             config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
-            RuntimeClient.Current = this;
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
-            tryResendMessage = TryResendMessage;
+            tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             RuntimeClient.Current = this;
         }
-
-        public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
-
+        
         public IServiceProvider ServiceProvider { get; }
 
         public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
-        public Catalog Catalog { get; private set; }
-
-        public SiloAddress MySilo { get; private set; }
-
-        public ClusterConfiguration Config { get; private set; }
-
         public OrleansTaskScheduler Scheduler { get; }
 
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
-        public GrainFactory ConcreteGrainFactory { get; private set; }
+        private SiloAddress MySilo { get; }
+
+        private ClusterConfiguration Config { get; }
+
+        public GrainFactory ConcreteGrainFactory { get; }
 
         public SerializationManager SerializationManager { get; }
+
+        private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
+
+        private ILocalGrainDirectory Directory
+            => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>());
+
+        private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
         #region Implementation of IRuntimeClient
 
@@ -198,11 +193,11 @@ namespace Orleans.Runtime
             if (targetGrainId.IsSystemTarget)
             {
                 // Messages to system targets bypass the task system and get sent "in-line"
-                dispatcher.TransportMessage(message);
+                this.Dispatcher.TransportMessage(message);
             }
             else
             {
-                dispatcher.SendMessage(message, sendingActivation);
+                this.Dispatcher.SendMessage(message, sendingActivation);
             }
         }
 
@@ -215,60 +210,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            dispatcher.SendResponse(request, response);
-        }
-
-        /// <summary>
-        /// Reroute a message coming in through a gateway
-        /// </summary>
-        /// <param name="message"></param>
-        internal void RerouteMessage(Message message)
-        {
-            ResendMessageImpl(message);
-        }
-
-        private bool TryResendMessage(Message message)
-        {
-            if (!message.MayResend(Config.Globals)) return false;
-
-            message.ResendCount = message.ResendCount + 1;
-            MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
-            ResendMessageImpl(message);
-            return true;
-        }
-
-        internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
-        {
-            if (!message.MayForward(Config.Globals)) return false;
-
-            message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);
-            ResendMessageImpl(message, forwardingAddress);
-            return true;
-        }
-
-        private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
-        {
-            if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
-            message.TargetHistory = message.GetTargetHistory();
-
-            if (message.TargetGrain.IsSystemTarget)
-            {
-                dispatcher.SendSystemTargetMessage(message);
-            }
-            else if (forwardingAddress != null)
-            {
-                message.TargetAddress = forwardingAddress;
-                message.IsNewPlacement = false;
-                dispatcher.Transport.SendMessage(message);
-            }
-            else
-            {
-                message.TargetActivation = null;
-                message.TargetSilo = null;
-                message.ClearTargetAddress();
-                dispatcher.SendMessage(message);
-            }
+            this.Dispatcher.SendResponse(request, response);
         }
 
         /// <summary>
@@ -289,7 +231,7 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
+                        this.Directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
 
@@ -472,8 +414,7 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-
-
+        
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(
@@ -558,7 +499,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    dispatcher.Transport.SendMessage(message);
+                    this.Dispatcher.Transport.SendMessage(message);
                     return;
                 }
 
@@ -579,7 +520,7 @@ namespace Orleans.Runtime
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
-                            directory.InvalidateCacheEntry(message.SendingAddress);
+                            this.Directory.InvalidateCacheEntry(message.SendingAddress);
                         }
                         break;
 
