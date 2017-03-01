@@ -132,8 +132,13 @@ namespace Orleans.Runtime
         /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
         {
-            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : GlobalConfig.DeploymentId; } 
+            get {
+                var configuredId = GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : GlobalConfig.DeploymentId;
+                return string.IsNullOrEmpty(configuredId) ? CLUSTER_ID_DEFAULT : configuredId; 
+            } 
         }
+
+        private const string CLUSTER_ID_DEFAULT = "DefaultClusterID"; // if no id is configured, we pick a nonempty default.
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => this.initializationParams.SiloAddress;
