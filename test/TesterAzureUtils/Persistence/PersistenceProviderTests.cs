@@ -19,7 +19,7 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Persistence
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class PersistenceProviderTests_Local : IDisposable
+    public class PersistenceProviderTests_Local
     {
         private readonly StorageProviderManager storageProviderManager;
         private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
@@ -36,12 +36,6 @@ namespace Tester.AzureUtils.Persistence
                 new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services));
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        public void Dispose()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]

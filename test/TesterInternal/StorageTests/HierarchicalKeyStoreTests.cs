@@ -11,19 +11,13 @@ namespace UnitTests.StorageTests
 {
     public class HierarchicalKeyStoreTests : IClassFixture<HierarchicalKeyStoreTests.Fixture>
     {
-        public class Fixture : IDisposable
+        public class Fixture
         {
             public Fixture()
             {
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 ClientConfiguration cfg = ClientConfiguration.StandardLoad();
                 LogManager.Initialize(cfg);
-                LocalDataStoreInstance.LocalDataStore = null;
-            }
-
-            public void Dispose()
-            {
-                LocalDataStoreInstance.LocalDataStore = null;
             }
         }
 
