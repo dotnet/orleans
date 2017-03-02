@@ -224,6 +224,7 @@ namespace Orleans.Runtime
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
+            services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.AddSingleton<SerializationManager>();
             services.AddSingleton<ITimerRegistry, TimerRegistry>();
             services.AddSingleton<IReminderRegistry, ReminderRegistry>();
@@ -262,6 +263,8 @@ namespace Orleans.Runtime
             services.AddFromExisting<IMembershipOracle, MembershipOracle>();
             services.AddFromExisting<ISiloStatusOracle, MembershipOracle>();
             services.AddSingleton<MembershipTableFactory>();
+            services.AddSingleton<ReminderTableFactory>();
+            services.AddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
             services.AddSingleton<LocalReminderServiceFactory>();
             services.AddSingleton<ClientObserverRegistrar>();
             services.AddSingleton<SiloProviderRuntime>();
@@ -454,7 +457,7 @@ namespace Orleans.Runtime
             {
                 // start the reminder service system target
                 reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
-                                          .CreateReminderService(this, grainFactory, initTimeout, this.runtimeClient);
+                                          .CreateReminderService(this, initTimeout, this.runtimeClient);
                 var reminderServiceSystemTarget = this.reminderService as SystemTarget;
                 if (reminderServiceSystemTarget != null) RegisterSystemTarget(reminderServiceSystemTarget);
             }

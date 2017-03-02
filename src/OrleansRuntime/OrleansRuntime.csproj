@@ -131,7 +131,7 @@
     <Compile Include="ReminderService\InMemoryRemindersTable.cs" />
     <Compile Include="ReminderService\LocalReminderService.cs" />
     <Compile Include="ReminderService\LocalReminderServiceFactory.cs" />
-    <Compile Include="ReminderService\ReminderTable.cs" />
+    <Compile Include="ReminderService\ReminderTableFactory.cs" />
     <Compile Include="Placement\DeploymentLoadPublisher.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

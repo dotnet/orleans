@@ -114,6 +114,7 @@ namespace Orleans
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.AddSingleton<ClientProviderRuntime>();
             services.AddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+            services.AddFromExisting<ITraceConfiguration, ClientConfiguration>();
             services.AddSingleton<IGatewayListProvider>(
                 sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.AddSingleton<SerializationManager>();
