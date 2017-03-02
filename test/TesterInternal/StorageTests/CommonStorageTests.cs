@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests.Relational
             //Since the version is NULL, storage provider tries to insert this data
             //as new state. If there is already data with this class, the writing fails
             //and the storage provider throws. Essentially it means either this range
-            //is ill chosen or the test failed due another problem.
+            //is ill chosen or the test failed due to another problem.
             var grainStates = Enumerable.Range(StartOfRange, CountOfRange).Select(i => this.GetTestReferenceAndState(string.Format(grainIdTemplate, i), null)).ToList();
 
             await Task.WhenAll(grainStates.AsParallel()
@@ -61,14 +61,12 @@ namespace UnitTests.StorageTests.Relational
                     var firstVersion = grainData.Item2.ETag;
                     Assert.Equal(firstVersion, null);
 
-                    //This loop writes the state consecutive times to the database to make sure its
-                    //version is updated appropriately.
                     await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
                     var secondVersion = grainData.Item2.ETag;
                     Assert.NotEqual(firstVersion, secondVersion);
                 }));
 
-            int maxNumberOfThreads = 25;
+            const int MaxNumberOfThreads = 25;
             // The purpose of AsParallel is to ensure the storage provider will be tested from
             // multiple threads concurrently, as would happen in running system also.
             // Nevertheless limit the degree of parallelization (concurrent threads) to
@@ -76,9 +74,11 @@ namespace UnitTests.StorageTests.Relational
             // if a few threads coupled with parallelization via tasks can force most concurrency
             // scenarios.
 
-            var tasks = grainStates.AsParallel().WithDegreeOfParallelism(maxNumberOfThreads)
+            var tasks = grainStates.AsParallel().WithDegreeOfParallelism(MaxNumberOfThreads)
                 .Select(async grainData =>
                 {
+                    // This loop writes the state consecutive times to the database to make sure its
+                    // version is updated appropriately.
                     for (int k = 0; k < 10; ++k)
                     {
                         var versionBefore = grainData.Item2.ETag;
