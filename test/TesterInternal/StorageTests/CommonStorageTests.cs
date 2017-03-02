@@ -46,36 +46,48 @@ namespace UnitTests.StorageTests.Relational
             int CountOfRange = countOfGrains;
             string grainIdTemplate = $"{prefix}-{{0}}";
 
-            //The purpose of this Task.Run is to ensure the storage provider will be tested from
-            //multiple threads concurrently, as would happen in running system also.
-            var tasks = Enumerable.Range(StartOfRange, CountOfRange).Select(i => Task.Run(async () =>
-            {
-                //Since the version is NULL, storage provider tries to insert this data
-                //as new state. If there is already data with this class, the writing fails
-                //and the storage provider throws. Essentially it means either this range
-                //is ill chosen or the test failed due another problem.
-                var grainId = string.Format(grainIdTemplate, i);
-                var grainData = this.GetTestReferenceAndState(grainId, null);
+            //Since the version is NULL, storage provider tries to insert this data
+            //as new state. If there is already data with this class, the writing fails
+            //and the storage provider throws. Essentially it means either this range
+            //is ill chosen or the test failed due another problem.
+            var grainStates = Enumerable.Range(StartOfRange, CountOfRange).Select(i => this.GetTestReferenceAndState(string.Format(grainIdTemplate, i), null)).ToList();
 
-                //A sanity checker that the first version really has null as its state. Then it is stored
-                //to the database and a new version is acquired.
-                var firstVersion = grainData.Item2.ETag;
-                Assert.Equal(firstVersion, null);
-
-                //This loop writes the state consecutive times to the database to make sure its
-                //version is updated appropriately.
-                await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
-                for(int k = 0; k < 10; ++k)
+            await Task.WhenAll(grainStates.AsParallel()
+                .WithDegreeOfParallelism(8) // Limit parallelization of the first write to not stress out the system with deadlocks on INSERT
+                .Select(async grainData =>
                 {
+                    //A sanity checker that the first version really has null as its state. Then it is stored
+                    //to the database and a new version is acquired.
+                    var firstVersion = grainData.Item2.ETag;
+                    Assert.Equal(firstVersion, null);
+
+                    //This loop writes the state consecutive times to the database to make sure its
+                    //version is updated appropriately.
+                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
                     var secondVersion = grainData.Item2.ETag;
                     Assert.NotEqual(firstVersion, secondVersion);
-                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                }));
 
-                    var thirdVersion = grainData.Item2.ETag;
-                    Assert.NotEqual(firstVersion, secondVersion);
-                    Assert.NotEqual(secondVersion, thirdVersion);
-                }
-            }));
+            int maxNumberOfThreads = 25;
+            // The purpose of AsParallel is to ensure the storage provider will be tested from
+            // multiple threads concurrently, as would happen in running system also.
+            // Nevertheless limit the degree of parallelization (concurrent threads) to
+            // avoid unnecessarily starving and growing the thread pool (which is very slow)
+            // if a few threads coupled with parallelization via tasks can force most concurrency
+            // scenarios.
+
+            var tasks = grainStates.AsParallel().WithDegreeOfParallelism(maxNumberOfThreads)
+                .Select(async grainData =>
+                {
+                    for (int k = 0; k < 10; ++k)
+                    {
+                        var versionBefore = grainData.Item2.ETag;
+                        await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+
+                        var versionAfter = grainData.Item2.ETag;
+                        Assert.NotEqual(versionBefore, versionAfter);
+                    }
+                });
             await Task.WhenAll(tasks);
         }
 
