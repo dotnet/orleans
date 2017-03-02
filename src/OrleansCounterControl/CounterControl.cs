@@ -28,7 +28,9 @@ namespace Orleans.Counter.Control
             var userIdent = WindowsIdentity.GetCurrent();
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
-            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer();
+            
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
+            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer(siloAssemblyLoader);
         }
 
         public void PrintUsage()

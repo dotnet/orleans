@@ -22,10 +22,7 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
         private readonly SerializationManager serializationManager;
-
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
-
-        private static readonly object lockable = new object();
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
@@ -33,17 +30,10 @@ namespace Orleans.Runtime
             get { return grainInterfaceMapsBySilo; }
         }
 
-        public static GrainTypeManager Instance { get; private set; }
-
         public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData { get { return grainTypes; } }
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
-
-        public static void Stop()
-        {
-            Instance = null;
-        }
-
+        
         public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
             : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager, multiClusterRegistrationStrategyManager)
         {
@@ -58,12 +48,6 @@ namespace Orleans.Runtime
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
-            lock (lockable)
-            {
-                if (Instance != null)
-                    throw new InvalidOperationException("An attempt to create a second insance of GrainTypeManager.");
-                Instance = this;
-            }
         }
 
         public void Start(bool strict = true)

@@ -97,7 +97,8 @@ namespace Orleans.Runtime.GrainDirectory
             OrleansTaskScheduler scheduler,
             ISiloStatusOracle siloStatusOracle,
             IMultiClusterOracle multiClusterOracle,
-            IInternalGrainFactory grainFactory)
+            IInternalGrainFactory grainFactory,
+            GrainTypeManager grainTypeManager)
         {
             this.log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");
             var globalConfig = clusterConfig.Globals;
@@ -203,7 +204,7 @@ namespace Orleans.Runtime.GrainDirectory
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_PREDECESSORS, () => Utils.EnumerableToString(this.FindPredecessors(this.MyAddress, 1), siloAddressPrint));
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_SUCCESSORS, () => Utils.EnumerableToString(this.FindSuccessors(this.MyAddress, 1), siloAddressPrint));
 
-            this.registrarManager = new RegistrarManager(this.DirectoryPartition, this.GsiActivationMaintainer, globalConfig, this.log, this.grainFactory);
+            this.registrarManager = new RegistrarManager(this.DirectoryPartition, this.GsiActivationMaintainer, globalConfig, this.log, this.grainFactory, grainTypeManager);
         }
 
         public void Start()

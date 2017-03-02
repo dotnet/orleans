@@ -25,7 +25,8 @@ namespace OrleansTelemetryConsumers.Counters
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);
-            consumer = new OrleansPerfCounterTelemetryConsumer();
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
+            consumer = new OrleansPerfCounterTelemetryConsumer(siloAssemblyLoader);
         }
 
         /// <summary>
