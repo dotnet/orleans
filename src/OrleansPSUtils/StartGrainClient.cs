@@ -7,6 +7,8 @@ using System.Net;
 
 namespace OrleansPSUtils
 {
+    using System.Collections.Generic;
+
     [Cmdlet(VerbsLifecycle.Start, "GrainClient", DefaultParameterSetName = DefaultSet)]
     public class StartGrainClient : PSCmdlet
     {
@@ -42,41 +44,45 @@ namespace OrleansPSUtils
             try
             {
                 WriteVerbose($"[{DateTime.UtcNow}] Initializing Orleans Grain Client");
-
+                IClusterClient client;
                 switch (ParameterSetName)
                 {
                     case FilePathSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using config file at '{ConfigFilePath}'...");
                         if (string.IsNullOrWhiteSpace(ConfigFilePath))
                             throw new ArgumentNullException(nameof(ConfigFilePath));
-                        GrainClient.Initialize(ConfigFilePath);
+                        client = ClusterClient.Create(ConfigFilePath);
                         break;
                     case FileSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using provided config file...");
                         if (ConfigFile == null)
                             throw new ArgumentNullException(nameof(ConfigFile));
-                        GrainClient.Initialize(ConfigFile);
+                        client = ClusterClient.Create(ConfigFile);
                         break;
                     case ConfigSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using provided 'ClientConfiguration' object...");
                         if (Config == null)
                             throw new ArgumentNullException(nameof(Config));
-                        GrainClient.Initialize(Config);
+                        client = ClusterClient.Create(Config);
                         break;
                     case EndpointSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
                         if (GatewayAddress == null)
                             throw new ArgumentNullException(nameof(GatewayAddress));
-                        GrainClient.Initialize(GatewayAddress, OverrideConfig);
+                        var config = this.GetOverriddenConfig();
+                        client = ClusterClient.Create(config);
                         break;
                     default:
                         WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
-                        GrainClient.Initialize();
+                        client = ClusterClient.Create();
                         break;
                 }
 
                 if (Timeout != TimeSpan.Zero)
-                    GrainClient.SetResponseTimeout(Timeout);
+                    client.ResponseTimeout = this.Timeout;
+                client.Start();
+                this.SetClient(client);
+                this.WriteObject(client);
             }
             catch (Exception ex)
             {
@@ -84,9 +90,32 @@ namespace OrleansPSUtils
             }
         }
 
+        private ClientConfiguration GetOverriddenConfig()
+        {
+            var config = ClientConfiguration.StandardLoad();
+            if (config == null)
+            {
+                Console.WriteLine("Error loading standard client configuration file.");
+                throw new ArgumentException("Error loading standard client configuration file");
+            }
+            if (this.OverrideConfig)
+            {
+                config.Gateways = new List<IPEndPoint>(new[] { this.GatewayAddress });
+            }
+            else if (!config.Gateways.Contains(this.GatewayAddress))
+            {
+                config.Gateways.Add(this.GatewayAddress);
+            }
+            config.PreferedGatewayIndex = config.Gateways.IndexOf(this.GatewayAddress);
+            return config;
+        }
+
         protected override void StopProcessing()
         {
-            GrainClient.Uninitialize();
+            var client = this.GetClient();
+            client?.Stop();
+            client?.Dispose();
+            this.SetClient(null);
         }
     }
 }
