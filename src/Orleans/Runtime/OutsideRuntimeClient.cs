@@ -153,7 +153,7 @@ namespace Orleans
 
                 if (!secondary)
                 {
-                    UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnhandledException);
+                    UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException);
                 }
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
