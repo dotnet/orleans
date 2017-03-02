@@ -47,11 +47,18 @@ namespace Orleans.Messaging
             int headerLength = 0;
             try
             {
-                data = msg.Serialize(this.serializationManager, out headerLength);
+                int bodyLength;
+                data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
+                if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
+                {
+                    this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                        headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
+                    if (this.Log.IsVerbose3) this.Log.Verbose3("Sending large message {0}", msg.ToLongString());
+                }
             }
             catch (Exception exc)
             {
-                OnMessageSerializationFailure(msg, exc);
+                this.OnMessageSerializationFailure(msg, exc);
                 return;
             }
 

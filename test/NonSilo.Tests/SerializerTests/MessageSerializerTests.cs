@@ -54,8 +54,8 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             string s = resp.ToString();
             output.WriteLine(s);
 
-            int dummy = 0;
-            var serialized = resp.Serialize(this.fixture.SerializationManager, out dummy);
+            int dummy;
+            var serialized = resp.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
             int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
             byte[] data = new byte[length];
             int n = 0;

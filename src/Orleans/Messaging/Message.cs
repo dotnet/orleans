@@ -9,7 +9,6 @@ namespace Orleans.Runtime
 {
     internal class Message : IOutgoingMessage
     {
-        public static int LargeMessageSizeThreshold { get; set; }
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
@@ -464,13 +463,7 @@ namespace Orleans.Runtime
 
         #region Serialization
 
-        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLength)
-        {
-            int dummy;
-            return Serialize_Impl(serializationManager, out headerLength, out dummy);
-        }
-
-        private List<ArraySegment<byte>> Serialize_Impl(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
+        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
             var context = new SerializationContext(serializationManager)
             {
@@ -503,13 +496,6 @@ namespace Orleans.Runtime
            
             bytes.AddRange(headerBytes);
             bytes.AddRange(bodyBytes);
-
-            if (headerLength + bodyLength > LargeMessageSizeThreshold)
-            {
-                logger.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
-                    headerLength + bodyLength + LENGTH_HEADER_SIZE, headerLength, bodyLength, bytes.Count, this.ToString());
-                if (logger.IsVerbose3) logger.Verbose3("Sending large message {0}", this.ToLongString());
-            }
 
             headerLengthOut = headerLength;
             bodyLengthOut = bodyLength;

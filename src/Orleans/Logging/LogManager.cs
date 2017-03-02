@@ -126,8 +126,6 @@ namespace Orleans.Runtime
                 runtimeTraceLevel = config.DefaultTraceLevel;
                 appTraceLevel = config.DefaultTraceLevel;
                 SetTraceLevelOverrides(config.TraceLevelOverrides);
-                Message.LargeMessageSizeThreshold = config.LargeMessageWarningThreshold;
-                SerializationManager.LARGE_OBJECT_LIMIT = config.LargeMessageWarningThreshold;
                 RequestContext.PropagateActivityId = config.PropagateActivityId;
                 defaultModificationCounter++;
                 if (configChange)
