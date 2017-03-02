@@ -152,6 +152,6 @@ However, that is just about making different configuration choices - the code in
 
 ## Next
 
-Next we'll see how we can run this sample in a stand-alone silo.
+Next we'll see how we can run a minimal Orleans application.
 
-[Running in a Stand-alone Silo](Running-in-a-Stand-alone-Silo.md)
+[Minimal Orleans Application](Minimal-Orleans-Application.md)

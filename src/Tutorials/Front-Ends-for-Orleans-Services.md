@@ -107,6 +107,6 @@ That's the basics in place, the rest of the API can be completed by adding the r
 
 ## Next
 
-Let's look at the steps required to run Orleans on Windows Server:
+We'll look at how you can deploy Orleans in the Azure Cloud
 
-[On-Premise Deployment](On-Premise-Deployment.md)
+[Cloud Deployment](Cloud-Deployment.md)

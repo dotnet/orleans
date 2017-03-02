@@ -40,4 +40,4 @@ So this mode is appropriate for grains that hold no local state, or grains whose
 ## Next
 Next we look at Silos, a unit for hosting grains.
 
-[Silos](Silos.md)
+[Observers](Observers.md)
