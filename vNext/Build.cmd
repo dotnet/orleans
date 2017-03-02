@@ -23,6 +23,8 @@ SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 SET SOLUTION=%CMDHOME%\Orleans.vNext.sln
 SET CodeGenProject=%CMDHOME%\src\OrleansCodeGeneratorBuildMetaPackage\OrleansCodeGeneratorBuildMetaPackage.csproj
 
+if "%1" == "Pack" GOTO :Package
+
 @echo ===== Building %SOLUTION% =====
 call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES_PATH%
 
@@ -34,10 +36,7 @@ call %_dotnet% restore "%SOLUTION%"
 SET Configuration=Debug
 SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-:: Set DateTime suffix for debug builds
-for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%i
-
-call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
@@ -66,20 +65,36 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %CodeGenProject%
 
-REM set STEP=VSIX
 
-REM if "%VSSDK140Install%" == "" (
-REM    @echo Visual Studio 2015 SDK not installed - Skipping building VSIX
-REM     @GOTO :BuildFinished
-REM )
+:Package
+@echo Package Debug ============================
+:: Set DateTime suffix for debug builds
+for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%i
 
-REM @echo Build VSIX ============================
+SET Configuration=Debug
+SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-REM set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-REM SET OutputPath=%OutputPath%\VSIX
-REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%SOLUTION%"
-REM @if ERRORLEVEL 1 GOTO :ErrorStop
-REM @echo BUILD ok for VSIX package for %SOLUTION%
+call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo PACKAGE ok for %CONFIGURATION% %SOLUTION%
+
+call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo PACKAGE ok for %CONFIGURATION% %CodeGenProject%
+
+@echo Package Release ============================
+
+SET CONFIGURATION=Release
+SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
+
+call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
+@if ERRORLEVEL 1 GOTO :ErrorStop                                    
+@echo PACKAGE ok for %CONFIGURATION% %SOLUTION%
+
+call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo PACKAGE ok for %CONFIGURATION% %CodeGenProject%
+
 
 :BuildFinished
 @echo ===== Build succeeded for %SOLUTION% =====
