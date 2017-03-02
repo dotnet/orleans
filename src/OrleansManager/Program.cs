@@ -12,6 +12,8 @@ namespace OrleansManager
     {
         private static IManagementGrain systemManagement;
 
+        private static IInternalClusterClient client;
+
         static void Main(string[] args)
         {
             Console.WriteLine("Invoked OrleansManager.exe with arguments {0}", Utils.EnumerableToString(args));
@@ -38,9 +40,10 @@ namespace OrleansManager
 
         private static void RunCommand(string command, string[] args)
         {
-            GrainClient.Initialize();
+            client = ClusterClient.Create();
+            client.Start();
 
-            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            systemManagement = client.GrainFactory.GetGrain<IManagementGrain>(0);
             Dictionary<string, string> options = args.Skip(1)
                 .Where(s => s.StartsWith("-"))
                 .Select(s => s.Substring(1).Split('='))
@@ -143,7 +146,7 @@ namespace OrleansManager
                 WriteStatus(string.Format("**Calling GetDetailedGrainReport({0}, {1})", silo, grainId));
                 try
                 {
-                    var siloControl = GrainClient.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+                    var siloControl = client.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
                     DetailedGrainReport grainReport = siloControl.GetDetailedGrainReport(grainId).Result;
                     reports.Add(grainReport);
                 }
@@ -165,7 +168,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
             WriteStatus(string.Format("**Calling DeleteGrain({0}, {1})", silo, grainId));
             directory.DeleteGrainAsync(grainId).Wait();
@@ -179,7 +182,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
             WriteStatus(string.Format("**Calling LookupGrain({0}, {1})", silo, grainId));
             //Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.FullLookUp(grainId, true);
@@ -252,7 +255,7 @@ namespace OrleansManager
 
         private static async Task<List<SiloAddress>> GetSiloAddresses()
         {
-            var gatewayProvider = (IGatewayListProvider) GrainClient.ServiceProvider.GetService(typeof(IGatewayListProvider));
+            var gatewayProvider = (IGatewayListProvider) client.ServiceProvider.GetService(typeof(IGatewayListProvider));
             IList<Uri> gateways = await gatewayProvider.GetGateways();
             if (gateways.Count >= 1) 
                 return gateways.Select(Utils.ToSiloAddress).ToList();
