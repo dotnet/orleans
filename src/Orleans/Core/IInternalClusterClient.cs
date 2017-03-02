@@ -16,10 +16,5 @@ namespace Orleans
         /// Gets the client's <see cref="IStreamProviderRuntime"/>.
         /// </summary>
         IStreamProviderRuntime StreamProviderRuntime { get; }
-
-        /// <summary>
-        /// Notifies this client that the connection to the cluster has been lost.
-        /// </summary>
-        void NotifyClusterConnectionLost();
     }
 }

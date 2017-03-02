@@ -110,7 +110,18 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public event ConnectionToClusterLostHandler ClusterConnectionLost;
+        public event ConnectionToClusterLostHandler ClusterConnectionLost
+        {
+            add
+            {
+                this.runtimeClient.ClusterConnectionLost += value;
+            }
+
+            remove
+            {
+                this.runtimeClient.ClusterConnectionLost -= value;
+            }
+        }
 
         /// <summary>
         /// Creates a new <see cref="ClusterClient"/>, loading configuration using the default method.
@@ -199,19 +210,6 @@ namespace Orleans
 
             this.IsInitialized = false;
             GC.SuppressFinalize(this);
-        }
-
-        /// <inheritdoc />
-        public void NotifyClusterConnectionLost()
-        {
-            try
-            {
-                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                this.Logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
-            }
         }
 
         private void ThrowIfNotInitialized()

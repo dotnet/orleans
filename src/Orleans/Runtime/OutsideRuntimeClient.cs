@@ -17,7 +17,7 @@ using Orleans.Streams;
 
 namespace Orleans
 {
-    internal class OutsideRuntimeClient : IRuntimeClient, IDisposable
+    internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
@@ -99,11 +99,13 @@ namespace Orleans
             }
             
             var services = new ServiceCollection();
+            services.AddFromExisting<IClusterClient, IInternalClusterClient>();
             services.AddSingleton(cfg);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
             services.AddSingleton(this);
             services.AddSingleton<IRuntimeClient>(this);
+            services.AddSingleton<IClusterConnectionStatusListener>(this);
             services.AddSingleton<GrainFactory>();
             services.AddFromExisting<IGrainFactory, GrainFactory>();
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
@@ -919,5 +921,21 @@ namespace Orleans
 
         /// <inheritdoc />
         public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
+        
+        /// <inheritdoc />
+        public event ConnectionToClusterLostHandler ClusterConnectionLost;
+
+        /// <inheritdoc />
+        public void NotifyClusterConnectionLost()
+        {
+            try
+            {
+                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+            }
+        }
     }
 }

@@ -445,11 +445,5 @@ namespace Orleans
                 client.ClusterConnectionLost -= value;
             }
         }
-
-        internal static void NotifyClusterConnectionLost()
-        {
-            CheckInitialized();
-            client.NotifyClusterConnectionLost();
-        }
     }
 }
