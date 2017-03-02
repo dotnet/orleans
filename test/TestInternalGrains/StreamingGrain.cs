@@ -35,19 +35,19 @@ namespace UnitTests.Grains
     public class ConsumerObserver : IAsyncObserver<StreamItem>, IConsumerObserver
     {
         [NonSerialized]
-        protected Logger _logger;
+        private Logger _logger;
         [NonSerialized]
-        protected StreamSubscriptionHandle<StreamItem> _subscription;
-        protected int _itemsConsumed;
-        protected Guid _streamId;
-        protected string _streamNamespace;
+        private StreamSubscriptionHandle<StreamItem> _subscription;
+        private int _itemsConsumed;
+        private Guid _streamId;
+        private string _streamNamespace;
 
         public Task<int> ItemsConsumed
         {
             get { return Task.FromResult(_itemsConsumed); }
         }
 
-        protected ConsumerObserver(Logger logger)
+        private ConsumerObserver(Logger logger)
         {
             _logger = logger;
             _itemsConsumed = 0;
@@ -97,7 +97,7 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
-        public virtual async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
+        public async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
         {
             _logger.Info("BecomeConsumer");
             if (ProviderName != null)
@@ -110,7 +110,7 @@ namespace UnitTests.Grains
             _subscription = await stream.SubscribeAsync(this);    
         }
 
-        public virtual async Task RenewConsumer(Logger logger, IStreamProvider streamProvider)
+        public async Task RenewConsumer(Logger logger, IStreamProvider streamProvider)
         {
             _logger = logger;
             _logger.Info("RenewConsumer");
@@ -134,7 +134,7 @@ namespace UnitTests.Grains
             get { return Task.FromResult(_subscription == null ? 0 : 1); }
         }
 
-        public string ProviderName { get; protected set; }
+        public string ProviderName { get; private set; }
     }
 
     [Serializable]
@@ -642,7 +642,6 @@ namespace UnitTests.Grains
             await ClearStateAsync();
         }
     }
-
     
     [StorageProvider(ProviderName = "MemoryStore")]
     public class Streaming_ConsumerGrain : Grain<Streaming_ConsumerGrain_State>, IStreaming_ConsumerGrain    

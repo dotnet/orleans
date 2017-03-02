@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 using System.Collections.Concurrent;
+using Microsoft.FSharp.Collections;
 using Orleans.Providers;
 using Orleans.Streams.Core;
 
@@ -18,9 +19,9 @@ namespace UnitTests.Grains
     [StatelessWorker(MaxLocalWorkers)]
     public class Stateless_ConsumerGrain : SampleStreaming_ConsumerGrain, IStateless_ConsumerGrain
     {
-        private string providerToUse = "SMSProvider";
         public const int MaxLocalWorkers = 2;
 
+        private List<StreamSubscriptionHandle<int>> consumerHandles;
         public override async Task OnActivateAsync()
         {
             logger = base.GetLogger("Stateless_ConsumerGrain " + base.IdentityString);
@@ -29,7 +30,7 @@ namespace UnitTests.Grains
             consumerHandle = null;
             logger.Info("ResumeAsyncOnObserver");
             consumerObserver = new SampleConsumerObserver<int>(this);
-            //read only on StreamingConfig when grain activate
+            consumerHandles = new List<StreamSubscriptionHandle<int>>();
             var subGrain = this.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
             var streamIds = await subGrain.GetStreamIdForConsumerGrain(this.GetPrimaryKey());
             foreach (var streamId in streamIds)
@@ -38,9 +39,20 @@ namespace UnitTests.Grains
                 IAsyncStream<int> stream = streamProvider.GetStream<int>(streamId.Guid, streamId.Namespace);
                 foreach (var handle in await stream.GetAllSubscriptionHandles())
                 {
-                    await handle.ResumeAsync(consumerObserver);
+                    var newHandle = await handle.ResumeAsync(consumerObserver);
+                    consumerHandles.Add(newHandle);
                 }
             }
+        }
+
+        public async Task StopConsuming()
+        {
+            logger.Info("StopConsuming");
+            foreach (var handle in consumerHandles)
+            {
+                await handle.UnsubscribeAsync();
+            }
+            consumerHandles.Clear();
         }
     }
 
@@ -51,6 +63,7 @@ namespace UnitTests.Grains
         Task<List<FullStreamIdentity>> GetStreamIdForConsumerGrain(Guid grainId);
         Task RemoveSubscription(StreamSubscription subscription);
         Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity);
+        Task ClearStateAfterTesting();
     }
 
 
@@ -76,6 +89,11 @@ namespace UnitTests.Grains
             }
             await this.WriteStateAsync();
             return subscriptions;
+        }
+
+        public async Task ClearStateAfterTesting()
+        {
+            await this.ClearStateAsync();
         }
 
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity)

@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -12,10 +11,6 @@ using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using System.Collections.Generic;
-using Orleans.Streams.Core;
-using UnitTests.Grains;
-using Tester.StreamingTests;
 
 namespace UnitTests.StreamingTests
 {
@@ -98,7 +93,7 @@ namespace UnitTests.StreamingTests
 
     public class SampleStreamingTests
     {
-        public const string StreamNamespace = "SampleStreamNamespace";
+        private const string StreamNamespace = "SampleStreamNamespace";
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private readonly string streamProvider;

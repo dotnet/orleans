@@ -116,7 +116,7 @@ namespace UnitTests.Grains
 
     public class SampleStreaming_ConsumerGrain : Grain, ISampleStreaming_ConsumerGrain
     {
-        protected IAsyncObservable<int> consumer;
+        private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
         internal Logger logger;
         protected IAsyncObserver<int> consumerObserver;
@@ -140,7 +140,7 @@ namespace UnitTests.Grains
             consumerHandle = await consumer.SubscribeAsync(consumerObserver);
         }
 
-        public async Task StopConsuming()
+        public virtual async Task StopConsuming()
         {
             logger.Info("StopConsuming");
             if (consumerHandle != null)
