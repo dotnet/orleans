@@ -52,7 +52,7 @@ namespace Tester.SQLUtils
         [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
         public async Task ClientInit_SqlServer_WithStats()
         {
-            Assert.True(GrainClient.IsInitialized);
+            Assert.True(this.HostedCluster.Client.IsInitialized);
 
             ClientConfiguration config = this.HostedCluster.ClientConfiguration;
 
@@ -66,7 +66,7 @@ namespace Tester.SQLUtils
             Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
+            Assert.True(await silo.GetTestHook(this.HostedCluster.InternalGrainFactory).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
             Assert.Equal(statisticProviderName, silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }

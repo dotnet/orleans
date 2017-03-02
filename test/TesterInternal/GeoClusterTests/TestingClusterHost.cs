@@ -313,6 +313,9 @@ namespace Tests.GeoClusterTests
             static Lazy<ClientConfiguration> clientconfiguration = new Lazy<ClientConfiguration>(() => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
 
             public ClientWrapperBase(string name, int gatewayport, string clusterId, Action<ClientConfiguration> clientconfig_customizer)
+            private readonly Lazy<ClientConfiguration> clientConfiguration =
+                new Lazy<ClientConfiguration>(
+                    () => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
             {
                 this.Name = name;
 
@@ -321,7 +324,7 @@ namespace Tests.GeoClusterTests
                 ClientConfiguration config = null;
                 try
                 {
-                    config = clientconfiguration.Value;
+                    config = this.clientConfiguration.Value;
                 }
                 catch (Exception) { }
 

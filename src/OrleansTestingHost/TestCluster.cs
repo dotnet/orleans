@@ -59,9 +59,19 @@ namespace Orleans.TestingHost
         public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
 
         /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient { get; private set; }
+
+        /// <summary>
+        /// The client.
+        /// </summary>
+        public IClusterClient Client => this.InternalClient;
+
+        /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        public IGrainFactory GrainFactory { get; private set; }
+        public IGrainFactory GrainFactory => this.Client.GrainFactory;
 
         /// <summary>
         /// The client-side <see cref="StreamProviderManager"/>.
@@ -71,12 +81,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        internal IInternalGrainFactory InternalGrainFactory { get; private set; }
-        
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient.InternalGrainFactory;
+
         /// <summary>
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
         /// </summary>
-        public IServiceProvider ServiceProvider { get; private set; }
+        public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
         
         /// <summary>
         /// SerializationManager to use in the tests
@@ -310,7 +320,9 @@ namespace Orleans.TestingHost
         {
             try
             {
-                GrainClient.Uninitialize();
+                this.InternalClient.Stop();
+                this.InternalClient.Abort();
+                this.InternalClient = null;
             }
             catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
 
@@ -365,7 +377,7 @@ namespace Orleans.TestingHost
         /// </summary>
         public void KillClient()
         {
-            GrainClient.HardKill();
+            this.InternalClient?.Abort();
         }
 
         /// <summary>
@@ -424,10 +436,8 @@ namespace Orleans.TestingHost
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
 
-            GrainClient.Initialize(clientConfig);
-            this.GrainFactory = GrainClient.GrainFactory;
-            this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
-            this.ServiceProvider = GrainClient.ServiceProvider;
+            this.InternalClient = ClusterClient.Create(clientConfig);
+            this.InternalClient.Start();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }

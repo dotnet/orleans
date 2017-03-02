@@ -148,7 +148,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, List<Guid> streamGuids, int eventsInStream, int payloadSize)
         {
-            IStreamProvider streamProvider = GrainClient.GetStreamProvider(StreamProviderName);
+            IStreamProvider streamProvider = this.Client.GetStreamProvider(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers = streamGuids
                     .Select(streamGuid => streamProvider.GetStream<GeneratedEvent>(streamGuid, streamNamespace))
                     .ToArray();

@@ -174,47 +174,58 @@ namespace DefaultCluster.Tests.General
             ITestGrain simple = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
 
             simple.GetMultipleGrainInterfaces_List().Wait();
-            logger.Info("GetMultipleGrainInterfaces_List() worked");
+            this.Logger.Info("GetMultipleGrainInterfaces_List() worked");
 
             simple.GetMultipleGrainInterfaces_Array().Wait();
 
-            logger.Info("GetMultipleGrainInterfaces_Array() worked");
+            this.Logger.Info("GetMultipleGrainInterfaces_Array() worked");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"),
+         TestCategory("Reentrancy")]
         public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            TimeSpan prevTimeout = GrainClient.GetResponseTimeout();
-
-            // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
-            TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
-            GrainClient.SetResponseTimeout(shortTimeout);
-
-            ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
-            int num = 10;
-            for (long i = 0; i < num; i++)
-            {
-                Task task = grain.DoLongAction(TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3), "A_" + i);
-                promises.Add(task);
-            }
+            TimeSpan prevTimeout = this.Client.ResponseTimeout;
             try
             {
-                Task.WhenAll(promises).Wait();
-            }catch(Exception)
-            {
-                logger.Info("Done with stress iteration.");
+                // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
+                TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
+                this.Client.ResponseTimeout = shortTimeout;
+
+                ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+                int num = 10;
+                for (long i = 0; i < num; i++)
+                {
+                    Task task = grain.DoLongAction(
+                        TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3),
+                        "A_" + i);
+                    promises.Add(task);
+                }
+                try
+                {
+                    Task.WhenAll(promises).Wait();
+                }
+                catch (Exception)
+                {
+                    this.Logger.Info("Done with stress iteration.");
+                }
+
+                // wait a bit to make sure expired msgs in the silo is trigered.
+                Thread.Sleep(TimeSpan.FromSeconds(10));
+
+                // set the regular response time back, expect msgs ot succeed.
+                this.Client.ResponseTimeout = prevTimeout;
+                
+                this.Logger.Info("About to send a next legit request that should succeed.");
+                grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
+                this.Logger.Info("The request succeeded.");
             }
-
-            // wait a bit to make sure expired msgs in the silo is trigered.
-            Thread.Sleep(TimeSpan.FromSeconds(10));
-
-            // set the regular response time back, expect msgs ot succeed.
-            GrainClient.SetResponseTimeout(prevTimeout);
-
-            logger.Info("About to send a next legit request that should succeed.");
-            grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
-            logger.Info("The request succeeded.");
+            finally
+            {
+                // set the regular response time back, expect msgs ot succeed.
+                this.HostedCluster.Client.ResponseTimeout = prevTimeout;
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext"), TestCategory("GetGrain")]
@@ -223,7 +234,7 @@ namespace DefaultCluster.Tests.General
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             Task<Tuple<string, string>> promise1 = g1.TestRequestContext();
             Tuple<string, string> requstContext = promise1.Result;
-            logger.Info("Request Context is: " + requstContext);
+            this.Logger.Info("Request Context is: " + requstContext);
             Assert.NotNull(requstContext.Item2);
             Assert.NotNull(requstContext.Item1);
         }

@@ -48,7 +48,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackWithStreamTest()
         {
-            var streamProvider = GrainClient.GetStreamProvider("SMSProvider");
+            var streamProvider = this.Client.GetStreamProvider("SMSProvider");
             var id = Guid.NewGuid();
             var stream = streamProvider.GetStream<int>(id, "InterceptedStream");
             var grain = this.GrainFactory.GetGrain<IStreamInterceptionGrain>(id);

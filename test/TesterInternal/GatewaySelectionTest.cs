@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {
-    public class GatewaySelectionTest : IDisposable
+    public class GatewaySelectionTest
     {
         protected readonly ITestOutputHelper output;
 
@@ -29,14 +29,6 @@ namespace UnitTests.MessageCenterTests
         public GatewaySelectionTest(ITestOutputHelper output)
         {
             this.output = output;
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
-        }
-        
-        public void Dispose()
-        {
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
@@ -54,7 +46,7 @@ namespace UnitTests.MessageCenterTests
             bool failed = false;
             try
             {
-                GrainClient.Initialize(cfg);
+                ClusterClient.Create(cfg);
             }
             catch (Exception exc)
             {

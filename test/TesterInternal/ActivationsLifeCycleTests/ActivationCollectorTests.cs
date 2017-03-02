@@ -24,7 +24,9 @@ namespace UnitTests.ActivationsLifeCycleTests
         private static readonly TimeSpan WAIT_TIME = DEFAULT_IDLE_TIMEOUT.Multiply(3.0);
 
         private TestCluster testCluster;
-        
+
+        private Logger logger;
+
         private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
             GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
@@ -36,7 +38,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
             testCluster = new TestCluster(config);
             testCluster.Deploy();
-
+            this.logger = this.testCluster.Client.Logger;
         }
 
         private void Initialize(TimeSpan collectionAgeLimit)

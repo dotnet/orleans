@@ -37,7 +37,7 @@ namespace Tester.AzureUtils.Streaming
 
         public AQStreamingTests()
         {
-            runner = new SingleStreamTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
         
         public override void Dispose()
@@ -149,14 +149,14 @@ namespace Tester.AzureUtils.Streaming
         [Fact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 this.HostedCluster.StartAdditionalSilo);
         }
@@ -164,7 +164,7 @@ namespace Tester.AzureUtils.Streaming
         //[Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task AQ_18_MultipleStreams_1J_1F_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 this.HostedCluster.StartAdditionalSilo,
                 this.HostedCluster.StopSilo);

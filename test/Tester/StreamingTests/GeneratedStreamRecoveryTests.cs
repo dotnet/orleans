@@ -65,7 +65,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
-            logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
+            this.fixture.Logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
                 ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 Fixture.AdapterConfig.TotalQueueCount,
@@ -75,7 +75,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
-            logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+            this.fixture.Logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
                 ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 Fixture.AdapterConfig.TotalQueueCount,

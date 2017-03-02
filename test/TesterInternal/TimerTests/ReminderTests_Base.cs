@@ -183,7 +183,7 @@ namespace UnitTests.TimerTests
             // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing 
             // functionality implemented on the LocalReminderService yet
             TimeSpan period = await g.GetReminderPeriod(DR);
-            logger.Info("PerGrainMultiReminderTestChurn Period={0} Grain={1}", period, g);
+            this.log.Info("PerGrainMultiReminderTestChurn Period={0} Grain={1}", period, g);
 
             // Start Default Reminder
             //g.StartReminder(DR, file + "_" + DR).Wait();
@@ -237,7 +237,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            logger.Info("PerGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.Info("PerGrainFailureTest Period={0} Grain={1}", period, grain);
 
             await grain.StartReminder(DR);
             TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
@@ -261,7 +261,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await g.GetReminderPeriod(DR);
 
-            logger.Info("PerGrainMultiReminderTest Period={0} Grain={1}", period, g);
+            this.log.Info("PerGrainMultiReminderTest Period={0} Grain={1}", period, g);
 
             // Each reminder is started 2 periods after the previous reminder
             // once all reminders have been started, stop them every 2 periods
@@ -332,7 +332,7 @@ namespace UnitTests.TimerTests
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
-            logger.Info("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
+            this.log.Info("PerCopyGrainFailureTest Period={0} Grain={1}", period, grain);
 
             await grain.StartReminder(DR);
             Thread.Sleep(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
@@ -363,7 +363,7 @@ namespace UnitTests.TimerTests
             sb.AppendFormat(
                 " -- Expecting value in the range between {0} and {1}, and got value {2}.",
                 lowerLimit, upperLimit, val);
-            logger.Info(sb.ToString());
+            this.log.Info(sb.ToString());
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 

@@ -442,16 +442,16 @@ namespace UnitTests.Streaming.Reliability
             when = "After BecomeProducer";
             // Note: Only semantics guarenteed for producer is that they will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.Info("AddConsumer x 2 : StreamId={0} Provider={1}", _streamId, _streamProviderName);
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -478,21 +478,21 @@ namespace UnitTests.Streaming.Reliability
             when = "After first BecomeProducer";
             // Note: Only semantics guarenteed for producer is that they will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             await producerGrain.BecomeProducer(_streamId, _streamProviderName);
             when = "After second BecomeProducer";
             await producerGrain.SendItem(0);
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.Info("AddConsumer x 2 : StreamId={0} Provider={1}", _streamId, _streamProviderName);
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -521,22 +521,22 @@ namespace UnitTests.Streaming.Reliability
             when = "After BecomeProducer";
             // Note: Only semantics guarenteed are that producer will have been registered by time that first msg is sent.
             await producerGrain.SendItem(0);
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             logger.Info("AddConsumer x 2 : StreamId={0} Provider={1}", _streamId, _streamProviderName);
             var c1 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After first AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 1);
             var c2 = await consumerGrain.AddConsumer(_streamId, _streamProviderName);
             when = "After second AddConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 2);
 
             logger.Info("RemoveConsumer: StreamId={0} Provider={1}", _streamId, _streamProviderName);
             await consumerGrain.RemoveConsumer(_streamId, _streamProviderName, c1);
             when = "After first RemoveConsumer";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
             await CheckConsumerCounts(when, consumerGrain, 1);
 #if REMOVE_PRODUCER
             logger.Info("RemoveProducer: StreamId={0} Provider={1}", _streamId, _streamProviderName);
@@ -551,7 +551,7 @@ namespace UnitTests.Streaming.Reliability
 #if REMOVE_PRODUCER
             await CheckPubSubCounts(when, 0, 0);
 #else
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 0, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 #endif
             await CheckConsumerCounts(when, consumerGrain, 0);
 
@@ -628,7 +628,7 @@ namespace UnitTests.Streaming.Reliability
  await Do_BaselineTest(consumerGrainId, producerGrainId);
 
             string when = "Before restart all silos";
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             // Restart silos
             //RestartDefaultSilosButKeepCurrentClient(testName);
@@ -638,12 +638,12 @@ namespace UnitTests.Streaming.Reliability
             CheckSilosRunning(when, numExpectedSilos);
             // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here. 
             // Expected == -1 means don't care.
-            await StreamTestUtils.CheckPubSubCounts(output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             await producerGrain.SendItem(1);
             when = "After SendItem";
 
-            await StreamTestUtils.CheckPubSubCounts(output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             var consumerGrain = GetGrain(consumerGrainId);
             await CheckReceivedCounts(when, consumerGrain, 1, 0);

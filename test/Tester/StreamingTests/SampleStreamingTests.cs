@@ -19,6 +19,8 @@ namespace UnitTests.StreamingTests
     {
         private readonly Fixture fixture;
 
+        private Logger logger;
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -38,36 +40,37 @@ namespace UnitTests.StreamingTests
         public SampleSmsStreamingTests(Fixture fixture)
         {
             this.fixture = fixture;
+            logger = this.fixture.Logger;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SampleStreamingTests_1()
         {
-            logger.Info("************************ SampleStreamingTests_1 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger, this.fixture.HostedCluster);
+            this.logger.Info("************************ SampleStreamingTests_1 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_2()
         {
-            logger.Info("************************ SampleStreamingTests_2 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger, this.fixture.HostedCluster);
+            this.logger.Info("************************ SampleStreamingTests_2 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_3()
         {
-            logger.Info("************************ SampleStreamingTests_3 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger, this.fixture.HostedCluster);
+            this.logger.Info("************************ SampleStreamingTests_3 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_InlineConsumer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MultipleImplicitSubscriptionTest()
         {
-            logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
+            this.logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
             var streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
@@ -170,7 +173,7 @@ namespace UnitTests.StreamingTests
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            this.logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);

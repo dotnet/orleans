@@ -26,17 +26,13 @@ namespace UnitTests
 
         public ConfigTests(ITestOutputHelper output)
         {
-            this.output = output;
             LogManager.UnInitialize();
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
+            this.output = output;
         }
 
         public void Dispose()
         {
             LogManager.UnInitialize();
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -770,42 +766,25 @@ namespace UnitTests
         {
             const string filename = "ClientConfig_NewAzure.xml";
 
-            try
-            {
-                GrainClient.TestOnlyNoConnect = true;
+            var client = ClusterClient.Create(filename);
 
-                GrainClient.Initialize(filename);
+            ClientConfiguration config = client.Configuration;
 
-                ClientConfiguration config = GrainClient.CurrentConfig;
+            output.WriteLine(config);
 
-                output.WriteLine(config);
+            Assert.NotNull(config); // Client.CurrentConfig
 
-                Assert.NotNull(config); // Client.CurrentConfig
+            Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
 
-                Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
-
-                Assert.Equal(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider); // GatewayProviderType
-            }
-            finally
-            {
-                GrainClient.TestOnlyNoConnect = false;
-            }
+            // GatewayProviderType
+            Assert.Equal(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_AzureInit_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-            GrainClient.TestOnlyNoConnect = true;
-            try
-            {
-                Assert.Throws<FileNotFoundException>(() =>
-                    GrainClient.Initialize(filename));
-            }
-            finally
-            {
-                GrainClient.TestOnlyNoConnect = false;
-            }
+            Assert.Throws<FileNotFoundException>(() => ClusterClient.Create(filename));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]

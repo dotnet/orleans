@@ -93,7 +93,7 @@ namespace UnitTests.MembershipTests
                 CreateAndDeployTestCluster();
                 var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
                 clientId = client.CurrentActivationAddress.Grain;
-                var report = await TestUtils.GetDetailedGrainReport(clientId, hostedCluster.Primary);
+                var report = await TestUtils.GetDetailedGrainReport(this.hostedCluster.InternalGrainFactory, clientId, hostedCluster.Primary);
                 if (this.hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
                 {
                     break;

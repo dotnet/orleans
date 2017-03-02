@@ -11,10 +11,16 @@ using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace DefaultCluster.Tests
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
+        private readonly IInternalGrainFactory internalGrainFactory;
+
         public GrainReferenceCastTests(DefaultClusterFixture fixture) : base(fixture)
         {
+            var client = this.HostedCluster.Client;
+            this.internalGrainFactory = client.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
@@ -149,7 +155,7 @@ namespace DefaultCluster.Tests
                 SimpleGrain.SimpleGrainNamePrefix);
 
             // Attempting to cast a grain to a non-grain type should fail.
-            Assert.Throws<InvalidCastException>(() => GrainClient.InternalGrainFactory.Cast(grain, typeof(bool)));
+            Assert.Throws<InvalidCastException>(() => this.internalGrainFactory.Cast(grain, typeof(bool)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]

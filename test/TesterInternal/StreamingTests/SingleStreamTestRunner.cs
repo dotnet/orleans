@@ -29,10 +29,12 @@ namespace UnitTests.StreamingTests
         private readonly int testNumber;
         private readonly bool runFullTest;
         private readonly SafeRandom random;
+        private readonly IInternalClusterClient client;
 
-        internal SingleStreamTestRunner(IInternalGrainFactory grainFactory, string streamProvider, int testNum = 0, bool fullTest = true)
+        internal SingleStreamTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
         {
-            this.grainFactory = grainFactory;
+            this.client = client;
+            this.grainFactory = client.InternalGrainFactory;
             this.streamProviderName = streamProvider;
             this.logger = LogManager.GetLogger("SingleStreamTestRunner", LoggerType.Application);
             this.testNumber = testNum;
@@ -68,14 +70,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_02_OneProducerGrainOneConsumerClient");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
             producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
             producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -85,12 +87,12 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_03_OneProducerClientOneConsumerGrain");
             Guid streamId = Guid.NewGuid();
             consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, this.grainFactory);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
             consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, this.grainFactory);
             await BasicTestAsync();
             await StopProxies();
@@ -100,14 +102,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_04_OneProducerClientOneConsumerClient");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -128,7 +130,7 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory, Many);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
             producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, this.grainFactory, null, Many);
             await BasicTestAsync();
             await StopProxies();
@@ -139,7 +141,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains");
             Guid streamId = Guid.NewGuid();
             consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, this.grainFactory, null, Many);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory, Many);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -148,8 +150,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory, Many);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory, Many);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -193,7 +195,7 @@ namespace UnitTests.StreamingTests
             Guid grain1 = Guid.NewGuid();
             Guid[] producerGrainIds = new Guid[] { grain1, grain1, grain1, grain1 };
             producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, this.grainFactory, producerGrainIds);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.grainFactory, Many);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -205,7 +207,7 @@ namespace UnitTests.StreamingTests
             Guid grain1 = Guid.NewGuid();
             Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
             consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, this.grainFactory, consumerGrainIds);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.grainFactory, Many);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -316,7 +318,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_19_ConsumerImplicitlySubscribedToProducerClient");
             string consumerTypeName = typeof(Streaming_ImplicitlySubscribedConsumerGrain).FullName;
             Guid streamGuid = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.grainFactory);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.client);
             consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, logger, this.grainFactory, consumerTypeName);
 
             logger.Info("\n** Starting Test {0}.\n", testNumber);
@@ -482,7 +484,7 @@ namespace UnitTests.StreamingTests
             // currently, we only support checking the producer count on the SMS rendezvous grain.
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
-                var actualCount = await StreamTestUtils.GetStreamPubSub().ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
+                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
                 Assert.Equal(expectedCount, actualCount);
             }

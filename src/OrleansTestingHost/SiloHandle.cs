@@ -33,7 +33,7 @@ namespace Orleans.TestingHost
         public abstract void StopSilo(bool stopGracefully);
 
         /// <summary>Gets the Silo test hook</summary>
-        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.ProxyAddress);
+        internal ITestHooks GetTestHook(IInternalGrainFactory grainFactory) => grainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.ProxyAddress);
 
         /// <summary>Gets the Silo test hook that uses AppDomain remoting
         /// (NOTE: this will be removed really soon, and was migrated here temporarily. It does not respect the abstraction
