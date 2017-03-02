@@ -182,6 +182,11 @@ namespace Orleans
         /// </summary>
         /// <param name="gatewayAddress">IP address and port of the gateway silo</param>
         /// <param name="overrideConfig">Whether the specified gateway endpoint should override / replace the values from config file, or be additive</param>
+        [Obsolete(
+             "This method is obsolete and will be removed in a future release. If it is needed, reimplement this method "
+             + "according to its source: "
+             + "https://github.com/dotnet/orleans/blob/8f067e77f115c0599eff00c2bdc6f37f2adbc58d/src/Orleans/Core/GrainClient.cs#L173"
+         )]
         public static void Initialize(IPEndPoint gatewayAddress, bool overrideConfig = true)
         {
             var config = ClientConfiguration.StandardLoad();
