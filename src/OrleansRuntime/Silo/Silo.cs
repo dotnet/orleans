@@ -190,7 +190,6 @@ namespace Orleans.Runtime
                 LogManager.Initialize(LocalConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
-            MultiClusterRegistrationStrategy.Initialize(config.Globals);
             StatisticsCollector.Initialize(LocalConfig);
             
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
@@ -256,6 +255,7 @@ namespace Orleans.Runtime
             services.AddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddSingleton<MultiClusterGossipChannelFactory>();
             services.AddSingleton<MultiClusterOracle>();
+            services.AddSingleton<MultiClusterRegistrationStrategyManager>();
             services.AddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.AddSingleton<DeploymentLoadPublisher>();
             services.AddSingleton<MembershipOracle>();

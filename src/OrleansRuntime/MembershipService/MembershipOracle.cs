@@ -339,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
 
         #region Table update/insert processing
 
-        private static Task<bool> MembershipExecuteWithRetries(
+        private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction, 
             TimeSpan timeout)
         {
@@ -350,8 +350,8 @@ namespace Orleans.Runtime.MembershipService
                     (result, i) => result == false,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
             );
         }
 

@@ -22,6 +22,9 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
         private readonly SerializationManager serializationManager;
+
+        private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
+
         private static readonly object lockable = new object();
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
@@ -41,16 +44,17 @@ namespace Orleans.Runtime
             Instance = null;
         }
 
-        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager)
-            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager)
+        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
+            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager, multiClusterRegistrationStrategyManager)
         {
         }
 
-        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager)
+        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
         {
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
             this.serializationManager = serializationManager;
+            this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
@@ -189,7 +193,7 @@ namespace Orleans.Runtime
             var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
             var grainClassTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
             var placement = GrainTypeData.GetPlacementStrategy(grainClass, this.defaultPlacementStrategy);
-            var registrationStrategy = GrainTypeData.GetMultiClusterRegistrationStrategy(grainClass);
+            var registrationStrategy = this.multiClusterRegistrationStrategyManager.GetMultiClusterRegistrationStrategy(grainClass);
 
             foreach (var iface in grainInterfaces)
             {

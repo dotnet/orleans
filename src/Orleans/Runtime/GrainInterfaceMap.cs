@@ -423,7 +423,7 @@ namespace Orleans.Runtime
             this.interfaceData = interfaceData;
             genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
             placementStrategy = placement;
-            this.registrationStrategy = registrationStrategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            this.registrationStrategy = registrationStrategy;
         }
 
         internal string GetClassName(string typeArguments)
