@@ -144,7 +144,7 @@ await friend.Subscribe(obj);
 </code></pre><p>Now whenever our grain on the server calls the <code>SendUpdateMessage</code> method, all subscribed clients will receive the message. In our client code, the <code>Chat</code> instance in variable <code>c</code> will receive the message and output it to the console.</p>
 <p><strong>Note:</strong> Objects passed to <code>CreateObjectReference</code> are held via a <a href="https://msdn.microsoft.com/en-us/library/system.weakreference"><code>WeakReference&lt;T&gt;</code></a> and will therefore be garbage collected if no other references exist. Users should maintain a reference for each observer which they do not want to be collected.</p>
 <h2 id="next">Next</h2>
-<p>Next we look at <a href="Developing-a-Grain.html">Developing a Grain</a></p>
+<p>Next we look at <a href="Running-the-Application.html">Running the Application</a></p>
 
             </article>
           </div>
