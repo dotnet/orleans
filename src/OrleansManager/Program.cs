@@ -218,7 +218,7 @@ namespace OrleansManager
             int interfaceTypeCodeDataLong;
             long implementationTypeCode;
 
-            var grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
+            var grainTypeResolver = (IGrainTypeResolver)client.ServiceProvider.GetService(typeof(IGrainTypeResolver));
             if (int.TryParse(interfaceTypeCodeOrImplClassName, out interfaceTypeCodeDataLong))
             {
                 // parsed it as int, so it is an interface type code.

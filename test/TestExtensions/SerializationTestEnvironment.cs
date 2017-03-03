@@ -13,7 +13,7 @@ namespace TestExtensions
         public SerializationTestEnvironment(ClientConfiguration config = null)
         {
             if (config == null) config = this.DefaultConfig();
-            Orleans.Runtime.RuntimeClient.Current = this.RuntimeClient = new OutsideRuntimeClient(config, true);
+            this.RuntimeClient = new OutsideRuntimeClient(config, true);
         }
 
         private ClientConfiguration DefaultConfig()
