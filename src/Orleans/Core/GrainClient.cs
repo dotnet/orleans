@@ -62,29 +62,6 @@ namespace Orleans
             return client.GrainFactory;
         }
 
-        internal static IInternalGrainFactory InternalGrainFactory
-        {
-            get
-            {
-                if (!IsInitialized)
-                {
-                    throw new OrleansException("You must initialize the Grain Client before accessing the InternalGrainFactory");
-                }
-
-                return client.InternalGrainFactory;
-            }
-        }
-
-        internal static IServiceProvider ServiceProvider
-        {
-            get
-            {
-                CheckInitialized();
-                return client.ServiceProvider;
-            }
-        }
-
-
         /// <summary>
         /// Initializes the client runtime from the standard client configuration file.
         /// </summary>
