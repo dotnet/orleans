@@ -163,7 +163,10 @@ namespace UnitTests.GeoClusterTests
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> clientconfig_customizer) : base(name, gatewayport, clusterId, clientconfig_customizer)
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer) : base(name, gatewayport, clusterId, configCustomizer)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }

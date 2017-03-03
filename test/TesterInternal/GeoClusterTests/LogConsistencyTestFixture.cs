@@ -28,6 +28,9 @@ namespace Tests.GeoClusterTests
 
         public class ClientWrapper : Tests.GeoClusterTests.TestingClusterHost.ClientWrapperBase
         {
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
                : base(name, gatewayport, clusterId, customizer)
             {
@@ -160,7 +163,7 @@ namespace Tests.GeoClusterTests
                     var clustername = Cluster[i] = ((char)('A' + i)).ToString();
                     NewGeoCluster(globalserviceid, clustername, 1,
                         cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString, cfg));
-                    Client[i] = NewClient<ClientWrapper>(clustername, 0);
+                    Client[i] = this.NewClient(clustername, 0, ClientWrapper.Factory);
                 }
 
                 WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
