@@ -35,7 +35,6 @@ namespace Tester.StreamingTests
                     StreamPubSubType.ExplicitGrainBasedOnly);
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
                     StreamPubSubType.ExplicitGrainBasedOnly);
-
                 return new TestCluster(options);
             }
         }
@@ -51,7 +50,7 @@ namespace Tester.StreamingTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
             //set up subscription for 10 consumer grains
-            await subGrain.SetupInitialStreamingSubscriptionForTests(streamId, 10);
+            await subGrain.SetupInitialStreamingSubscriptionForTests<IStateless_ConsumerGrain>(streamId, 10);
 
             var producer = this.fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -83,14 +82,13 @@ namespace Tester.StreamingTests
             await subGrain.ClearStateAfterTesting();
         }
 
-
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StreamingTests_Consumer_Producer_UnSubscribe()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
             //set up subscription for consumer grains
-            var subscriptions = await subGrain.SetupInitialStreamingSubscriptionForTests(streamId, 2);
+            var subscriptions = await subGrain.SetupInitialStreamingSubscriptionForTests<IStateless_ConsumerGrain>(streamId, 2);
 
             var producer = this.fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -110,14 +108,18 @@ namespace Tester.StreamingTests
             var consumerNormal = this.fixture.GrainFactory.GetGrain<IStateless_ConsumerGrain>(subscriptions[1].GrainId.PrimaryKey);
             //wait for consumers to finish consuming
             await Task.Delay(TimeSpan.FromMilliseconds(2000));
-            numProduced = await producer.GetNumberProduced();
-            var numConsumed = await consumerUnSub.GetNumberConsumed();
-            //asert unsubscribed consumer consumed less than produced
-            Assert.True(numConsumed <= numProducedWhenUnSub);
-            Assert.True(numConsumed < numProduced);
+
             //assert normal consumer consumed equal to produced
             await TestingUtils.WaitUntilAsync(
             lastTry => SampleStreamingTests.CheckCounters(producer, consumerNormal, lastTry, logger), _timeout);
+
+            //asert unsubscribed consumer consumed less than produced
+            numProduced = await producer.GetNumberProduced();
+            var numConsumed = await consumerUnSub.GetNumberConsumed();
+            Assert.True(numConsumed <= numProducedWhenUnSub);
+            Assert.True(numConsumed < numProduced);
+            
+            // clean up test
             await consumerNormal.StopConsuming();
             await consumerUnSub.StopConsuming();
             await subGrain.ClearStateAfterTesting();
@@ -129,7 +131,7 @@ namespace Tester.StreamingTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
             //set up subscriptions
-            var expectedSubscriptions = await subGrain.SetupInitialStreamingSubscriptionForTests(streamId, 2);
+            var expectedSubscriptions = await subGrain.SetupInitialStreamingSubscriptionForTests<IStateless_ConsumerGrain>(streamId, 2);
             var expectedSubscriptionIds = expectedSubscriptions.Select(sub => sub.SubscriptionId).ToSet();
             var subscriptions = await subGrain.GetSubscriptions(streamId);
             var subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
@@ -143,6 +145,7 @@ namespace Tester.StreamingTests
             subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
             Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
+            // clean up tests
             await subGrain.ClearStateAfterTesting();
         }
 

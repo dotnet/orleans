@@ -56,12 +56,22 @@ namespace UnitTests.Grains
         }
     }
 
+    [ImplicitStreamSubscription(StreamNameSpace)]
+    public class ImplicitSubscribeGrain : Grain, IImplicitSubscribeGrain
+    {
+        public const string StreamNameSpace = "ImplicitSubscriptionSpace";
+    }
+
+
     public interface ISubscribeGrain : IGrainWithGuidKey
     {
-        Task<List<StreamSubscription>> SetupInitialStreamingSubscriptionForTests(FullStreamIdentity streamIdentity, int grainCount);
+        Task<List<StreamSubscription>> SetupInitialStreamingSubscriptionForTests<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)
+            where TGrainInterface : IGrainWithGuidKey;
         Task<List<Guid>> GetConsumerGrains();
         Task<List<FullStreamIdentity>> GetStreamIdForConsumerGrain(Guid grainId);
         Task RemoveSubscription(StreamSubscription subscription);
+        Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
+            where TGrainInterface : IGrainWithGuidKey;
         Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity);
         Task ClearStateAfterTesting();
     }
@@ -72,7 +82,8 @@ namespace UnitTests.Grains
     {
         //one test should use the same SubscribeGrain to set up and retrieve subscribe info
         public static Guid SubscribeGrainId = new Guid("936DA01F-9ABD-4d9d-80C7-02AF85C822A8");
-        public async Task<List<StreamSubscription>> SetupInitialStreamingSubscriptionForTests(FullStreamIdentity streamIdentity, int grainCount)
+        public async Task<List<StreamSubscription>> SetupInitialStreamingSubscriptionForTests<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)
+            where TGrainInterface: IGrainWithGuidKey
         {
             var streamingConfig = this.State;
             SetUpStreamingConfig(streamingConfig, streamIdentity, grainCount);
@@ -80,7 +91,7 @@ namespace UnitTests.Grains
             foreach (var pair in streamingConfig.GrainIdToStreamIdMap)
             {
                 var grainId = pair.Key;
-                var grainRef = this.GrainFactory.GetGrain<IStateless_ConsumerGrain>(grainId) as GrainReference;
+                var grainRef = this.GrainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
                 foreach (var streamId in pair.Value)
                 {
                     var provider = this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(streamId.ProviderName);
@@ -96,6 +107,27 @@ namespace UnitTests.Grains
             await this.ClearStateAsync();
         }
 
+        public async Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
+            where TGrainInterface : IGrainWithGuidKey
+        {
+            var streamingConfig = this.State;
+            List<FullStreamIdentity> streamIds;
+            var grainRef = this.GrainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
+            if (streamingConfig.GrainIdToStreamIdMap.TryGetValue(grainRef.GetPrimaryKey(), out streamIds))
+            {
+                streamIds.Add(streamId);
+            }
+            else
+            {
+                streamingConfig.GrainIdToStreamIdMap.Add(grainRef.GetPrimaryKey(), new List<FullStreamIdentity>{streamId});
+            }
+            await this.WriteStateAsync();
+            var sub = await this.ServiceProvider.GetService<IStreamProviderManager>()
+                .GetStreamProvider(streamId.ProviderName)
+                .StreamSubscriptionManager.AddSubscription(streamId, grainRef);
+            return sub;
+        }
+
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity)
         {
             var provider = this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(streamIdentity.ProviderName);
@@ -104,6 +136,20 @@ namespace UnitTests.Grains
 
         public async Task RemoveSubscription(StreamSubscription subscription)
         {
+            var streamingConfig = this.State;
+            List<FullStreamIdentity> streamIds;
+            if (streamingConfig.GrainIdToStreamIdMap.TryGetValue(subscription.GrainId.PrimaryKey, out streamIds))
+            {
+                for (int i = 0; i < streamIds.Count; i++)
+                {
+                    if (streamIds[0].Guid == subscription.StreamId.Guid)
+                    {
+                       streamIds.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+            await this.WriteStateAsync();
             var provider = this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(subscription.StreamProviderName);
             await provider.StreamSubscriptionManager.RemoveSubscription(subscription.StreamId, subscription.SubscriptionId);
         }

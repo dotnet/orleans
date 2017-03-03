@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -66,9 +67,18 @@ namespace Orleans.Streams
 
         public async Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
-            return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
-                ? await implicitPubSub.GetAllSubscriptions(streamId, streamConsumer)
-                : await explicitPubSub.GetAllSubscriptions(streamId, streamConsumer);
+            if (streamConsumer != null)
+            {
+                return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
+                    ? await implicitPubSub.GetAllSubscriptions(streamId, streamConsumer)
+                    : await explicitPubSub.GetAllSubscriptions(streamId, streamConsumer);
+            }
+            else
+            {
+                var implicitSubs = await implicitPubSub.GetAllSubscriptions(streamId);
+                var explicitSubs = await explicitPubSub.GetAllSubscriptions(streamId);
+                return implicitSubs.Concat(explicitSubs).ToList();
+            }
         }
 
         public GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer)
