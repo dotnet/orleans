@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Configuration.Install;
 using System.Diagnostics;
 using System.Collections;
+using System.Linq;
 using Orleans.Runtime.Configuration;
 
 namespace OrleansTelemetryConsumers.Counters
@@ -25,6 +26,8 @@ namespace OrleansTelemetryConsumers.Counters
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration());
+            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes(true).Keys.ToList();
             consumer = new OrleansPerfCounterTelemetryConsumer();
         }
 

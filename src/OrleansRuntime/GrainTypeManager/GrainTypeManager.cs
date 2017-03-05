@@ -161,6 +161,7 @@ namespace Orleans.Runtime
         private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
         {
             grainTypes = loader.GetGrainClassTypes(strict);
+            LogManager.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
         private void InitializeInvokerMap(SiloAssemblyLoader loader, bool strict)
