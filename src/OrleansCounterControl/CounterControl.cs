@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Security.Principal;
 using Orleans.Runtime;
@@ -30,7 +31,8 @@ namespace Orleans.Counter.Control
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
             
             var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
-            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer(siloAssemblyLoader);
+            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes(true).Keys.ToList();
+            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer();
         }
 
         public void PrintUsage()

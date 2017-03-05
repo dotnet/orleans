@@ -10,25 +10,24 @@ namespace OrleansTelemetryConsumers.Counters
     /// <summary>
     /// Telemetry consumer that writes metrics to predefined performance counters.
     /// </summary>
-    internal class OrleansPerfCounterTelemetryConsumer : IMetricTelemetryConsumer
+    public class OrleansPerfCounterTelemetryConsumer : IMetricTelemetryConsumer
     {
-        private readonly SiloAssemblyLoader siloAssemblyLoader;
-
         internal const string CATEGORY_NAME = "OrleansRuntime";
         internal const string CATEGORY_DESCRIPTION = "Orleans Runtime Counters";
         private const string ExplainHowToCreateOrleansPerfCounters = "Run 'InstallUtil.exe OrleansTelemetryConsumers.Counters.dll' as Administrator to create perf counters for Orleans.";
 
         private static readonly Logger logger = LogManager.GetLogger("OrleansPerfCounterManager", LoggerType.Runtime);
-        private static readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
-        private static bool isInstalling = false;
+        private readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
+        private bool isInstalling = false;
+        private readonly object initializationLock = new object();
         private readonly Lazy<bool> isInitialized;
+        private bool initializedGrainCounters;
 
         /// <summary>
         /// Default constructor
         /// </summary>
-        public OrleansPerfCounterTelemetryConsumer(SiloAssemblyLoader siloAssemblyLoader)
+        public OrleansPerfCounterTelemetryConsumer()
         {
-            this.siloAssemblyLoader = siloAssemblyLoader;
             this.isInitialized = new Lazy<bool>(this.Initialize, true);
             if (!AreWindowsPerfCountersAvailable())
             {
@@ -184,29 +183,35 @@ namespace OrleansTelemetryConsumers.Counters
         {
             try
             {
-                perfCounterData.Clear();
-
                 // (1) Start with list of static counters
-                perfCounterData.AddRange(PerfCounterConfigData.StaticPerfCounters);
+                var newPerfCounterData = new List<PerfCounterConfigData>(PerfCounterConfigData.StaticPerfCounters);
 
-                if (this.siloAssemblyLoader != null)
+                var grainTypes = LogManager.GrainTypes;
+                if (grainTypes != null)
                 {
                     // (2) Then search for grain DLLs and pre-create activation counters for any grain types found
-                    var loadedGrainClasses = this.siloAssemblyLoader.GetGrainClassTypes(strict: true);
-                    foreach (var grainClass in loadedGrainClasses)
+                    foreach (var grainType in grainTypes)
                     {
-                        var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainClass.Key);
-                        perfCounterData.Add(new PerfCounterConfigData { Name = counterName, UseDeltaValue = false });
+                        var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainType);
+                        newPerfCounterData.Add(new PerfCounterConfigData { Name = counterName, UseDeltaValue = false });
                     }
+
+                    this.initializedGrainCounters = true;
                 }
 
-                if (!isInstalling)
+                if (!this.isInstalling)
                 {
-                    foreach (var cd in perfCounterData)
+                    foreach (var cd in newPerfCounterData)
                     {
                         var perfCounterName = GetPerfCounterName(cd);
                         cd.PerfCounter = CreatePerfCounter(perfCounterName);
                     }
+                }
+
+                lock (this.initializationLock)
+                {
+                    this.perfCounterData.Clear();
+                    this.perfCounterData.AddRange(newPerfCounterData);
                 }
 
                 return true;
@@ -221,6 +226,12 @@ namespace OrleansTelemetryConsumers.Counters
         {
             if (!isInitialized.Value)
                 return;
+
+            // Attempt to initialize grain-specific counters if they haven't been initialized yet.
+            if (!this.initializedGrainCounters)
+            {
+                this.Initialize();
+            }
 
             PerfCounterConfigData cd = GetCounter(name);
             if (cd == null || cd.PerfCounter == null)
