@@ -62,6 +62,10 @@ namespace Orleans.Runtime
         /// </summary>
         internal static bool ShowDate = true;
 
+        // TODO: This is a hack (global variable) to work around initialization order issues in telemetry provider code.
+        // This is used by Performance Counter code to know which grains to create counters for.
+        internal static IList<string> GrainTypes = null;
+
         // http://www.csharp-examples.net/string-format-datetime/
         // http://msdn.microsoft.com/en-us/library/system.globalization.datetimeformatinfo.aspx
 
