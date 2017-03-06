@@ -234,6 +234,8 @@ namespace OrleansManager
                 grainId = GrainId.GetGrainId(implementationTypeCode, grainIdLong);
             else if (Guid.TryParse(grainIdStr, out grainIdGuid))
                 grainId = GrainId.GetGrainId(implementationTypeCode, grainIdGuid);
+            else 
+                grainId = GrainId.GetGrainId(implementationTypeCode, grainIdStr);
             
             WriteStatus(string.Format("**Full Grain Id to {0} is: GrainId = {1}", operation, grainId.ToFullString()));
             return grainId;
