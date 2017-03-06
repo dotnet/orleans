@@ -27,9 +27,9 @@ namespace AWSUtils.Tests.RemindersTest
             return new DynamoDBReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
         }
 
-        protected override string GetConnectionString()
+        protected override Task<string> GetConnectionString()
         {
-            return $"Service={AWSTestConstants.Service}";
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.Service}" : null);
         }
 
         [SkippableFact]

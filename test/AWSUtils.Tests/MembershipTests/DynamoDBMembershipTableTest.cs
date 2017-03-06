@@ -37,9 +37,9 @@ namespace AWSUtils.Tests.MembershipTests
             return new DynamoDBGatewayListProvider();
         }
 
-        protected override string GetConnectionString()
+        protected override Task<string> GetConnectionString()
         {
-            return "Service=http://localhost:8000;";
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? "Service=http://localhost:8000;" : null);
         }
 
         [SkippableFact, TestCategory("Functional")]

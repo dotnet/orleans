@@ -13,6 +13,7 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using SQL Server
     /// </summary>
+    [TestCategory("Reminders"), TestCategory("SqlServer")]
     public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
         public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
@@ -30,31 +31,30 @@ namespace UnitTests.RemindersTest
             return AdoNetInvariants.InvariantNameSqlServer;
         }
 
-        protected override string GetConnectionString()
+        protected override async Task<string> GetConnectionString()
         {
-            return RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
-                .Result.CurrentConnectionString;
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
+            return instance.CurrentConnectionString;
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [SkippableFact]
         public void RemindersTable_SqlServer_Init()
         {
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task RemindersTable_SqlServer_RemindersRange()
         {
             await RemindersRange();
         }
 
-
-        [Fact, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task RemindersTable_SqlServer_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task RemindersTable_SqlServer_ReminderSimple()
         {
             await ReminderSimple();

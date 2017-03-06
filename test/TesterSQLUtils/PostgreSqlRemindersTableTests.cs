@@ -10,6 +10,7 @@ using Xunit;
 
 namespace UnitTests.RemindersTest
 {
+    [TestCategory("Reminders"), TestCategory("PostgreSql")]
     public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {
         public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
@@ -27,32 +28,31 @@ namespace UnitTests.RemindersTest
             return AdoNetInvariants.InvariantNamePostgreSql;
         }
 
-        protected override string GetConnectionString()
+        protected override async Task<string> GetConnectionString()
         {
-            return RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
-                    .Result.CurrentConnectionString;
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
+            return instance.CurrentConnectionString;
         }
 
-
-        [Fact, TestCategory("Reminders"), TestCategory("PostgreSql")]
+        [SkippableFact]
         public void RemindersTable_PostgreSql_Init()
         {
         }
 
 
-        [Fact, TestCategory("Reminders"), TestCategory("PostgreSql")]
+        [SkippableFact]
         public async Task RemindersTable_PostgreSql_RemindersRange()
         {
             await RemindersRange();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("PostgreSql")]
+        [SkippableFact]
         public async Task RemindersTable_PostgreSql_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("PostgreSql")]
+        [SkippableFact]
         public async Task RemindersTable_PostgreSql_ReminderSimple()
         {
             await ReminderSimple();
