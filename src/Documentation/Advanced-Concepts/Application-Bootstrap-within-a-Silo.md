@@ -35,7 +35,7 @@ on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/
 
 These bootstrap providers are C# classes that implement the `Orleans.Providers.IBootstrapProvider` interface.
 
-When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.
+When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains. There should be no blocking calls made inside the Init method.
 
 ``` csharp
 Task Init(
