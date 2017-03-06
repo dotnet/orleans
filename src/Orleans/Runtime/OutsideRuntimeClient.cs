@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,7 +29,7 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
 
-        private readonly ProxiedMessageCenter transport;
+        private ProxiedMessageCenter transport;
         private bool listenForMessages;
         private CancellationTokenSource listeningCts;
         private bool firstMessageReceived;
@@ -58,10 +59,9 @@ namespace Orleans
         /// </summary>
         private TimeSpan responseTimeout;
 
-        private static readonly Object staticLock = new Object();
-
         private readonly AssemblyProcessor assemblyProcessor;
         private readonly MessageFactory messageFactory;
+        private readonly IPAddress localAddress;
 
         public SerializationManager SerializationManager { get; }
 
@@ -169,7 +169,7 @@ namespace Orleans
                 }
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;
-                var localAddress = ClusterConfiguration.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
+                this.localAddress = ClusterConfiguration.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
@@ -186,13 +186,7 @@ namespace Orleans
                 }
 
                 config.CheckGatewayProviderSettings();
-
-                var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-                var gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
-                gatewayListProvider.InitializeGatewayListProvider(cfg, LogManager.GetLogger(gatewayListProvider.GetType().Name))
-                                   .WaitWithThrow(initTimeout);
-                transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
-
+                
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver");
@@ -259,12 +253,6 @@ namespace Orleans
 
         public void Start()
         {
-            lock (staticLock)
-            {
-                if (RuntimeClient.Current != null)
-                    throw new InvalidOperationException("Can only have one RuntimeClient per AppDomain");
-                RuntimeClient.Current = this;
-            }
             StartInternal();
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
@@ -273,6 +261,12 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         internal void StartInternal()
         {
+            var gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
+            gatewayListProvider.InitializeGatewayListProvider(config, LogManager.GetLogger(gatewayListProvider.GetType().Name))
+                               .WaitWithThrow(initTimeout);
+
+            var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
+            transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
             transport.Start();
             LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
@@ -891,10 +885,10 @@ namespace Orleans
                 listeningCts.Dispose();
                 listeningCts = null;
 
-                this.assemblyProcessor.Dispose();
+                this.assemblyProcessor?.Dispose();
             }
 
-            transport.Dispose();
+            transport?.Dispose();
             if (ClientStatistics != null)
             {
                 ClientStatistics.Dispose();
