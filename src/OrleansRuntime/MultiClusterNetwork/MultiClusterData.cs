@@ -257,7 +257,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// <summary>
         /// time after which entries expire.
         /// </summary>
-        public static TimeSpan ExpiresAfter = new TimeSpan(hours: 0, minutes: 30, seconds: 0);
+        public static readonly TimeSpan ExpiresAfter = new TimeSpan(hours: 0, minutes: 30, seconds: 0);
 
         /// <summary>
         /// Checks equality of all fields.

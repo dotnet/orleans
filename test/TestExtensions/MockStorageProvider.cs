@@ -146,20 +146,10 @@ namespace UnitTests.StorageTests
             Log.Info(0, "Init Name={0} Config={1}", name, config);
             this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
             Interlocked.Increment(ref initCount);
-
-            if (LocalDataStoreInstance.LocalDataStore != null)
-            {
-                // Attached to shared local key store
-                StateStore = LocalDataStoreInstance.LocalDataStore;
-            }
-            else
-            {
-
-                //blocked by port HierarchicalKeyStore to coreclr
-                StateStore = new HierarchicalKeyStore(numKeys);
-
-            }
-
+            
+            //blocked by port HierarchicalKeyStore to coreclr
+            StateStore = new HierarchicalKeyStore(numKeys);
+            
             Log.Info(0, "Finished Init Name={0} Config={1}", name, config);
             return TaskDone.Done;
         }

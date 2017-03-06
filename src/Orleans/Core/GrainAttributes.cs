@@ -121,7 +121,7 @@ namespace Orleans
 
             internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
             {
-                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+                this.RegistrationStrategy = strategy;
             }
         }
 

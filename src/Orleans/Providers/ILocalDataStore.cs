@@ -12,9 +12,4 @@ namespace Orleans.Storage
         bool DeleteRow(IList<Tuple<string, string>> keys, string eTag);
         void Clear();
     }
-
-    internal static class LocalDataStoreInstance
-    {
-        public static ILocalDataStore LocalDataStore { get; internal set; }
-    }
 }

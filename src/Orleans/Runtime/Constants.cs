@@ -53,7 +53,7 @@ namespace Orleans.Runtime
 
         internal const long ReminderTableGrainId = 12345;
 
-        public static TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// The default timeout before a request is assumed to have failed.

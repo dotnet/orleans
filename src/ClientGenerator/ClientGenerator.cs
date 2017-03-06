@@ -103,8 +103,9 @@ namespace Orleans.CodeGeneration
             {
                 Directory.CreateDirectory(outputFileDirectory);
             }
-            
-            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, new GlobalConfiguration()));
+
+            var config = new ClusterConfiguration();
+            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults));
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);

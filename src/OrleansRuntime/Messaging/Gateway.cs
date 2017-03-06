@@ -31,6 +31,7 @@ namespace Orleans.Runtime.Messaging
         private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
         private readonly SerializationManager serializationManager;
+
         private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
@@ -357,7 +358,7 @@ namespace Orleans.Runtime.Messaging
             private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
             private readonly SerializationManager serializationManager;
-
+            
             internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager)
                 : base(name, gateway.MessagingConfiguration)
             {
@@ -473,11 +474,18 @@ namespace Orleans.Runtime.Messaging
                 int headerLength;
                 try
                 {
-                    data = msg.Serialize(serializationManager, out headerLength);
+                    int bodyLength;
+                    data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
+                    if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
+                    {
+                        logger.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                            headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
+                        if (logger.IsVerbose3) logger.Verbose3("Sending large message {0}", msg.ToLongString());
+                    }
                 }
                 catch (Exception exc)
                 {
-                    OnMessageSerializationFailure(msg, exc);
+                    this.OnMessageSerializationFailure(msg, exc);
                     return true;
                 }
 

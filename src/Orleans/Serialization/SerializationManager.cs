@@ -133,7 +133,7 @@ namespace Orleans.Serialization
         internal CounterStatistic FallbackDeserTimeStatistic;
         internal CounterStatistic FallbackCopiesTimeStatistic;
 
-        internal static int LARGE_OBJECT_LIMIT = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
+        internal int LargeObjectSizeThreshold { get; }
 
         private readonly ThreadLocal<SerializationContext> serializationContext;
         
@@ -150,13 +150,11 @@ namespace Orleans.Serialization
 
         #region Static initialization
         
-        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config)
-            : this(serviceProvider, config.SerializationProviders, config.FallbackSerializationProvider)
+        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ITraceConfiguration traceConfig)
         {
-        }
-
-        internal SerializationManager(IServiceProvider serviceProvider, List<TypeInfo> serializationProviders = null, TypeInfo fallbackType = null)
-        {
+            var serializationProviders = config.SerializationProviders;
+            var fallbackType = config.FallbackSerializationProvider;
+            this.LargeObjectSizeThreshold = traceConfig.LargeMessageWarningThreshold;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
@@ -1015,7 +1013,7 @@ namespace Orleans.Serialization
                 if (t.TypeHandle.Equals(byteArrayTypeHandle) && (originalArray.Rank == 1))
                 {
                     var source = (byte[])original;
-                    if (source.Length > LARGE_OBJECT_LIMIT)
+                    if (source.Length > this.LargeObjectSizeThreshold)
                     {
                         logger.Info(ErrorCode.Ser_LargeObjectAllocated,
                             "Large byte array of size {0} is being copied. This will result in an allocation on the large object heap. " +
@@ -1032,7 +1030,7 @@ namespace Orleans.Serialization
                 if (et.IsOrleansShallowCopyable())
                 {
                     // Only check the size for primitive types because otherwise Buffer.ByteLength throws
-                    if (etInfo.IsPrimitive && Buffer.ByteLength(originalArray) > LARGE_OBJECT_LIMIT)
+                    if (etInfo.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
                     {
                         logger.Info(ErrorCode.Ser_LargeObjectAllocated,
                             "Large {0} array of total byte size {1} is being copied. This will result in an allocation on the large object heap. " +
@@ -1984,6 +1982,7 @@ namespace Orleans.Serialization
 #endregion
 
 #region Utilities
+
         internal Type ResolveTypeName(string typeName)
         {
             Type t;

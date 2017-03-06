@@ -150,6 +150,8 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
 
+        private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
+
         public Catalog(
             SiloInitializationParameters siloInitializationParameters,
             ILocalGrainDirectory grainDirectory,
@@ -162,7 +164,8 @@ namespace Orleans.Runtime
             ISiloMessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
-            SerializationManager serializationManager)
+            SerializationManager serializationManager,
+            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = siloInitializationParameters.SiloAddress;
@@ -176,6 +179,7 @@ namespace Orleans.Runtime
             this.grainCreator = grainCreator;
             this.nodeConfig = nodeConfig;
             this.serializationManager = serializationManager;
+            this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
@@ -732,7 +736,7 @@ namespace Orleans.Runtime
                 {
                     var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);                  
                     grainCreator.InstallLogViewAdaptor(grain, grainType, 
-                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy,
+                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
                         consistencyProvider, data.StorageProvider);
                 }
              

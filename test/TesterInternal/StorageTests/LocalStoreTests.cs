@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests
     }
     
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class LocalStoreTests : IDisposable
+    public class LocalStoreTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -34,12 +34,6 @@ namespace UnitTests.StorageTests
         {
             this.output = output;
             this.fixture = fixture;
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        public void Dispose()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]

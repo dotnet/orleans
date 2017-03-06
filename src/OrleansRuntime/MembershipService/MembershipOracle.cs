@@ -28,8 +28,8 @@ namespace Orleans.Runtime.MembershipService
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = SiloMessageSender.CONNECTION_RETRY_DELAY;
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
-        private static TimeSpan EXP_BACKOFF_ERROR_MAX;
-        private static TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
+        private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
+        private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
 
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
@@ -339,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
 
         #region Table update/insert processing
 
-        private static Task<bool> MembershipExecuteWithRetries(
+        private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction, 
             TimeSpan timeout)
         {
@@ -350,8 +350,8 @@ namespace Orleans.Runtime.MembershipService
                     (result, i) => result == false,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
             );
         }
 

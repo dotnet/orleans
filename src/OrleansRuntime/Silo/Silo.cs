@@ -190,7 +190,6 @@ namespace Orleans.Runtime
                 LogManager.Initialize(LocalConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
-            MultiClusterRegistrationStrategy.Initialize(config.Globals);
             StatisticsCollector.Initialize(LocalConfig);
             
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
@@ -225,6 +224,7 @@ namespace Orleans.Runtime
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
+            services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.AddSingleton<SerializationManager>();
             services.AddSingleton<ITimerRegistry, TimerRegistry>();
             services.AddSingleton<IReminderRegistry, ReminderRegistry>();
@@ -256,12 +256,15 @@ namespace Orleans.Runtime
             services.AddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddSingleton<MultiClusterGossipChannelFactory>();
             services.AddSingleton<MultiClusterOracle>();
+            services.AddSingleton<MultiClusterRegistrationStrategyManager>();
             services.AddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.AddSingleton<DeploymentLoadPublisher>();
             services.AddSingleton<MembershipOracle>();
             services.AddFromExisting<IMembershipOracle, MembershipOracle>();
             services.AddFromExisting<ISiloStatusOracle, MembershipOracle>();
             services.AddSingleton<MembershipTableFactory>();
+            services.AddSingleton<ReminderTableFactory>();
+            services.AddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
             services.AddSingleton<LocalReminderServiceFactory>();
             services.AddSingleton<ClientObserverRegistrar>();
             services.AddSingleton<SiloProviderRuntime>();
@@ -454,7 +457,7 @@ namespace Orleans.Runtime
             {
                 // start the reminder service system target
                 reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
-                                          .CreateReminderService(this, grainFactory, initTimeout, this.runtimeClient);
+                                          .CreateReminderService(this, initTimeout, this.runtimeClient);
                 var reminderServiceSystemTarget = this.reminderService as SystemTarget;
                 if (reminderServiceSystemTarget != null) RegisterSystemTarget(reminderServiceSystemTarget);
             }
@@ -918,7 +921,6 @@ namespace Orleans.Runtime
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
-            SafeExecute(GrainTypeManager.Stop);
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 

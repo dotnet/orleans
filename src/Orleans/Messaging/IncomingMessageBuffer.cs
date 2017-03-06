@@ -193,7 +193,7 @@ namespace Orleans.Runtime
             {
                 MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
-                if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
+                if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
                 {
                     Log.Info(
                         ErrorCode.Messaging_LargeMsg_Incoming,
