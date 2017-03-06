@@ -74,11 +74,11 @@ for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "
 SET Configuration=Debug
 SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CONFIGURATION% %CodeGenProject%
 
