@@ -41,7 +41,7 @@ namespace OrleansManager
         private static void RunCommand(string command, string[] args)
         {
             client = ClusterClient.Create();
-            client.Start();
+            client.Start().Wait();
 
             systemManagement = client.GetGrain<IManagementGrain>(0);
             Dictionary<string, string> options = args.Skip(1)

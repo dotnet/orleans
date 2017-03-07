@@ -437,7 +437,7 @@ namespace Orleans.TestingHost
             }
 
             this.InternalClient = ClusterClient.Create(clientConfig);
-            this.InternalClient.Start();
+            this.InternalClient.Start().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -70,7 +71,8 @@ namespace Orleans
         /// <summary>
         /// Starts the client and connects to the configured cluster.
         /// </summary>
-        void Start();
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task Start();
 
         /// <summary>
         /// Stops the client gracefully, disconnecting from the cluster.

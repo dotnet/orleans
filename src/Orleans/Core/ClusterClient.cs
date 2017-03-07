@@ -15,7 +15,15 @@ namespace Orleans
     public class ClusterClient : IInternalClusterClient
     {
         private readonly OutsideRuntimeClient runtimeClient;
-        private readonly object initLock = new object();
+        private readonly AsyncLock initLock = new AsyncLock();
+        private LifecycleState state = LifecycleState.Created;
+
+        private enum LifecycleState
+        {
+            Created,
+            Started,
+            Disposed
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterClient"/> class.
@@ -33,14 +41,17 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public bool IsInitialized { get; private set; }
+        public bool IsInitialized => this.state == LifecycleState.Started;
 
         /// <inheritdoc />
-        public IGrainFactory GrainFactory
+        public IGrainFactory GrainFactory => this.InternalGrainFactory;
+
+        /// <inheritdoc />
+        internal IInternalGrainFactory InternalGrainFactory
         {
             get
             {
-                this.ThrowIfNotInitialized();
+                this.ThrowIfDisposedOrNotInitialized();
                 return this.runtimeClient.InternalGrainFactory;
             }
         }
@@ -50,7 +61,7 @@ namespace Orleans
         {
             get
             {
-                this.ThrowIfNotInitialized();
+                this.ThrowIfDisposedOrNotInitialized();
                 return this.runtimeClient.AppLogger;
             }
         }
@@ -82,12 +93,14 @@ namespace Orleans
         /// <inheritdoc />
         public IEnumerable<IStreamProvider> GetStreamProviders()
         {
+            this.ThrowIfDisposedOrNotInitialized();
             return this.runtimeClient.CurrentStreamProviderManager.GetStreamProviders();
         }
 
         /// <inheritdoc />
         public IStreamProvider GetStreamProvider(string name)
         {
+            this.ThrowIfDisposedOrNotInitialized();
             if (string.IsNullOrWhiteSpace(name))
             {
                 throw new ArgumentNullException(nameof(name));
@@ -99,9 +112,17 @@ namespace Orleans
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost
         {
-            add { this.runtimeClient.ClusterConnectionLost += value; }
+            add
+            {
+                this.ThrowIfDisposed();
+                this.runtimeClient.ClusterConnectionLost += value;
+            }
 
-            remove { this.runtimeClient.ClusterConnectionLost -= value; }
+            remove
+            {
+                this.ThrowIfDisposed();
+                this.runtimeClient.ClusterConnectionLost -= value;
+            }
         }
 
         /// <summary>
@@ -143,31 +164,36 @@ namespace Orleans
         public static ClusterClient Create(ClientConfiguration configuration) => new ClusterClient(configuration);
 
         /// <inheritdoc />
-        public void Start()
+        public async Task Start()
         {
-            lock (this.initLock)
+            this.ThrowIfDisposed();
+            using (await this.initLock.LockAsync())
             {
-                this.runtimeClient.Start();
-                this.IsInitialized = true;
+                await this.runtimeClient.Start();
+                this.state = LifecycleState.Started;
             }
         }
 
         /// <inheritdoc />
         public void Stop()
         {
-            lock (this.initLock)
-            {
-                this.runtimeClient.Reset(true);
-                this.IsInitialized = false;
-            }
+            this.Stop(gracefully: true).Wait();
         }
 
         /// <inheritdoc />
         public void Abort()
         {
-            lock (this.initLock)
+            this.Stop(gracefully: false).Wait();
+        }
+
+        private async Task Stop(bool gracefully)
+        {
+            if (this.state == LifecycleState.Disposed) return;
+
+            using (await this.initLock.LockAsync())
             {
-                Utils.SafeExecute(() => this.runtimeClient.Reset(false));
+                if (this.state == LifecycleState.Disposed) return;
+                Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
                 this.Dispose();
             }
         }
@@ -177,89 +203,96 @@ namespace Orleans
         {
             this.Dispose(true);
         }
-        
+
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidKey
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithIntegerKey
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithStringKey
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidCompoundKey
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithIntegerCompoundKey
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
         }
 
         /// <inheritdoc />
-        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
+        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
+            where TGrainObserverInterface : IGrainObserver
         {
-            return ((IGrainFactory)this.runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
+            return ((IGrainFactory) this.runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
         }
 
         /// <inheritdoc />
         public Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            return this.runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
+            return this.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
         }
 
         /// <inheritdoc />
         public void BindGrainReference(IAddressable grain)
         {
-            this.runtimeClient.InternalGrainFactory.BindGrainReference(grain);
+            this.InternalGrainFactory.BindGrainReference(grain);
         }
 
         /// <inheritdoc />
-        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj) where TGrainObserverInterface : IAddressable
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
+            where TGrainObserverInterface : IAddressable
         {
-            return this.runtimeClient.InternalGrainFactory.CreateObjectReference<TGrainObserverInterface>(obj);
+            return this.InternalGrainFactory.CreateObjectReference<TGrainObserverInterface>(obj);
         }
 
         /// <inheritdoc />
         TGrainInterface IInternalGrainFactory.GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
         {
-            return this.runtimeClient.InternalGrainFactory.GetSystemTarget<TGrainInterface>(grainId, destination);
+            return this.InternalGrainFactory.GetSystemTarget<TGrainInterface>(grainId, destination);
         }
 
         /// <inheritdoc />
         TGrainInterface IInternalGrainFactory.Cast<TGrainInterface>(IAddressable grain)
         {
-            return this.runtimeClient.InternalGrainFactory.Cast<TGrainInterface>(grain);
+            return this.InternalGrainFactory.Cast<TGrainInterface>(grain);
         }
 
         /// <inheritdoc />
         object IInternalGrainFactory.Cast(IAddressable grain, Type interfaceType)
         {
-            return this.runtimeClient.InternalGrainFactory.Cast(grain, interfaceType);
+            return this.InternalGrainFactory.Cast(grain, interfaceType);
         }
 
         /// <inheritdoc />
         TGrainInterface IInternalGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
+            return this.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
         }
 
         /// <inheritdoc />
         GrainReference IInternalGrainFactory.GetGrain(GrainId grainId, string genericArguments)
         {
-            return this.runtimeClient.InternalGrainFactory.GetGrain(grainId, genericArguments);
+            return this.InternalGrainFactory.GetGrain(grainId, genericArguments);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed")]
@@ -267,19 +300,25 @@ namespace Orleans
         {
             if (disposing)
             {
-                lock (this.initLock)
-                {
-                    Utils.SafeExecute(() => this.runtimeClient.Dispose());
-                }
+                Utils.SafeExecute(() => this.runtimeClient.Dispose());
+                this.state = LifecycleState.Disposed;
             }
 
-            this.IsInitialized = false;
             GC.SuppressFinalize(this);
         }
 
-        private void ThrowIfNotInitialized()
+        private void ThrowIfDisposedOrNotInitialized()
         {
+            this.ThrowIfDisposed();
             if (!this.IsInitialized) throw new InvalidOperationException("Client is not initialized.");
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (this.state == LifecycleState.Disposed)
+                throw new ObjectDisposedException(
+                    nameof(ClusterClient),
+                    $"Client has been disposed either by a call to {nameof(Dispose)} or because it has been stopped.");
         }
     }
 }

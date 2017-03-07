@@ -340,7 +340,7 @@ namespace Tests.GeoClusterTests
                 configCustomizer?.Invoke(config);
 
                 this.InternalClient = ClusterClient.Create(config);
-                this.InternalClient.Start();
+                this.InternalClient.Start().Wait();
             }
 
             public IGrainFactory GrainFactory => this.Client;

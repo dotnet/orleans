@@ -155,8 +155,12 @@ namespace Orleans
 
                 if (!secondary)
                 {
-                    UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException);
+                    if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
+                    {
+                        logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
+                    }
                 }
+
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
@@ -202,16 +206,15 @@ namespace Orleans
 
         public IServiceProvider ServiceProvider { get; }
 
-        private void StreamingInitialize()
+        private async Task StreamingInitialize()
         {
-            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory).Result;
+            var implicitSubscriberTable = await transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
             var streamProviderManager = this.ServiceProvider.GetRequiredService<StreamProviderManager>();
-            streamProviderManager
+            await streamProviderManager
                 .LoadStreamProviders(
                     this.config.ProviderConfigurations,
-                    clientProviderRuntime)
-                .Wait();
+                    clientProviderRuntime);
             CurrentStreamProviderManager = streamProviderManager;
         }
 
@@ -251,19 +254,19 @@ namespace Orleans
             logger.Assert(ErrorCode.Runtime_Error_100008, context == null, "context should be not null only inside OrleansRuntime and not on the client.");
         }
 
-        public void Start()
+        public async Task Start()
         {
-            StartInternal();
+            await StartInternal().ConfigureAwait(false);
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
         }
 
         // used for testing to (carefully!) allow two clients in the same process
-        internal void StartInternal()
+        internal async Task StartInternal()
         {
             var gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
-            gatewayListProvider.InitializeGatewayListProvider(config, LogManager.GetLogger(gatewayListProvider.GetType().Name))
-                               .WaitWithThrow(initTimeout);
+            await gatewayListProvider.InitializeGatewayListProvider(config, LogManager.GetLogger(gatewayListProvider.GetType().Name))
+                               .WithTimeout(initTimeout);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
@@ -276,7 +279,8 @@ namespace Orleans
             listenForMessages = true;
 
             // Keeping this thread handling it very simple for now. Just queue task on thread pool.
-            Task.Factory.StartNew(() =>
+            Task.Run(
+                () =>
                 {
                     try
                     {
@@ -286,13 +290,13 @@ namespace Orleans
                     {
                         logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
                     }
-                }
-            );
-            grainInterfaceMap = transport.GetTypeCodeMap(this.InternalGrainFactory).Result;
+                },
+                ct).Ignore();
+            grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
             
-            ClientStatistics.Start(statisticsProviderManager, transport, clientId)
-                .WaitWithThrow(initTimeout);
-            StreamingInitialize();
+            await ClientStatistics.Start(statisticsProviderManager, transport, clientId)
+                .WithTimeout(initTimeout);
+            await StreamingInitialize();
         }
 
         private void RunClientMessagePump(CancellationToken ct)

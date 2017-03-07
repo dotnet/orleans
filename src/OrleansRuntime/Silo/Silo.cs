@@ -308,7 +308,11 @@ namespace Orleans.Runtime
 
             BufferPool.InitGlobalBufferPool(GlobalConfig);
 
-            UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnobservedExceptionHandler);
+            if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnobservedExceptionHandler))
+            {
+                logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
+            }
+
             AppDomain.CurrentDomain.UnhandledException += this.DomainUnobservedExceptionHandler;
 
             try

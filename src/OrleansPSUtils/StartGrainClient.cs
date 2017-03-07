@@ -80,7 +80,7 @@ namespace OrleansPSUtils
 
                 if (Timeout != TimeSpan.Zero)
                     client.ResponseTimeout = this.Timeout;
-                client.Start();
+                client.Start().Wait();
                 this.SetClient(client);
                 this.WriteObject(client);
             }
