@@ -67,29 +67,29 @@ namespace OrleansPSUtils
                 switch (this.ParameterSetName)
                 {
                     case GuidKeySet:
-                        baseMethodInfo = client.GrainFactory.GetType()
+                        baseMethodInfo = client.GetType()
                             .GetMethod(GetGrainMethodName, new[] { typeof(Guid), typeof(string) });
                         methodParams.Add(this.GuidKey);
                         break;
                     case GuidCompoundKeySet:
-                        baseMethodInfo = client.GrainFactory.GetType()
+                        baseMethodInfo = client.GetType()
                             .GetMethod(GetGrainMethodName, new[] { typeof(Guid), typeof(string), typeof(string) });
                         methodParams.Add(this.GuidKey);
                         methodParams.Add(this.KeyExtension);
                         break;
                     case LongKeySet:
-                        baseMethodInfo = client.GrainFactory.GetType()
+                        baseMethodInfo = client.GetType()
                             .GetMethod(GetGrainMethodName, new[] { typeof(long), typeof(string) });
                         methodParams.Add(this.LongKey);
                         break;
                     case LongCompoundKeySet:
-                        baseMethodInfo = client.GrainFactory.GetType()
+                        baseMethodInfo = client.GetType()
                             .GetMethod(GetGrainMethodName, new[] { typeof(long), typeof(string), typeof(string) });
                         methodParams.Add(this.LongKey);
                         methodParams.Add(this.KeyExtension);
                         break;
                     case StringKeySet:
-                        baseMethodInfo = client.GrainFactory.GetType()
+                        baseMethodInfo = client.GetType()
                             .GetMethod(GetGrainMethodName, new[] { typeof(string), typeof(string) });
                         methodParams.Add(this.StringKey);
                         break;
@@ -98,7 +98,7 @@ namespace OrleansPSUtils
                 methodParams.Add(this.GrainClassNamePrefix);
 
                 var getGrainMethod = baseMethodInfo.MakeGenericMethod(this.GrainType);
-                var grain = getGrainMethod.Invoke(client.GrainFactory, methodParams.ToArray());
+                var grain = getGrainMethod.Invoke(client, methodParams.ToArray());
 
                 this.WriteObject(grain);
             }

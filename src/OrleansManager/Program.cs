@@ -43,7 +43,7 @@ namespace OrleansManager
             client = ClusterClient.Create();
             client.Start();
 
-            systemManagement = client.GrainFactory.GetGrain<IManagementGrain>(0);
+            systemManagement = client.GetGrain<IManagementGrain>(0);
             Dictionary<string, string> options = args.Skip(1)
                 .Where(s => s.StartsWith("-"))
                 .Select(s => s.Substring(1).Split('='))
@@ -146,7 +146,7 @@ namespace OrleansManager
                 WriteStatus(string.Format("**Calling GetDetailedGrainReport({0}, {1})", silo, grainId));
                 try
                 {
-                    var siloControl = client.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+                    var siloControl = client.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
                     DetailedGrainReport grainReport = siloControl.GetDetailedGrainReport(grainId).Result;
                     reports.Add(grainReport);
                 }
@@ -168,7 +168,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = client.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
             WriteStatus(string.Format("**Calling DeleteGrain({0}, {1})", silo, grainId));
             directory.DeleteGrainAsync(grainId).Wait();
@@ -182,7 +182,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = client.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
             WriteStatus(string.Format("**Calling LookupGrain({0}, {1})", silo, grainId));
             //Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.FullLookUp(grainId, true);

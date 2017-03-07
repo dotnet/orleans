@@ -10,17 +10,12 @@ namespace Orleans
     /// <summary>
     /// Client interface for interacting with an Orleans cluster.
     /// </summary>
-    public interface IClusterClient : IDisposable
+    public interface IClusterClient : IDisposable, IGrainFactory
     {
         /// <summary>
-        /// Gets a value indicating whether or not this client is intiailized.
+        /// Gets a value indicating whether or not this client is initialized.
         /// </summary>
         bool IsInitialized { get; }
-
-        /// <summary>
-        /// Gets the <see cref="IGrainFactory"/> for this client.
-        /// </summary>
-        IGrainFactory GrainFactory { get; }
 
         /// <summary>
         /// Provides logging facility for applications.

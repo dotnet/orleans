@@ -84,7 +84,7 @@ namespace UnitTests.StreamingTests
         private Streaming_ProducerClientObject(Logger logger, IClusterClient client)
         {
             this.client = client;
-            this.producer = ProducerObserver.NewObserver(logger, client.GrainFactory);
+            this.producer = ProducerObserver.NewObserver(logger, client);
         }
 
         public static Streaming_ProducerClientObject NewObserver(Logger logger, IClusterClient client)
@@ -262,7 +262,7 @@ namespace UnitTests.StreamingTests
             var objs = new IStreaming_ConsumerGrain[consumerCount];
             for (var i = 0; i < consumerCount; ++i)
                 objs[i] = Streaming_ConsumerClientObject.NewObserver(logger, client);
-            return NewConsumerProxy(streamId, streamProvider, objs, logger, client.InternalGrainFactory);
+            return NewConsumerProxy(streamId, streamProvider, objs, logger, client);
         }
 
         public static ConsumerProxy NewConsumerGrainAsync_WithoutBecomeConsumer(Guid consumerGrainId, Logger logger, IInternalGrainFactory grainFactory, string grainClassName = "")

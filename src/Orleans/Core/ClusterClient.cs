@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -8,6 +9,9 @@ using Orleans.Streams;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Client for communicating with clusters of Orleans silos.
+    /// </summary>
     public class ClusterClient : IInternalClusterClient
     {
         private readonly OutsideRuntimeClient runtimeClient;
@@ -52,39 +56,22 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        IInternalGrainFactory IInternalClusterClient.InternalGrainFactory
-        {
-            get
-            {
-                this.ThrowIfNotInitialized();
-                return this.runtimeClient.InternalGrainFactory;
-            }
-        }
-
-        /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
         /// <inheritdoc />
         public TimeSpan ResponseTimeout
         {
-            get
-            {
-                return this.runtimeClient.GetResponseTimeout();
-            }
+            get { return this.runtimeClient.GetResponseTimeout(); }
 
-            set
-            {
-                this.runtimeClient.SetResponseTimeout(value);
-            }
+            set { this.runtimeClient.SetResponseTimeout(value); }
         }
 
         /// <inheritdoc />
-        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback {
-            get
-            {
-                return this.runtimeClient.ClientInvokeCallback;
-            }
-            set { this.runtimeClient.ClientInvokeCallback = value; } }
+        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback
+        {
+            get { return this.runtimeClient.ClientInvokeCallback; }
+            set { this.runtimeClient.ClientInvokeCallback = value; }
+        }
 
         /// <inheritdoc />
         public ClientConfiguration Configuration { get; }
@@ -112,15 +99,9 @@ namespace Orleans
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost
         {
-            add
-            {
-                this.runtimeClient.ClusterConnectionLost += value;
-            }
+            add { this.runtimeClient.ClusterConnectionLost += value; }
 
-            remove
-            {
-                this.runtimeClient.ClusterConnectionLost -= value;
-            }
+            remove { this.runtimeClient.ClusterConnectionLost -= value; }
         }
 
         /// <summary>
@@ -195,6 +176,90 @@ namespace Orleans
         public void Dispose()
         {
             this.Dispose(true);
+        }
+        
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+        }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+        }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
+        }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
+        }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
+        }
+
+        /// <inheritdoc />
+        public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
+        {
+            return ((IGrainFactory)this.runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
+        }
+
+        /// <inheritdoc />
+        public Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
+        {
+            return this.runtimeClient.InternalGrainFactory.DeleteObjectReference<TGrainObserverInterface>(obj);
+        }
+
+        /// <inheritdoc />
+        public void BindGrainReference(IAddressable grain)
+        {
+            this.runtimeClient.InternalGrainFactory.BindGrainReference(grain);
+        }
+
+        /// <inheritdoc />
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj) where TGrainObserverInterface : IAddressable
+        {
+            return this.runtimeClient.InternalGrainFactory.CreateObjectReference<TGrainObserverInterface>(obj);
+        }
+
+        /// <inheritdoc />
+        TGrainInterface IInternalGrainFactory.GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        {
+            return this.runtimeClient.InternalGrainFactory.GetSystemTarget<TGrainInterface>(grainId, destination);
+        }
+
+        /// <inheritdoc />
+        TGrainInterface IInternalGrainFactory.Cast<TGrainInterface>(IAddressable grain)
+        {
+            return this.runtimeClient.InternalGrainFactory.Cast<TGrainInterface>(grain);
+        }
+
+        /// <inheritdoc />
+        object IInternalGrainFactory.Cast(IAddressable grain, Type interfaceType)
+        {
+            return this.runtimeClient.InternalGrainFactory.Cast(grain, interfaceType);
+        }
+
+        /// <inheritdoc />
+        TGrainInterface IInternalGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
+        }
+
+        /// <inheritdoc />
+        GrainReference IInternalGrainFactory.GetGrain(GrainId grainId, string genericArguments)
+        {
+            return this.runtimeClient.InternalGrainFactory.GetGrain(grainId, genericArguments);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed")]

@@ -343,7 +343,7 @@ namespace Tests.GeoClusterTests
                 this.InternalClient.Start();
             }
 
-            public IGrainFactory GrainFactory => this.Client.GrainFactory;
+            public IGrainFactory GrainFactory => this.Client;
         }
 
         // Create a new client.

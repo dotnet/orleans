@@ -5,13 +5,8 @@ namespace Orleans
     /// <summary>
     /// The internal-facing client interface.
     /// </summary>
-    internal interface IInternalClusterClient : IClusterClient
+    internal interface IInternalClusterClient : IClusterClient, IInternalGrainFactory
     {
-        /// <summary>
-        /// Gets the client's <see cref="IInternalGrainFactory"/>.
-        /// </summary>
-        IInternalGrainFactory InternalGrainFactory { get; }
-
         /// <summary>
         /// Gets the client's <see cref="IStreamProviderRuntime"/>.
         /// </summary>

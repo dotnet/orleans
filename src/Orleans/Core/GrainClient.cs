@@ -44,13 +44,7 @@ namespace Orleans
         public static IClusterClient Instance => client;
 
         //TODO: prevent client code from using this from inside a Grain or provider
-        public static IGrainFactory GrainFactory
-        {
-            get
-            {
-                return GetGrainFactory();
-            }
-        }
+        public static IGrainFactory GrainFactory => GetGrainFactory();
 
         private static IGrainFactory GetGrainFactory()
         {
@@ -59,7 +53,7 @@ namespace Orleans
                 throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
             }
 
-            return client.GrainFactory;
+            return client;
         }
 
         /// <summary>

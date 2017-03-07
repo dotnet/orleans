@@ -74,10 +74,10 @@ namespace Orleans.TestingHost
         private static int InstanceCounter = 0;
 
         /// <summary> GrainFactory to use in the tests </summary>
-        public IGrainFactory GrainFactory => this.Client.GrainFactory;
+        public IGrainFactory GrainFactory => this.Client;
 
         /// <summary> GrainFactory to use in the tests </summary>
-        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient.InternalGrainFactory;
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
         
         /// <summary>
         /// The internal client interface.

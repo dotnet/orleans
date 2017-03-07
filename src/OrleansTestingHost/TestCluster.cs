@@ -71,7 +71,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        public IGrainFactory GrainFactory => this.Client.GrainFactory;
+        public IGrainFactory GrainFactory => this.Client;
 
         /// <summary>
         /// The client-side <see cref="StreamProviderManager"/>.
@@ -81,7 +81,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient.InternalGrainFactory;
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
 
         /// <summary>
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.

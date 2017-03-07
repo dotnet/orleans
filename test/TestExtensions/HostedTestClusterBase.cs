@@ -39,7 +39,7 @@ namespace TestExtensions
 
         public IClusterClient Client => this.HostedCluster.Client;
 
-        protected IGrainFactory GrainFactory => this.Client.GrainFactory;
+        protected IGrainFactory GrainFactory => this.Client;
 
         protected Logger Logger => this.Client.Logger;
         protected Logger logger => this.Logger;
