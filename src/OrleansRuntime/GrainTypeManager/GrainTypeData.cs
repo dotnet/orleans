@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
             MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
-            MultiClusterRegistrationStrategy = registrationManager.GetMultiClusterRegistrationStrategy(type);
+            MultiClusterRegistrationStrategy = registrationManager?.GetMultiClusterRegistrationStrategy(type);
         }
 
         /// <summary>
