@@ -93,7 +93,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders = new List<IProvider>();
-        
+
         /// <summary>
         /// Gets the type of this 
         /// </summary>
@@ -119,6 +119,8 @@ namespace Orleans.Runtime
             get { return allSiloProviders.AsReadOnly();  }
         }
         internal ICatalog Catalog => catalog;
+
+        internal SystemStatus SystemStatus { get; set; }
 
         internal IServiceProvider Services { get; }
 
@@ -178,7 +180,7 @@ namespace Orleans.Runtime
             ClusterConfiguration config = initializationParams.ClusterConfig;
             this.initializationParams = initializationParams;
 
-            SystemStatus.Current = SystemStatus.Creating;
+            this.SystemStatus = SystemStatus.Creating;
 
             CurrentSilo = this;
 
@@ -378,7 +380,8 @@ namespace Orleans.Runtime
                 multiClusterOracle = Services.GetRequiredService<IMultiClusterOracle>();
             }
 
-            SystemStatus.Current = SystemStatus.Created;
+            this.SystemStatus = SystemStatus.Created;
+            AsynchAgent.CurrentSystemStatus = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
@@ -493,10 +496,10 @@ namespace Orleans.Runtime
         {
             lock (lockable)
             {
-                if (!SystemStatus.Current.Equals(SystemStatus.Created))
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus.Current));
+                if (!this.SystemStatus.Equals(SystemStatus.Created))
+                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", this.SystemStatus));
                 
-                SystemStatus.Current = SystemStatus.Starting;
+                this.SystemStatus = SystemStatus.Starting;
             }
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
@@ -649,7 +652,7 @@ namespace Orleans.Runtime
                 mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
                 if (this.logger.IsVerbose) { this.logger.Verbose("Message gateway service started successfully."); }
 
-                SystemStatus.Current = SystemStatus.Running;
+                this.SystemStatus = SystemStatus.Running;
             }
             catch (Exception exc)
             {
@@ -657,7 +660,7 @@ namespace Orleans.Runtime
                 this.FastKill(); // if failed after Membership became active, mark itself as dead in Membership abale.
                 throw;
             }
-            if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", SystemStatus.Current); }
+            if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", this.SystemStatus); }
         }
 
         private void CreateGrainServices(GrainServiceConfigurations grainServiceConfigurations)
@@ -774,23 +777,23 @@ namespace Orleans.Runtime
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
-                if (SystemStatus.Current.Equals(SystemStatus.Stopping) || 
-                    SystemStatus.Current.Equals(SystemStatus.ShuttingDown) || 
-                    SystemStatus.Current.Equals(SystemStatus.Terminated))
+                if (this.SystemStatus.Equals(SystemStatus.Stopping) || 
+                    this.SystemStatus.Equals(SystemStatus.ShuttingDown) || 
+                    this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     stopAlreadyInProgress = true;
                     // Drop through to wait below
                 }
-                else if (!SystemStatus.Current.Equals(SystemStatus.Running))
+                else if (!this.SystemStatus.Equals(SystemStatus.Running))
                 {
-                    throw new InvalidOperationException(String.Format("Calling Silo.{0} on a silo which is not in the Running state. This silo is in the {1} state.", operation, SystemStatus.Current));
+                    throw new InvalidOperationException(String.Format("Calling Silo.{0} on a silo which is not in the Running state. This silo is in the {1} state.", operation, this.SystemStatus));
                 }
                 else
                 {
                     if (gracefully)
-                        SystemStatus.Current = SystemStatus.ShuttingDown;
+                        this.SystemStatus = SystemStatus.ShuttingDown;
                     else
-                        SystemStatus.Current = SystemStatus.Stopping;
+                        this.SystemStatus = SystemStatus.Stopping;
                 }
             }
 
@@ -798,7 +801,7 @@ namespace Orleans.Runtime
             {
                 logger.Info(ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
                 var pause = TimeSpan.FromSeconds(1);
-                while (!SystemStatus.Current.Equals(SystemStatus.Terminated))
+                while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
@@ -928,7 +931,7 @@ namespace Orleans.Runtime
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
-            SafeExecute(() => SystemStatus.Current = SystemStatus.Terminated);
+            SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
             SafeExecute(LogManager.Close);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
             SafeExecute(() => this.assemblyProcessor?.Dispose());
@@ -953,9 +956,9 @@ namespace Orleans.Runtime
             {
                 lock (lockable)
                 {
-                    if (!SystemStatus.Current.Equals(SystemStatus.Running)) return;
+                    if (!this.SystemStatus.Equals(SystemStatus.Running)) return;
                     
-                    SystemStatus.Current = SystemStatus.Stopping;
+                    this.SystemStatus = SystemStatus.Stopping;
                 }
                 
                 logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");

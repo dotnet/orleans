@@ -18,19 +18,6 @@ namespace UnitTests
             CheckNotEquals(same2, other);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
-        public void SystemStatusCurrent()
-        {
-            SystemStatus.Current = null;
-            Assert.True(SystemStatus.Current == SystemStatus.Unknown);
-
-            SystemStatus.Current = SystemStatus.Starting;
-            Assert.True(SystemStatus.Current == SystemStatus.Starting);
-            
-            SystemStatus.Current = SystemStatus.Running;
-            Assert.True(SystemStatus.Current == SystemStatus.Running);
-        }
-
         //[Fact]
         //public void CheckEventChannelEnvSetup()
         //{
