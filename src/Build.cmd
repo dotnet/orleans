@@ -8,12 +8,16 @@ if "%VisualStudioVersion%" == "" (
     @REM Try to find VS command prompt init script
     where /Q VsDevCmd.bat
     if ERRORLEVEL 1 (
-        if exist "%VS140COMNTOOLS%" (
-            call "%VS140COMNTOOLS%VsDevCmd.bat"
+        if exist "%VS150COMNTOOLS%" (
+            call "%VS150COMNTOOLS%VsDevCmd.bat"
+        ) else (
+            if exist "%VS140COMNTOOLS%" (
+                call "%VS140COMNTOOLS%VsDevCmd.bat"
+            )
         )
     ) else (
         @REM VsDevCmd.bat is in PATH, so just exec it.
-        VsDevCmd.bat
+        call VsDevCmd.bat
     )
 )
 if "%VisualStudioVersion%" == "" (
@@ -23,12 +27,13 @@ if "%VisualStudioVersion%" == "" (
 @ECHO VisualStudioVersion = %VisualStudioVersion%
 
 @REM Get path to MSBuild Binaries
+if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin
 if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBuild\14.0\bin
 if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 
 @REM Can't multi-block if statement when check condition contains '(' and ')' char, so do as single line checks
 if NOT "%MSBUILDEXEDIR%" == "" SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
-if NOT "%MSBUILDEXEDIR%" == "" GOTO :MsBuildFound
+if exist "%MSBUILDEXE%" GOTO :MsBuildFound
 
 @REM Try to find VS command prompt init script
 where /Q MsBuild.exe
@@ -37,7 +42,7 @@ if ERRORLEVEL 1 (
     exit /b 1
 ) else (
     @REM MsBuild.exe is in PATH, so just use it.
-   SET MSBUILDEXE=MSBuild.exe
+    SET MSBUILDEXE=MSBuild.exe
  )
 :MsBuildFound
 @ECHO MsBuild Location = %MSBUILDEXE%
