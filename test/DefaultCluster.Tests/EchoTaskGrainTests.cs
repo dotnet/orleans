@@ -53,12 +53,12 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
-        public void EchoGrain_EchoError()
+        public async Task EchoGrain_EchoError()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
-            bool ok = promise.ContinueWith(t =>
+            await promise.ContinueWith(t =>
             {
                 if (!t.IsFaulted) Assert.True(false); // EchoError should not have completed successfully
 
@@ -66,12 +66,11 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).Wait(timeout);
-            Assert.True(ok); // Finished OK
+            }).WithTimeout(timeout);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
-        public void EchoGrain_Timeout_Wait()
+        public async Task EchoGrain_Timeout_Wait()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
@@ -81,16 +80,16 @@ namespace DefaultCluster.Tests.General
             Stopwatch sw = new Stopwatch();
             sw.Start();
             Task<int> promise = grain.BlockingCallTimeoutAsync(delay60);
-            bool ok = promise.ContinueWith(t =>
-            {
-                if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
+            await promise.ContinueWith(
+                t =>
+                {
+                    if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
 
-                Exception exc = t.Exception;
-                while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsAssignableFrom<TimeoutException>(exc);
-            }).Wait(delay45);
+                    Exception exc = t.Exception;
+                    while (exc is AggregateException) exc = exc.InnerException;
+                    Assert.IsAssignableFrom<TimeoutException>(exc);
+                }).WithTimeout(delay45);
             sw.Stop();
-            Assert.True(ok); // Wait should not have timed-out. The grain call should have time out.
             Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
@@ -156,7 +155,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal(expectedEcho, received); // LastEcho-Echo
 
-            EchoGrain_EchoError();
+            await EchoGrain_EchoError();
 
             clock.Restart();
             received = await grain.GetLastEchoAsync();
