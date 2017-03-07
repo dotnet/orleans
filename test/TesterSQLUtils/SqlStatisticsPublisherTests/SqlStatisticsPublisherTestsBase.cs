@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -38,18 +39,19 @@ namespace UnitTests.SqlStatisticsPublisherTests
             LogManager.Initialize(new NodeConfiguration());
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
 
-            lock (fixture.SyncRoot)
-            {
-                if (fixture.ConnectionString == null)
-                    fixture.ConnectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, testDatabaseName)
-                        .Result.CurrentConnectionString;
-            }
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             ConnectionString = fixture.ConnectionString;
 
             StatisticsPublisher = new SqlStatisticsPublisher();
             StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(logger),
                 new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString)).Wait();
+        }
+
+        protected async Task<string> GetConnectionString()
+        {
+            var instance = await RelationalStorageForTesting.SetupInstance(this.AdoInvariant, testDatabaseName);
+            return instance.CurrentConnectionString;
         }
 
         protected async Task SqlStatisticsPublisher_ReportMetrics_Client()

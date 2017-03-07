@@ -47,11 +47,8 @@ namespace UnitTests.MembershipTests
 
             logger.Info("DeploymentId={0}", deploymentId);
 
-            lock (fixture.SyncRoot)
-            {
-                if (fixture.ConnectionString == null)
-                    fixture.ConnectionString = GetConnectionString();
-            }
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
+
             var globalConfiguration = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
@@ -89,7 +86,7 @@ namespace UnitTests.MembershipTests
 
         protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);
         protected abstract IMembershipTable CreateMembershipTable(Logger logger);
-        protected abstract string GetConnectionString();
+        protected abstract Task<string> GetConnectionString();
 
         protected virtual string GetAdoInvariant()
         {

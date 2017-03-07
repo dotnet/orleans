@@ -13,6 +13,7 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using MySQL
     /// </summary>
+    [TestCategory("Reminders"), TestCategory("MySql")]
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
         public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
@@ -30,32 +31,31 @@ namespace UnitTests.RemindersTest
             return AdoNetInvariants.InvariantNameMySql;
         }
 
-        protected override string GetConnectionString()
+        protected override async Task<string> GetConnectionString()
         {
-            return RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
-                    .Result.CurrentConnectionString;
+            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
+            return instance.CurrentConnectionString;
         }
 
-
-        [Fact, TestCategory("Reminders"), TestCategory("MySql")]
+        [SkippableFact]
         public void RemindersTable_MySql_Init()
         {
         }
 
 
-        [Fact, TestCategory("Reminders"), TestCategory("MySql")]
+        [SkippableFact]
         public async Task RemindersTable_MySql_RemindersRange()
         {
             await RemindersRange();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("MySql")]
+        [SkippableFact]
         public async Task RemindersTable_MySql_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("MySql")]
+        [SkippableFact]
         public async Task RemindersTable_MySql_ReminderSimple()
         {
             await ReminderSimple();

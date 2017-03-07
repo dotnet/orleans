@@ -37,9 +37,9 @@ namespace Consul.Tests
             return new ConsulBasedMembershipTable();
         }
 
-        protected override string GetConnectionString()
+        protected override async Task<string> GetConnectionString()
         {
-            return ConsulTestUtils.CONSUL_ENDPOINT;
+            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.CONSUL_ENDPOINT : null;
         }
 
         [SkippableFact, TestCategory("Functional")]
