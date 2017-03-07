@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
@@ -127,11 +128,18 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
-                                bool isGenericGrainClass, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy, bool primaryImplementation = false)
+        internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy, bool primaryImplementation)
         {
             lock (this)
             {
+                var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
+                var ifaceCompleteName = TypeUtils.GetFullName(iface);
+                var grainInterface = TypeUtils.GetRawClassName(ifaceCompleteName);
+                var grainTypeInfo = grain.GetTypeInfo();
+                var grainClass = TypeUtils.GetFullName(grainTypeInfo);
+                var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
+                var grainTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grain);
+
                 GrainInterfaceData grainInterfaceData;
 
                 if (table.ContainsKey(interfaceId))
@@ -164,6 +172,7 @@ namespace Orleans.Runtime
 
                 if (localTestMode)
                 {
+                    var assembly = grain.Assembly.CodeBase;
                     if (!loadedGrainAsemblies.Contains(assembly))
                         loadedGrainAsemblies.Add(assembly);
                 }
@@ -380,11 +389,12 @@ namespace Orleans.Runtime
             return loadedGrainAsemblies != null ? loadedGrainAsemblies.ToStrings() : String.Empty;
         }
 
-        public void AddToUnorderedList(int grainClassTypeCode)
+        public void AddToUnorderedList(Type grainClass)
         {
+            var grainClassTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
             if (!unordered.Contains(grainClassTypeCode))
                 unordered.Add(grainClassTypeCode);
-    }
+        }
 
 
         public bool IsUnordered(int grainTypeCode)
