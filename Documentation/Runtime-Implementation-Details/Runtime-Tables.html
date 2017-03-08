@@ -116,7 +116,7 @@ When SQL, ZooKeeper, Consul and other technologies are used for system store, or
 </ol>
 <h3 id="naming">Naming:</h3>
 <p>The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
-First, it is important to note that <a href="http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html">Orleans cluster protocol</a> does not use any of these names for distinguishing between silos. Instead it uses <code>IP:port:epoch</code> as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.</p>
+First, it is important to note that <a href="Cluster-Management.html">Orleans cluster protocol</a> does not use any of these names for distinguishing between silos. Instead it uses <code>IP:port:epoch</code> as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.</p>
 <p>Hostname is always set to the name of this host, as returned by <code>Dns.GetHostName()</code>.
 Role name is a logical name of the whole service and instance name is the name of this specific silo instance within this service.</p>
 <p>Role name and Instance name depend on the hosting - where the silo runs. Each silo host can set those differently.
