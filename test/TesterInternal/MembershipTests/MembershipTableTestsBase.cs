@@ -400,7 +400,9 @@ namespace UnitTests.MembershipTests
 
             tableData = await membershipTable.ReadAll();
             Tuple<MembershipEntry, string> member = tableData.Members.First();
-            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(1));
+            // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
+            // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
+            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
         }
 
         private static int generation;
