@@ -133,10 +133,9 @@ namespace Orleans.Runtime
             lock (this)
             {
                 var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
-                var ifaceCompleteName = TypeUtils.GetFullName(iface);
-                var grainInterface = TypeUtils.GetRawClassName(ifaceCompleteName);
+                var interfaceName = TypeUtils.GetRawClassName(TypeUtils.GetFullName(iface));
                 var grainTypeInfo = grain.GetTypeInfo();
-                var grainClass = TypeUtils.GetFullName(grainTypeInfo);
+                var grainName = TypeUtils.GetFullName(grainTypeInfo);
                 var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
                 var grainTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grain);
 
@@ -148,26 +147,26 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    grainInterfaceData = new GrainInterfaceData(interfaceId, iface, grainInterface);
+                    grainInterfaceData = new GrainInterfaceData(interfaceId, iface, interfaceName);
 
                     table[interfaceId] = grainInterfaceData;
                     var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
                     typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
                 }
 
-                var implementation = new GrainClassData(grainTypeCode, grainClass, isGenericGrainClass, grainInterfaceData, placement, registrationStrategy);
+                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass, grainInterfaceData, placement, registrationStrategy);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
                 {
-                    primaryImplementations[grainInterface] = grainClass;
+                    primaryImplementations[interfaceName] = grainName;
                 }
                 else
                 {
-                    if (!primaryImplementations.ContainsKey(grainInterface))
-                        primaryImplementations.Add(grainInterface, grainClass);
+                    if (!primaryImplementations.ContainsKey(interfaceName))
+                        primaryImplementations.Add(interfaceName, grainName);
                 }
 
                 if (localTestMode)
