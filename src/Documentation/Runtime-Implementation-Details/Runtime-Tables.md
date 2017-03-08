@@ -51,7 +51,7 @@ There is also a special row in this table, called membership version row, with t
 
 ### Naming:
 The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
-First, it is important to note that [Orleans cluster protocol](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html) does not use any of these names for distinguishing between silos. Instead it uses `IP:port:epoch` as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.
+First, it is important to note that [Orleans cluster protocol](Cluster-Management.md) does not use any of these names for distinguishing between silos. Instead it uses `IP:port:epoch` as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.
 
 Hostname is always set to the name of this host, as returned by `Dns.GetHostName()`.
 Role name is a logical name of the whole service and instance name is the name of this specific silo instance within this service.
