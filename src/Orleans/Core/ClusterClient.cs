@@ -1,20 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 
 namespace Orleans
 {
-    /// <summary>
-    /// The delegate called before every request to a grain.
-    /// </summary>
-    /// <param name="request">The request.</param>
-    /// <param name="grain">The grain.</param>
-    public delegate void ClientInvokeCallback(InvokeMethodRequest request, IGrain grain);
-
     /// <summary>
     /// Client for communicating with clusters of Orleans silos.
     /// </summary>
@@ -116,13 +108,11 @@ namespace Orleans
         {
             add
             {
-                this.ThrowIfDisposed();
                 this.runtimeClient.ClusterConnectionLost += value;
             }
 
             remove
             {
-                this.ThrowIfDisposed();
                 this.runtimeClient.ClusterConnectionLost -= value;
             }
         }
@@ -131,9 +121,10 @@ namespace Orleans
         public async Task Start()
         {
             this.ThrowIfDisposed();
-            using (await this.initLock.LockAsync())
+            using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
-                await this.runtimeClient.Start();
+                this.ThrowIfDisposed();
+                await this.runtimeClient.Start().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
         }
@@ -154,7 +145,7 @@ namespace Orleans
         {
             if (this.state == LifecycleState.Disposed) return;
 
-            using (await this.initLock.LockAsync())
+            using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
                 Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
