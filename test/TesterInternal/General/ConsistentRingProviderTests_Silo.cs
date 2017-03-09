@@ -198,7 +198,7 @@ namespace UnitTests.General
         private uint PickKey(SiloAddress responsibleSilo)
         {
             int iteration = 10000;
-            var testHooks = this.HostedCluster.Primary.GetTestHook(this.HostedCluster.InternalGrainFactory);
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             for (int i = 0; i < iteration; i++)
             {
                 double next = random.NextDouble();
@@ -241,7 +241,7 @@ namespace UnitTests.General
 
         private void VerifyKey(uint key, List<SiloAddress> silos)
         {
-            var testHooks = this.HostedCluster.Primary.GetTestHook(this.HostedCluster.InternalGrainFactory);
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             SiloAddress truth = testHooks.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
             //if (truth == null) // if the truth isn't passed, we compute it here
             //{

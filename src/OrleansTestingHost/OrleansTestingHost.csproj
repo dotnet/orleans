@@ -51,6 +51,7 @@
     </Compile>
     <Compile Include="AppDomainSiloHandle.cs" />
     <Compile Include="AppDomainSiloHost.cs" />
+    <Compile Include="ClientExtensions.cs" />
     <Compile Include="Extensions\ConfigurationExtensions.cs" />
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

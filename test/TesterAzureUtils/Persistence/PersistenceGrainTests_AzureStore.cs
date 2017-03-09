@@ -373,7 +373,7 @@ namespace Tester.AzureUtils.Persistence
             {
                 string provider = providerType.FullName;
 
-                var testHooks = silo.GetTestHook(this.HostedCluster.InternalGrainFactory);
+                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
                 List<string> providers = (await testHooks.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }

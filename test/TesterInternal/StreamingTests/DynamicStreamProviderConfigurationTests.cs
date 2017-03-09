@@ -278,7 +278,7 @@ namespace UnitTests.StreamingTests
         private async Task RemoveProvidersAndVerify(ICollection<string> streamProviderNames)
         {
             this.mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            ICollection<string> names = await fixture.HostedCluster.Primary.GetTestHook(fixture.HostedCluster.InternalGrainFactory).GetStreamProviderNames();
+            ICollection<string> names = await this.GetTestHook(fixture.HostedCluster.Primary).GetStreamProviderNames();
             int Count = names.Count;
             foreach (string name in streamProviderNames)
             {
@@ -327,7 +327,7 @@ namespace UnitTests.StreamingTests
 
         private ITestHooks GetTestHook(SiloHandle silo)
         {
-            return silo.GetTestHook(fixture.HostedCluster.InternalGrainFactory);
+            return this.fixture.Client.GetTestHooks(silo);
         }
     }
 }

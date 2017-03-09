@@ -66,7 +66,7 @@ namespace Tester.SQLUtils
             Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.GetTestHook(this.HostedCluster.InternalGrainFactory).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
+            Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
             Assert.Equal(statisticProviderName, silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }

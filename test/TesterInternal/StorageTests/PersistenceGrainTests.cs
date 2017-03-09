@@ -70,7 +70,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                var testHooks = silo.GetTestHook(this.HostedCluster.InternalGrainFactory);
+                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
                 ICollection<string> providers = await testHooks.GetStorageProviderNames();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
@@ -91,7 +91,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            Assert.False(silo.GetTestHook(this.HostedCluster.InternalGrainFactory).HasStorageProvider(providerName).Result,
+            Assert.False(this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName).Result,
                     $"provider {providerName} on silo {silo.Name} should not be registered");
         }
 
@@ -1182,7 +1182,7 @@ namespace UnitTests.StorageTests
         {
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
-                if (siloHandle.GetTestHook(this.HostedCluster.InternalGrainFactory).HasStorageProvider(providerName).Result)
+                if (this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result)
                 {
                     return true;
                 }
@@ -1226,7 +1226,7 @@ namespace UnitTests.StorageTests
             {
                 foreach (var providerName in mockStorageProviders)
                 {
-                    if (!siloHandle.GetTestHook(this.HostedCluster.InternalGrainFactory).HasStorageProvider(providerName).Result) continue;
+                    if (!this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
                     IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
                     object[] replies = mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
                        providerName, (int)MockStorageProvider.Commands.ResetHistory, null).Result;

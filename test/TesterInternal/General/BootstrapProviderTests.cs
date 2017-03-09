@@ -100,7 +100,7 @@ namespace UnitTests.General
             // check all providers are registered correctly
             foreach (SiloHandle silo in silos)
             {
-                var providers = await silo.GetTestHook(this.HostedCluster.InternalGrainFactory).GetAllSiloProviderNames();
+                var providers = await this.HostedCluster.Client.GetTestHooks(silo).GetAllSiloProviderNames();
 
                 Assert.Contains(BootstrapProviderName1, providers);
                 Assert.Contains(BootstrapProviderName2, providers);
@@ -132,7 +132,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                bool re = await siloHandle.GetTestHook(this.HostedCluster.InternalGrainFactory).HasBoostraperProvider(providerName);
+                bool re = await this.HostedCluster.Client.GetTestHooks(siloHandle).HasBoostraperProvider(providerName);
                 if (re)
                 {
                     return true;

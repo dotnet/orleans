@@ -363,7 +363,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
             int primaryActivation =
                 await
-                    testCluster.Primary.GetTestHook(this.testCluster.InternalGrainFactory)
+                    this.testCluster.Client.GetTestHooks(testCluster.Primary)
                         .UnregisterGrainForTesting(grainReference);
             int secondaryActivation = 0;
 
@@ -371,7 +371,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 secondaryActivation =
                     await
-                        testCluster.SecondarySilos[0].GetTestHook(this.testCluster.InternalGrainFactory)
+                        this.testCluster.Client.GetTestHooks(testCluster.SecondarySilos[0])
                             .UnregisterGrainForTesting(grainReference);
             }
 
@@ -380,7 +380,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // If we try again, we shouldn't find any
             primaryActivation =
                 await
-                    testCluster.Primary.GetTestHook(this.testCluster.InternalGrainFactory)
+                    this.testCluster.Client.GetTestHooks(testCluster.Primary)
                         .UnregisterGrainForTesting(grainReference);
             secondaryActivation = 0;
 
@@ -388,7 +388,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 secondaryActivation =
                     await
-                        testCluster.SecondarySilos[0].GetTestHook(this.testCluster.InternalGrainFactory)
+                        this.testCluster.Client.GetTestHooks(testCluster.SecondarySilos[0])
                             .UnregisterGrainForTesting(grainReference);
             }
 

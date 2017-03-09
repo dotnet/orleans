@@ -37,7 +37,7 @@ namespace UnitTests.General
             ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             var latchPeriod = TimeSpan.FromSeconds(1);
-            await this.HostedCluster.Primary.GetTestHook(this.HostedCluster.InternalGrainFactory).LatchIsOverloaded(true, latchPeriod);
+            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
 
             // Do not accept message in overloaded state
             await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
@@ -56,7 +56,7 @@ namespace UnitTests.General
             this.fixture.Logger.Info("First set succeeded");
 
             var latchPeriod = TimeSpan.FromSeconds(1);
-            await this.HostedCluster.Primary.GetTestHook(this.HostedCluster.InternalGrainFactory).LatchIsOverloaded(true, latchPeriod);
+            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
 
             // Do not accept message in overloaded state
             await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
@@ -66,7 +66,7 @@ namespace UnitTests.General
 
             this.fixture.Logger.Info("Second set was shed");
 
-            await this.HostedCluster.Primary.GetTestHook(this.HostedCluster.InternalGrainFactory).LatchIsOverloaded(false, latchPeriod);
+            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(false, latchPeriod);
 
             // Simple request after overload is cleared should succeed
             await grain.SetA(4);
