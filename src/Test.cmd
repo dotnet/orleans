@@ -1,6 +1,5 @@
 @if not defined _echo @echo off
 setlocal
-ECHO off
 
 SET CONFIGURATION=Release
 
