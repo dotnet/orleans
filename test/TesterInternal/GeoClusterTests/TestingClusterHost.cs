@@ -305,8 +305,8 @@ namespace Tests.GeoClusterTests
 
         // The following is a base class to use for creating client wrappers.
         // This allows us to create multiple clients that are connected to different silos.
-        public class ClientWrapperBase {
-
+        public class ClientWrapperBase : IDisposable
+        {
             public string Name { get; private set; }
 
             internal IInternalClusterClient InternalClient { get; }
@@ -344,6 +344,11 @@ namespace Tests.GeoClusterTests
             }
 
             public IGrainFactory GrainFactory => this.Client;
+
+            public void Dispose()
+            {
+                this.InternalClient?.Dispose();
+            }
         }
 
         // Create a new client.
@@ -389,11 +394,14 @@ namespace Tests.GeoClusterTests
                 {
                     this.WriteLog("Stopping client {0}", i);
                     clients[i]?.Client.Stop();
-                    clients[i]?.Client.Dispose();
                 }
                 catch (Exception e)
                 {
                     this.WriteLog("Exception caught While stopping client {0}: {1}", i, e);
+                }
+                finally
+                {
+                    clients[i]?.Dispose();
                 }
             });
         }
