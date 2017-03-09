@@ -156,7 +156,7 @@ namespace Orleans.Runtime
 
                 if (localTestMode)
                 {
-                    var assembly = grain.Assembly.CodeBase;
+                    var assembly = grainTypeInfo.Assembly.CodeBase;
                     if (!loadedGrainAsemblies.Contains(assembly))
                         loadedGrainAsemblies.Add(assembly);
                 }
