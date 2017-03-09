@@ -181,6 +181,7 @@ namespace Orleans.Runtime
             this.initializationParams = initializationParams;
 
             this.SystemStatus = SystemStatus.Creating;
+            AsynchAgent.IsStarting = true;
 
             CurrentSilo = this;
 
@@ -381,7 +382,7 @@ namespace Orleans.Runtime
             }
 
             this.SystemStatus = SystemStatus.Created;
-            AsynchAgent.CurrentSystemStatus = SystemStatus.Created;
+            AsynchAgent.IsStarting = false;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
