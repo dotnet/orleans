@@ -243,7 +243,7 @@ namespace Orleans
         }
 
         // used for testing to (carefully!) allow two clients in the same process
-        internal async Task StartInternal()
+        private async Task StartInternal()
         {
             var gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
             await gatewayListProvider.InitializeGatewayListProvider(config, LogManager.GetLogger(gatewayListProvider.GetType().Name))
