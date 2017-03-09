@@ -105,10 +105,16 @@ namespace OrleansPSUtils
 
         protected override void StopProcessing()
         {
-            var client = this.GetClient();
-            client?.Stop();
-            client?.Dispose();
-            this.SetClient(null);
+            try
+            {
+                var client = this.GetClient();
+                client?.Stop();
+                client?.Dispose();
+            }
+            finally
+            {
+                this.SetClient(null);
+            }
         }
     }
 }
