@@ -320,9 +320,16 @@ namespace Orleans.TestingHost
         {
             try
             {
-                this.Client?.Stop();
+                this.Client?.Close();
             }
-            catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
+            catch (Exception exc)
+            {
+                WriteLog("Exception Uninitializing grain client: {0}", exc);
+            }
+            finally
+            {
+                this.Client?.Dispose();
+            }
 
             StopSilo(Secondary);
             StopSilo(Primary);
@@ -381,7 +388,7 @@ namespace Orleans.TestingHost
             
             WaitForLivenessToStabilizeAsync().Wait();
             this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(this.ClientConfig).Build();
-            this.InternalClient.Start().Wait();
+            this.InternalClient.Connect().Wait();
         }
 
         /// <summary>
@@ -555,7 +562,7 @@ namespace Orleans.TestingHost
                 try
                 {
                     this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(clientConfig).Build();
-                    this.InternalClient.Start().Wait();
+                    this.InternalClient.Connect().Wait();
                 }
                 catch
                 {

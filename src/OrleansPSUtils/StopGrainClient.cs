@@ -17,15 +17,7 @@ namespace OrleansPSUtils
             if (client == null)
                 throw new ArgumentException("No client specified.");
 
-            try
-            {
-                client.Stop();
-                client.Dispose();
-            }
-            finally
-            {
-                if (this.Client == null) this.SetClient(null);
-            }
+            this.CloseClient(client);
         }
     }
 }

@@ -229,7 +229,7 @@ namespace Orleans
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
                         client = clusterClient;  // Keep reference, to avoid GC problems
-                        client.Start().Wait();
+                        client.Connect().Wait();
 
                         // this needs to be the last successful step inside the lock so
                         // IsInitialized doesn't return true until we're fully initialized
@@ -285,18 +285,21 @@ namespace Orleans
             {
                 if (cleanup)
                 {
-                    client?.Stop();
+                    client?.Close().Wait();
                 }
                 else
                 {
                     client?.Abort();
                 }
-
-                client?.Dispose();
             }
-            catch (Exception) { }
-            
-            client = null;
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                client?.Dispose();
+                client = null;
+            }
         }
 
         /// <summary>

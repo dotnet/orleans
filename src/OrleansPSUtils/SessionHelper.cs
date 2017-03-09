@@ -1,4 +1,6 @@
-﻿namespace OrleansPSUtils
+﻿using System;
+
+namespace OrleansPSUtils
 {
     using System.Management.Automation;
 
@@ -16,6 +18,34 @@
         public static void SetClient(this PSCmdlet cmdlet, IClusterClient client)
         {
             cmdlet.SessionState.PSVariable.Set(ClusterClientVariableName, client);
+        }
+
+        public static void CloseClient(this PSCmdlet cmdlet, IClusterClient client)
+        {
+            try
+            {
+                if (client == null) return;
+
+                try
+                {
+                    client.Close().Wait();
+                }
+                catch (Exception exception)
+                {
+                    cmdlet.WriteError(
+                        new ErrorRecord(
+                            exception,
+                            $"{nameof(IClusterClient)}{nameof(IClusterClient.Close)}Failed",
+                            ErrorCategory.CloseError,
+                            client));
+                }
+
+                client.Dispose();
+            }
+            finally
+            {
+                cmdlet.SetClient(null);
+            }
         }
     }
 }

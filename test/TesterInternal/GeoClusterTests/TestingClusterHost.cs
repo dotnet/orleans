@@ -340,7 +340,7 @@ namespace Tests.GeoClusterTests
                 configCustomizer?.Invoke(config);
 
                 this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(config).Build();
-                this.InternalClient.Start().Wait();
+                this.InternalClient.Connect().Wait();
             }
 
             public IGrainFactory GrainFactory => this.Client;
@@ -393,7 +393,7 @@ namespace Tests.GeoClusterTests
                 try
                 {
                     this.WriteLog("Stopping client {0}", i);
-                    clients[i]?.Client.Stop();
+                    clients[i]?.Client.Close().Wait();
                 }
                 catch (Exception e)
                 {

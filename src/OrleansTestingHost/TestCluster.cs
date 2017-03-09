@@ -320,11 +320,17 @@ namespace Orleans.TestingHost
         {
             try
             {
-                this.InternalClient.Stop();
-                this.InternalClient.Abort();
+                this.InternalClient.Close().Wait();
+            }
+            catch (Exception exc)
+            {
+                WriteLog("Exception Uninitializing grain client: {0}", exc);
+            }
+            finally
+            {
+                this.InternalClient.Dispose();
                 this.InternalClient = null;
             }
-            catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
 
             StopSilo(Primary);
         }
@@ -437,7 +443,7 @@ namespace Orleans.TestingHost
             }
 
             this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(clientConfig).Build();
-            this.InternalClient.Start().Wait();
+            this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }

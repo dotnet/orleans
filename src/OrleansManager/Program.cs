@@ -43,7 +43,7 @@ namespace OrleansManager
             var clientBuilder = new ClientBuilder().LoadConfiguration();
             using (client = (IInternalClusterClient)clientBuilder.Build())
             {
-                client.Start().Wait();
+                client.Connect().Wait();
                 systemManagement = client.GetGrain<IManagementGrain>(0);
                 var options = args.Skip(1)
                                   .Where(s => s.StartsWith("-"))
@@ -86,7 +86,7 @@ namespace OrleansManager
                         break;
                 }
                 
-                client.Stop();
+                client.Close().Wait();
             }
         }
 

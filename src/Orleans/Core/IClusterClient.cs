@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -52,12 +51,13 @@ namespace Orleans
         /// </summary>
         /// <remarks>This method may be called at-most-once per instance.</remarks>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task Start();
+        Task Connect();
 
         /// <summary>
         /// Stops the client gracefully, disconnecting from the cluster.
         /// </summary>
-        void Stop();
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task Close();
 
         /// <summary>
         /// Aborts the client ungracefully.

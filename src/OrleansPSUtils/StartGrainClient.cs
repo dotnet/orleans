@@ -73,7 +73,7 @@ namespace OrleansPSUtils
                 }
                 
                 var client = builder.Build();
-                client.Start().Wait();
+                client.Connect().Wait();
                 this.SetClient(client);
                 this.WriteObject(client);
             }
@@ -93,7 +93,7 @@ namespace OrleansPSUtils
             }
             if (this.OverrideConfig)
             {
-                config.Gateways = new List<IPEndPoint>(new[] { this.GatewayAddress });
+                config.Gateways = new List<IPEndPoint>(new[] {this.GatewayAddress});
             }
             else if (!config.Gateways.Contains(this.GatewayAddress))
             {
@@ -105,16 +105,8 @@ namespace OrleansPSUtils
 
         protected override void StopProcessing()
         {
-            try
-            {
-                var client = this.GetClient();
-                client?.Stop();
-                client?.Dispose();
-            }
-            finally
-            {
-                this.SetClient(null);
-            }
+            var client = this.GetClient();
+            this.CloseClient(client);
         }
     }
 }

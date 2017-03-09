@@ -19,8 +19,9 @@ namespace Orleans
         private enum LifecycleState
         {
             Created,
+            Starting,
             Started,
-            Disposed
+            Disposed,
         }
 
         /// <summary>
@@ -89,22 +90,25 @@ namespace Orleans
         }
         
         /// <inheritdoc />
-        public async Task Start()
+        public async Task Connect()
         {
             this.ThrowIfDisposedOrAlreadyInitialized();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 this.ThrowIfDisposedOrAlreadyInitialized();
+                if (this.state == LifecycleState.Starting)
+                {
+                    throw new InvalidOperationException("A prior connection attempt failed. This instance must be disposed.");
+                }
+                
+                this.state = LifecycleState.Starting;
                 await this.runtimeClient.Start().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
         }
 
         /// <inheritdoc />
-        public void Stop()
-        {
-            this.Stop(gracefully: true).Wait();
-        }
+        public Task Close() => this.Stop(gracefully: true);
 
         /// <inheritdoc />
         public void Abort()
