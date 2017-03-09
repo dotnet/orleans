@@ -137,7 +137,7 @@ namespace Orleans.Runtime
                 var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
                 var grainTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grain);
 
-                var grainInterfaceData = AddOrGetGrainInterfaceData(iface, isGenericGrainClass);
+                var grainInterfaceData = GetOrAddGrainInterfaceData(iface, isGenericGrainClass);
 
                 var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass, grainInterfaceData, placement, registrationStrategy);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
@@ -163,7 +163,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private GrainInterfaceData AddOrGetGrainInterfaceData(Type iface, bool isGenericGrainClass)
+        private GrainInterfaceData GetOrAddGrainInterfaceData(Type iface, bool isGenericGrainClass)
         {
             var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
 
@@ -185,7 +185,7 @@ namespace Orleans.Runtime
             // add also the latter to the map: GrainReference and InvokeMethodRequest 
             // always use the id of the generic one
             if (iface.IsConstructedGenericType)
-                AddOrGetGrainInterfaceData(iface.GetGenericTypeDefinition(), true);
+                GetOrAddGrainInterfaceData(iface.GetGenericTypeDefinition(), true);
 
             return grainInterfaceData;
         }
