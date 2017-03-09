@@ -91,10 +91,10 @@ namespace Orleans
         /// <inheritdoc />
         public async Task Start()
         {
-            this.ThrowIfDisposed();
+            this.ThrowIfDisposedOrAlreadyInitialized();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
-                this.ThrowIfDisposed();
+                this.ThrowIfDisposedOrAlreadyInitialized();
                 await this.runtimeClient.Start().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
@@ -237,6 +237,12 @@ namespace Orleans
         {
             this.ThrowIfDisposed();
             if (!this.IsInitialized) throw new InvalidOperationException("Client is not initialized.");
+        }
+
+        private void ThrowIfDisposedOrAlreadyInitialized()
+        {
+            this.ThrowIfDisposed();
+            if (this.IsInitialized) throw new InvalidOperationException("Client is already initialized.");
         }
 
         private void ThrowIfDisposed()

@@ -50,6 +50,7 @@ namespace Orleans
         /// <summary>
         /// Starts the client and connects to the configured cluster.
         /// </summary>
+        /// <remarks>This method may be called at-most-once per instance.</remarks>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task Start();
 
