@@ -123,6 +123,11 @@ namespace Orleans
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
+                if (gracefully)
+                {
+                    Utils.SafeExecute(() => this.runtimeClient.Disconnect());
+                }
+
                 Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
                 this.Dispose();
             }

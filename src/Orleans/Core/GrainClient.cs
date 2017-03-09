@@ -41,7 +41,7 @@ namespace Orleans
         /// <returns><c>true</c> if client runtime is already initialized</returns>
         public static bool IsInitialized => isFullyInitialized && client.IsInitialized;
 
-        internal static ClientConfiguration CurrentConfig { get; private set; }
+        internal static ClientConfiguration CurrentConfig => client.Configuration;
         internal static bool TestOnlyNoConnect { get; set; }
 
         private static bool isFullyInitialized = false;
@@ -168,46 +168,14 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private static void InternalInitialize(IInternalClusterClient clusterClient)
         {
-            // We deliberately want to run this initialization code on .NET thread pool thread to escape any
-            // TPL execution environment and avoid any conflicts with client's synchronization context
-            var tcs = new TaskCompletionSource<ClientConfiguration>();
-            WaitCallback doInit = state =>
+            if (TestOnlyNoConnect)
             {
-                try
-                {
-                    if (TestOnlyNoConnect)
-                    {
-                        Trace.TraceInformation("TestOnlyNoConnect - Returning before connecting to cluster.");
-                    }
-                    else
-                    {
-                        // Finish initializing this client connection to the Orleans cluster
-                        DoInternalInitialize(clusterClient);
-                    }
-                    tcs.SetResult(clusterClient.Configuration); // Resolve promise
-                }
-                catch (Exception exc)
-                {
-                    tcs.SetException(exc); // Break promise
-                }
-            };
-
-            // Queue Init call to thread pool thread
-            ThreadPool.QueueUserWorkItem(doInit, null);
-            try
-            {
-                CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+                Trace.TraceInformation("TestOnlyNoConnect - Returning before connecting to cluster.");
             }
-            catch (AggregateException ae)
+            else
             {
-                // Flatten the aggregate exception, which can be deeply nested.
-                ae = ae.Flatten();
-
-                // If there is just one exception in the aggregate exception, throw that, otherwise throw the entire
-                // flattened aggregate exception.
-                var innerExceptions = ae.InnerExceptions;
-                var exceptionToThrow = innerExceptions.Count == 1 ? innerExceptions[0] : ae;
-                ExceptionDispatchInfo.Capture(exceptionToThrow).Throw();
+                // Finish initializing this client connection to the Orleans cluster
+                DoInternalInitialize(clusterClient);
             }
         }
 

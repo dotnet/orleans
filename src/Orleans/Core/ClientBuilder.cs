@@ -65,7 +65,6 @@ namespace Orleans
 
         private static void AddBasicServices(IServiceCollection services, ClientConfiguration clientConfiguration)
         {
-            services.AddFromExisting<IClusterClient, IInternalClusterClient>();
             services.AddSingleton(clientConfiguration);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
@@ -88,7 +87,8 @@ namespace Orleans
             services.AddSingleton<ClientStatisticsManager>();
             services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
             services.AddSingleton<CodeGeneratorManager>();
-            services.AddSingleton<IClusterClient, ClusterClient>();
+            services.AddSingleton<IInternalClusterClient, ClusterClient>();
+            services.AddFromExisting<IClusterClient, IInternalClusterClient>();
         }
     }
 }

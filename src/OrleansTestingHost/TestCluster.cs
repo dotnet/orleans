@@ -320,7 +320,7 @@ namespace Orleans.TestingHost
         {
             try
             {
-                this.InternalClient.Close().Wait();
+                this.InternalClient?.Close().Wait();
             }
             catch (Exception exc)
             {
@@ -328,7 +328,7 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                this.InternalClient.Dispose();
+                this.InternalClient?.Dispose();
                 this.InternalClient = null;
             }
 

@@ -237,7 +237,7 @@ namespace Orleans
 
         public async Task Start()
         {
-            await StartInternal().ConfigureAwait(false);
+            await Task.Run(this.StartInternal).ConfigureAwait(false);
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
         }
