@@ -40,49 +40,53 @@ namespace OrleansManager
 
         private static void RunCommand(string command, string[] args)
         {
-            client = (IInternalClusterClient)new ClientBuilder().LoadConfiguration().Build();
-            client.Start().Wait();
-
-            systemManagement = client.GetGrain<IManagementGrain>(0);
-            Dictionary<string, string> options = args.Skip(1)
-                .Where(s => s.StartsWith("-"))
-                .Select(s => s.Substring(1).Split('='))
-                .ToDictionary(a => a[0].ToLowerInvariant(), a => a.Length > 1 ? a[1] : "");
-
-            var restWithoutOptions = args.Skip(1).Where(s => !s.StartsWith("-")).ToArray();
-
-            switch (command)
+            var clientBuilder = new ClientBuilder().LoadConfiguration();
+            using (client = (IInternalClusterClient)clientBuilder.Build())
             {
-                case "grainstats":
-                    PrintSimpleGrainStatistics(restWithoutOptions);
-                    break;
+                client.Start().Wait();
+                systemManagement = client.GetGrain<IManagementGrain>(0);
+                var options = args.Skip(1)
+                                  .Where(s => s.StartsWith("-"))
+                                  .Select(s => s.Substring(1).Split('='))
+                                  .ToDictionary(a => a[0].ToLowerInvariant(), a => a.Length > 1 ? a[1] : "");
 
-                case "fullgrainstats":
-                    PrintGrainStatistics(restWithoutOptions);
-                    break;
+                var restWithoutOptions = args.Skip(1).Where(s => !s.StartsWith("-")).ToArray();
 
-                case "collect":
-                    CollectActivations(options, restWithoutOptions);
-                    break;
+                switch (command)
+                {
+                    case "grainstats":
+                        PrintSimpleGrainStatistics(restWithoutOptions);
+                        break;
 
-                case "unregister":
-                    var unregisterArgs = args.Skip(1).ToArray();
-                    UnregisterGrain(unregisterArgs);
-                    break;
+                    case "fullgrainstats":
+                        PrintGrainStatistics(restWithoutOptions);
+                        break;
 
-                case "lookup":
-                    var lookupArgs = args.Skip(1).ToArray();
-                    LookupGrain(lookupArgs);
-                    break;
+                    case "collect":
+                        CollectActivations(options, restWithoutOptions);
+                        break;
 
-                case "grainreport":
-                    var grainReportArgs = args.Skip(1).ToArray();
-                    GrainReport(grainReportArgs);
-                    break;
+                    case "unregister":
+                        var unregisterArgs = args.Skip(1).ToArray();
+                        UnregisterGrain(unregisterArgs);
+                        break;
 
-                default:
-                    PrintUsage();
-                    break;
+                    case "lookup":
+                        var lookupArgs = args.Skip(1).ToArray();
+                        LookupGrain(lookupArgs);
+                        break;
+
+                    case "grainreport":
+                        var grainReportArgs = args.Skip(1).ToArray();
+                        GrainReport(grainReportArgs);
+                        break;
+
+                    default:
+                        PrintUsage();
+                        break;
+                }
+                
+                client.Stop();
             }
         }
 
