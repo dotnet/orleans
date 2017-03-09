@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Multi-Clsuter Configuration
+title: Multi-Cluster Configuration
 ---
 
 ## Multi-Cluster Configuration
