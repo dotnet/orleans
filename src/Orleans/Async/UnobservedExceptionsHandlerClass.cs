@@ -26,18 +26,6 @@ namespace Orleans
             }
         }
 
-        internal static void SetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
-        {
-            lock (lockObject)
-            {
-                if (unobservedExceptionHandler != null && handler != null)
-                {
-                    throw new InvalidOperationException("Calling SetUnobservedExceptionHandler the second time.");
-                }
-                unobservedExceptionHandler = handler;
-            }
-        }
-
         internal static bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
