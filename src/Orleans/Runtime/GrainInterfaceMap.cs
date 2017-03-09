@@ -181,6 +181,12 @@ namespace Orleans.Runtime
             var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
             typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
 
+            // If we are adding a concrete implementation of a generic interface
+            // add also the latter to the map: GrainReference and InvokeMethodRequest 
+            // always use the id of the generic one
+            if (iface.IsConstructedGenericType)
+                AddOrGetGrainInterfaceData(iface.GetGenericTypeDefinition(), true);
+
             return grainInterfaceData;
         }
 
