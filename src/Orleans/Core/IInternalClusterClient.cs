@@ -29,10 +29,5 @@ namespace Orleans
         /// Event fired when connection to the cluster is lost.
         /// </summary>
         event ConnectionToClusterLostHandler ClusterConnectionLost;
-
-        /// <summary>
-        /// Gets or sets the response timeout used by this client.
-        /// </summary>
-        TimeSpan ResponseTimeout { get; set; }
     }
 }

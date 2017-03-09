@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -18,6 +19,9 @@ namespace DefaultCluster.Tests.General
         public BasicActivationTests(DefaultClusterFixture fixture) : base(fixture)
         {
         }
+
+        private TimeSpan GetResponseTimeout() => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
+        private void SetResponseTimeout(TimeSpan value) => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(value);
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ActivateAndUpdate()
@@ -187,12 +191,12 @@ namespace DefaultCluster.Tests.General
         {
             List<Task> promises = new List<Task>();
             var client = (IInternalClusterClient) this.Client;
-            TimeSpan prevTimeout = client.ResponseTimeout;
+            TimeSpan prevTimeout = this.GetResponseTimeout();
             try
             {
                 // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
                 TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
-                client.ResponseTimeout = shortTimeout;
+                this.SetResponseTimeout(shortTimeout);
 
                 ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
                 int num = 10;
@@ -216,7 +220,7 @@ namespace DefaultCluster.Tests.General
                 Thread.Sleep(TimeSpan.FromSeconds(10));
 
                 // set the regular response time back, expect msgs ot succeed.
-                client.ResponseTimeout = prevTimeout;
+                this.SetResponseTimeout(prevTimeout);
                 
                 this.Logger.Info("About to send a next legit request that should succeed.");
                 grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
@@ -225,7 +229,7 @@ namespace DefaultCluster.Tests.General
             finally
             {
                 // set the regular response time back, expect msgs ot succeed.
-                client.ResponseTimeout = prevTimeout;
+                this.SetResponseTimeout(prevTimeout);
             }
         }
 

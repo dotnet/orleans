@@ -64,14 +64,6 @@ namespace Orleans
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
         /// <inheritdoc />
-        public TimeSpan ResponseTimeout
-        {
-            get { return this.runtimeClient.GetResponseTimeout(); }
-
-            set { this.runtimeClient.SetResponseTimeout(value); }
-        }
-
-        /// <inheritdoc />
         public ClientInvokeCallback ClientInvokeCallback
         {
             get { return this.runtimeClient.ClientInvokeCallback; }

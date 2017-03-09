@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -328,7 +329,7 @@ namespace Orleans
         public static void SetResponseTimeout(TimeSpan timeout)
         {
             CheckInitialized();
-            client.ResponseTimeout = timeout;
+            client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(timeout);
         }
 
         /// <summary>
@@ -339,7 +340,7 @@ namespace Orleans
         public static TimeSpan GetResponseTimeout()
         {
             CheckInitialized();
-            return client.ResponseTimeout;
+            return client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
         }
 
         /// <summary>
