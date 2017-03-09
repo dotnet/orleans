@@ -5,54 +5,6 @@ using System.Xml;
 namespace Orleans.Runtime.Configuration
 {
     [Serializable]
-    public class GrainServiceConfigurations
-    {
-        public IDictionary<string, IGrainServiceConfiguration> GrainServices { get; set; }
-
-        public GrainServiceConfigurations()
-        {
-            GrainServices = new Dictionary<string, IGrainServiceConfiguration>();
-        }
-
-        internal static GrainServiceConfigurations Load(XmlElement child)
-        {
-            var container = new GrainServiceConfigurations();
-
-            var nsManager = new XmlNamespaceManager(new NameTable());
-            nsManager.AddNamespace("orleans", "urn:orleans");
-
-            GrainServiceConfiguration.LoadProviderConfigurations(
-                child, nsManager, container.GrainServices,
-                c => container.GrainServices.Add(c.Name, c));
-
-            return container;
-        }
-    }
-
-    internal static class GrainServiceConfigurationsUtility
-    {
-        internal static void RegisterGrainService(GrainServiceConfigurations grainServicesConfig, string serviceName, string serviceType, IDictionary<string, string> properties = null)
-        {
-            if (grainServicesConfig.GrainServices.ContainsKey(serviceName))
-                throw new InvalidOperationException(
-                    string.Format("Grain service of with name '{0}' has been already registered", serviceName));
-
-            var config = new GrainServiceConfiguration(
-                properties ?? new Dictionary<string, string>(),
-                serviceName, serviceType);
-
-            grainServicesConfig.GrainServices.Add(config.Name, config);
-        }
-    }
-
-    public interface IGrainServiceConfiguration
-    {
-        string Name { get; set; }
-        string ServiceType { get; set; }
-        IDictionary<string, string> Properties { get; set; }
-    }
-
-    [Serializable]
     public class GrainServiceConfiguration : IGrainServiceConfiguration
     {
 

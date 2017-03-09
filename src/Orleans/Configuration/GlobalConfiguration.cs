@@ -15,18 +15,6 @@ using Orleans.LogConsistency;
 namespace Orleans.Runtime.Configuration
 {
     // helper utility class to handle default vs. explicitly set config value.
-    [Serializable]
-    internal class ConfigValue<T>
-    {
-        public T Value;
-        public bool IsDefaultValue;
-
-        public ConfigValue(T val, bool isDefaultValue)
-        {
-            Value = val;
-            IsDefaultValue = isDefaultValue;
-        }
-    }
 
     /// <summary>
     /// Data object holding Silo global configuration parameters.

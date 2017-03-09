@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Net;
-using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Orleans.Providers;
@@ -107,38 +106,4 @@ namespace Orleans.LogConsistency
 
         #endregion
     }
-
-
-
-    /// <summary>
-    /// Exception thrown by protocol messaging layer.
-    /// </summary>
-    [Serializable]
-    public class ProtocolTransportException : OrleansException
-    {
-        public ProtocolTransportException()
-        { }
-        public ProtocolTransportException(string msg)
-            : base(msg)
-        { }
-        public ProtocolTransportException(string msg, Exception exc)
-            : base(msg, exc)
-        { }
-
-#if !NETSTANDARD
-        protected ProtocolTransportException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
-#endif
-
-        public override string ToString()
-        {
-            if (InnerException != null)
-                return $"ProtocolTransportException: {InnerException}";
-            else
-                return Message;
-        }
-    }
-
-  
 }

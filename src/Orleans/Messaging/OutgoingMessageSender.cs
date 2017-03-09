@@ -9,13 +9,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Messaging
 {
-    internal enum SocketDirection
-    {
-        SiloToSilo,
-        ClientToGateway,
-        GatewayToClient
-    }
-
     internal abstract class OutgoingMessageSender : AsynchQueueAgent<Message>
     {
         private readonly SerializationManager serializationManager;
