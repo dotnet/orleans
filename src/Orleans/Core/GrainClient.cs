@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -329,7 +330,7 @@ namespace Orleans
         public static void SetResponseTimeout(TimeSpan timeout)
         {
             CheckInitialized();
-            client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(timeout);
+            RuntimeClient.SetResponseTimeout(timeout);
         }
 
         /// <summary>
@@ -340,7 +341,7 @@ namespace Orleans
         public static TimeSpan GetResponseTimeout()
         {
             CheckInitialized();
-            return client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
+            return RuntimeClient.GetResponseTimeout();
         }
 
         /// <summary>
@@ -356,11 +357,11 @@ namespace Orleans
         {
             get
             {
-                return client.ClientInvokeCallback;
+                return RuntimeClient.ClientInvokeCallback;
             }
             set
             {
-                client.ClientInvokeCallback = value;
+                RuntimeClient.ClientInvokeCallback = value;
             }
         }
 
@@ -390,14 +391,16 @@ namespace Orleans
             add
             {
                 CheckInitialized();
-                client.ClusterConnectionLost += value;
+                RuntimeClient.ClusterConnectionLost += value;
             }
 
             remove
             {
                 CheckInitialized();
-                client.ClusterConnectionLost -= value;
+                RuntimeClient.ClusterConnectionLost -= value;
             }
         }
+
+        private static OutsideRuntimeClient RuntimeClient => client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
     }
 }

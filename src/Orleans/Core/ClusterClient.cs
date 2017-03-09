@@ -62,14 +62,7 @@ namespace Orleans
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-
-        /// <inheritdoc />
-        public ClientInvokeCallback ClientInvokeCallback
-        {
-            get { return this.runtimeClient.ClientInvokeCallback; }
-            set { this.runtimeClient.ClientInvokeCallback = value; }
-        }
-
+        
         /// <inheritdoc />
         public ClientConfiguration Configuration { get; }
 
@@ -93,20 +86,6 @@ namespace Orleans
             }
 
             return this.runtimeClient.CurrentStreamProviderManager.GetProvider(name) as IStreamProvider;
-        }
-
-        /// <inheritdoc />
-        public event ConnectionToClusterLostHandler ClusterConnectionLost
-        {
-            add
-            {
-                this.runtimeClient.ClusterConnectionLost += value;
-            }
-
-            remove
-            {
-                this.runtimeClient.ClusterConnectionLost -= value;
-            }
         }
         
         /// <inheritdoc />
