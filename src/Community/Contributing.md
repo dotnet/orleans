@@ -31,7 +31,7 @@ This project uses the same contribution process as the other **[DotNet projects]
 * **[DotNet Project Contribution Guidelines](https://github.com/dotnet/corefx/wiki/Contributing)**
 Guidelines and workflow for contributing to DotNet projects on GitHub.
 
-* **[DotNet CLA](https://github.com/dotnet/corefx/wiki/Contribution-License-Agreement-%28CLA%29)**
+* **[DotNet CLA](https://cla.dotnetfoundation.org/)**
 Contribution License Agreement for DotNet projects on GitHub.
 
 * **[.NET Framework Design Guidelines](https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest)**
