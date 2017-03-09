@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -68,43 +67,5 @@ namespace Orleans.GrainDirectory
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
         Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
-    }
-
-
-    [Serializable]
-    internal struct AddressAndTag
-    {
-        public ActivationAddress Address;
-        public int VersionTag;
-    }
-    
-
-    [Serializable]
-    internal struct AddressesAndTag 
-    {
-        public List<ActivationAddress> Addresses;
-        public int VersionTag;
-    }
-
-    /// <summary>
-    /// Indicates the reason for removing activations from the directory.
-    /// This influences the conditions that are applied when determining whether or not to remove an entry.
-    /// </summary>
-    internal enum UnregistrationCause : byte
-    {
-        /// <summary>
-        /// Remove the directory entry forcefully, without any conditions
-        /// </summary>
-        Force,
-
-        /// <summary>
-        /// Remove the directory entry only if it points to an activation in a different cluster
-        /// </summary>
-        CacheInvalidation,
-
-        /// <summary>
-        /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
-        /// </summary>
-        NonexistentActivation
     }
 }

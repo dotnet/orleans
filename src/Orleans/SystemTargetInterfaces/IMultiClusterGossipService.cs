@@ -30,5 +30,4 @@ namespace Orleans.Runtime
 
 
     // placeholder interface for gossip data. Actual implementation is in Orleans.Runtime.
-    internal interface IMultiClusterGossipData { }
 }

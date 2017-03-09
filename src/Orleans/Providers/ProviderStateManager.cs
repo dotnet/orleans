@@ -1,20 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    internal enum ProviderState
-    {
-        None,
-        Initialized,
-        Started,
-        Closed
-    }
     internal class ProviderStateManager
     {
         public ProviderState State { get; private set; }
@@ -73,22 +63,4 @@ namespace Orleans.Providers
             State = presetState;
         }
     }
-
-    [Serializable]
-    public class ProviderStateException : OrleansException
-    {
-        public ProviderStateException() : base("Unexpected provider state")
-        { }
-        public ProviderStateException(string message) : base(message) { }
-
-        public ProviderStateException(string message, Exception innerException) : base(message, innerException) { }
-
-#if !NETSTANDARD
-        protected ProviderStateException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-#endif
-    }
-
 }

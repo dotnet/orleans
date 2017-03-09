@@ -5,8 +5,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public delegate bool StreamFilterPredicate(IStreamIdentity stream, object filterData, object item);
-
     /// <summary>
     /// This class is a [Serializable] function pointer to a static predicate method, used for stream filtering.
     /// The predicate function / lamda is not directly serialized, only the class / method info details required to reconstruct the function reference on the other side.
