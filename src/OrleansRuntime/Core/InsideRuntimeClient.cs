@@ -67,7 +67,7 @@ namespace Orleans.Runtime
         public IServiceProvider ServiceProvider { get; }
 
         /// <inheritdoc />
-        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
+        public ClientInvokeCallback ClientInvokeCallback { get; set; }
 
         public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 

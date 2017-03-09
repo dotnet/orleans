@@ -766,7 +766,7 @@ namespace UnitTests
         {
             const string filename = "ClientConfig_NewAzure.xml";
 
-            var client = ClusterClient.Create(filename);
+            var client = new ClientBuilder().LoadConfiguration(filename).Build();
 
             ClientConfiguration config = client.Configuration;
 
@@ -784,7 +784,7 @@ namespace UnitTests
         public void ClientConfig_AzureInit_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-            Assert.Throws<FileNotFoundException>(() => ClusterClient.Create(filename));
+            Assert.Throws<FileNotFoundException>(() => new ClientBuilder().LoadConfiguration(filename).Build());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]

@@ -33,53 +33,46 @@ namespace OrleansPSUtils
         [Parameter(Position = 5, ValueFromPipeline = true, ParameterSetName = EndpointSet)]
         public bool OverrideConfig { get; set; } = true;
 
-        [Parameter(Position = 6, ValueFromPipeline = true, ParameterSetName = FilePathSet)]
-        [Parameter(Position = 6, ValueFromPipeline = true, ParameterSetName = FileSet)]
-        [Parameter(Position = 6, ValueFromPipeline = true, ParameterSetName = ConfigSet)]
-        [Parameter(Position = 6, ValueFromPipeline = true, ParameterSetName = EndpointSet)]
-        public TimeSpan Timeout { get; set; } = TimeSpan.Zero;
-
         protected override void ProcessRecord()
         {
             try
             {
                 WriteVerbose($"[{DateTime.UtcNow}] Initializing Orleans Grain Client");
-                IClusterClient client;
+                var builder = new ClientBuilder();
                 switch (ParameterSetName)
                 {
                     case FilePathSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using config file at '{ConfigFilePath}'...");
                         if (string.IsNullOrWhiteSpace(ConfigFilePath))
                             throw new ArgumentNullException(nameof(ConfigFilePath));
-                        client = ClusterClient.Create(ConfigFilePath);
+                        builder.LoadConfiguration(ConfigFilePath);
                         break;
                     case FileSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using provided config file...");
                         if (ConfigFile == null)
                             throw new ArgumentNullException(nameof(ConfigFile));
-                        client = ClusterClient.Create(ConfigFile);
+                        builder.LoadConfiguration(ConfigFile);
                         break;
                     case ConfigSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using provided 'ClientConfiguration' object...");
                         if (Config == null)
                             throw new ArgumentNullException(nameof(Config));
-                        client = ClusterClient.Create(Config);
+                        builder.UseConfiguration(Config);
                         break;
                     case EndpointSet:
                         WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
                         if (GatewayAddress == null)
                             throw new ArgumentNullException(nameof(GatewayAddress));
                         var config = this.GetOverriddenConfig();
-                        client = ClusterClient.Create(config);
+                        builder.UseConfiguration(config);
                         break;
                     default:
                         WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
-                        client = ClusterClient.Create();
+                        builder.LoadConfiguration();
                         break;
                 }
-
-                if (Timeout != TimeSpan.Zero)
-                    client.ResponseTimeout = this.Timeout;
+                
+                var client = builder.Build();
                 client.Start().Wait();
                 this.SetClient(client);
                 this.WriteObject(client);

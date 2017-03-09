@@ -21,6 +21,13 @@ namespace Orleans
     public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
 
     /// <summary>
+    /// The delegate called before every request to a grain.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="grain">The grain.</param>
+    public delegate void ClientInvokeCallback(InvokeMethodRequest request, IGrain grain);
+
+    /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
     /// TODO: Make this class non-static and inject it where it is needed.
@@ -67,7 +74,7 @@ namespace Orleans
                 Console.WriteLine("Error loading standard client configuration file.");
                 throw new ArgumentException("Error loading standard client configuration file");
             }
-            var orleansClient = ClusterClient.Create(config);
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -104,7 +111,7 @@ namespace Orleans
                 Console.WriteLine("Error loading client configuration file {0}:", configFile.FullName);
                 throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
-            var orleansClient = ClusterClient.Create(config);
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -120,7 +127,7 @@ namespace Orleans
                 Console.WriteLine("Initialize was called with null ClientConfiguration object.");
                 throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
-            var orleansClient = ClusterClient.Create(config);
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -152,7 +159,7 @@ namespace Orleans
                 config.Gateways.Add(gatewayAddress);
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
-            var orleansClient = ClusterClient.Create(config);
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -344,7 +351,7 @@ namespace Orleans
         /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
         /// </summary>
         /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        public static Action<InvokeMethodRequest, IGrain> ClientInvokeCallback
+        public static ClientInvokeCallback ClientInvokeCallback
         {
             get
             {

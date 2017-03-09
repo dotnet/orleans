@@ -339,7 +339,7 @@ namespace Tests.GeoClusterTests
 
                 configCustomizer?.Invoke(config);
 
-                this.InternalClient = ClusterClient.Create(config);
+                this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(config).Build();
                 this.InternalClient.Start().Wait();
             }
 

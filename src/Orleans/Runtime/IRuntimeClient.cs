@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
         /// </summary>
         /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
+        ClientInvokeCallback ClientInvokeCallback { get; set; }
 
         /// <summary>
         /// Get the current response timeout setting for this client.

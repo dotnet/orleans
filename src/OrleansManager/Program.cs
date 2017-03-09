@@ -40,7 +40,7 @@ namespace OrleansManager
 
         private static void RunCommand(string command, string[] args)
         {
-            client = ClusterClient.Create();
+            client = (IInternalClusterClient)new ClientBuilder().LoadConfiguration().Build();
             client.Start().Wait();
 
             systemManagement = client.GetGrain<IManagementGrain>(0);

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -10,9 +9,16 @@ using Orleans.Streams;
 namespace Orleans
 {
     /// <summary>
+    /// The delegate called before every request to a grain.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="grain">The grain.</param>
+    public delegate void ClientInvokeCallback(InvokeMethodRequest request, IGrain grain);
+
+    /// <summary>
     /// Client for communicating with clusters of Orleans silos.
     /// </summary>
-    public class ClusterClient : IInternalClusterClient
+    internal class ClusterClient : IInternalClusterClient
     {
         private readonly OutsideRuntimeClient runtimeClient;
         private readonly AsyncLock initLock = new AsyncLock();
@@ -28,16 +34,12 @@ namespace Orleans
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterClient"/> class.
         /// </summary>
+        /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="configuration">The client configuration.</param>
-        public ClusterClient(ClientConfiguration configuration)
+        public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration)
         {
-            if (configuration == null)
-            {
-                throw new ArgumentException(nameof(configuration));
-            }
-
             this.Configuration = configuration;
-            this.runtimeClient = new OutsideRuntimeClient(configuration);
+            this.runtimeClient = runtimeClient;
         }
 
         /// <inheritdoc />
@@ -78,7 +80,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback
+        public ClientInvokeCallback ClientInvokeCallback
         {
             get { return this.runtimeClient.ClientInvokeCallback; }
             set { this.runtimeClient.ClientInvokeCallback = value; }
@@ -124,45 +126,7 @@ namespace Orleans
                 this.runtimeClient.ClusterConnectionLost -= value;
             }
         }
-
-        /// <summary>
-        /// Creates a new <see cref="ClusterClient"/>, loading configuration using the default method.
-        /// </summary>
-        /// <returns></returns>
-        public static ClusterClient Create() => new ClusterClient(ClientConfiguration.StandardLoad());
-
-        /// <summary>
-        /// Creates a new <see cref="ClusterClient"/>, loading configuration from the specified file.
-        /// </summary>
-        /// <param name="configFilePath">The configuration file.</param>
-        /// <returns>A newly instantiated <see cref="ClusterClient"/>.</returns>
-        public static ClusterClient Create(string configFilePath) => Create(new FileInfo(configFilePath));
-
-        /// <summary>
-        /// Creates a new <see cref="ClusterClient"/>, loading configuration from the specified file.
-        /// </summary>
-        /// <param name="configFile">The configuration file.</param>
-        /// <returns>A newly instantiated <see cref="ClusterClient"/>.</returns>
-        public static ClusterClient Create(FileInfo configFile)
-        {
-            var config = ClientConfiguration.LoadFromFile(configFile.FullName);
-            if (config == null)
-            {
-                throw new ArgumentException(
-                    $"Error loading client configuration file {configFile.FullName}",
-                    nameof(configFile));
-            }
-
-            return new ClusterClient(config);
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="ClusterClient"/> using the provided configuration.
-        /// </summary>
-        /// <param name="configuration">The configuration.</param>
-        /// <returns>A newly instantiated <see cref="ClusterClient"/>.</returns>
-        public static ClusterClient Create(ClientConfiguration configuration) => new ClusterClient(configuration);
-
+        
         /// <inheritdoc />
         public async Task Start()
         {

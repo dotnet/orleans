@@ -186,12 +186,13 @@ namespace DefaultCluster.Tests.General
         public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            TimeSpan prevTimeout = this.Client.ResponseTimeout;
+            var client = (IInternalClusterClient) this.Client;
+            TimeSpan prevTimeout = client.ResponseTimeout;
             try
             {
                 // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
                 TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
-                this.Client.ResponseTimeout = shortTimeout;
+                client.ResponseTimeout = shortTimeout;
 
                 ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
                 int num = 10;
@@ -215,7 +216,7 @@ namespace DefaultCluster.Tests.General
                 Thread.Sleep(TimeSpan.FromSeconds(10));
 
                 // set the regular response time back, expect msgs ot succeed.
-                this.Client.ResponseTimeout = prevTimeout;
+                client.ResponseTimeout = prevTimeout;
                 
                 this.Logger.Info("About to send a next legit request that should succeed.");
                 grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
@@ -224,7 +225,7 @@ namespace DefaultCluster.Tests.General
             finally
             {
                 // set the regular response time back, expect msgs ot succeed.
-                this.HostedCluster.Client.ResponseTimeout = prevTimeout;
+                client.ResponseTimeout = prevTimeout;
             }
         }
 

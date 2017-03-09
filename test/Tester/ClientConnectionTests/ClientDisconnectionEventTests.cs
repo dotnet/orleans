@@ -27,7 +27,7 @@ namespace Tester.ClientConnectionTests
             var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             var semaphore = new SemaphoreSlim(0, 1);
-            this.HostedCluster.Client.ClusterConnectionLost += (sender, args) => semaphore.Release();
+            ((IInternalClusterClient)this.HostedCluster.Client).ClusterConnectionLost += (sender, args) => semaphore.Release();
 
             // Burst lot of call, to be sure that we are connected to all silos
             for (int i = 0; i < 100; i++)

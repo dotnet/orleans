@@ -46,7 +46,7 @@ namespace UnitTests.MessageCenterTests
             bool failed = false;
             try
             {
-                ClusterClient.Create(cfg);
+                new ClientBuilder().UseConfiguration(cfg).Build();
             }
             catch (Exception exc)
             {

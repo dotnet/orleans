@@ -389,7 +389,7 @@ namespace Orleans.Runtime
             // Should we set some kind of callback-in-progress flag to detect and prevent any inappropriate callback loops on this GrainReference?
             try
             {
-                Action<InvokeMethodRequest, IGrain> callback = this.RuntimeClient.ClientInvokeCallback; // Take copy to avoid potential race conditions
+                var callback = this.RuntimeClient.ClientInvokeCallback; // Take copy to avoid potential race conditions
                 if (callback == null) return;
 
                 // Call ClientInvokeCallback only for grain calls, not for system targets.

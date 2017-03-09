@@ -81,7 +81,10 @@
     <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
     <Compile Include="CodeGeneration\GenericMethodInvoker.cs" />
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
+    <Compile Include="Core\ClientBuilder.cs" />
+    <Compile Include="Core\ClientBuilderExtensions.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
+    <Compile Include="Core\IClientBuilder.cs" />
     <Compile Include="Core\IClusterConnectionStatusListener.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="Core\IInternalClusterClient.cs" />

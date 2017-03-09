@@ -22,9 +22,9 @@ namespace Orleans
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
-        private readonly Logger logger;
+        private Logger logger;
 
-        private readonly ClientConfiguration config;
+        private ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
@@ -34,14 +34,14 @@ namespace Orleans
         private CancellationTokenSource listeningCts;
         private bool firstMessageReceived;
 
-        private readonly ClientProviderRuntime clientProviderRuntime;
-        private readonly StatisticsProviderManager statisticsProviderManager;
+        private ClientProviderRuntime clientProviderRuntime;
+        private StatisticsProviderManager statisticsProviderManager;
 
         internal ClientStatisticsManager ClientStatistics;
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
         private IGrainTypeResolver grainInterfaceMap;
-        private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
+        private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
 
@@ -52,20 +52,20 @@ namespace Orleans
 
         private const string BARS = "----------";
         
-        public IInternalGrainFactory InternalGrainFactory { get; }
+        public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         /// <summary>
         /// Response timeout.
         /// </summary>
         private TimeSpan responseTimeout;
 
-        private readonly AssemblyProcessor assemblyProcessor;
-        private readonly MessageFactory messageFactory;
-        private readonly IPAddress localAddress;
+        private AssemblyProcessor assemblyProcessor;
+        private MessageFactory messageFactory;
+        private IPAddress localAddress;
 
-        public SerializationManager SerializationManager { get; }
+        public SerializationManager SerializationManager { get; set; }
 
-        public Logger AppLogger { get; }
+        public Logger AppLogger { get; private set; }
 
         public ActivationAddress CurrentActivationAddress
         {
@@ -90,47 +90,37 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
+        public OutsideRuntimeClient()
         {
-            if (cfg == null)
-            {
-                Console.WriteLine("An attempt to create an OutsideRuntimeClient with null ClientConfiguration object.");
-                throw new ArgumentException("OutsideRuntimeClient was attempted to be created with null ClientConfiguration object.", "cfg");
-            }
-            
-            var services = new ServiceCollection();
-            services.AddFromExisting<IClusterClient, IInternalClusterClient>();
-            services.AddSingleton(cfg);
-            services.AddSingleton<TypeMetadataCache>();
-            services.AddSingleton<AssemblyProcessor>();
-            services.AddSingleton(this);
-            services.AddSingleton<IRuntimeClient>(this);
-            services.AddSingleton<IClusterConnectionStatusListener>(this);
-            services.AddSingleton<GrainFactory>();
-            services.AddFromExisting<IGrainFactory, GrainFactory>();
-            services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
-            services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
-            services.AddSingleton<ClientProviderRuntime>();
-            services.AddFromExisting<IMessagingConfiguration, ClientConfiguration>();
-            services.AddFromExisting<ITraceConfiguration, ClientConfiguration>();
-            services.AddSingleton<IGatewayListProvider>(
-                sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
-            services.AddSingleton<SerializationManager>();
-            services.AddSingleton<MessageFactory>();
-            services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
-            services.AddSingleton<StreamProviderManager>();
-            services.AddSingleton<ClientStatisticsManager>();
-            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
-            services.AddSingleton<CodeGeneratorManager>();
+            this.handshakeClientId = GrainId.NewClientId();
+            tryResendMessage = TryResendMessage;
+            unregisterCallback = msg => UnRegisterCallback(msg.Id);
+            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
+        }
 
-            this.ServiceProvider = services.BuildServiceProvider();
+        internal void ConsumeServices(IServiceProvider services)
+        {
+            this.ServiceProvider = services;
+
+            var connectionLostHandlers = services.GetServices<ConnectionToClusterLostHandler>();
+            foreach (var handler in connectionLostHandlers)
+            {
+                this.ClusterConnectionLost += handler;
+            }
+
+            var clientInvokeCallbacks = services.GetServices<ClientInvokeCallback>();
+            foreach (var handler in clientInvokeCallbacks)
+            {
+                this.ClientInvokeCallback += handler;
+            }
 
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
-            this.config = cfg;
+            this.config = services.GetRequiredService<ClientConfiguration>();
 
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
             StatisticsCollector.Initialize(config);
@@ -141,24 +131,15 @@ namespace Orleans
             this.AppLogger = LogManager.GetLogger("Application", LoggerType.Application);
 
             BufferPool.InitGlobalBufferPool(config);
-            this.handshakeClientId = GrainId.NewClientId();
 
-            tryResendMessage = TryResendMessage;
-            unregisterCallback = msg => UnRegisterCallback(msg.Id);
 
             try
             {
                 LoadAdditionalAssemblies();
-
-                callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-                localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
-
-                if (!secondary)
+                
+                if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
                 {
-                    if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
-                    {
-                        logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
-                    }
+                    logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
                 }
 
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
@@ -190,7 +171,7 @@ namespace Orleans
                 }
 
                 config.CheckGatewayProviderSettings();
-                
+
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver");
@@ -204,7 +185,7 @@ namespace Orleans
             }
         }
 
-        public IServiceProvider ServiceProvider { get; }
+        public IServiceProvider ServiceProvider { get; private set; }
 
         private async Task StreamingInitialize()
         {
@@ -918,7 +899,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
+        public ClientInvokeCallback ClientInvokeCallback { get; set; }
         
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost;

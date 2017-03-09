@@ -380,7 +380,7 @@ namespace Orleans.TestingHost
             }
             
             WaitForLivenessToStabilizeAsync().Wait();
-            this.InternalClient = ClusterClient.Create(this.ClientConfig);
+            this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(this.ClientConfig).Build();
             this.InternalClient.Start().Wait();
         }
 
@@ -554,7 +554,7 @@ namespace Orleans.TestingHost
 
                 try
                 {
-                    this.InternalClient = ClusterClient.Create(clientConfig);
+                    this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(clientConfig).Build();
                     this.InternalClient.Start().Wait();
                 }
                 catch
