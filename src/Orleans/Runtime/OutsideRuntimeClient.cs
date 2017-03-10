@@ -237,6 +237,8 @@ namespace Orleans
 
         public async Task Start()
         {
+            // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
+            // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(this.StartInternal).ConfigureAwait(false);
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);

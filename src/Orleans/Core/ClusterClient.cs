@@ -113,7 +113,7 @@ namespace Orleans
         /// <inheritdoc />
         public void Abort()
         {
-            this.Stop(gracefully: false).Wait();
+            this.Stop(gracefully: false).GetAwaiter().GetResult();
         }
 
         private async Task Stop(bool gracefully)
