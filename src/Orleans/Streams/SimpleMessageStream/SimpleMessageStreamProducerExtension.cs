@@ -215,16 +215,16 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 try
                 {
                     if (optimizeForImmutableData)
-                        await remoteConsumer.DeliverImmutable(subscriptionId, new Immutable<object>(item), null, null);
+                        await remoteConsumer.DeliverImmutable(subscriptionId, streamId, new Immutable<object>(item), null, null);
                     else
-                        await remoteConsumer.DeliverMutable(subscriptionId, item, null, null);
+                        await remoteConsumer.DeliverMutable(subscriptionId, streamId, item, null, null);
                 }
                 catch (ClientNotAvailableException)
                 {
                     Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper> discard;
                     if (consumers.TryRemove(subscriptionId, out discard))
                     {
-                        streamPubSub.UnregisterConsumer(subscriptionId, streamId, streamId.ProviderName).Ignore();
+                        streamPubSub.UnregisterConsumer(subscriptionId, streamId, streamId.ProviderName, true).Ignore();
                         logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                             "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", remoteConsumer, streamId);
                     }

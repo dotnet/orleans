@@ -5,6 +5,7 @@ using Orleans.Async;
 using Orleans.Streams;
 using Orleans.Providers;
 using Orleans.Streams.Core;
+using Orleans.Runtime;
 
 namespace Tester.TestStreamProviders
 {
@@ -26,8 +27,6 @@ namespace Tester.TestStreamProviders
 
         public string Name { get; set; }
 
-        public IStreamSubscriptionManager StreamSubscriptionManager { get { throw new NotImplementedException("StreamSubscriptionManager getter is not implemeted"); }}
-
         public IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace)
         {
             throw new NotImplementedException();
@@ -38,6 +37,11 @@ namespace Tester.TestStreamProviders
         public Task Close()
         {
             return TaskDone.Done;
+        }
+
+        public Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null)
+        {
+            throw new NotImplementedException();
         }
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration providerConfig)

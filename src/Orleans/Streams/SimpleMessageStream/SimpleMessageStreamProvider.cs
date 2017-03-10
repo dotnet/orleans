@@ -7,7 +7,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IInternalStreamProvider
+    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamSubscriptionManagerRetriever
     {
         public string                       Name { get; private set; }
 
@@ -18,17 +18,16 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private StreamPubSubType            pubSubType;
         private ProviderStateManager        stateManager = new ProviderStateManager();
         private IRuntimeClient              runtimeClient;
-
+        private IStreamSubscriptionManager streamSubscriptionManager;
         internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
         internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
         internal const string                OPTIMIZE_FOR_IMMUTABLE_DATA = "OptimizeForImmutableData";
         internal const StreamPubSubType      DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
-
         internal const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
         internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
-
-        public IStreamSubscriptionManager StreamSubscriptionManager { get; private set; }
         public bool IsRewindable { get { return false; } }
+        [NonSerialized]
+        private readonly AsyncLock bindExtLock = new AsyncLock();
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
@@ -43,7 +42,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
                 ? DEFAULT_STREAM_PUBSUB_TYPE
                 : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
-            this.StreamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(pubSubType), this.Name);
+            if (pubSubType != StreamPubSubType.ImplicitOnly)
+            {
+                this.streamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(pubSubType), this.Name);
+            }
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
@@ -61,6 +63,17 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (stateManager.PresetState(ProviderState.Closed)) stateManager.CommitState();
             return TaskDone.Done;
+        }
+
+        public async Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null)
+        {
+            var consumerExtension = await Orleans.Streams.Providers.StreamProviderUtils.BindExtensionLazy(providerRuntime, logger, IsRewindable, bindExtLock);
+            await consumerExtension.OnSubscriptionChange<T>(onAdd, onRemove);
+        }
+
+        public IStreamSubscriptionManager GetStreamSubscriptionManager()
+        {
+            return this.streamSubscriptionManager;
         }
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)

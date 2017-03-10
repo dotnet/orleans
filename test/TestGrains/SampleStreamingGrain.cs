@@ -119,8 +119,8 @@ namespace UnitTests.Grains
         private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
         internal Logger logger;
-        protected IAsyncObserver<int> consumerObserver;
-        protected StreamSubscriptionHandle<int> consumerHandle;
+        private IAsyncObserver<int> consumerObserver;
+        private StreamSubscriptionHandle<int> consumerHandle;
 
         public override Task OnActivateAsync()
         {
@@ -140,7 +140,7 @@ namespace UnitTests.Grains
             consumerHandle = await consumer.SubscribeAsync(consumerObserver);
         }
 
-        public virtual async Task StopConsuming()
+        public async Task StopConsuming()
         {
             logger.Info("StopConsuming");
             if (consumerHandle != null)

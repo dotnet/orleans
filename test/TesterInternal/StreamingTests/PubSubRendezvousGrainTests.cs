@@ -81,10 +81,10 @@ namespace UnitTests.StreamingTests
 
             // expect exception when unregistering a consumer
             await Assert.ThrowsAsync<OrleansException>(
-                    () => pubSubGrain.UnregisterConsumer(subscriptionId1, streamId));
+                    () => pubSubGrain.UnregisterConsumer(subscriptionId1, streamId, true));
 
             // pubsub grain should recover and still function
-            await pubSubGrain.UnregisterConsumer(subscriptionId1, streamId);
+            await pubSubGrain.UnregisterConsumer(subscriptionId1, streamId, true);
             consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(1, consumers);
 
@@ -93,10 +93,10 @@ namespace UnitTests.StreamingTests
 
             // expect exception when unregistering a consumer
             await Assert.ThrowsAsync<OrleansException>(
-                    () => pubSubGrain.UnregisterConsumer(subscriptionId2, streamId));
+                    () => pubSubGrain.UnregisterConsumer(subscriptionId2, streamId, true));
 
             // pubsub grain should recover and still function
-            await pubSubGrain.UnregisterConsumer(subscriptionId2, streamId);
+            await pubSubGrain.UnregisterConsumer(subscriptionId2, streamId,true);
             consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(0, consumers);
         }

@@ -172,9 +172,13 @@
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManager.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionManagerAdmin.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionManagerRetriever.cs" />
     <Compile Include="Streams\Core\StreamSubscription.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManager.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionManagerAdmin.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
+    <Compile Include="Streams\Providers\StreamProviderUtils.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />

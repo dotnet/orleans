@@ -71,6 +71,20 @@ namespace Orleans.Streams.PubSub
             var grainRef = grainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix) as GrainReference;
             return manager.AddSubscription(streamId, grainRef);
         }
+
+        public static bool TryGetStreamSubscrptionManager(this IStreamProvider streamProvider, out IStreamSubscriptionManager manager)
+        {
+            manager = null;
+            if (streamProvider is IStreamSubscriptionManagerRetriever)
+            {
+                var streamSubManagerRetriever = streamProvider as IStreamSubscriptionManagerRetriever;
+                manager = streamSubManagerRetriever.GetStreamSubscriptionManager();
+                //implicit only stream provider don't have a subscription manager configured 
+                //so manager can be null;
+                return manager != null;
+            }
+            return false;
+        }
     }
 
 }

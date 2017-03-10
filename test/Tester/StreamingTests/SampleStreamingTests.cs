@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
@@ -123,7 +122,7 @@ namespace UnitTests.StreamingTests
 
             await producer.StopPeriodicProducing();
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -144,7 +143,7 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -165,12 +164,12 @@ namespace UnitTests.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = await producer.NumberProduced;
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry, logger), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
 
-        public static async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue, Logger logger)
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();

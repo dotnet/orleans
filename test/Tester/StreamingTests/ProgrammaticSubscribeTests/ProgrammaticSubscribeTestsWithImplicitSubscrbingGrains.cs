@@ -13,6 +13,7 @@ using Xunit;
 using UnitTests.GrainInterfaces;
 using Orleans.TestingHost.Utils;
 using UnitTests.Grains;
+using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -42,25 +43,10 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task StreamingTests_ImplicitSubscribedConsumer_Producer_GetSubscriptions()
+        public async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
-            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
-            var subscriptions = await subGrain.GetSubscriptions(streamId);
-            //since only one type of grain implicitly subscribed to the name space, so only can find one subscription
-            Assert.Equal(1, subscriptions.Count());
-            await subGrain.ClearStateAfterTesting();
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task StreamingTests_ImplicitSubscribedConsumer_Producer_AddRemoveSubscriptions()
-        {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
-            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(SubscribeGrain.SubscribeGrainId);
-            var consumer = this.fixture.GrainFactory.GetGrain<IImplicitSubscribeGrain>(Guid.NewGuid());
-            var subscriptions = await subGrain.GetSubscriptions(streamId);
-            await Assert.ThrowsAsync<OrleansException>(() => subGrain.RemoveSubscription(subscriptions.ToList()[0]));
-            await subGrain.ClearStateAfterTesting();
+            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+            Assert.False(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
 
         //test utilities and statics

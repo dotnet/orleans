@@ -51,7 +51,7 @@ namespace Orleans.Streams
             return TaskDone.Done;
         }
 
-        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, bool observerRemoved)
         {
             if (!IsImplicitSubscriber(subscriptionId, streamId))
             {

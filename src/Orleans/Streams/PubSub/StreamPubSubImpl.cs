@@ -48,11 +48,11 @@ namespace Orleans.Streams
                 : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, filter);
         }
 
-        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, bool observerRemoved)
         {
             return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
-                ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider)
-                : explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider);
+                ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider, observerRemoved)
+                : explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider, observerRemoved);
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
