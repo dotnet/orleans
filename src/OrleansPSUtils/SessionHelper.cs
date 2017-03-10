@@ -28,7 +28,7 @@ namespace OrleansPSUtils
 
                 try
                 {
-                    client.Close().Wait();
+                    client.Close().GetAwaiter().GetResult();
                 }
                 catch (Exception exception)
                 {
@@ -44,7 +44,13 @@ namespace OrleansPSUtils
             }
             finally
             {
-                cmdlet.SetClient(null);
+                var sessionClient = cmdlet.GetClient();
+
+                // If this client is the client associated with the current session, clear the current session's client.
+                if (ReferenceEquals(sessionClient, client))
+                {
+                    cmdlet.SetClient(null);
+                }
             }
         }
     }

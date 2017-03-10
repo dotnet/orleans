@@ -46,13 +46,22 @@ namespace PSUtils.Tests
 
         public override void Dispose()
         {
-            var stopCommand = new Command("Stop-GrainClient");
-            Powershell.Commands.Clear();
-            Powershell.Commands.AddCommand(stopCommand);
-            Powershell.Invoke();
-            Powershell.Dispose();
-            Runspace.Dispose();
-            base.Dispose();
+            try
+            {
+                var stopCommand = new Command("Stop-GrainClient");
+                Powershell.Commands.Clear();
+                Powershell.Commands.AddCommand(stopCommand);
+                Powershell.Invoke();
+            }
+            catch
+            {
+            }
+            finally
+            {
+                Powershell.Dispose();
+                Runspace.Dispose();
+                base.Dispose();
+            }
         }
     }
 

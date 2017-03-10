@@ -18,6 +18,8 @@ namespace OrleansPSUtils
         private const string ConfigSet = "Config";
         private const string EndpointSet = "Endpoint";
 
+        private IClusterClient client;
+
         [Parameter(Position = 1, Mandatory = true, ValueFromPipeline = true, ParameterSetName = FilePathSet)]
         public string ConfigFilePath { get; set; }
 
@@ -71,11 +73,11 @@ namespace OrleansPSUtils
                         builder.LoadConfiguration();
                         break;
                 }
-                
-                var client = builder.Build();
-                client.Connect().Wait();
-                this.SetClient(client);
-                this.WriteObject(client);
+
+                this.client = builder.Build();
+                this.client.Connect().GetAwaiter().GetResult();
+                this.SetClient(this.client);
+                this.WriteObject(this.client);
             }
             catch (Exception ex)
             {
@@ -105,8 +107,7 @@ namespace OrleansPSUtils
 
         protected override void StopProcessing()
         {
-            var client = this.GetClient();
-            this.CloseClient(client);
+            this.CloseClient(this.client);
         }
     }
 }
