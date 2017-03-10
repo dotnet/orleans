@@ -62,10 +62,12 @@ namespace Orleans.Runtime
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
-            RuntimeClient.Current = this;
         }
         
         public IServiceProvider ServiceProvider { get; }
+
+        /// <inheritdoc />
+        public ClientInvokeCallback ClientInvokeCallback { get; set; }
 
         public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 

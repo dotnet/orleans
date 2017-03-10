@@ -42,7 +42,7 @@ namespace AWSUtils.Tests.Streaming
 
         public SQSSubscriptionMultiplicityTests()
         {
-            runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, GrainClient.Logger, this.HostedCluster);
+            runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, this.HostedCluster);
         }
 
         public override void Dispose()

@@ -15,6 +15,15 @@ namespace OrleansPSUtils
         private const string GuidCompoundKeySet = "GuidCompoundKey";
         private const string LongCompoundKeySet = "LongCompoundKey";
 
+        private const string GetGrainMethodName = "GetGrain";
+
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ParameterSetName = GuidKeySet)]
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ParameterSetName = LongKeySet)]
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ParameterSetName = StringKeySet)]
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ParameterSetName = GuidCompoundKeySet)]
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ParameterSetName = LongCompoundKeySet)]
+        public IClusterClient Client { get; set; }
+
         [Parameter(Position = 1, Mandatory = true, ValueFromPipeline = true, ParameterSetName = GuidKeySet)]
         [Parameter(Position = 1, Mandatory = true, ValueFromPipeline = true, ParameterSetName = LongKeySet)]
         [Parameter(Position = 1, Mandatory = true, ValueFromPipeline = true, ParameterSetName = StringKeySet)]
@@ -48,49 +57,54 @@ namespace OrleansPSUtils
         {
             try
             {
-                if (!GrainClient.IsInitialized)
-                    throw new InvalidOperationException("GrainClient not initialized. Call 'Start-GrainClient' before call Get-Grain");
+                var client = this.Client ?? this.GetClient();
+                if (client == null)
+                    throw new InvalidOperationException("Client not initialized. Call 'Start-GrainClient' before call Get-Grain");
 
                 MethodInfo baseMethodInfo = null;
-                var methodName = "GetGrain";
                 var methodParams = new List<object>();
 
-                switch (ParameterSetName)
+                switch (this.ParameterSetName)
                 {
                     case GuidKeySet:
-                        baseMethodInfo = GrainClient.GrainFactory.GetType().GetMethod(methodName, new[] { typeof(Guid), typeof(string) });
-                        methodParams.Add(GuidKey);
+                        baseMethodInfo = client.GetType()
+                            .GetMethod(GetGrainMethodName, new[] { typeof(Guid), typeof(string) });
+                        methodParams.Add(this.GuidKey);
                         break;
                     case GuidCompoundKeySet:
-                        baseMethodInfo = GrainClient.GrainFactory.GetType().GetMethod("GetGrain", new[] { typeof(Guid), typeof(string), typeof(string) });
-                        methodParams.Add(GuidKey);
-                        methodParams.Add(KeyExtension);
+                        baseMethodInfo = client.GetType()
+                            .GetMethod(GetGrainMethodName, new[] { typeof(Guid), typeof(string), typeof(string) });
+                        methodParams.Add(this.GuidKey);
+                        methodParams.Add(this.KeyExtension);
                         break;
                     case LongKeySet:
-                        baseMethodInfo = GrainClient.GrainFactory.GetType().GetMethod(methodName, new[] { typeof(long), typeof(string) });
-                        methodParams.Add(LongKey);
+                        baseMethodInfo = client.GetType()
+                            .GetMethod(GetGrainMethodName, new[] { typeof(long), typeof(string) });
+                        methodParams.Add(this.LongKey);
                         break;
                     case LongCompoundKeySet:
-                        baseMethodInfo = GrainClient.GrainFactory.GetType().GetMethod("GetGrain", new[] { typeof(long), typeof(string), typeof(string) });
-                        methodParams.Add(LongKey);
-                        methodParams.Add(KeyExtension);
+                        baseMethodInfo = client.GetType()
+                            .GetMethod(GetGrainMethodName, new[] { typeof(long), typeof(string), typeof(string) });
+                        methodParams.Add(this.LongKey);
+                        methodParams.Add(this.KeyExtension);
                         break;
                     case StringKeySet:
-                        baseMethodInfo = GrainClient.GrainFactory.GetType().GetMethod(methodName, new[] { typeof(string), typeof(string) });
-                        methodParams.Add(StringKey);
+                        baseMethodInfo = client.GetType()
+                            .GetMethod(GetGrainMethodName, new[] { typeof(string), typeof(string) });
+                        methodParams.Add(this.StringKey);
                         break;
                 }
 
-                methodParams.Add(GrainClassNamePrefix);
+                methodParams.Add(this.GrainClassNamePrefix);
 
-                var getGrainMethod = baseMethodInfo.MakeGenericMethod(GrainType);
-                var grain = getGrainMethod.Invoke(GrainClient.GrainFactory, methodParams.ToArray());
+                var getGrainMethod = baseMethodInfo.MakeGenericMethod(this.GrainType);
+                var grain = getGrainMethod.Invoke(client, methodParams.ToArray());
 
-                WriteObject(grain);
+                this.WriteObject(grain);
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(ex, ex.GetType().Name, ErrorCategory.InvalidOperation, this));
+                this.WriteError(new ErrorRecord(ex, ex.GetType().Name, ErrorCategory.InvalidOperation, this));
             }
         }
     }

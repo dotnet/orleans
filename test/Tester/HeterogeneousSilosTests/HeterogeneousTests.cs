@@ -74,7 +74,8 @@ namespace Tester.HeterogeneousSilosTests
             await Task.Delay(delayTimeout);
 
             // Disconnect/Reconnect the client
-            GrainClient.Uninitialize();
+            await cluster.Client.Close();
+            cluster.Client.Dispose();
             cluster.InitializeClient();
 
             for (var i = 0; i < 5; i++)
@@ -93,7 +94,8 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Contains("Cannot find an implementation class for grain interface", orleansException.Message);
 
             // Disconnect/Reconnect the client
-            GrainClient.Uninitialize();
+            await cluster.Client.Close();
+            cluster.Client.Dispose();
             cluster.InitializeClient();
 
             // Should fail

@@ -43,22 +43,22 @@ namespace DefaultCluster.Tests.General
 
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("CreateGrain took " + clock.Elapsed);
+            this.Logger.Info("CreateGrain took " + clock.Elapsed);
 
             clock.Restart();
             string received = await grain.EchoAsync(expectedEcho);
-            logger.Info("EchoGrain.Echo took " + clock.Elapsed);
+            this.Logger.Info("EchoGrain.Echo took " + clock.Elapsed);
 
             Assert.Equal(expectedEcho, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
-        public void EchoGrain_EchoError()
+        public async Task EchoGrain_EchoError()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
-            bool ok = promise.ContinueWith(t =>
+            await promise.ContinueWith(t =>
             {
                 if (!t.IsFaulted) Assert.True(false); // EchoError should not have completed successfully
 
@@ -66,12 +66,11 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).Wait(timeout);
-            Assert.True(ok); // Finished OK
+            }).WithTimeout(timeout);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
-        public void EchoGrain_Timeout_Wait()
+        public async Task EchoGrain_Timeout_Wait()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
@@ -81,16 +80,16 @@ namespace DefaultCluster.Tests.General
             Stopwatch sw = new Stopwatch();
             sw.Start();
             Task<int> promise = grain.BlockingCallTimeoutAsync(delay60);
-            bool ok = promise.ContinueWith(t =>
-            {
-                if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
+            await promise.ContinueWith(
+                t =>
+                {
+                    if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
 
-                Exception exc = t.Exception;
-                while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsAssignableFrom<TimeoutException>(exc);
-            }).Wait(delay45);
+                    Exception exc = t.Exception;
+                    while (exc is AggregateException) exc = exc.InnerException;
+                    Assert.IsAssignableFrom<TimeoutException>(exc);
+                }).WithTimeout(delay45);
             sw.Stop();
-            Assert.True(ok); // Wait should not have timed-out. The grain call should have time out.
             Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
@@ -152,15 +151,15 @@ namespace DefaultCluster.Tests.General
 
             clock.Start();
             string received = await grain.GetLastEchoAsync();
-            logger.Info("EchoGrain.LastEcho took " + clock.Elapsed);
+            this.Logger.Info("EchoGrain.LastEcho took " + clock.Elapsed);
 
             Assert.Equal(expectedEcho, received); // LastEcho-Echo
 
-            EchoGrain_EchoError();
+            await EchoGrain_EchoError();
 
             clock.Restart();
             received = await grain.GetLastEchoAsync();
-            logger.Info("EchoGrain.LastEcho-Error took " + clock.Elapsed);
+            this.Logger.Info("EchoGrain.LastEcho-Error took " + clock.Elapsed);
 
             Assert.Equal(expectedEchoError, received); // LastEcho-Error
         }
@@ -173,13 +172,13 @@ namespace DefaultCluster.Tests.General
             string what = "CreateGrain";
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.Ping";
             clock.Restart();
             
             await grain.PingAsync().WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -190,12 +189,12 @@ namespace DefaultCluster.Tests.General
             string what = "CreateGrain";
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingLocalSilo";
             clock.Restart();
             await grain.PingLocalSiloAsync().WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -206,7 +205,7 @@ namespace DefaultCluster.Tests.General
             string what = "CreateGrain";
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             SiloAddress silo1 = HostedCluster.Primary.SiloAddress;
             SiloAddress silo2 = HostedCluster.SecondarySilos[0].SiloAddress;
@@ -214,12 +213,12 @@ namespace DefaultCluster.Tests.General
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
             await grain.PingRemoteSiloAsync(silo1).WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingRemoteSilo[2]";
             clock.Restart();
             await grain.PingRemoteSiloAsync(silo2).WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -230,12 +229,12 @@ namespace DefaultCluster.Tests.General
             string what = "CreateGrain";
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingOtherSilo";
             clock.Restart();
             await grain.PingOtherSiloAsync().WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -246,12 +245,12 @@ namespace DefaultCluster.Tests.General
             string what = "CreateGrain";
             clock.Start();
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingOtherSiloMembership";
             clock.Restart();
             await grain.PingClusterMemberAsync().WithTimeout(timeout);
-            logger.Info("{0} took {1}", what, clock.Elapsed);
+            this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -288,13 +287,13 @@ namespace DefaultCluster.Tests.General
 
         private bool TimeIsLonger(TimeSpan time, TimeSpan limit)
         {
-            logger.Info("Compare TimeIsLonger: Actual={0} Limit={1} Epsilon={2}", time, limit, Epsilon);
+            this.Logger.Info("Compare TimeIsLonger: Actual={0} Limit={1} Epsilon={2}", time, limit, Epsilon);
             return time >= (limit - Epsilon);
         }
 
         private bool TimeIsShorter(TimeSpan time, TimeSpan limit)
         {
-            logger.Info("Compare TimeIsShorter: Actual={0} Limit={1} Epsilon={2}", time, limit, Epsilon);
+            this.Logger.Info("Compare TimeIsShorter: Actual={0} Limit={1} Epsilon={2}", time, limit, Epsilon);
             return time <= (limit + Epsilon);
         }
     }

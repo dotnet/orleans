@@ -84,7 +84,7 @@ namespace UnitTests.General
             {
                 ITestContentGrain grain = this.GrainFactory.GetGrain<ITestContentGrain>(i);
                 object content = await grain.FetchContentFromLocalGrain();
-                this.logger.Info(content.ToString());
+                this.fixture.Logger.Info(content.ToString());
                 string testGrainSiloId = await grain.GetRuntimeInstanceId();
                 Assert.Equal(testGrainSiloId, content);
             }
@@ -100,7 +100,7 @@ namespace UnitTests.General
             // check all providers are registered correctly
             foreach (SiloHandle silo in silos)
             {
-                var providers = await silo.TestHook.GetAllSiloProviderNames();
+                var providers = await this.HostedCluster.Client.GetTestHooks(silo).GetAllSiloProviderNames();
 
                 Assert.Contains(BootstrapProviderName1, providers);
                 Assert.Contains(BootstrapProviderName2, providers);
@@ -132,7 +132,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                bool re = await siloHandle.TestHook.HasBoostraperProvider(providerName);
+                bool re = await this.HostedCluster.Client.GetTestHooks(siloHandle).HasBoostraperProvider(providerName);
                 if (re)
                 {
                     return true;

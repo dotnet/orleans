@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Persistence
         private readonly ITestOutputHelper output;
         protected TestCluster HostedCluster { get; private set; }
         private readonly double timingFactor;
-
+        protected readonly Logger logger;
         private const int LoopIterations_Grain = 1000;
         private const int BatchSize = 100;
 
@@ -50,6 +50,7 @@ namespace Tester.AzureUtils.Persistence
         public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
             this.output = output;
+            this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
             timingFactor = TestUtils.CalibrateTimings();
@@ -371,7 +372,9 @@ namespace Tester.AzureUtils.Persistence
             foreach (var silo in silos)
             {
                 string provider = providerType.FullName;
-                List<string> providers = (await silo.TestHook.GetStorageProviderNames()).ToList();
+
+                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
+                List<string> providers = (await testHooks.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }

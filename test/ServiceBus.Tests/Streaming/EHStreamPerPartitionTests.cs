@@ -87,7 +87,7 @@ namespace ServiceBus.Tests.StreamingTests
         [Fact]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
-            logger.Info("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
+            this.fixture.Logger.Info("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
 
             int streamCount = 100;
             int eventsInStream = 10;
@@ -111,7 +111,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = GrainClient.GetStreamProvider(StreamProviderName);
+            IStreamProvider streamProvider = this.fixture.Client.GetStreamProvider(StreamProviderName);
             IAsyncStream<int>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<int>(Guid.NewGuid(), null))

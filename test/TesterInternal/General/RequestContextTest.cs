@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -22,6 +23,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
+        private OutsideRuntimeClient runtimeClient;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -40,6 +42,7 @@ namespace UnitTests.General
         {
             this.output = output;
             this.fixture = fixture;
+            this.runtimeClient = this.fixture.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
             RequestContext.PropagateActivityId = true; // Client-side setting
 
             RequestContextTestUtils.SetActivityId(Guid.Empty);
@@ -49,7 +52,6 @@ namespace UnitTests.General
         public void Dispose()
         {
             RequestContextTestUtils.SetActivityId(Guid.Empty);
-            GrainClient.ClientInvokeCallback = null;
             RequestContext.Clear();
         }
 
@@ -132,7 +134,7 @@ namespace UnitTests.General
         {
             var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
             Tuple<string, string> requestContext = await grain.TestRequestContext();
-            logger.Info("Request Context is: " + requestContext);
+            this.fixture.Logger.Info("Request Context is: " + requestContext);
             Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
             Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
         }
@@ -370,7 +372,7 @@ namespace UnitTests.General
         public async Task ClientInvokeCallback_CountCallbacks()
         {
             TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
-            GrainClient.ClientInvokeCallback = callback.OnInvoke;
+            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             RequestContextTestUtils.SetActivityId(Guid.Empty);
@@ -378,7 +380,7 @@ namespace UnitTests.General
             Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#1"
             Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
 
-            GrainClient.ClientInvokeCallback = null;
+            this.runtimeClient.ClientInvokeCallback = null;
             activityId = await grain.E2EActivityId();
             Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2"
             Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks - should be unchanged"
@@ -392,7 +394,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId2);
             TestClientInvokeCallback callback = new TestClientInvokeCallback(output, setActivityId);
-            GrainClient.ClientInvokeCallback = callback.OnInvoke;
+            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             Guid activityId = await grain.E2EActivityId();
@@ -401,7 +403,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(Guid.Empty);
             RequestContext.Clear(); // Need this to clear out any old ActivityId value cached in RequestContext. Code optimization in RequestContext does not unset entry if Trace.CorrelationManager.ActivityId == Guid.Empty [which is the "normal" case]
-            GrainClient.ClientInvokeCallback = null;
+            this.runtimeClient.ClientInvokeCallback = null;
 
             activityId = await grain.E2EActivityId();
             Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2 == Zero"
@@ -412,7 +414,7 @@ namespace UnitTests.General
         public async Task ClientInvokeCallback_GrainObserver()
         {
             TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
-            GrainClient.ClientInvokeCallback = callback.OnInvoke;
+            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
             RequestContextGrainObserver observer = new RequestContextGrainObserver(output, null, null);
             // CreateObjectReference will result in system target call to IClientObserverRegistrar.
             // We want to make sure this does not invoke ClientInvokeCallback.

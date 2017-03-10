@@ -12,6 +12,8 @@ namespace OrleansManager
     {
         private static IManagementGrain systemManagement;
 
+        private static IInternalClusterClient client;
+
         static void Main(string[] args)
         {
             Console.WriteLine("Invoked OrleansManager.exe with arguments {0}", Utils.EnumerableToString(args));
@@ -38,48 +40,53 @@ namespace OrleansManager
 
         private static void RunCommand(string command, string[] args)
         {
-            GrainClient.Initialize();
-
-            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
-            Dictionary<string, string> options = args.Skip(1)
-                .Where(s => s.StartsWith("-"))
-                .Select(s => s.Substring(1).Split('='))
-                .ToDictionary(a => a[0].ToLowerInvariant(), a => a.Length > 1 ? a[1] : "");
-
-            var restWithoutOptions = args.Skip(1).Where(s => !s.StartsWith("-")).ToArray();
-
-            switch (command)
+            var clientBuilder = new ClientBuilder().LoadConfiguration();
+            using (client = (IInternalClusterClient)clientBuilder.Build())
             {
-                case "grainstats":
-                    PrintSimpleGrainStatistics(restWithoutOptions);
-                    break;
+                client.Connect().Wait();
+                systemManagement = client.GetGrain<IManagementGrain>(0);
+                var options = args.Skip(1)
+                                  .Where(s => s.StartsWith("-"))
+                                  .Select(s => s.Substring(1).Split('='))
+                                  .ToDictionary(a => a[0].ToLowerInvariant(), a => a.Length > 1 ? a[1] : "");
 
-                case "fullgrainstats":
-                    PrintGrainStatistics(restWithoutOptions);
-                    break;
+                var restWithoutOptions = args.Skip(1).Where(s => !s.StartsWith("-")).ToArray();
 
-                case "collect":
-                    CollectActivations(options, restWithoutOptions);
-                    break;
+                switch (command)
+                {
+                    case "grainstats":
+                        PrintSimpleGrainStatistics(restWithoutOptions);
+                        break;
 
-                case "unregister":
-                    var unregisterArgs = args.Skip(1).ToArray();
-                    UnregisterGrain(unregisterArgs);
-                    break;
+                    case "fullgrainstats":
+                        PrintGrainStatistics(restWithoutOptions);
+                        break;
 
-                case "lookup":
-                    var lookupArgs = args.Skip(1).ToArray();
-                    LookupGrain(lookupArgs);
-                    break;
+                    case "collect":
+                        CollectActivations(options, restWithoutOptions);
+                        break;
 
-                case "grainreport":
-                    var grainReportArgs = args.Skip(1).ToArray();
-                    GrainReport(grainReportArgs);
-                    break;
+                    case "unregister":
+                        var unregisterArgs = args.Skip(1).ToArray();
+                        UnregisterGrain(unregisterArgs);
+                        break;
 
-                default:
-                    PrintUsage();
-                    break;
+                    case "lookup":
+                        var lookupArgs = args.Skip(1).ToArray();
+                        LookupGrain(lookupArgs);
+                        break;
+
+                    case "grainreport":
+                        var grainReportArgs = args.Skip(1).ToArray();
+                        GrainReport(grainReportArgs);
+                        break;
+
+                    default:
+                        PrintUsage();
+                        break;
+                }
+                
+                client.Close().Wait();
             }
         }
 
@@ -143,7 +150,7 @@ namespace OrleansManager
                 WriteStatus(string.Format("**Calling GetDetailedGrainReport({0}, {1})", silo, grainId));
                 try
                 {
-                    var siloControl = GrainClient.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+                    var siloControl = client.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
                     DetailedGrainReport grainReport = siloControl.GetDetailedGrainReport(grainId).Result;
                     reports.Add(grainReport);
                 }
@@ -165,7 +172,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
             WriteStatus(string.Format("**Calling DeleteGrain({0}, {1})", silo, grainId));
             directory.DeleteGrainAsync(grainId).Wait();
@@ -179,7 +186,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = client.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
             WriteStatus(string.Format("**Calling LookupGrain({0}, {1})", silo, grainId));
             //Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.FullLookUp(grainId, true);
@@ -215,7 +222,7 @@ namespace OrleansManager
             int interfaceTypeCodeDataLong;
             long implementationTypeCode;
 
-            var grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
+            var grainTypeResolver = (IGrainTypeResolver)client.ServiceProvider.GetService(typeof(IGrainTypeResolver));
             if (int.TryParse(interfaceTypeCodeOrImplClassName, out interfaceTypeCodeDataLong))
             {
                 // parsed it as int, so it is an interface type code.
@@ -252,7 +259,7 @@ namespace OrleansManager
 
         private static async Task<List<SiloAddress>> GetSiloAddresses()
         {
-            var gatewayProvider = (IGatewayListProvider) GrainClient.ServiceProvider.GetService(typeof(IGatewayListProvider));
+            var gatewayProvider = (IGatewayListProvider) client.ServiceProvider.GetService(typeof(IGatewayListProvider));
             IList<Uri> gateways = await gatewayProvider.GetGateways();
             if (gateways.Count >= 1) 
                 return gateways.Select(Utils.ToSiloAddress).ToList();

@@ -13,6 +13,12 @@ namespace Tester.EventSourcingTests
 {
     public class AccountGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
+        private readonly EventSourcingClusterFixture fixture;
+
+        public AccountGrainTests(EventSourcingClusterFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
         public async Task TestSequence(IAccountGrain account, bool hasLogStored)
         {
@@ -57,7 +63,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithLog()
         {
-            var account = GrainClient.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
+            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
             await TestSequence(account, true);
         }
 
@@ -65,7 +71,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithoutLog()
         {
-            var account = GrainClient.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_PersistStateOnly");
+            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_PersistStateOnly");
             await TestSequence(account, false);
         }
 

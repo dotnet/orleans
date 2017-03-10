@@ -70,16 +70,17 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                ICollection<string> providers = await silo.TestHook.GetStorageProviderNames();
+                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
+                ICollection<string> providers = await testHooks.GetStorageProviderNames();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
-                Assert.True(silo.TestHook.HasStorageProvider(MockStorageProviderName1).Result,
+                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName1).Result,
                     $"provider {MockStorageProviderName1} on silo {silo.Name} should be registered");
-                Assert.True(silo.TestHook.HasStorageProvider(MockStorageProviderName2).Result,
+                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName2).Result,
                     $"provider {MockStorageProviderName2} on silo {silo.Name} should be registered");
-                Assert.True(silo.TestHook.HasStorageProvider(MockStorageProviderNameLowerCase).Result,
+                Assert.True(testHooks.HasStorageProvider(MockStorageProviderNameLowerCase).Result,
                     $"provider {MockStorageProviderNameLowerCase} on silo {silo.Name} should be registered");
-                Assert.True(silo.TestHook.HasStorageProvider(ErrorInjectorProviderName).Result,
+                Assert.True(testHooks.HasStorageProvider(ErrorInjectorProviderName).Result,
                     $"provider {ErrorInjectorProviderName} on silo {silo.Name} should be registered");
             }
         }
@@ -90,7 +91,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            Assert.False(silo.TestHook.HasStorageProvider(providerName).Result,
+            Assert.False(this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName).Result,
                     $"provider {providerName} on silo {silo.Name} should not be registered");
         }
 
@@ -1181,7 +1182,7 @@ namespace UnitTests.StorageTests
         {
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
-                if (siloHandle.TestHook.HasStorageProvider(providerName).Result)
+                if (this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result)
                 {
                     return true;
                 }
@@ -1225,7 +1226,7 @@ namespace UnitTests.StorageTests
             {
                 foreach (var providerName in mockStorageProviders)
                 {
-                    if (!siloHandle.TestHook.HasStorageProvider(providerName).Result) continue;
+                    if (!this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
                     IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
                     object[] replies = mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
                        providerName, (int)MockStorageProvider.Commands.ResetHistory, null).Result;

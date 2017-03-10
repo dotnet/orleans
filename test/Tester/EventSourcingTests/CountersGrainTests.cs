@@ -15,11 +15,17 @@ namespace Tester.EventSourcingTests
 {
     public partial class CountersGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
+        private readonly EventSourcingClusterFixture fixture;
+
+        public CountersGrainTests(EventSourcingClusterFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Record()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
 
             var currentstate = await grain.GetTentativeState();
             Assert.NotNull(currentstate);
@@ -41,7 +47,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task ConcurrentIncrements()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
             await ConcurrentIncrements(grain, 50, false);
         }
 

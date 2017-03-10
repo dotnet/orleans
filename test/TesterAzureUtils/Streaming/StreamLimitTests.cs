@@ -717,7 +717,7 @@ namespace UnitTests.StreamingTests
                 promises.Clear();
             }
 
-            var pubSub = StreamTestUtils.GetStreamPubSub();
+            var pubSub = StreamTestUtils.GetStreamPubSub(this.InternalClient);
 
             // Check Consumer counts
             int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, StreamNamespace);

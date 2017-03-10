@@ -77,7 +77,7 @@ namespace UnitTests.HaloTests.Streaming
         [Fact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ConsumerProducer()
         {
-            logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
+            this.fixture.Logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = SmsStreamProviderName;
             Guid consumerGuid = Guid.NewGuid();
@@ -89,7 +89,7 @@ namespace UnitTests.HaloTests.Streaming
         [Fact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ProducerConsumer()
         {
-            logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
+            this.fixture.Logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = SmsStreamProviderName;
             Guid producerGuid = Guid.NewGuid();
@@ -101,7 +101,7 @@ namespace UnitTests.HaloTests.Streaming
         [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
-            logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
+            this.fixture.Logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
             Guid consumerGuid = Guid.NewGuid();
@@ -113,7 +113,7 @@ namespace UnitTests.HaloTests.Streaming
         [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
-            logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");
+            this.fixture.Logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
             Guid producerGuid = Guid.NewGuid();
@@ -162,7 +162,7 @@ namespace UnitTests.HaloTests.Streaming
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            this.fixture.Logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             return numProduced == numConsumed;
         }
     }

@@ -29,7 +29,7 @@ namespace Tester.AzureUtils.Streaming
 
         public AQSubscriptionMultiplicityTests()
         {
-            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger, this.HostedCluster);
+            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, this.HostedCluster);
         }
 
         public override void Dispose()

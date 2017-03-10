@@ -88,7 +88,8 @@ namespace Orleans.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
         private int numberOfConnectedGateways = 0;
-        private MessageFactory messageFactory;
+        private readonly MessageFactory messageFactory;
+        private readonly IClusterConnectionStatusListener connectionStatusListener;
 
         public ProxiedMessageCenter(
             ClientConfiguration config,
@@ -98,7 +99,8 @@ namespace Orleans.Messaging
             IGatewayListProvider gatewayListProvider,
             SerializationManager serializationManager,
             IRuntimeClient runtimeClient,
-            MessageFactory messageFactory)
+            MessageFactory messageFactory,
+            IClusterConnectionStatusListener connectionStatusListener)
         {
             this.SerializationManager = serializationManager;
             lockable = new object();
@@ -106,6 +108,7 @@ namespace Orleans.Messaging
             ClientId = clientId;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
+            this.connectionStatusListener = connectionStatusListener;
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
@@ -456,7 +459,7 @@ namespace Orleans.Messaging
         {
             if (Interlocked.Decrement(ref numberOfConnectedGateways) == 0)
             {
-                GrainClient.NotifyClusterConnectionLost();
+                this.connectionStatusListener.NotifyClusterConnectionLost();
             }
         }
 

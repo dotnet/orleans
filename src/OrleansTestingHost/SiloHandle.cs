@@ -32,9 +32,6 @@ namespace Orleans.TestingHost
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
         public abstract void StopSilo(bool stopGracefully);
 
-        /// <summary>Gets the Silo test hook</summary>
-        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.ProxyAddress);
-
         /// <summary>Gets the Silo test hook that uses AppDomain remoting
         /// (NOTE: this will be removed really soon, and was migrated here temporarily. It does not respect the abstraction
         /// as this only works with AppDomains for now, but we'll be removing TestHooks with AppDomains entirely)</summary>

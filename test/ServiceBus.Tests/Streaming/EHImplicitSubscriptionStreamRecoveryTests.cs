@@ -94,14 +94,14 @@ namespace ServiceBus.Tests.StreamingTests
         [Fact]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
-            logger.Info("************************ EHRecoverable100EventStreamsWithTransientErrorsTest *********************************");
+            this.fixture.Logger.Info("************************ EHRecoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents, ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace, 4, 100);
         }
 
         [Fact]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
-            logger.Info("************************ EHRecoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+            this.fixture.Logger.Info("************************ EHRecoverable100EventStreamsWith1NonTransientErrorTest *********************************");
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents, ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace, 4, 100);
         }
 

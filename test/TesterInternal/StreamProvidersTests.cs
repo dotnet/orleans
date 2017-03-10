@@ -63,7 +63,7 @@ namespace UnitTests.Streaming
             Guid thisRunServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = await siloHandle.TestHook.GetServiceId();
+            Guid serviceId = await this.HostedCluster.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
           
         }
@@ -92,7 +92,7 @@ namespace UnitTests.Streaming
             Assert.Equal(ServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = await siloHandle.TestHook.GetServiceId();
+            Guid serviceId = await this.HostedCluster.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
         }
     }

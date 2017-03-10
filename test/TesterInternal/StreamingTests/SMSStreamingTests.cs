@@ -48,7 +48,7 @@ namespace UnitTests.StreamingTests
         
         public SMSStreamingTests(Fixture fixture)
         {
-            runner = new SingleStreamTestRunner(fixture.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(fixture.HostedCluster.InternalClient, SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
             // runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
             fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty(fixture);
         }
