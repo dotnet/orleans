@@ -229,7 +229,7 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
     ``` xml
     <Target Name="AfterBuild">
     <Copy
-        SourceFiles="<Name-of-your-config-file.xml"
+        SourceFiles="<Name-of-your-config-file>.xml"
         DestinationFolder="$(OutputPath)"
         ContinueOnError="true"
         />
