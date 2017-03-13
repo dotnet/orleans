@@ -1,3 +1,4 @@
+#if !NETSTANDARD_TODO
 using System;
 using System.IO;
 using System.Reflection;
@@ -169,3 +170,4 @@ namespace Tester.HeterogeneousSilosTests
         }
     }
 }
+#endif

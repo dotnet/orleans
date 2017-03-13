@@ -178,7 +178,7 @@ namespace Orleans.CodeGeneration
             if (typeof(IGrainExtension).IsAssignableFrom(grainInterface))
                 return 0;
 
-            var attr = grainInterface.GetCustomAttribute<VersionAttribute>();
+            var attr = grainInterface.GetTypeInfo().GetCustomAttribute<VersionAttribute>();
             return attr?.Version ?? Constants.DefaultInterfaceVersion;
         }
 
