@@ -66,66 +66,66 @@ namespace Orleans.Runtime
     }
 
     internal class SparseArray<T> where T : class
-    {
-        private volatile T[] m_array;
-
-        internal SparseArray(int initialSize)
         {
-            m_array = new T[initialSize];
-        }
+            private volatile T[] m_array;
 
-        internal T[] Current
-        {
-            get { return m_array; }
-        }
+            internal SparseArray(int initialSize)
+            {
+                m_array = new T[initialSize];
+            }
 
-        internal int Add(T e)
-        {
-            while (true)
+            internal T[] Current
+            {
+                get { return m_array; }
+            }
+
+            internal int Add(T e)
+            {
+                while (true)
+                {
+                    T[] array = m_array;
+                    lock (array)
+                    {
+                        for (int i = 0; i < array.Length; i++)
+                        {
+                            if (array[i] == null)
+                            {
+                                Volatile.Write(ref array[i], e);
+                                return i;
+                            }
+                            else if (i == array.Length - 1)
+                            {
+                                // Must resize. If there was a race condition, we start over again.
+                                if (array != m_array)
+                                    continue;
+
+                                T[] newArray = new T[array.Length * 2];
+                                Array.Copy(array, newArray, i + 1);
+                                newArray[i + 1] = e;
+                                m_array = newArray;
+                                return i + 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            internal void Remove(T e)
             {
                 T[] array = m_array;
                 lock (array)
                 {
-                    for (int i = 0; i < array.Length; i++)
+                    for (int i = 0; i < m_array.Length; i++)
                     {
-                        if (array[i] == null)
+                        if (m_array[i] == e)
                         {
-                            Volatile.Write(ref array[i], e);
-                            return i;
-                        }
-                        else if (i == array.Length - 1)
-                        {
-                            // Must resize. If there was a race condition, we start over again.
-                            if (array != m_array)
-                                continue;
-
-                            T[] newArray = new T[array.Length * 2];
-                            Array.Copy(array, newArray, i + 1);
-                            newArray[i + 1] = e;
-                            m_array = newArray;
-                            return i + 1;
+                            Volatile.Write(ref m_array[i], null);
+                            break;
                         }
                     }
                 }
             }
         }
-
-        internal void Remove(T e)
-        {
-            T[] array = m_array;
-            lock (array)
-            {
-                for (int i = 0; i < m_array.Length; i++)
-                {
-                    if (m_array[i] == e)
-                    {
-                        Volatile.Write(ref m_array[i], null);
-                        break;
-                    }
-                }
-            }
-        }
-    }
     internal sealed class ThreadPoolWorkQueue
     {
         // Simple sparsely populated array to allow lock-free reading.
@@ -133,6 +133,7 @@ namespace Orleans.Runtime
 
         internal class WorkStealingQueue
         {
+            public bool AddingComplete;
             private const int INITIAL_SIZE = 32; // 32
             internal volatile IThreadPoolWorkItem[] m_array = new IThreadPoolWorkItem[INITIAL_SIZE];
             private volatile int m_mask = INITIAL_SIZE - 1;
@@ -723,7 +724,10 @@ namespace Orleans.Runtime
                 // Set up our thread-local data
                 //
                 ThreadPoolWorkQueueThreadLocals tl = workQueue.EnsureCurrentThreadHasQueue();
-
+                if (tl.workStealingQueue.AddingComplete)
+                {
+                    return false;
+                }
                 //
                 // Loop until our quantum expires.
                 while (true)
@@ -1086,7 +1090,11 @@ namespace Orleans.Runtime
                         try
                         {
                             _semaphore.Wait();
-                            ThreadPoolWorkQueue.Dispatch();
+                            if (!ThreadPoolWorkQueue.Dispatch())
+                            { 
+                                // todo: need to drain local queue into global one if environment still running
+                                return;
+                            }
                         }
                         catch (Exception ex)
 #if !NETSTANDARD
@@ -1107,8 +1115,31 @@ namespace Orleans.Runtime
             }
 
             _workerThreads.ForEach(v => v.Start());
+#if !NETSTANDARD
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+#endif
+
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
+        private static void CurrentDomain_DomainUnload(object sender, EventArgs e)
+        {
+            try
+            {
+                foreach (var tl in ThreadPoolWorkQueue.allThreadQueues.Current)
+                {
+                    if (tl != null)
+                    {
+                        tl.AddingComplete = true;
+                    }
+                }
+            }
+            catch (Exception exc)
+            {
+                // ignore. Just make sure DomainUnload handler does not throw.
+                //Log.Verbose("Ignoring error during Stop: {0}", exc);
+            }
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool QueueUserWorkItem(WaitCallback callBack)
         {
