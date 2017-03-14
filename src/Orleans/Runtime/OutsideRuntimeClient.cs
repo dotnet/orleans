@@ -44,6 +44,8 @@ namespace Orleans
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
+	 //   private readonly ActionBlock<Message> messageHandler;
+	    private readonly WaitCallback msgHandler;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
@@ -97,6 +99,15 @@ namespace Orleans
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
+	        msgHandler = state => HandleMessage(((Message) state));
+			//messageHandler = new ActionBlock<Message>(message =>
+			//{
+			//	HandleMessage(message);
+			//},
+			//new ExecutionDataflowBlockOptions
+			//{
+			//	MaxDegreeOfParallelism = 1
+			//});
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -260,21 +271,21 @@ namespace Orleans
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;
             listenForMessages = true;
-
-            // Keeping this thread handling it very simple for now. Just queue task on thread pool.
-            Task.Run(
-                () =>
-                {
-                    try
-                    {
-                        RunClientMessagePump(ct);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
-                    }
-                },
-                ct).Ignore();
+			transport.AddTargetBlock(Message.Categories.Application, message =>OrleansThreadPool.QueueUserWorkItem(msgHandler, message)); // tdo: dispatch to somewhere
+			//// Keeping this thread handling it very simple for now. Just queue task on thread pool.
+			//Task.Run(
+   //             () =>
+   //             {
+   //                 try
+   //                 {
+   //                     RunClientMessagePump(ct);
+   //                 }
+   //                 catch (Exception exc)
+   //                 {
+   //                     logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+   //                 }
+   //             },
+   //             ct).Ignore();
             grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
             
             await ClientStatistics.Start(statisticsProviderManager, transport, clientId)
@@ -290,10 +301,21 @@ namespace Orleans
             }
             while (listenForMessages)
             {
-                var message = transport.WaitMessage(Message.Categories.Application, ct);
+				Thread.Sleep(int.MaxValue);
+                //if (HandleMessage(ct)) break;
+            }
+            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                incomingMessagesThreadTimeTracking.OnStopExecution();
+            }
+        }
+
+	    private bool HandleMessage(Message m)
+	    {
+		    var message = m;
 
                 if (message == null) // if wait was cancelled
-                    break;
+			    return true;
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectThreadTimeTrackingStats)
                         {
@@ -343,11 +365,7 @@ namespace Orleans
                             incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
                         }
 #endif
-            }
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                incomingMessagesThreadTimeTracking.OnStopExecution();
-            }
+		    return false;
         }
 
         private void DispatchToLocalObject(Message message)

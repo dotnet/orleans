@@ -73,7 +73,6 @@ namespace Orleans.Messaging
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
-        internal readonly BlockingCollection<Message> PendingInboundMessages;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -84,7 +83,8 @@ namespace Orleans.Messaging
         private readonly WeakReference[] grainBuckets;
         private readonly Logger logger;
         private readonly object lockable;
-        public SiloAddress MyAddress { get; private set; }
+		private Action<Message> messageHandler;
+		public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         public ManualResetEvent Completion { get; }
         private readonly QueueTrackingStatistic queueTracking;
@@ -113,7 +113,6 @@ namespace Orleans.Messaging
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
-            PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
@@ -155,7 +154,6 @@ namespace Orleans.Messaging
 
             Utils.SafeExecute(() =>
             {
-                PendingInboundMessages.CompleteAdding();
             });
 
             if (StatisticsCollector.CollectQueueStats)
@@ -286,9 +284,12 @@ namespace Orleans.Messaging
             }
         }
 
-        public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
-        {
-        }
+
+		public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
+		{
+			messageHandler = actionBlock;
+
+		}
 
         private void RejectOrResend(Message msg)
         {
@@ -317,6 +318,7 @@ namespace Orleans.Messaging
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public Message WaitMessage(Message.Categories type, CancellationToken ct)
         {
+			Thread.Sleep(Int32.MaxValue);
             try
             {
                 if (ct.IsCancellationRequested)
@@ -325,7 +327,7 @@ namespace Orleans.Messaging
                 }
 
                 // Don't pass CancellationToken to Take. It causes too much spinning.
-                Message msg = PendingInboundMessages.Take();
+                Message msg =null;
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
                 {
@@ -373,7 +375,7 @@ namespace Orleans.Messaging
                 queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
             }
 #endif
-            PendingInboundMessages.Add(msg);
+            messageHandler(msg);
         }
 
         private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)
@@ -470,7 +472,6 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
-            PendingInboundMessages.Dispose();
             if (gatewayConnections != null)
                 foreach (var item in gatewayConnections)
                 {
