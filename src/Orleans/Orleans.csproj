@@ -122,6 +122,7 @@
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
+    <Compile Include="Runtime\OrleansThreadPool.cs" />
     <Compile Include="Runtime\RingRange.cs" />
     <Compile Include="Serialization\ILBasedExceptionSerializer.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />

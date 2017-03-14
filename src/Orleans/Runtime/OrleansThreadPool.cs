@@ -1078,7 +1078,7 @@ namespace Orleans.Runtime
 
         static OrleansThreadPool()
         {
-            _workerThreads.AddRange(Enumerable.Range(1, GrainClient.IsRunningInsideSilo ? Environment.ProcessorCount * 2 : 2)
+            _workerThreads.AddRange(Enumerable.Range(1, Environment.ProcessorCount * 2 )
                 .Select(v => new Thread(() =>
                 {
                     while (true)
