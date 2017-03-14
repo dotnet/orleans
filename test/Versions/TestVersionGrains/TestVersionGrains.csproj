@@ -49,6 +49,22 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
+      <Name>OrleansCodeGenerator</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
+      <Name>OrleansProviders</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
+      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
+      <Name>OrleansTestingHost</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>

@@ -196,12 +196,12 @@
     <ProjectReference Include="..\Versions\TestVersionGrainInterfaces\TestVersionGrainInterfaces.csproj">
       <Project>{566309fe-6851-445a-9491-4612a2a52c31}</Project>
       <Name>TestVersionGrainInterfaces</Name>
-      <Private>False</Private>
+      <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.csproj">
       <Project>{668ac915-7c11-4ec7-a899-bb49011e529a}</Project>
       <Name>TestVersionGrains</Name>
-      <Private>False</Private>
+      <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
