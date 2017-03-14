@@ -65,71 +65,71 @@ namespace Orleans.Runtime
         Background
     }
 
-
-    internal sealed class ThreadPoolWorkQueue
+    internal class SparseArray<T> where T : class
     {
-        // Simple sparsely populated array to allow lock-free reading.
-        internal class SparseArray<T> where T : class
+        private volatile T[] m_array;
+
+        internal SparseArray(int initialSize)
         {
-            private volatile T[] m_array;
+            m_array = new T[initialSize];
+        }
 
-            internal SparseArray(int initialSize)
-            {
-                m_array = new T[initialSize];
-            }
+        internal T[] Current
+        {
+            get { return m_array; }
+        }
 
-            internal T[] Current
-            {
-                get { return m_array; }
-            }
-
-            internal int Add(T e)
-            {
-                while (true)
-                {
-                    T[] array = m_array;
-                    lock (array)
-                    {
-                        for (int i = 0; i < array.Length; i++)
-                        {
-                            if (array[i] == null)
-                            {
-                                Volatile.Write(ref array[i], e);
-                                return i;
-                            }
-                            else if (i == array.Length - 1)
-                            {
-                                // Must resize. If there was a race condition, we start over again.
-                                if (array != m_array)
-                                    continue;
-
-                                T[] newArray = new T[array.Length * 2];
-                                Array.Copy(array, newArray, i + 1);
-                                newArray[i + 1] = e;
-                                m_array = newArray;
-                                return i + 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            internal void Remove(T e)
+        internal int Add(T e)
+        {
+            while (true)
             {
                 T[] array = m_array;
                 lock (array)
                 {
-                    for (int i = 0; i < m_array.Length; i++)
+                    for (int i = 0; i < array.Length; i++)
                     {
-                        if (m_array[i] == e)
+                        if (array[i] == null)
                         {
-                            Volatile.Write(ref m_array[i], null);
-                            break;
+                            Volatile.Write(ref array[i], e);
+                            return i;
+                        }
+                        else if (i == array.Length - 1)
+                        {
+                            // Must resize. If there was a race condition, we start over again.
+                            if (array != m_array)
+                                continue;
+
+                            T[] newArray = new T[array.Length * 2];
+                            Array.Copy(array, newArray, i + 1);
+                            newArray[i + 1] = e;
+                            m_array = newArray;
+                            return i + 1;
                         }
                     }
                 }
             }
         }
+
+        internal void Remove(T e)
+        {
+            T[] array = m_array;
+            lock (array)
+            {
+                for (int i = 0; i < m_array.Length; i++)
+                {
+                    if (m_array[i] == e)
+                    {
+                        Volatile.Write(ref m_array[i], null);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    internal sealed class ThreadPoolWorkQueue
+    {
+        // Simple sparsely populated array to allow lock-free reading.
+        
 
         internal class WorkStealingQueue
         {

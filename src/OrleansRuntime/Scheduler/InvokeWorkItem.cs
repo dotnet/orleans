@@ -44,14 +44,16 @@ namespace Orleans.Runtime.Scheduler
             {
                 var grain = activation.GrainInstance;
                 var runtimeClient = (ISiloRuntimeClient)grain.GrainReference.RuntimeClient;
-                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
-	            Action onTaskFinish = () =>
-	            {
-		            activation.DecrementInFlightCount();
-		            this.dispatcher.OnActivationCompletedRequest(activation, message);
-	            };
+                Action onTaskFinish = () =>
+                {
+                    activation.DecrementInFlightCount();
+                    this.dispatcher.OnActivationCompletedRequest(activation, message);
+                };
 
-				task.ContinueWithOptimized(onTaskFinish, onTaskFinish, onTaskFinish);
+               runtimeClient.Invoke(grain, this.activation, this.message)
+                    .ContinueWithOptimized(onTaskFinish, onTaskFinish, onTaskFinish);
+
+                //task.ContinueWithOptimized(onTaskFinish, onTaskFinish, onTaskFinish);
             }
             catch (Exception exc)
             {

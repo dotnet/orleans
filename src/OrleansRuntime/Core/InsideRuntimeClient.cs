@@ -189,7 +189,7 @@ namespace Orleans.Runtime
                     unregisterCallback,
                     Config.Globals);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(ResponseTimeout);
+                callbackData.RegisterTimeout(ResponseTimeout);
             }
 
             if (targetGrainId.IsSystemTarget)

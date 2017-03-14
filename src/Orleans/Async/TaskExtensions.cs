@@ -41,15 +41,16 @@ namespace Orleans
 
 	    public static void ContinueWithOptimized(
 			this Task task,
-			Action onSuccess,
-			Action onException = null, //<Exception> no exception passing for now
+			Action<Task> onSuccess,
+            Action onException = null, //<Exception> no exception passing for now
 			Action onCancel = null)
 	    {
 			switch (task.Status)
 			{
 				case TaskStatus.RanToCompletion:
-					onSuccess();
-					return ;
+					onSuccess(task);
+
+                    return ;
 
 				case TaskStatus.Faulted:
 					onException?.Invoke(); //task.Exception
@@ -64,9 +65,44 @@ namespace Orleans
 					return;
 			}
 		}
-	
-		private static void Continue(Task task,
-			Action onSuccess,
+        public static void ContinueWithOptimized(
+              this Task task,
+              Action onSuccess,
+              Action onException = null, //<Exception> no exception passing for now
+              Action onCancel = null)
+        {
+            switch (task.Status)
+            {
+                case TaskStatus.RanToCompletion:
+                    onSuccess();
+
+                    return;
+
+                case TaskStatus.Faulted:
+                    onException?.Invoke(); //task.Exception
+                    return;
+
+                case TaskStatus.Canceled:
+                    onCancel?.Invoke();
+                    return;
+
+                default:
+                    Continue(task, onSuccess, onException, onCancel);
+                    return;
+            }
+        }
+        private static void Continue(Task task,
+           Action onSuccess,
+           Action onException = null,
+           Action onCancel = null)
+        {
+            task.ContinueWith(task1 =>
+            {
+                ContinueWithOptimized(task1, onSuccess, onException, onCancel);
+            });
+        }
+        private static void Continue(Task task,
+            Action<Task> onSuccess,
 			Action onException = null,
 			Action onCancel = null)
 		{

@@ -655,7 +655,7 @@ namespace Orleans
                     unregisterCallback,
                     config);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(responseTimeout);
+                callbackData.RegisterTimeout(responseTimeout);
             }
 
             if (logger.IsVerbose2) logger.Verbose2("Send {0}", message);
