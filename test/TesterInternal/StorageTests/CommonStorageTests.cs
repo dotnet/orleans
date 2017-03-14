@@ -44,38 +44,50 @@ namespace UnitTests.StorageTests.Relational
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             int StartOfRange = 33900;
             int CountOfRange = countOfGrains;
-            string grainIdTemplate = $"{prefix}-" + "{0}";
+            string grainIdTemplate = $"{prefix}-{{0}}";
 
-            //The purpose of this Task.Run is to ensure the storage provider will be tested from
-            //multiple threads concurrently, as would happen in running system also.
-            var tasks = Enumerable.Range(StartOfRange, CountOfRange).Select(i => Task.Run(async () =>
-            {
-                //Since the version is NULL, storage provider tries to insert this data
-                //as new state. If there is already data with this class, the writing fails
-                //and the storage provider throws. Essentially it means either this range
-                //is ill chosen or the test failed due another problem.
-                var grainId = string.Format(grainIdTemplate, i);
-                var grainData = this.GetTestReferenceAndState(i, null);
+            //Since the version is NULL, storage provider tries to insert this data
+            //as new state. If there is already data with this class, the writing fails
+            //and the storage provider throws. Essentially it means either this range
+            //is ill chosen or the test failed due to another problem.
+            var grainStates = Enumerable.Range(StartOfRange, CountOfRange).Select(i => this.GetTestReferenceAndState(string.Format(grainIdTemplate, i), null)).ToList();
 
-                //A sanity checker that the first version really has null as its state. Then it is stored
-                //to the database and a new version is acquired.
-                var firstVersion = grainData.Item2.ETag;
-                Assert.Equal(firstVersion, null);
-
-                //This loop writes the state consecutive times to the database to make sure its
-                //version is updated appropriately.
-                await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
-                for(int k = 0; k < 10; ++k)
+            await Task.WhenAll(grainStates.AsParallel()
+                .WithDegreeOfParallelism(8) // Limit parallelization of the first write to not stress out the system with deadlocks on INSERT
+                .Select(async grainData =>
                 {
+                    //A sanity checker that the first version really has null as its state. Then it is stored
+                    //to the database and a new version is acquired.
+                    var firstVersion = grainData.Item2.ETag;
+                    Assert.Equal(firstVersion, null);
+
+                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
                     var secondVersion = grainData.Item2.ETag;
                     Assert.NotEqual(firstVersion, secondVersion);
-                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                }));
 
-                    var thirdVersion = grainData.Item2.ETag;
-                    Assert.NotEqual(firstVersion, secondVersion);
-                    Assert.NotEqual(secondVersion, thirdVersion);
-                }
-            }));
+            const int MaxNumberOfThreads = 25;
+            // The purpose of AsParallel is to ensure the storage provider will be tested from
+            // multiple threads concurrently, as would happen in running system also.
+            // Nevertheless limit the degree of parallelization (concurrent threads) to
+            // avoid unnecessarily starving and growing the thread pool (which is very slow)
+            // if a few threads coupled with parallelization via tasks can force most concurrency
+            // scenarios.
+
+            var tasks = grainStates.AsParallel().WithDegreeOfParallelism(MaxNumberOfThreads)
+                .Select(async grainData =>
+                {
+                    // This loop writes the state consecutive times to the database to make sure its
+                    // version is updated appropriately.
+                    for (int k = 0; k < 10; ++k)
+                    {
+                        var versionBefore = grainData.Item2.ETag;
+                        await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+
+                        var versionAfter = grainData.Item2.ETag;
+                        Assert.NotEqual(versionBefore, versionAfter);
+                    }
+                });
             await Task.WhenAll(tasks);
         }
 
@@ -196,7 +208,7 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>A grain reference and a state pair.</returns>
         internal Tuple<GrainReference, GrainState<TestState1>> GetTestReferenceAndState(long grainId, string version)
         {
-            return Tuple.Create(GrainReference.FromGrainId(GrainId.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            return Tuple.Create(this.grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });
         }
 
         /// <summary>
@@ -207,7 +219,7 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>A grain reference and a state pair.</returns>
         internal Tuple<GrainReference, GrainState<TestState1>> GetTestReferenceAndState(string grainId, string version)
         {
-            return Tuple.Create(GrainReference.FromGrainId(GrainId.FromParsableString(GrainId.GetGrainId(RandomUtilities.NormalGrainTypeCode, grainId).ToParsableString())), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            return Tuple.Create(this.grainFactory.GetGrain(GrainId.FromParsableString(GrainId.GetGrainId(RandomUtilities.NormalGrainTypeCode, grainId).ToParsableString())), new GrainState<TestState1> { State = new TestState1(), ETag = version });
         }
     }
 }

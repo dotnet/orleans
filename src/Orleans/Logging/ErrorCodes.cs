@@ -321,7 +321,7 @@ namespace Orleans
         Runtime_Error_100312 = Runtime + 312,
         ClientInitializing   = Runtime + 313,
         ClientStarting       = Runtime + 314,
-        Runtime_Error_100315 = Runtime + 315,
+        ClientError          = Runtime + 315,
         Runtime_Error_100316 = Runtime + 316,
         Runtime_Error_100317 = Runtime + 317,
         Runtime_Error_100318 = Runtime + 318,
@@ -891,6 +891,7 @@ namespace Orleans
         SerMgr_TypeRegistrationFailureIgnore    = SerializationManagerBase + 9,
         SerMgr_ArtifactReport                   = SerializationManagerBase + 10,
         SerMgr_UnavailableSerializer            = SerializationManagerBase + 11,
+        SerMgr_SerializationMethodsMissing      = SerializationManagerBase + 12,
 
         WatchdogBase                            = Runtime + 2600,
         Watchdog_ParticipantThrownException     = WatchdogBase + 1,

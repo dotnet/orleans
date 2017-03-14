@@ -19,14 +19,14 @@ namespace UnitTests.StreamingTests
         private readonly Logger logger;
         private readonly TestCluster testCluster;
 
-        public SubscriptionMultiplicityTestRunner(string streamProviderName, Logger logger, TestCluster testCluster)
+        public SubscriptionMultiplicityTestRunner(string streamProviderName, TestCluster testCluster)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
                 throw new ArgumentNullException("streamProviderName");
             }
             this.streamProviderName = streamProviderName;
-            this.logger = logger;
+            this.logger = testCluster.Client.Logger;
             this.testCluster = testCluster;
         }
 

@@ -300,28 +300,31 @@ namespace Tests.GeoClusterTests
 
         #region client wrappers
 
-        private readonly List<AppDomain> activeClients = new List<AppDomain>();
+        private readonly List<ClientWrapperBase> activeClients = new List<ClientWrapperBase>();
 
 
         // The following is a base class to use for creating client wrappers.
-        // We use ClientWrappers to load an Orleans client in its own app domain. 
         // This allows us to create multiple clients that are connected to different silos.
-        public class ClientWrapperBase : MarshalByRefObject {
-
+        public class ClientWrapperBase : IDisposable
+        {
             public string Name { get; private set; }
 
-            static Lazy<ClientConfiguration> clientconfiguration = new Lazy<ClientConfiguration>(() => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+            internal IInternalClusterClient InternalClient { get; }
 
-            public ClientWrapperBase(string name, int gatewayport, string clusterId, Action<ClientConfiguration> clientconfig_customizer)
+            public IClusterClient Client => this.InternalClient;
+            private readonly Lazy<ClientConfiguration> clientConfiguration =
+                new Lazy<ClientConfiguration>(
+                    () => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+            public ClientWrapperBase(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer)
             {
                 this.Name = name;
 
-                Console.WriteLine("Initializing client {0} in AppDomain {1}", name, AppDomain.CurrentDomain.FriendlyName);
+                Console.WriteLine("Initializing client {0}");
 
                 ClientConfiguration config = null;
                 try
                 {
-                    config = clientconfiguration.Value;
+                    config = this.clientConfiguration.Value;
                 }
                 catch (Exception) { }
 
@@ -329,41 +332,45 @@ namespace Tests.GeoClusterTests
                 {
                     Assert.True(false, "Error loading client configuration file");
                 }
-                config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
+
+                config.GatewayProvider = Orleans.Runtime.Configuration.ClientConfiguration.GatewayProviderType.Config;
                 config.Gateways.Clear();
                 config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayport));
 
-                clientconfig_customizer?.Invoke(config);
+                configCustomizer?.Invoke(config);
 
-                GrainClient.Initialize(config);
-                this.GrainFactory = GrainClient.GrainFactory;
+                this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(config).Build();
+                this.InternalClient.Connect().Wait();
             }
-            public IGrainFactory GrainFactory { get; }
+
+            public IGrainFactory GrainFactory => this.Client;
+
+            public void Dispose()
+            {
+                this.InternalClient?.Dispose();
+            }
         }
 
-        // Create a client, loaded in a new app domain.
-        public T NewClient<T>(string ClusterId, int ClientNumber, Action<ClientConfiguration> customizer = null) where T : ClientWrapperBase
+        // Create a new client.
+        public T NewClient<T>(
+            string clusterId,
+            int clientNumber,
+            Func<string, int, string, Action<ClientConfiguration>, T> factory,
+            Action<ClientConfiguration> customizer = null) where T : ClientWrapperBase
         {
-            var ci = Clusters[ClusterId];
-            var name = string.Format("Client-{0}-{1}", ClusterId, ClientNumber);
+            var ci = this.Clusters[clusterId];
+            var name = string.Format("Client-{0}-{1}", clusterId, clientNumber);
 
             // clients are assigned to silos round-robin
-            var gatewayport = ci.Silos[ClientNumber % ci.Silos.Count].NodeConfiguration.ProxyGatewayEndpoint.Port;
+            var gatewayport = ci.Silos[clientNumber % ci.Silos.Count].NodeConfiguration.ProxyGatewayEndpoint.Port;
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
-
-            var clientArgs = new object[] { name, gatewayport, ClusterId, customizer };
-            var setup = AppDomainSiloHandle.GetAppDomainSetupInfo();
-            var clientDomain = AppDomain.CreateDomain(name, null, setup);
-
-            T client = (T)clientDomain.CreateInstanceFromAndUnwrap(
-                    Assembly.GetExecutingAssembly().Location, typeof(T).FullName, false,
-                    BindingFlags.Default, null, clientArgs, CultureInfo.CurrentCulture,
-                    new object[] { });
+            
+            var client = factory(name, gatewayport, clusterId, customizer);
 
             lock (activeClients)
             {
-                activeClients.Add(clientDomain);
+                activeClients.Add(client);
             }
 
             WriteLog("Started {0} connected", name);
@@ -373,25 +380,28 @@ namespace Tests.GeoClusterTests
 
         public void StopAllClients()
         {
-            List<AppDomain> ac;
+            List<ClientWrapperBase> clients;
 
             lock (activeClients)
             {
-                ac = activeClients.ToList();
+                clients = activeClients.ToList();
                 activeClients.Clear();
             }
 
-            Parallel.For(0, ac.Count, paralleloptions, (i) =>
+            Parallel.For(0, clients.Count, paralleloptions, (i) =>
             {
                 try
                 {
-                    WriteLog("Unloading client {0}", i);
-
-                    AppDomain.Unload(ac[i]);
+                    this.WriteLog("Stopping client {0}", i);
+                    clients[i]?.Client.Close().Wait();
                 }
                 catch (Exception e)
                 {
-                    WriteLog("Exception Caught While Unloading AppDomain for client {0}: {1}", i, e);
+                    this.WriteLog("Exception caught While stopping client {0}: {1}", i, e);
+                }
+                finally
+                {
+                    clients[i]?.Dispose();
                 }
             });
         }

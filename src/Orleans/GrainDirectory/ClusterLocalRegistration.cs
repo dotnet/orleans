@@ -11,20 +11,7 @@ namespace Orleans.GrainDirectory
     [Serializable]
     internal class ClusterLocalRegistration : MultiClusterRegistrationStrategy
     {
-        private static readonly Lazy<ClusterLocalRegistration> singleton = new Lazy<ClusterLocalRegistration>(() => new ClusterLocalRegistration());
-
-        internal static ClusterLocalRegistration Singleton
-        {
-            get { return singleton.Value; }
-        }
-
-        internal static void Initialize()
-        {
-            var instance = Singleton;
-        }
-
-        private ClusterLocalRegistration()
-        { }
+        internal static ClusterLocalRegistration Singleton { get; } = new ClusterLocalRegistration();
 
         public override bool Equals(object obj)
         {
@@ -33,7 +20,7 @@ namespace Orleans.GrainDirectory
 
         public override int GetHashCode()
         {
-            return GetType().GetHashCode();
+            return this.GetType().GetHashCode();
         }
 
         public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)

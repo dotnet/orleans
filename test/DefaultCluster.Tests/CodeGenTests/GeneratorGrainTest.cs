@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -12,13 +13,14 @@ namespace Tester.CodeGenTests
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
+    [TestCategory("BVT"), TestCategory("CodeGen")]
     public class GeneratorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         public GeneratorGrainTest(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact]
         public async Task CodeGenRoundTripSerialization()
         {
             var grain = this.GrainFactory.GetGrain<ISerializationGenerationGrain>(GetRandomGrainId());
@@ -59,7 +61,7 @@ namespace Tester.CodeGenTests
             Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
             Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
             Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
-            
+
             Assert.Equal(0, output.NonSerializedInt);
 
             // Test abstract class serialization with state.
@@ -77,7 +79,7 @@ namespace Tester.CodeGenTests
             var expectedInterface = input;
             var actualInterface = await grain.RoundTripInterface(expectedInterface);
             Assert.Equal(input.Int, actualInterface.Int);
-            
+
             // Test enum serialization.
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
             var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
@@ -90,23 +92,23 @@ namespace Tester.CodeGenTests
             Assert.Equal(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]
+        [Fact]
         public async Task GeneratorGrainControlFlow()
         {
             var grainName = typeof(GeneratorTestGrain).FullName;
             IGeneratorTestGrain grain = this.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
             await grain.StringSet("Begin");
-            
+
             isNull = await grain.StringIsNullOrEmpty();
             Assert.False(isNull);
 
             MemberVariables members = await grain.GetMemberVariables();
             Assert.Equal("Begin", members.stringVar);
-            
+
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
             string str = "StringBegin";
@@ -122,11 +124,11 @@ namespace Tester.CodeGenTests
             Assert.Equal(ReturnCode.Fail, members.code);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
+        [Fact]
         public async Task GeneratorDerivedGrain1ControlFlow()
         {
             IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
@@ -153,7 +155,7 @@ namespace Tester.CodeGenTests
             Assert.Equal(ReturnCode.Fail, members.code);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
+        [Fact]
         public async Task GeneratorDerivedGrain2ControlFlow()
         {
             var grainName = typeof(GeneratorTestDerivedGrain2).FullName;
@@ -188,11 +190,11 @@ namespace Tester.CodeGenTests
             Assert.Equal("BeginContEnd", strPromise);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
+        [Fact]
         public async Task GeneratorDerivedDerivedGrainControlFlow()
         {
             IGeneratorTestDerivedDerivedGrain grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
@@ -231,7 +233,7 @@ namespace Tester.CodeGenTests
             Assert.Equal(ReturnCode.Fail, members.code);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact]
         public async Task CodeGenDerivedFromCSharpInterfaceInDifferentAssembly()
         {
             var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
@@ -240,8 +242,61 @@ namespace Tester.CodeGenTests
             Assert.Equal(input, output);
         }
 
+        [Fact]
+        public async Task GrainWithGenericMethods()
+        {
+            var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
+            Assert.Equal("default string", await grain.Default());
+            Assert.Equal(-8, await grain.RoundTrip(8));
+            Assert.Equal(new[] { typeof(IGrain), typeof(string), typeof(DateTime) }, await grain.GetTypesExplicit<IGrain, string, DateTime>());
+            Assert.Equal(new[] { typeof(IGrain), typeof(string), typeof(DateTime) }, await grain.GetTypesInferred((IGrain)grain, default(string), default(DateTime)));
+            Assert.Equal(new[] { typeof(IGrain), typeof(string) }, await grain.GetTypesInferred(default(IGrain), default(string), 0));
+            var now = DateTime.Now;
+            Assert.Equal(now, await grain.RoundTrip(now));
+            Assert.Equal(default(DateTime), await grain.Default<DateTime>());
+
+            Assert.Equal(grain, await grain.Constraints(grain));
+        }
+
+        [Fact]
+        public async Task GenericGrainWithGenericMethods()
+        {
+            var grain = this.GrainFactory.GetGrain<IGenericGrainWithGenericMethods<int>>(Guid.NewGuid());
+
+            // The non-generic version of the method returns default(T).
+            Assert.Equal(0, await grain.Method(888));
+
+            // The generic version of the method returns the value provided.
+            var now = DateTime.Now;
+            Assert.Equal(now, await grain.Method(now));
+        }
+
+        [Fact]
+        public async Task GrainObserverWithGenericMethods()
+        {
+            var localObject = new ObserverWithGenericMethods();
+
+            var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
+            var observer = await this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
+            await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
+            Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
+        }
+
+        private class ObserverWithGenericMethods : IGrainObserverWithGenericMethods
+        {
+            private readonly TaskCompletionSource<object> valueCompletion = new TaskCompletionSource<object>();
+
+            public Task<object> ValueTask => this.valueCompletion.Task;
+
+            public void SetValue<T>(T value)
+            {
+                this.valueCompletion.SetResult(value);
+            }
+        }
+
+#if !EXCLUDEFSHARP
 #if !NETSTANDARD_TODO
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("FSharp")]
+        [Fact, TestCategory("FSharp")]
         public async Task CodeGenDerivedFromFSharpInterfaceInDifferentAssembly()
         {
             var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
@@ -249,6 +304,7 @@ namespace Tester.CodeGenTests
             var output = await grain.Echo(input);
             Assert.Equal(input, output);
         }
+#endif
 #endif
     }
 }

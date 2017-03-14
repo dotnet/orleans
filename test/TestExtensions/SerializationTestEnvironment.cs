@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace TestExtensions
 {
@@ -12,8 +15,11 @@ namespace TestExtensions
         public SerializationTestEnvironment(ClientConfiguration config = null)
         {
             if (config == null) config = this.DefaultConfig();
-            this.RuntimeClient = new OutsideRuntimeClient(config, true);
+            this.Client = new ClientBuilder().UseConfiguration(config).Build();
+            this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
+
+        public IClusterClient Client { get; set; }
 
         private ClientConfiguration DefaultConfig()
         {
@@ -53,6 +59,10 @@ namespace TestExtensions
 
         internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
 
+        internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
+
+        public SerializationManager SerializationManager => this.RuntimeClient.SerializationManager;
+        
         public void Dispose()
         {
             this.RuntimeClient?.Dispose();

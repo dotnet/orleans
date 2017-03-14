@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
-            logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
+            this.fixture.Logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
             await TestingUtils.WaitUntilAsync(CheckCounters, Timeout);
         }
 

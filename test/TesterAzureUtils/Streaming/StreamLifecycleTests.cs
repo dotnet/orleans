@@ -116,7 +116,7 @@ namespace UnitTests.StreamingTests
 
                 // Force Remove
                 await producer.TestInternalRemoveProducer(StreamId, StreamProviderName);
-                await StreamTestUtils.CheckPubSubCounts(output, "producer #" + i + " remove", (i - 1), 1,
+                await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "producer #" + i + " remove", (i - 1), 1,
                     StreamId, StreamProviderName, StreamNamespace);
             }
 
@@ -135,7 +135,7 @@ namespace UnitTests.StreamingTests
             }
             await Task.WhenAll(promises);
             await WaitForDeactivation();
-            await StreamTestUtils.CheckPubSubCounts(output, "all producers deactivated", 0, 1,
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "all producers deactivated", 0, 1,
                     StreamId, StreamProviderName, StreamNamespace);
 
             when = "round 3";
@@ -154,6 +154,7 @@ namespace UnitTests.StreamingTests
 
                 // These Producers test grains always send first message when they register
                 await StreamTestUtils.CheckPubSubCounts(
+                    this.InternalClient,
                     output,
                     string.Format("producer #{0} create - {1}", i, when),
                     i, 1,
@@ -175,7 +176,7 @@ namespace UnitTests.StreamingTests
 
             await consumer1.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
             await producer1.BecomeProducer(StreamId, StreamNamespace, StreamProviderName);
-            await StreamTestUtils.CheckPubSubCounts(output, "after first producer added", 1, 1,
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after first producer added", 1, 1,
                 StreamId, StreamProviderName, StreamNamespace);
 
             Assert.Equal(1, await producer1.GetSendCount());  // "SendCount after first send"
@@ -202,13 +203,13 @@ namespace UnitTests.StreamingTests
             Assert.Equal(1, deactivations.Length);
 
             // Test grains that did unclean shutdown will not have cleaned up yet, so PubSub counts are unchanged here for them
-            await StreamTestUtils.CheckPubSubCounts(output, "after deactivate first producer", expectedNumProducers, 1,
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after deactivate first producer", expectedNumProducers, 1,
                 StreamId, StreamProviderName, StreamNamespace);
 
             // Add another consumer - which forces cleanup of dead producers and PubSub counts should now always be correct
             await consumer2.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
             // Runtime should have cleaned up after next consumer added
-            await StreamTestUtils.CheckPubSubCounts(output, "after add second consumer", 0, 2,
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after add second consumer", 0, 2,
                 StreamId, StreamProviderName, StreamNamespace);
 
             if (useStreamAfterDeactivate)
@@ -217,7 +218,7 @@ namespace UnitTests.StreamingTests
                 await producer2.BecomeProducer(StreamId, StreamNamespace, StreamProviderName);
 
                 // These Producer test grains always send first message when they BecomeProducer, so should be registered with PubSub
-                await StreamTestUtils.CheckPubSubCounts(output, "after add second producer", 1, 2,
+                await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after add second producer", 1, 2,
                     StreamId, StreamProviderName, StreamNamespace);
                 Assert.Equal(1, await producer1.GetSendCount()); // "SendCount (Producer#1) after second publisher added");
                 Assert.Equal(1, await producer2.GetSendCount()); // "SendCount (Producer#2) after second publisher added");
@@ -227,7 +228,7 @@ namespace UnitTests.StreamingTests
 
                 await producer2.SendItem(3);
 
-                await StreamTestUtils.CheckPubSubCounts(output, "after second producer send", 1, 2,
+                await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after second producer send", 1, 2,
                     StreamId, StreamProviderName, StreamNamespace);
                 Assert.Equal(3, await consumer1.GetReceivedCount()); // "ReceivedCount (Consumer#1) after second publisher send");
                 Assert.Equal(2, await consumer2.GetReceivedCount()); // "ReceivedCount (Consumer#2) after second publisher send");

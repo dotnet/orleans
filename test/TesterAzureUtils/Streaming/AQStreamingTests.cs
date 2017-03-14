@@ -2,7 +2,6 @@
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.Streaming;
 using UnitTests.StreamingTests;
@@ -16,31 +15,29 @@ namespace Tester.AzureUtils.Streaming
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-        private SingleStreamTestRunner runner;
+        private readonly SingleStreamTestRunner runner;
 
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(initialSilosCount: 2);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider();
 
             options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear : true);
             options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
             options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
+            options.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
 
             return new TestCluster(options);
         }
 
         public AQStreamingTests()
         {
-            runner = new SingleStreamTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
         
         public override void Dispose()
@@ -152,14 +149,14 @@ namespace Tester.AzureUtils.Streaming
         [Fact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 this.HostedCluster.StartAdditionalSilo);
         }
@@ -167,7 +164,7 @@ namespace Tester.AzureUtils.Streaming
         //[Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task AQ_18_MultipleStreams_1J_1F_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 this.HostedCluster.StartAdditionalSilo,
                 this.HostedCluster.StopSilo);

@@ -24,8 +24,8 @@ namespace Orleans.Runtime.Providers
         
         private InvokeInterceptor invokeInterceptor;
 
-        public IGrainFactory GrainFactory { get; }
-        public IServiceProvider ServiceProvider { get; }
+        public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
+        public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
         public Guid ServiceId { get; }
         public string SiloIdentity { get; }
@@ -33,10 +33,8 @@ namespace Orleans.Runtime.Providers
         public SiloProviderRuntime(
             SiloInitializationParameters siloDetails,
             GlobalConfiguration config,
-            IGrainFactory grainFactory,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
-            IServiceProvider serviceProvider,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             ISiloStatusOracle siloStatusOracle,
             OrleansTaskScheduler scheduler,
@@ -50,11 +48,9 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.ServiceId = config.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-            this.GrainFactory = grainFactory;
-            this.ServiceProvider = serviceProvider;
 
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
-            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
@@ -80,6 +76,7 @@ namespace Orleans.Runtime.Providers
         {
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            systemTarget.RuntimeClient = this.runtimeClient;
             scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
             activationDirectory.RecordNewSystemTarget(systemTarget);
         }
@@ -130,10 +127,21 @@ namespace Orleans.Runtime.Providers
         }
 
         /// <inheritdoc />
-        public string ExecutingEntityIdentity() => runtimeClient.ExecutingEntityIdentity();
+        public string ExecutingEntityIdentity() => runtimeClient.CurrentActivationIdentity;
 
         /// <inheritdoc />
-        public StreamDirectory GetStreamDirectory() => runtimeClient.GetStreamDirectory();
+        public StreamDirectory GetStreamDirectory()
+        {
+            if (runtimeClient.CurrentActivationData == null)
+            {
+                throw new InvalidOperationException(
+                    String.Format("Trying to get a Stream or send a stream message on a silo not from within grain and not from within system target (CurrentActivationData is null) "
+                        + "RuntimeContext.Current={0} TaskScheduler.Current={1}",
+                        RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString(),
+                        TaskScheduler.Current));
+            }
+            return runtimeClient.GetStreamDirectory();
+        }
 
         /// <inheritdoc />
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension

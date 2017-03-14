@@ -125,12 +125,9 @@ namespace UnitTests.StreamingTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
-            foreach (var siloHandle in silos)
-            {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
-                provider.SetErrorInjection(errorInjectionPoint);
-            }
+            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            mgmtGrain.SendControlCommandToProvider(typeof(ErrorInjectionStorageProvider).FullName,
+                providerName, (int)MockStorageProvider.Commands.SetErrorInjection, errorInjectionPoint).Wait();
         }
     }
 }

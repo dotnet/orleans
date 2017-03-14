@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -15,6 +16,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private bool                        optimizeForImmutableData;
         private StreamPubSubType            pubSubType;
         private ProviderStateManager        stateManager = new ProviderStateManager();
+        private IRuntimeClient              runtimeClient;
 
         internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
         internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
@@ -31,7 +33,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (!stateManager.PresetState(ProviderState.Initialized)) return TaskDone.Done;
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
-
+            this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
             fireAndForgetDelivery = config.GetBoolProperty(FIRE_AND_FORGET_DELIVERY, DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY);
             optimizeForImmutableData = config.GetBoolProperty(OPTIMIZE_FOR_IMMUTABLE_DATA, DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA);
             
@@ -64,7 +66,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
                 streamId,
-                () => new StreamImpl<T>(streamId, this, IsRewindable));
+                () => new StreamImpl<T>(streamId, this, IsRewindable, this.runtimeClient));
         }
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)

@@ -15,6 +15,8 @@ using TestExtensions;
 
 namespace PSUtils.Tests
 {
+    using System.Linq;
+
     public class PowershellHostFixture : BaseTestClusterFixture
     {
         public PowerShell Powershell { get; set; }
@@ -40,21 +42,26 @@ namespace PSUtils.Tests
             Runspace.Open();
             Powershell = PowerShell.Create();
             Powershell.Runspace = Runspace;
-
-            var stopGrainClient = new Command("Stop-GrainClient");
-            Powershell.Commands.AddCommand(stopGrainClient);
-            Powershell.Invoke();
         }
 
         public override void Dispose()
         {
-            var stopCommand = new Command("Stop-GrainClient");
-            Powershell.Commands.Clear();
-            Powershell.Commands.AddCommand(stopCommand);
-            Powershell.Invoke();
-            Powershell.Dispose();
-            Runspace.Dispose();
-            base.Dispose();
+            try
+            {
+                var stopCommand = new Command("Stop-GrainClient");
+                Powershell.Commands.Clear();
+                Powershell.Commands.AddCommand(stopCommand);
+                Powershell.Invoke();
+            }
+            catch
+            {
+            }
+            finally
+            {
+                Powershell.Dispose();
+                Runspace.Dispose();
+                base.Dispose();
+            }
         }
     }
 
@@ -78,15 +85,15 @@ namespace PSUtils.Tests
             _ps.Commands.AddScript(File.ReadAllText(@".\PSClient\PSClientTests.ps1"));
             _ps.Commands.AddParameter("clientConfig", _clientConfig);
             var results = _ps.Invoke();
-            Assert.True(results.Count == 5);
+            Assert.Equal(5, results.Count);
 
-            // Client must not be initialized
+            // Stop-Client with no current/specified client should throw (outputting $didThrow = true).
             Assert.NotNull(results[0]);
-            Assert.True((bool)results[0].BaseObject == false);
+            Assert.True((bool)results[0].BaseObject);
 
             // Client must true be initialized
             Assert.NotNull(results[1]);
-            Assert.True((bool)results[1].BaseObject == true);
+            Assert.True((bool)results[1].BaseObject);
 
             // The grain reference must not be null and of type IManagementGrain
             Assert.NotNull(results[2]);
@@ -105,24 +112,24 @@ namespace PSUtils.Tests
 
             // Client must be not initialized
             Assert.NotNull(results[4]);
-            Assert.True((bool)results[4].BaseObject == GrainClient.IsInitialized);            
+            Assert.False((bool)results[4].BaseObject);            
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Tooling")]
         public void GetGrainTest()
         {
-            StopGrainClient();
-
             var startGrainClient = new Command("Start-GrainClient");
             startGrainClient.Parameters.Add("Config", _clientConfig);
             _ps.Commands.AddCommand(startGrainClient);
-            _ps.Invoke();
-            Assert.True(GrainClient.IsInitialized);
+            var client = _ps.Invoke().FirstOrDefault()?.BaseObject as IClusterClient;
+            Assert.NotNull(client);
+            Assert.True(client.IsInitialized);
             _ps.Commands.Clear();
 
             var getGrainCommand = new Command("Get-Grain");
             getGrainCommand.Parameters.Add("GrainType", typeof(IManagementGrain));
             getGrainCommand.Parameters.Add("LongKey", (long)0);
+            getGrainCommand.Parameters.Add("Client", client);
             _ps.Commands.AddCommand(getGrainCommand);
 
             var results = _ps.Invoke<IManagementGrain>();
@@ -146,6 +153,7 @@ namespace PSUtils.Tests
             getGrainCommand.Parameters.Clear();
             getGrainCommand.Parameters.Add("GrainType", typeof(IStringGrain));
             getGrainCommand.Parameters.Add("StringKey", "myKey");
+            getGrainCommand.Parameters.Add("Client", client);
             _ps.Commands.AddCommand(getGrainCommand);
 
             var stringGrainsResults = _ps.Invoke<IStringGrain>();
@@ -159,6 +167,7 @@ namespace PSUtils.Tests
             getGrainCommand.Parameters.Clear();
             getGrainCommand.Parameters.Add("GrainType", typeof(IGuidGrain));
             getGrainCommand.Parameters.Add("GuidKey", Guid.NewGuid());
+            getGrainCommand.Parameters.Add("Client", client);
             _ps.Commands.AddCommand(getGrainCommand);
 
             var guidGrainsResults = _ps.Invoke<IGuidGrain>();
@@ -169,16 +178,16 @@ namespace PSUtils.Tests
             var guidGrain = guidGrainsResults[0];
             Assert.NotNull(guidGrain);
 
-            StopGrainClient();
+            this.StopGrainClient(client);
         }
 
-        private void StopGrainClient()
+        private void StopGrainClient(IClusterClient client)
         {
             var stopGrainClient = new Command("Stop-GrainClient");
-            _ps.Commands.AddCommand(stopGrainClient);
+            _ps.Commands.AddCommand(stopGrainClient).AddParameter("Client", client);
             _ps.Invoke();
             _ps.Commands.Clear();
-            Assert.True(!GrainClient.IsInitialized);
+            Assert.True(!client.IsInitialized);
         }
     }
 }

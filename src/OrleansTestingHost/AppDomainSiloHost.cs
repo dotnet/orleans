@@ -37,10 +37,7 @@ namespace Orleans.TestingHost
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => silo.SiloAddress;
-
-        /// <summary>Gets the Silo test hook</summary>
-        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.SiloAddress);
-
+        
         internal AppDomainTestHooks AppDomainTestHook { get; }
 
         /// <summary>Methods for optimizing the code generator.</summary>

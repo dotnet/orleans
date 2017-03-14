@@ -16,6 +16,7 @@ namespace Orleans.Runtime
     {
         private readonly Silo silo;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
@@ -26,11 +27,13 @@ namespace Orleans.Runtime
         public DeploymentLoadPublisher(
             Silo silo,
             ISiloStatusOracle siloStatusOracle,
-            GlobalConfiguration config)
+            GlobalConfiguration config,
+            IInternalGrainFactory grainFactory)
             : base(Constants.DeploymentLoadPublisherSystemTargetId, silo.SiloAddress)
         {
             this.silo = silo;
             this.siloStatusOracle = siloStatusOracle;
+            this.grainFactory = grainFactory;
             statisticsRefreshTime = config.DeploymentLoadPublisherRefreshTime;
             periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
@@ -45,8 +48,7 @@ namespace Orleans.Runtime
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = random.NextTimeSpan(statisticsRefreshTime);
-                var t = GrainTimer.FromTaskCallback(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
-                t.Start();
+                this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
             }
             await RefreshStatistics();
             await PublishStatistics(null);
@@ -65,7 +67,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        tasks.Add(InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
+                        tasks.Add(this.grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
                             Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
                             .UpdateRuntimeStatistics(silo.SiloAddress, myStats));
                     }
@@ -111,7 +113,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
+                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {

@@ -13,14 +13,16 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class GlobalSingleInstanceActivationMaintainer : AsynchAgent
     {
-        private LocalGrainDirectory router;
-        private Logger logger;
-        private TimeSpan period;
+        private readonly LocalGrainDirectory router;
+        private readonly Logger logger;
+        private readonly IInternalGrainFactory grainFactory;
+        private readonly TimeSpan period;
 
-        internal GlobalSingleInstanceActivationMaintainer(LocalGrainDirectory router, Logger logger, GlobalConfiguration config)
+        internal GlobalSingleInstanceActivationMaintainer(LocalGrainDirectory router, Logger logger, GlobalConfiguration config, IInternalGrainFactory grainFactory)
         {
             this.router = router;
             this.logger = logger;
+            this.grainFactory = grainFactory;
             this.period = config.GlobalSingleInstanceRetryInterval;
             logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
 
@@ -182,7 +184,7 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
                     var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), Silo.CurrentSilo.ClusterId);
                     batchResponses.Add(r);
                 }
@@ -312,7 +314,7 @@ namespace Orleans.Runtime.GrainDirectory
             // remove loser activations
             foreach (var kvp in loser_activations_per_silo)
             {
-                var catalog = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, kvp.Key);
+                var catalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, kvp.Key);
                 catalog.DeleteActivations(kvp.Value).Ignore();
             }
         }

@@ -58,8 +58,9 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Invoked upon initialization of the service</summary>
-        protected virtual void Init(IServiceProvider serviceProvider)
+        public virtual Task Init(IServiceProvider serviceProvider)
         {
+            return TaskDone.Done;
         }
 
         private void OnStatusChange(GrainServiceStatus oldStatus, GrainServiceStatus newStatus)

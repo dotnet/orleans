@@ -5,6 +5,7 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -51,7 +52,7 @@ namespace Tester.SQLUtils
         [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
         public async Task ClientInit_SqlServer_WithStats()
         {
-            Assert.True(GrainClient.IsInitialized);
+            Assert.True(this.HostedCluster.Client.IsInitialized);
 
             ClientConfiguration config = this.HostedCluster.ClientConfiguration;
 
@@ -59,13 +60,13 @@ namespace Tester.SQLUtils
 
             Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
 
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient)RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
+            var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
+            Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
             Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
+            Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
             Assert.Equal(statisticProviderName, silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }

@@ -358,7 +358,7 @@ namespace AWSUtils.Tests.StorageTests
             foreach (var silo in silos)
             {
                 string provider = providerType.FullName;
-                ICollection<string> providers = await silo.TestHook.GetStorageProviderNames();
+                ICollection<string> providers = await this.HostedCluster.Client.GetTestHooks(silo).GetStorageProviderNames();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }

@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
@@ -23,6 +23,21 @@ namespace Orleans.Runtime
         GrainId ISystemTargetBase.GrainId => grainId;
         internal SchedulingContext SchedulingContext => schedulingContext;
         internal ActivationId ActivationId { get; set; }
+        private ISiloRuntimeClient runtimeClient;
+
+        internal ISiloRuntimeClient RuntimeClient
+        {
+            get
+            {
+                if (this.runtimeClient == null)
+                    throw new OrleansException(
+                        $"{nameof(this.RuntimeClient)} has not been set on {this.GetType()}. Most likely, this means that the system target was not registered.");
+                return this.runtimeClient;
+            }
+            set { this.runtimeClient = value; }
+        }
+
+        IRuntimeClient ISystemTargetBase.RuntimeClient => this.RuntimeClient;
 
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
@@ -56,13 +71,13 @@ namespace Orleans.Runtime
         internal void HandleNewRequest(Message request)
         {
             running = request;
-            InsideRuntimeClient.Current.Invoke(this, this, request).Ignore();
+            this.RuntimeClient.Invoke(this, this, request).Ignore();
         }
 
         internal void HandleResponse(Message response)
         {
             running = response;
-            InsideRuntimeClient.Current.ReceiveResponse(response);
+            this.RuntimeClient.ReceiveResponse(response);
         }
 
         /// <summary>
@@ -73,14 +88,15 @@ namespace Orleans.Runtime
         /// <param name="state"></param>
         /// <param name="dueTime"></param>
         /// <param name="period"></param>
+        /// <param name="name"></param>
         /// <returns></returns>
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
-            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
-            String name = ctxt.Name + "Timer";
-          
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, name);
+            this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
+            name = name ?? ctxt.Name + "Timer";
+
+            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, asyncCallback, state, dueTime, period, name);
             timer.Start();
             return timer;
         }

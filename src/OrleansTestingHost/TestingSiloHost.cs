@@ -74,16 +74,20 @@ namespace Orleans.TestingHost
         private static int InstanceCounter = 0;
 
         /// <summary> GrainFactory to use in the tests </summary>
-        public IGrainFactory GrainFactory { get; private set; }
+        public IGrainFactory GrainFactory => this.Client;
 
         /// <summary> GrainFactory to use in the tests </summary>
-        internal IInternalGrainFactory InternalGrainFactory { get; private set; }
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
+        
+        /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient { get; private set; }
 
-        /// <summary> Get the logger to use in tests </summary>
-        protected Logger logger
-        {
-            get { return GrainClient.Logger; }
-        }
+        /// <summary>
+        /// Gets the client.
+        /// </summary>
+        public IClusterClient Client => this.InternalClient;
 
         /// <summary>
         /// Start the default Primary and Secondary test silos, plus client in-process, 
@@ -316,9 +320,16 @@ namespace Orleans.TestingHost
         {
             try
             {
-                GrainClient.Uninitialize();
+                this.Client?.Close();
             }
-            catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
+            catch (Exception exc)
+            {
+                WriteLog("Exception Uninitializing grain client: {0}", exc);
+            }
+            finally
+            {
+                this.Client?.Dispose();
+            }
 
             StopSilo(Secondary);
             StopSilo(Primary);
@@ -376,7 +387,8 @@ namespace Orleans.TestingHost
             }
             
             WaitForLivenessToStabilizeAsync().Wait();
-            GrainClient.Initialize(this.ClientConfig);
+            this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(this.ClientConfig).Build();
+            this.InternalClient.Connect().Wait();
         }
 
         /// <summary>
@@ -419,10 +431,9 @@ namespace Orleans.TestingHost
         /// </summary>
         public void KillClient()
         {
-            GrainClient.HardKill();
+            this.InternalClient?.Abort();
         }
-
-
+        
         /// <summary>
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
@@ -489,7 +500,7 @@ namespace Orleans.TestingHost
 
         private void InitializeClient(TestingClientOptions clientOptions, int largeMessageWarningThreshold)
         {
-            if (!GrainClient.IsInitialized)
+            if (this.Client == null)
             {
                 WriteLog("Initializing Grain Client");
                 ClientConfiguration clientConfig;
@@ -548,9 +559,16 @@ namespace Orleans.TestingHost
                 AdjustForTest(clientConfig, clientOptions);
                 this.ClientConfig = clientConfig;
 
-                GrainClient.Initialize(clientConfig);
-                this.GrainFactory = GrainClient.GrainFactory;
-                this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
+                try
+                {
+                    this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(clientConfig).Build();
+                    this.InternalClient.Connect().Wait();
+                }
+                catch
+                {
+                    this.InternalClient = null;
+                    throw;
+                }
             }
         }
 
@@ -584,7 +602,7 @@ namespace Orleans.TestingHost
                     this.ClientConfig = runningInstance.ClientConfig;
                     this.DeploymentId = runningInstance.DeploymentId;
                     this.DeploymentIdPrefix = runningInstance.DeploymentIdPrefix;
-                    this.GrainFactory = runningInstance.GrainFactory;
+                    this.InternalClient = runningInstance.InternalClient;
                     this.additionalSilos.AddRange(runningInstance.additionalSilos);
                     foreach (var additionalAssembly in runningInstance.additionalAssemblies)
                     {
@@ -644,7 +662,7 @@ namespace Orleans.TestingHost
             
             WriteLog("Done initializing cluster");
 
-            if (!GrainClient.IsInitialized && options.StartClient)
+            if (this.InternalClient == null || !this.InternalClient.IsInitialized && options.StartClient)
             {
                 InitializeClient(clientOptions, options.LargeMessageWarningThreshold);
             }

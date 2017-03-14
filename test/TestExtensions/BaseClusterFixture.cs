@@ -4,6 +4,8 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
+    using Orleans.Runtime;
+
     public abstract class BaseTestClusterFixture : IDisposable
     {
         private static int defaultsAreInitialized = 0;
@@ -15,11 +17,10 @@ namespace TestExtensions
 
         protected BaseTestClusterFixture()
         {
-            GrainClient.Uninitialize();
             var testCluster = CreateTestCluster();
-            if (testCluster.Primary == null)
+            if (testCluster?.Primary == null)
             {
-                testCluster.Deploy();
+                testCluster?.Deploy();
             }
             this.HostedCluster = testCluster;
         }
@@ -30,9 +31,13 @@ namespace TestExtensions
 
         public IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
 
+        public IClusterClient Client => this.HostedCluster.Client;
+
+        public Logger Logger => this.Client.Logger;
+
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
+            this.HostedCluster?.StopAllSilos();
         }
     }
 }

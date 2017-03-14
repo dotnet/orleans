@@ -36,7 +36,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("OrleansBenchmarks")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester")]

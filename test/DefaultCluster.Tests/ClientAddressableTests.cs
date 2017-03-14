@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -12,6 +13,7 @@ namespace DefaultCluster.Tests
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
+        private IRuntimeClient runtimeClient;
 
         private class MyPseudoGrain : IClientAddressableTestClientObject
         {
@@ -69,6 +71,7 @@ namespace DefaultCluster.Tests
 
         public ClientAddressableTests(DefaultClusterFixture fixture) : base(fixture)
         {
+            this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -76,14 +79,14 @@ namespace DefaultCluster.Tests
         {
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = ((GrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((IInternalGrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = this.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             const string expected = "o hai!";
             await proxy.SetTarget(myRef);
             var actual = await proxy.HappyPath(expected);
             Assert.Equal(expected, actual);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -93,7 +96,7 @@ namespace DefaultCluster.Tests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = ((GrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((IInternalGrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = this.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
 
@@ -101,7 +104,7 @@ namespace DefaultCluster.Tests
                 proxy.SadPath(message)
             );
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -109,7 +112,7 @@ namespace DefaultCluster.Tests
         {
             var myOb = new MyProducer();
             this.anchor = myOb;
-            var myRef = ((GrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestProducer>(myOb);
+            var myRef = ((IInternalGrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestProducer>(myOb);
             var rendez = this.GrainFactory.GetGrain<IClientAddressableTestRendezvousGrain>(0);
             var consumer = this.GrainFactory.GetGrain<IClientAddressableTestConsumer>(0);
 
@@ -118,7 +121,7 @@ namespace DefaultCluster.Tests
             var n = await consumer.PollProducer();
             Assert.Equal(1, n);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -128,12 +131,12 @@ namespace DefaultCluster.Tests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = ((GrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((IInternalGrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = this.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
             await proxy.MicroSerialStressTest(iterationCount);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -143,12 +146,12 @@ namespace DefaultCluster.Tests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = ((GrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((IInternalGrainFactory)this.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = this.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
             await proxy.MicroParallelStressTest(iterationCount);
 
-            RuntimeClient.Current.DeleteObjectReference(myRef);
+            this.runtimeClient.DeleteObjectReference(myRef);
 
             myOb.VerifyNumbers(iterationCount);
         }

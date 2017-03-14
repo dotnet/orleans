@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,16 +16,18 @@ namespace UnitTests
     {
         private readonly ITestOutputHelper output;
         private readonly TimeSpan originalTimeout;
-        
+        private readonly IRuntimeClient runtimeClient;
+
         public TimeoutTests(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
-            originalTimeout = RuntimeClient.Current.GetResponseTimeout();
+            this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
         public void Dispose()
         {
-            RuntimeClient.Current.SetResponseTimeout(originalTimeout);
+            this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
@@ -34,7 +37,7 @@ namespace UnitTests
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-            RuntimeClient.Current.SetResponseTimeout(timeout);
+            this.runtimeClient.SetResponseTimeout(timeout);
 
             Task promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
             //promise = grain.LongMethodWithError(2000);

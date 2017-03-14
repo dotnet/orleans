@@ -26,7 +26,7 @@ namespace NonSiloTests
             Assert.Equal($"You said: '{greeting}', I say: Hello!", reply);
         }
 
-        [Fact(Skip = "WriteStateAsync currently throws an exception due to a null pointer within Grain.GrainReference. Hopefully fixed in 1.3.0")]
+        [Fact]
         public async void NonSiloSayHelloArchiveTest()
         {
             // The mocked Orleans runtime is already set up at this point

@@ -2,10 +2,7 @@
 {
     using System;
     using System.Collections.Concurrent;
-    using System.Collections.Generic;
     using System.Reflection;
-    using System.Text;
-
     using Orleans.Runtime;
 
     /// <summary>
@@ -13,6 +10,9 @@
     /// </summary>
     public class ILBasedSerializer : IExternalSerializer
     {
+        private static readonly Type ExceptionType = typeof(Exception);
+        private static readonly Type TypeType = typeof(Type);
+
         /// <summary>
         /// The serializer generator.
         /// </summary>
@@ -24,43 +24,52 @@
         private readonly ConcurrentDictionary<Type, SerializerBundle> serializers =
             new ConcurrentDictionary<Type, SerializerBundle>();
 
-        private readonly ConcurrentDictionary<Type, TypeKey> typeCache = new ConcurrentDictionary<Type, TypeKey>();
-
-        private readonly ConcurrentDictionary<TypeKey, Type> typeKeyCache =
-            new ConcurrentDictionary<TypeKey, Type>(new TypeKey.Comparer());
+        private readonly TypeSerializer typeSerializer = new TypeSerializer();
 
         /// <summary>
         /// The serializer used when a concrete type is not known.
         /// </summary>
-        private readonly SerializationManager.SerializerMethods thisSerializer;
+        private readonly SerializerBundle thisSerializer;
 
         /// <summary>
         /// The serializer used for implementations of <see cref="Type"/>.
         /// </summary>
-        private readonly SerializerBundle typeSerializer;
+        private readonly SerializerBundle namedTypeSerializer;
+
+        private readonly SerializerBundle exceptionSerializer;
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
-        private readonly Func<FieldInfo, bool> exceptionFieldFilter;
-
         public ILBasedSerializer()
         {
-            this.exceptionFieldFilter = ExceptionFieldFilter;
-
+            var fallbackExceptionSerializer = new ILBasedExceptionSerializer(this.generator, this.typeSerializer);
+            this.exceptionSerializer = new SerializerBundle(
+                new SerializationManager.SerializerMethods(
+                    fallbackExceptionSerializer.DeepCopy,
+                    fallbackExceptionSerializer.Serialize,
+                    fallbackExceptionSerializer.Deserialize));
+            
             // Configure the serializer to be used when a concrete type is not known.
             // The serializer will generate and register serializers for concrete types
             // as they are discovered.
-            this.thisSerializer = new SerializationManager.SerializerMethods(
-                this.DeepCopy,
-                this.Serialize,
-                this.Deserialize);
+            this.thisSerializer = new SerializerBundle(
+                new SerializationManager.SerializerMethods(
+                    this.DeepCopy,
+                    this.Serialize,
+                    this.Deserialize));
 
-            this.typeSerializer = new SerializerBundle(
-                typeof(Type),
+            this.namedTypeSerializer = new SerializerBundle(
                 new SerializationManager.SerializerMethods(
                     (original, context) => original,
-                    (original, writer, expected) => { this.WriteNamedType((Type)original, writer); },
-                    (expected, reader) => this.ReadNamedType(reader)));
+                    (original, writer, expected) => {
+                        var writer1 = writer.StreamWriter;
+                        this.typeSerializer.WriteNamedType((Type)original, writer1);
+                    },
+                    (expected, reader) =>
+                    {
+                        var reader1 = reader.StreamReader;
+                        return this.typeSerializer.ReadNamedType(reader1);
+                    }));
             this.generateSerializer = this.GenerateSerializer;
         }
 
@@ -93,7 +102,7 @@
         {
             if (item == null)
             {
-                context.StreamWriter.WriteNull();
+                context.StreamWriter.Write((byte)ILSerializerTypeToken.Null);
                 return;
             }
 
@@ -106,8 +115,8 @@
         public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             var reader = context.StreamReader;
-            var token = reader.ReadToken();
-            if (token == SerializationTokenType.Null) return null;
+            var token = (ILSerializerTypeToken)reader.ReadByte();
+            if (token == ILSerializerTypeToken.Null) return null;
             var actualType = this.ReadType(token, context, expectedType);
             return this.serializers.GetOrAdd(actualType, this.generateSerializer)
                        .Methods.Deserialize(expectedType, context);
@@ -115,143 +124,72 @@
 
         private void WriteType(Type actualType, Type expectedType, ISerializationContext context)
         {
-            if (actualType == expectedType)
+            if (ExceptionType.IsAssignableFrom(actualType))
             {
-                context.StreamWriter.Write((byte)SerializationTokenType.ExpectedType);
+                // Exceptions are always serialized using a special-purpose serializer, even if the actual and expected
+                // types match. That serializer also writes its own type header.
+                context.StreamWriter.Write((byte) ILSerializerTypeToken.Exception);
+            }
+            else if (actualType == expectedType)
+            {
+                context.StreamWriter.Write((byte) ILSerializerTypeToken.ExpectedType);
             }
             else
             {
-                context.StreamWriter.Write((byte)SerializationTokenType.NamedType);
-                this.WriteNamedType(actualType, context);
+                context.StreamWriter.Write((byte) ILSerializerTypeToken.NamedType);
+                this.typeSerializer.WriteNamedType(actualType, context.StreamWriter);
             }
         }
 
-        private Type ReadType(SerializationTokenType token, IDeserializationContext context, Type expectedType)
+        private Type ReadType(ILSerializerTypeToken token, IDeserializationContext context, Type expectedType)
         {
             switch (token)
             {
-                case SerializationTokenType.ExpectedType:
+                case ILSerializerTypeToken.ExpectedType:
                     return expectedType;
-                case SerializationTokenType.NamedType:
-                    return this.ReadNamedType(context);
+                case ILSerializerTypeToken.NamedType:
+                    return this.typeSerializer.ReadNamedType(context.StreamReader);
+                case ILSerializerTypeToken.Exception:
+                    return ExceptionType;
                 default:
-                    throw new NotSupportedException($"{nameof(SerializationTokenType)} of {token} is not supported.");
+                    throw new NotSupportedException($"{nameof(ILSerializerTypeToken)} of {token} is not supported.");
             }
-        }
-
-        private Type ReadNamedType(IDeserializationContext context)
-        {
-            var reader = context.StreamReader;
-            var hashCode = reader.ReadInt();
-            var count = reader.ReadUShort();
-            var typeName = reader.ReadBytes(count);
-            return this.typeKeyCache.GetOrAdd(
-                new TypeKey(hashCode, typeName),
-                k => Type.GetType(Encoding.UTF8.GetString(k.TypeName), throwOnError: true));
-        }
-
-        private void WriteNamedType(Type type, ISerializationContext context)
-        {
-            var writer = context.StreamWriter;
-            var key = this.typeCache.GetOrAdd(type, t => new TypeKey(Encoding.UTF8.GetBytes(t.AssemblyQualifiedName)));
-            writer.Write(key.HashCode);
-            writer.Write((ushort)key.TypeName.Length);
-            writer.Write(key.TypeName);
         }
 
         private SerializerBundle GenerateSerializer(Type type)
         {
-            if (type.GetTypeInfo().IsGenericTypeDefinition) return new SerializerBundle(type, this.thisSerializer);
+            if (type.GetTypeInfo().IsGenericTypeDefinition) return this.thisSerializer;
 
-            if (typeof(Type).IsAssignableFrom(type))
+            if (TypeType.IsAssignableFrom(type))
             {
-                return this.typeSerializer;
+                return this.namedTypeSerializer;
+            }
+            
+            if (ExceptionType.IsAssignableFrom(type))
+            {
+                return this.exceptionSerializer;
             }
 
-            Func<FieldInfo, bool> fieldFilter = null;
-            if (typeof(Exception).IsAssignableFrom(type))
-            {
-                fieldFilter = this.exceptionFieldFilter;
-            }
-
-            return new SerializerBundle(type, this.generator.GenerateSerializer(type, fieldFilter));
+            return new SerializerBundle(this.generator.GenerateSerializer(type));
         }
-
-        private static bool ExceptionFieldFilter(FieldInfo arg)
+        
+        private enum ILSerializerTypeToken : byte
         {
-            // Any field defined below Exception is acceptable.
-            if (arg.DeclaringType != typeof(Exception)) return true;
-
-            // Certain fields from the Exception base class are acceptable.
-            return arg.FieldType == typeof(string) || arg.FieldType == typeof(Exception);
+            Null,
+            ExpectedType,
+            NamedType,
+            Exception,
         }
 
         /// <summary>
-        /// Represents a named type for the purposes of serialization.
+        /// This class primarily exists as a means to hold a reference to a <see cref="SerializationManager.SerializerMethods"/> structure.
         /// </summary>
-        internal struct TypeKey
-        {
-            public readonly int HashCode;
-
-            public readonly byte[] TypeName;
-
-            public TypeKey(int hashCode, byte[] key)
-            {
-                this.HashCode = hashCode;
-                this.TypeName = key;
-            }
-
-            public TypeKey(byte[] key)
-            {
-                this.HashCode = unchecked((int)JenkinsHash.ComputeHash(key));
-                this.TypeName = key;
-            }
-
-            public bool Equals(TypeKey other)
-            {
-                if (this.HashCode != other.HashCode) return false;
-                var a = this.TypeName;
-                var b = other.TypeName;
-                if (ReferenceEquals(a, b)) return true;
-                if (a.Length != b.Length) return false;
-                var length = a.Length;
-                for (var i = 0; i < length; i++) if (a[i] != b[i]) return false;
-                return true;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is TypeKey && this.Equals((TypeKey)obj);
-            }
-
-            public override int GetHashCode()
-            {
-                return this.HashCode;
-            }
-
-            internal class Comparer : IEqualityComparer<TypeKey>
-            {
-                public bool Equals(TypeKey x, TypeKey y)
-                {
-                    return x.Equals(y);
-                }
-
-                public int GetHashCode(TypeKey obj)
-                {
-                    return obj.HashCode;
-                }
-            }
-        }
-
-        public class SerializerBundle
+        private class SerializerBundle
         {
             public readonly SerializationManager.SerializerMethods Methods;
-
-            public readonly Type Type;
-
-            public SerializerBundle(Type type, SerializationManager.SerializerMethods methods)
+            
+            public SerializerBundle(SerializationManager.SerializerMethods methods)
             {
-                this.Type = type;
                 this.Methods = methods;
             }
         }

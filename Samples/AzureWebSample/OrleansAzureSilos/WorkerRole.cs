@@ -81,11 +81,11 @@ namespace Orleans.Azure.Silos
             int i = 1;
             foreach (var c in e.Changes)
             {
-                Trace.WriteLine(string.Format("RoleEnvironmentChanging: #{0} Type={1} Change={2}", i++, c.GetType().FullName, c));
+                Trace.WriteLine($"RoleEnvironmentChanging: #{i++} Type={c.GetType().FullName} Change={c}");
             }
 
             // If a configuration setting is changing);
-            if (e.Changes.Any((RoleEnvironmentChange change) => change is RoleEnvironmentConfigurationSettingChange))
+            if (e.Changes.Any(change => change is RoleEnvironmentConfigurationSettingChange))
             {
                 // Set e.Cancel to true to restart this role instance
                 e.Cancel = true;

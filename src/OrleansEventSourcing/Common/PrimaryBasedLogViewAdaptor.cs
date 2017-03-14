@@ -87,6 +87,11 @@ namespace Orleans.EventSourcing.Common
             throw new NotImplementedException();
         }
 
+        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length)
+        {
+            throw new NotSupportedException();
+        }
+
         /// <summary>
         /// Handle notification messages. Override this to handle notification subtypes.
         /// </summary>
@@ -589,7 +594,7 @@ namespace Orleans.EventSourcing.Common
         private void CalculateTentativeState()
         {
             // copy the master
-            this.tentativeStateInternal = (TLogView)SerializationManager.DeepCopy(LastConfirmedView());
+            this.tentativeStateInternal = (TLogView)Services.SerializationManager.DeepCopy(LastConfirmedView());
 
             // Now apply all operations in pending 
             foreach (var u in this.pending)

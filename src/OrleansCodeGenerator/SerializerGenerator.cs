@@ -143,6 +143,17 @@ namespace Orleans.CodeGenerator
                             SF.CastExpression(field.Type, deserialized))));
             }
 
+            // If the type implements the internal IOnDeserialized lifecycle method, invoke it's method now.
+            if (typeof(IOnDeserialized).IsAssignableFrom(type))
+            {
+                Expression<Action<IOnDeserialized>> onDeserializedMethod = _ => _.OnDeserialized(default(ISerializerContext));
+
+                // C#: ((IOnDeserialized)result).OnDeserialized(context);
+                var typedResult = SF.ParenthesizedExpression(SF.CastExpression(typeof(IOnDeserialized).GetTypeSyntax(), resultVariable));
+                var invokeOnDeserialized = onDeserializedMethod.Invoke(typedResult).AddArgumentListArguments(SF.Argument(contextParameter));
+                body.Add(SF.ExpressionStatement(invokeOnDeserialized));
+            }
+
             body.Add(SF.ReturnStatement(SF.CastExpression(type.GetTypeSyntax(), resultVariable)));
             return
                 SF.MethodDeclaration(typeof(object).GetTypeSyntax(), "Deserializer")
@@ -435,7 +446,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
+                    .Where(field => !field.IsNotSerialized())
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -600,18 +611,22 @@ namespace Orleans.CodeGenerator
                         this.FieldInfo.FieldType);
 
                     // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
-                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    // C#: (value == null || value is GrainReference) ? value : value.AsReference<TInterface>()
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
-                            SF.PrefixUnaryExpression(
-                                SyntaxKind.LogicalNotExpression,
-                                SF.ParenthesizedExpression(
+                            SF.ParenthesizedExpression(
+                                SF.BinaryExpression(
+                                    SyntaxKind.LogicalOrExpression,
+                                    SF.BinaryExpression(
+                                        SyntaxKind.EqualsExpression,
+                                        getValueExpression,
+                                        SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     SF.BinaryExpression(
                                         SyntaxKind.IsExpression,
                                         getValueExpression,
                                         typeof(GrainReference).GetTypeSyntax()))),
-                            SF.InvocationExpression(getAsReference),
-                            getValueExpression);
+                            getValueExpression,
+                            SF.InvocationExpression(getAsReference));
                 }
                 else
                 {

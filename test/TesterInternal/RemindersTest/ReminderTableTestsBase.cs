@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
@@ -33,11 +34,7 @@ namespace UnitTests.RemindersTest
 
             logger.Info("DeploymentId={0}", deploymentId);
 
-            lock (fixture.SyncRoot)
-            {
-                if (fixture.ConnectionString == null)
-                    fixture.ConnectionString = GetConnectionString();
-            }
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration
             {
@@ -61,7 +58,7 @@ namespace UnitTests.RemindersTest
         }
 
         protected abstract IReminderTable CreateRemindersTable();
-        protected abstract string GetConnectionString();
+        protected abstract Task<string> GetConnectionString();
 
         protected virtual string GetAdoInvariant()
         {
@@ -159,7 +156,7 @@ namespace UnitTests.RemindersTest
         private GrainReference MakeTestGrainReference()
         {
             GrainId regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
-            GrainReference grainRef = GrainReference.FromGrainId(regularGrainId);
+            GrainReference grainRef = this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
             return grainRef;
         }
     }

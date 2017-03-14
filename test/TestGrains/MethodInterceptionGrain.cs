@@ -15,6 +15,7 @@ namespace UnitTests.Grains
         {
             if (methodInfo.Name == nameof(One) && methodInfo.GetParameters().Length == 0)
             {
+                if (request.MethodId != 14142) throw new Exception($"Method id of 'One' must be 14142, not {request.MethodId}.");
                 return "intercepted one with no args";
             }
 

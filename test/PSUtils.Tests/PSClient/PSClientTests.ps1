@@ -7,24 +7,29 @@ Import-Module ..\OrleansPSUtils.dll
 
 Add-Type -Path ..\Orleans.dll
 
-Stop-GrainClient
+$didThrow = $false;
+try {
+  Stop-GrainClient;
+} catch {
+	$didThrow = $true;
+}
 
-Write-Output([Orleans.GrainClient]::IsInitialized)
+Write-Output($didThrow);
 
-Start-GrainClient -Config $clientConfig
+$client = Start-GrainClient -Config $clientConfig
 
-Write-Output([Orleans.GrainClient]::IsInitialized)
+Write-Output($client -ne $null)
 
 $grainId = 1
 $grainType = [Orleans.Runtime.IManagementGrain]
 
-$grain = Get-Grain -GrainType $grainType -LongKey $grainId
+$grain = Get-Grain -GrainType $grainType -LongKey $grainId -Client $client
 Write-Output($grain)
 
 $activeSilos = $grain.GetHosts($true).Result
 
 Write-Output($activeSilos)
 
-Stop-GrainClient
+Stop-GrainClient -Client $client
 
-Write-Output([Orleans.GrainClient]::IsInitialized)
+Write-Output($client.IsInitialized)

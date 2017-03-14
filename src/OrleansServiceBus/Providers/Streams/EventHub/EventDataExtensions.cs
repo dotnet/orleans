@@ -2,7 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Serialization;
 
 namespace Orleans.ServiceBus.Providers
@@ -44,11 +48,12 @@ namespace Orleans.ServiceBus.Providers
         /// Serializes event data properties
         /// </summary>
         /// <param name="eventData"></param>
+        /// <param name="serializationManager"></param>
         /// <returns></returns>
-        public static byte[] SerializeProperties(this EventData eventData)
+        public static byte[] SerializeProperties(this EventData eventData, SerializationManager serializationManager)
         {
             var writeStream = new BinaryTokenStreamWriter();
-            SerializationManager.Serialize(eventData.Properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
+            serializationManager.Serialize(eventData.Properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
             var result = writeStream.ToByteArray();
             writeStream.ReleaseBuffers();
             return result;
@@ -58,11 +63,12 @@ namespace Orleans.ServiceBus.Providers
         /// Deserializes event data properties
         /// </summary>
         /// <param name="bytes"></param>
+        /// <param name="serializationManager"></param>
         /// <returns></returns>
-        public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes)
+        public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, SerializationManager serializationManager)
         {
             var stream = new BinaryTokenStreamReader(bytes);
-            return SerializationManager.Deserialize<List<KeyValuePair<string, object>>>(stream).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            return serializationManager.Deserialize<List<KeyValuePair<string, object>>>(stream).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
     }
 }

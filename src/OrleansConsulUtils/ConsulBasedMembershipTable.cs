@@ -67,7 +67,7 @@ namespace Orleans.Runtime.Host
             _connectionString = dataConnectionString;
 
             _consulClient =
-                new ConsulClient( config => config.Address = new Uri(dataConnectionString));
+                new ConsulClient( config => config.Address = new Uri(_connectionString));
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)

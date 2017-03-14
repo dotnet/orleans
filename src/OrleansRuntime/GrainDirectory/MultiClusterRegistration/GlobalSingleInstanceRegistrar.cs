@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -22,17 +21,18 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GlobalSingleInstanceRegistrar : IGrainRegistrar
     {
         private readonly int numRetries;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly Logger logger;
         private readonly GrainDirectoryPartition directoryPartition;
         private readonly GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer;
 
-        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, int numRetries)
-             
+        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, int numRetries, IInternalGrainFactory grainFactory)
         {
             this.directoryPartition = partition;
             this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
             this.numRetries = numRetries;
+            this.grainFactory = grainFactory;
         }
 
         public bool IsSynchronous { get { return false; } }
@@ -211,7 +211,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 if (clusterGatewayAddress != null)
                 {
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                     // try to send request
 
@@ -259,7 +259,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 if (clusterGatewayAddress != null)
                 {
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                     // try to send request
                     tasks.Add(clusterGrainDir.ProcessDeletion(gid));
@@ -293,7 +293,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // find gateway
                 var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
                 var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
-                var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
                 return await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);

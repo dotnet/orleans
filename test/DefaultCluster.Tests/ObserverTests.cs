@@ -50,7 +50,7 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_SimpleNotification_Callback, result, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
             await grain.Subscribe(reference);
             await grain.SetA(3);
@@ -68,7 +68,7 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_SimpleNotification_Callback, result, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(3);
@@ -82,7 +82,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
+            this.Logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
 
             if (a == 3 && b == 0)
                 callbacksRecieved[0] = true;
@@ -114,7 +114,7 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionSameReference_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_DoubleSubscriptionSameReference_Callback, result, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(1); // Use grain
@@ -129,7 +129,7 @@ namespace DefaultCluster.Tests.General
             catch (Exception exc)
             {
                 Exception baseException = exc.GetBaseException();
-                logger.Info("Received exception: {0}", baseException);
+                this.Logger.Info("Received exception: {0}", baseException);
                 Assert.IsAssignableFrom<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
@@ -147,7 +147,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", callbackCounter, a, b);
+            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected " + callbackCounter);
             if (callbackCounter == 2)
             {
@@ -162,7 +162,7 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_SubscribeUnsubscribe_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_SubscribeUnsubscribe_Callback, result, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
@@ -179,7 +179,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
+            this.Logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);
@@ -194,7 +194,7 @@ namespace DefaultCluster.Tests.General
         {
             TestInitialize();
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(null, null);
+            this.observer1 = new SimpleGrainObserver(null, null, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             try
             {
@@ -221,9 +221,9 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result, this.Logger);
             ISimpleGrainObserver reference1 = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
-            observer2 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
+            this.observer2 = new SimpleGrainObserver(this.ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result, this.Logger);
             ISimpleGrainObserver reference2 = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer2);
             await grain.Subscribe(reference1);
             await grain.Subscribe(reference2);
@@ -238,7 +238,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
+            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 3, "Callback has been called more times than was expected.");
 
             Assert.Equal(6, a);
@@ -255,7 +255,7 @@ namespace DefaultCluster.Tests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            observer1 = new SimpleGrainObserver(ObserverTest_DeleteObject_Callback, result);
+            this.observer1 = new SimpleGrainObserver(this.ObserverTest_DeleteObject_Callback, result, this.Logger);
             ISimpleGrainObserver reference = await this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
@@ -269,7 +269,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
+            this.Logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);
@@ -286,9 +286,9 @@ namespace DefaultCluster.Tests.General
             {
                 var result = new AsyncResultHandle();
 
-                ISimpleObserverableGrain grain = GetGrain();
-                observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
-                ISimpleGrainObserver reference = observer1;
+                ISimpleObserverableGrain grain = this.GetGrain();
+                this.observer1 = new SimpleGrainObserver(this.ObserverTest_SimpleNotification_Callback, result, this.Logger);
+                ISimpleGrainObserver reference = this.observer1;
                 // Should be: this.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(obj);
                 await grain.Subscribe(reference);
                 // Not reached
@@ -300,17 +300,20 @@ namespace DefaultCluster.Tests.General
             readonly Action<int, int, AsyncResultHandle> action;
             readonly AsyncResultHandle result;
 
-            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result)
+            private readonly Logger logger;
+
+            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, Logger logger)
             {
                 this.action = action;
                 this.result = result;
+                this.logger = logger;
             }
 
             #region ISimpleGrainObserver Members
 
             public void StateChanged(int a, int b)
             {
-                GrainClient.Logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                this.logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
                 action?.Invoke(a, b, result);
             }
 

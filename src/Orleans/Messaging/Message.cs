@@ -1,7 +1,5 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
@@ -11,7 +9,6 @@ namespace Orleans.Runtime
 {
     internal class Message : IOutgoingMessage
     {
-        public static int LargeMessageSizeThreshold { get; set; }
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
@@ -365,28 +362,28 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
+        public object GetDeserializedBody(SerializationManager serializationManager)
+        {
+            if (this.bodyObject != null) return this.bodyObject;
+            
+            try
+            {
+                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes);
+            }
+            finally
+            {
+                if (this.bodyBytes != null)
+                {
+                    BufferPool.GlobalPool.Release(bodyBytes);
+                    this.bodyBytes = null;
+                }
+            }
+
+            return this.bodyObject;
+        }
+
         public object BodyObject
         {
-            get
-            {
-                if (bodyObject != null)
-                {
-                    return bodyObject;
-                }
-                try
-                {
-                    bodyObject = DeserializeBody(bodyBytes);
-                }
-                finally
-                {
-                    if (bodyBytes != null)
-                    {
-                        BufferPool.GlobalPool.Release(bodyBytes);
-                        bodyBytes = null;
-                    }
-                }
-                return bodyObject;
-            }
             set
             {
                 bodyObject = value;
@@ -397,7 +394,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static object DeserializeBody(List<ArraySegment<byte>> bytes)
+        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes)
         {
             if (bytes == null)
             {
@@ -406,7 +403,7 @@ namespace Orleans.Runtime
             try
             {
                 var stream = new BinaryTokenStreamReader(bytes);
-                return SerializationManager.Deserialize(stream);
+                return serializationManager.Deserialize(stream);
             }
             catch (Exception ex)
             {
@@ -421,49 +418,7 @@ namespace Orleans.Runtime
             bodyBytes = null;
             headerBytes = null;
         }
-
-        private Message(Categories type, Directions subtype)
-            : this()
-        {
-            Category = type;
-            Direction = subtype;
-        }
-
-        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            var message = new Message(
-                Categories.Application,
-                (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
-            {
-                Id = CorrelationId.GetNext(),
-                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
-                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request
-            };
-
-            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
-                message.IsAlwaysInterleave = true;
-
-            var contextData = RequestContext.Export();
-            if (contextData != null)
-            {
-                message.RequestContextData = contextData;
-            }
-            return message;
-        }
-
-        // Initializes body and header but does not take ownership of byte.
-        // Caller must clean up bytes
-        public Message(List<ArraySegment<byte>> header)
-        {
-            var context = new DeserializationContext
-            {
-                StreamReader = new BinaryTokenStreamReader(header)
-            };
-
-            Headers = SerializationManager.DeserializeMessageHeaders(context);
-        }
-
+        
         /// <summary>
         /// Clears the current body and sets the serialized body contents to the provided value.
         /// </summary>
@@ -479,80 +434,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Deserializes the provided value into this instance's <see cref="BodyObject"/>.
         /// </summary>
+        /// <param name="serializationManager">The serialization manager.</param>
         /// <param name="body">The serialized body contents.</param>
-        public void DeserializeBodyObject(List<ArraySegment<byte>> body)
+        public void DeserializeBodyObject(SerializationManager serializationManager, List<ArraySegment<byte>> body)
         {
-            this.BodyObject = DeserializeBody(body);
-        }
-
-        public Message CreateResponseMessage()
-        {
-            var response = new Message(this.Category, Directions.Response)
-            {
-                Id = this.Id,
-                IsReadOnly = this.IsReadOnly,
-                IsAlwaysInterleave = this.IsAlwaysInterleave,
-                TargetSilo = this.SendingSilo
-            };
-
-            if (SendingGrain != null)
-            {
-                response.TargetGrain = SendingGrain;
-                if (SendingActivation != null)
-                {
-                    response.TargetActivation = SendingActivation;
-                }
-            }
-
-            response.SendingSilo = this.TargetSilo;
-            if (TargetGrain != null)
-            {
-                response.SendingGrain = TargetGrain;
-                if (TargetActivation != null)
-                {
-                    response.SendingActivation = TargetActivation;
-                }
-                else if (this.TargetGrain.IsSystemTarget)
-                {
-                    response.SendingActivation = ActivationId.GetSystemActivation(TargetGrain, TargetSilo);
-                }
-            }
-
-            if (DebugContext != null)
-            {
-                response.DebugContext = DebugContext;
-            }
-
-            response.CacheInvalidationHeader = CacheInvalidationHeader;
-            response.Expiration = Expiration;
-
-            var contextData = RequestContext.Export();
-            if (contextData != null)
-            {
-                response.RequestContextData = contextData;
-            }
-
-            return response;
-        }
-
-        public Message CreateRejectionResponse(RejectionTypes type, string info, OrleansException ex = null)
-        {
-            var response = CreateResponseMessage();
-            response.Result = ResponseTypes.Rejection;
-            response.RejectionType = type;
-            response.RejectionInfo = info;
-            response.BodyObject = ex;
-            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
-            return response;
-        }
-
-        public Message CreatePromptExceptionResponse(Exception exception)
-        {
-            return new Message(Category, Directions.Response)
-            {
-                Result = ResponseTypes.Error,
-                BodyObject = Response.ExceptionResponse(exception)
-            };
+            this.BodyObject = DeserializeBody(serializationManager, body);
         }
 
         public void ClearTargetAddress()
@@ -577,15 +463,9 @@ namespace Orleans.Runtime
 
         #region Serialization
 
-        public List<ArraySegment<byte>> Serialize(out int headerLength)
+        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
-            int dummy;
-            return Serialize_Impl(out headerLength, out dummy);
-        }
-
-        private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
-        {
-            var context = new SerializationContext
+            var context = new SerializationContext(serializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
@@ -594,19 +474,19 @@ namespace Orleans.Runtime
             if (bodyBytes == null)
             {
                 var bodyStream = new BinaryTokenStreamWriter();
-                SerializationManager.Serialize(bodyObject, bodyStream);
+                serializationManager.Serialize(bodyObject, bodyStream);
                 // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
                 // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
                 // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually
                 // pretty high (an array allocation plus a bunch of copying).
-                bodyBytes = bodyStream.ToBytes() as List<ArraySegment<byte>>;
+                bodyBytes = bodyStream.ToBytes();
             }
 
             if (headerBytes != null)
             {
                 BufferPool.GlobalPool.Release(headerBytes);
             }
-            headerBytes = context.StreamWriter.ToBytes() as List<ArraySegment<byte>>;
+            headerBytes = context.StreamWriter.ToBytes();
             int headerLength = context.StreamWriter.CurrentOffset;
             int bodyLength = BufferLength(bodyBytes);
 
@@ -616,13 +496,6 @@ namespace Orleans.Runtime
            
             bytes.AddRange(headerBytes);
             bytes.AddRange(bodyBytes);
-
-            if (headerLength + bodyLength > LargeMessageSizeThreshold)
-            {
-                logger.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
-                    headerLength + bodyLength + LENGTH_HEADER_SIZE, headerLength, bodyLength, bytes.Count, this.ToString());
-                if (logger.IsVerbose3) logger.Verbose3("Sending large message {0}", this.ToLongString());
-            }
 
             headerLengthOut = headerLength;
             bodyLengthOut = bodyLength;
@@ -805,6 +678,16 @@ namespace Orleans.Runtime
             get { return timeInterval.Elapsed; }
         }
 
+        public static Message CreatePromptExceptionResponse(Message request, Exception exception)
+        {
+            return new Message
+            {
+                Category = request.Category,
+                Direction = Message.Directions.Response,
+                Result = Message.ResponseTypes.Error,
+                BodyObject = Response.ExceptionResponse(exception)
+            };
+        }
 
         internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
         {
@@ -1171,12 +1054,6 @@ namespace Orleans.Runtime
                 return headers;
             }
 
-            static HeadersContainer()
-            {
-                Register();
-            }
-
-
             [CopierMethod]
             public static object DeepCopier(object original, ICopyContext context)
             {
@@ -1409,19 +1286,14 @@ namespace Orleans.Runtime
 
             private static void WriteObj(ISerializationContext context, Type type, object input)
             {
-                var ser = SerializationManager.GetSerializer(type);
+                var ser = context.SerializationManager.GetSerializer(type);
                 ser.Invoke(input, context, type);
             }
 
             private static object ReadObj(Type t, IDeserializationContext context)
             {
-                var des = SerializationManager.GetDeserializer(t);
+                var des = context.SerializationManager.GetDeserializer(t);
                 return des.Invoke(t, context);
-            }
-
-            public static void Register()
-            {
-                 SerializationManager.Register(typeof(HeadersContainer), DeepCopier, Serializer, Deserializer);
             }
         }
     }

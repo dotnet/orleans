@@ -91,54 +91,45 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// The current state (includes both confirmed and unconfirmed events).
+        /// The current confirmed state. 
+        /// Includes only confirmed events.
         /// </summary>
         protected TGrainState State
-        {
-            get { return this.LogViewAdaptor.TentativeView; }
-        }
-
-        /// <summary>
-        /// The version of the state.
-        /// Always equal to the confirmed version plus the number of unconfirmed events.
-        /// </summary>
-        protected int Version
-        {
-            get { return this.LogViewAdaptor.ConfirmedVersion + this.LogViewAdaptor.UnconfirmedSuffix.Count(); }
-        }
-
-        /// <summary>
-        /// Called whenever the current state may have changed due to local or remote events.
-        /// <para>Override this to react to changes of the state.</para>
-        /// </summary>
-        protected virtual void OnStateChanged()
-        {
-        }
-
-        /// <summary>
-        /// The current confirmed state (includes only confirmed events).
-        /// </summary>
-        protected TGrainState ConfirmedState
         {
             get { return this.LogViewAdaptor.ConfirmedView; }
         }
 
         /// <summary>
-        /// The version of the confirmed state.
-        /// Always equal to the number of confirmed events.
+        /// The version of the current confirmed state. 
+        /// Equals the total number of confirmed events.
         /// </summary>
-        protected int ConfirmedVersion
+        protected int Version
         {
             get { return this.LogViewAdaptor.ConfirmedVersion; }
         }
 
+        /// <summary>
+        /// Called whenever the tentative state may have changed due to local or remote events.
+        /// <para>Override this to react to changes of the state.</para>
+        /// </summary>
+        protected virtual void OnTentativeStateChanged()
+        {
+        }
 
+        /// <summary>
+        /// The current tentative state.
+        /// Includes both confirmed and unconfirmed events.
+        /// </summary>
+        protected TGrainState TentativeState
+        {
+            get { return this.LogViewAdaptor.TentativeView; }
+        }
 
         /// <summary>
         /// Called after the confirmed state may have changed (i.e. the confirmed version number is larger).
         /// <para>Override this to react to changes of the confirmed state.</para>
         /// </summary>
-        protected virtual void OnConfirmedStateChanged()
+        protected virtual void OnStateChanged()
         {
             // overridden by journaled grains that want to react to state changes
         }
@@ -175,6 +166,34 @@ namespace Orleans.EventSourcing
             get { return LogViewAdaptor.UnconfirmedSuffix; }
         }
 
+
+        /// <summary>
+        /// By default, upon activation, the journaled grain waits until it has loaded the latest
+        /// view from storage. Subclasses can override this behavior,
+        /// and skip the wait if desired.
+        /// </summary>
+        public override Task OnActivateAsync()
+        {
+            return LogViewAdaptor.Synchronize();
+        }
+
+        /// <summary>
+        /// Retrieves a segment of the confirmed event sequence, possibly from storage. 
+        /// Throws <see cref="NotSupportedException"/> if the events are not available to read.
+        /// Whether events are available, and for how long, depends on the providers used and how they are configured.
+        /// </summary>
+        /// <param name="fromVersion">the position of the event sequence from which to start</param>
+        /// <param name="toVersion">the position of the event sequence on which to end</param>
+        /// <returns>a task which returns the sequence of events between the two versions</returns>
+        protected Task<IReadOnlyList<TEventBase>> RetrieveConfirmedEvents(int fromVersion, int toVersion)
+        {
+            if (fromVersion < 0)
+                throw new ArgumentException("invalid range", nameof(fromVersion));
+            if (toVersion < fromVersion || toVersion > LogViewAdaptor.ConfirmedVersion)
+                throw new ArgumentException("invalid range", nameof(toVersion));
+
+            return LogViewAdaptor.RetrieveLogSegment(fromVersion, toVersion);
+        }
 
         /// <summary>
         /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
@@ -330,9 +349,9 @@ namespace Orleans.EventSourcing
         void ILogViewAdaptorHost<TGrainState, TEventBase>.OnViewChanged(bool tentative, bool confirmed)
         {
             if (tentative)
-                OnStateChanged();
+                OnTentativeStateChanged();
             if (confirmed)
-                OnConfirmedStateChanged();
+                OnStateChanged();
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -218,6 +219,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var random = new SafeRandom();
                 listRefreshTimer = GrainTimer.FromTaskCallback(
+                    this.RuntimeClient.Scheduler,
                     _ => DoInitialReadAndUpdateReminders(),
                     null,
                     random.NextTimeSpan(InitialReadRetryPeriod),
@@ -237,6 +239,7 @@ namespace Orleans.Runtime.ReminderService
             var dueTime = random.NextTimeSpan(Constants.RefreshReminderList);
             if (listRefreshTimer != null) listRefreshTimer.Dispose();
             listRefreshTimer = GrainTimer.FromTaskCallback(
+                this.RuntimeClient.Scheduler,
                 _ => ReadAndUpdateReminders(),
                 null,
                 dueTime,
@@ -399,7 +402,7 @@ namespace Orleans.Runtime.ReminderService
             localTableSequence++;
             newReminder.LocalSequenceNumber = localTableSequence;
             localReminders.Add(newReminder.Identity, newReminder);
-            newReminder.StartTimer(AsyncTimerCallback, Logger);
+            newReminder.StartTimer(this.RuntimeClient.Scheduler, AsyncTimerCallback, Logger);
             if (Logger.IsVerbose) Logger.Verbose(ErrorCode.RS_Started, "Started reminder {0}.", entry.ToString());
         }
 
@@ -517,11 +520,11 @@ namespace Orleans.Runtime.ReminderService
                 LocalSequenceNumber = -1;
             }
 
-            public void StartTimer(Func<object, Task> asyncCallback, Logger Logger)
+            public void StartTimer(OrleansTaskScheduler scheduler, Func<object, Task> asyncCallback, Logger Logger)
             {
                 StopReminder(Logger); // just to make sure.
                 var dueTimeSpan = CalculateDueTime();
-                Timer = GrainTimer.FromTaskCallback(asyncCallback, this, dueTimeSpan, period, name: ReminderName);
+                Timer = GrainTimer.FromTaskCallback(scheduler, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
                 if (Logger.IsVerbose) Logger.Verbose("Reminder {0}, Due time{1}", this, dueTimeSpan);
                 Timer.Start();
             }

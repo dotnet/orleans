@@ -86,9 +86,9 @@ namespace Orleans.Runtime.Host
     /// </summary>
     internal class ConsulSiloRegistrationAssembler
     {
-        private static String DeploymentKVPrefix = "orleans";  //Ensures a root KV namespace for orleans in Consul
-        private static Char KeySeparator = '/';
-        internal static String SiloIAmAliveSuffix = "iamalive";
+        private const string DeploymentKVPrefix = "orleans";  //Ensures a root KV namespace for orleans in Consul
+        private const char KeySeparator = '/';
+        internal const string SiloIAmAliveSuffix = "iamalive";
 
         internal static String ParseDeploymentKVPrefix(String deploymentId)
         {

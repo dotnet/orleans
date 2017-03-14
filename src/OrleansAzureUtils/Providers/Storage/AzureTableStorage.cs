@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
@@ -69,6 +70,7 @@ namespace Orleans.Storage
 
         private bool useJsonFormat;
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings;
+        private SerializationManager serializationManager;
 
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
@@ -91,6 +93,7 @@ namespace Orleans.Storage
         {
             Name = name;
             serviceId = providerRuntime.ServiceId.ToString();
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 
             if (!config.Properties.ContainsKey(DataConnectionStringPropertyName) || string.IsNullOrWhiteSpace(config.Properties[DataConnectionStringPropertyName]))
                 throw new ArgumentException("DataConnectionString property not set");
@@ -111,7 +114,8 @@ namespace Orleans.Storage
             if (config.Properties.ContainsKey(UseJsonFormatPropertyName))
                 useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
 
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+            var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
@@ -267,7 +271,7 @@ namespace Orleans.Storage
             {
                 // Convert to binary format
 
-                byte[] data = SerializationManager.SerializeToByteArray(grainState);
+                byte[] data = this.serializationManager.SerializeToByteArray(grainState);
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -415,7 +419,7 @@ namespace Orleans.Storage
                 if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = SerializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {

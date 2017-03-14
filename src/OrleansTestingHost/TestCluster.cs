@@ -5,9 +5,11 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 
@@ -57,9 +59,19 @@ namespace Orleans.TestingHost
         public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
 
         /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient { get; private set; }
+
+        /// <summary>
+        /// The client.
+        /// </summary>
+        public IClusterClient Client => this.InternalClient;
+
+        /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        public IGrainFactory GrainFactory { get; private set; }
+        public IGrainFactory GrainFactory => this.Client;
 
         /// <summary>
         /// The client-side <see cref="StreamProviderManager"/>.
@@ -69,8 +81,18 @@ namespace Orleans.TestingHost
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        internal IInternalGrainFactory InternalGrainFactory { get; private set; }
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
+
+        /// <summary>
+        /// Client-side <see cref="IServiceProvider"/> to use in the tests.
+        /// </summary>
+        public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
         
+        /// <summary>
+        /// SerializationManager to use in the tests
+        /// </summary>
+        public SerializationManager SerializationManager { get; private set; }
+
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -298,9 +320,17 @@ namespace Orleans.TestingHost
         {
             try
             {
-                GrainClient.Uninitialize();
+                this.InternalClient?.Close().Wait();
             }
-            catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
+            catch (Exception exc)
+            {
+                WriteLog("Exception Uninitializing grain client: {0}", exc);
+            }
+            finally
+            {
+                this.InternalClient?.Dispose();
+                this.InternalClient = null;
+            }
 
             StopSilo(Primary);
         }
@@ -353,7 +383,7 @@ namespace Orleans.TestingHost
         /// </summary>
         public void KillClient()
         {
-            GrainClient.HardKill();
+            this.InternalClient?.Abort();
         }
 
         /// <summary>
@@ -412,10 +442,10 @@ namespace Orleans.TestingHost
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
 
-            GrainClient.Initialize(clientConfig);
-            this.GrainFactory = GrainClient.GrainFactory;
-            this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
-            this.StreamProviderManager = RuntimeClient.Current.CurrentStreamProviderManager;
+            this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(clientConfig).Build();
+            this.InternalClient.Connect().Wait();
+            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+            this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }
         
         private async Task InitializeAsync(IEnumerable<string> siloNames)
@@ -448,7 +478,7 @@ namespace Orleans.TestingHost
                 }
                 catch (Exception)
                 {
-                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception != null).Select(t => t.Result));
+                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
                     throw;
                 }
 

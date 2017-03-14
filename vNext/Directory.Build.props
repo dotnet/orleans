@@ -1,0 +1,33 @@
+<Project>
+  <PropertyGroup>
+    <VersionPrefix>2.0.0</VersionPrefix>
+    <VersionSuffix>preview2</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <IsPackable>false</IsPackable>
+
+    <Authors>Microsoft</Authors>
+    <Product>Microsoft Orleans</Product>
+    <Copyright>Copyright (c) Microsoft Corporation 2017</Copyright>
+    <LicenseUrl>https://github.com/dotnet/Orleans#license</LicenseUrl>
+    <ProjectUrl>https://github.com/dotnet/Orleans</ProjectUrl>
+    <IconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</IconUrl>
+    <Tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</Tags>
+    <ReleaseNotes></ReleaseNotes>
+    <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <!-- For Debug builds generated a date/time dependent version suffix -->
+  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Include="ShowFilesOutsideOfProject" />
+  </ItemGroup>
+</Project>

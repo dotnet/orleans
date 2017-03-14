@@ -45,8 +45,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
+    <Compile Include="ClientConnectionTests\ClientDisconnectionEventTests.cs" />
+    <Compile Include="ClientConnectionTests\GatewayConnectionTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
-    <Compile Include="EventSourcingTests\JournaledGrainTests.cs" />
+    <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
+    <Compile Include="EventSourcingTests\ChatGrainTests.cs" />
+    <Compile Include="EventSourcingTests\CountersGrainPerfTests.cs" />
+    <Compile Include="EventSourcingTests\CountersGrainTests.cs" />
+    <Compile Include="EventSourcingTests\EventSourcingClusterFixture.cs" />
+    <Compile Include="EventSourcingTests\PersonGrainTests.cs" />
     <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
@@ -135,6 +142,10 @@
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
       <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
       <Name>OrleansCodeGenerator</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj">
+      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
+      <Name>OrleansEventSourcing</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>

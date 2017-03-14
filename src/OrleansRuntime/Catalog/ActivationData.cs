@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
 
 namespace Orleans.Runtime
@@ -168,7 +169,8 @@ namespace Orleans.Runtime
             TimeSpan ageLimit,
             NodeConfiguration nodeConfiguration,
             TimeSpan maxWarningRequestProcessingTime,
-			TimeSpan maxRequestProcessingTime)
+			TimeSpan maxRequestProcessingTime,
+            IRuntimeClient runtimeClient)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
@@ -189,8 +191,8 @@ namespace Orleans.Runtime
             }
             CollectionAgeLimit = ageLimit;
 
-
-            GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
+            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
+            this.SchedulingContext = new SchedulingContext(this);
         }
 
         #region Method invocation
@@ -242,6 +244,8 @@ namespace Orleans.Runtime
         }
 
         #endregion
+
+        public ISchedulingContext SchedulingContext { get; }
 
         public string GrainTypeName
         {
@@ -317,12 +321,9 @@ namespace Orleans.Runtime
 
         public ActivationAddress Address { get; private set; }
 
-        public IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public void OnTimerCreated(IGrainTimer timer)
         {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, activationData: this);
             AddTimer(timer);
-            timer.Start();
-            return timer;
         }
 
         #endregion

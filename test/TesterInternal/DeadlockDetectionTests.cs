@@ -63,7 +63,7 @@ namespace UnitTests.General
                 catch (Exception exc)
                 {
                     Exception baseExc = exc.GetBaseException();
-                    this.logger.Info(baseExc.Message);
+                    this.fixture.Logger.Info(baseExc.Message);
                     Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
                     Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
@@ -93,7 +93,7 @@ namespace UnitTests.General
                 catch (Exception exc)
                 {
                     Exception baseExc = exc.GetBaseException();
-                    this.logger.Info(baseExc.Message);
+                    this.fixture.Logger.Info(baseExc.Message);
                     Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
                     Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
@@ -124,7 +124,7 @@ namespace UnitTests.General
                 catch (Exception exc)
                 {
                     Exception baseExc = exc.GetBaseException();
-                    this.logger.Info(baseExc.Message);
+                    this.fixture.Logger.Info(baseExc.Message);
                     Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
                     Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());

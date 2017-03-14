@@ -73,11 +73,12 @@ namespace UnitTests.TestHelper
         }
 
         /// <summary>Gets a detailed grain report from a specified silo</summary>
+        /// <param name="grainFactory">The grain factory.</param>
         /// <param name="grainId">The grain id we are requesting information from</param>
         /// <param name="siloHandle">The target silo that should provide this information from it's cache</param>
-        internal static Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId, SiloHandle siloHandle)
+        internal static Task<DetailedGrainReport> GetDetailedGrainReport(IInternalGrainFactory grainFactory, GrainId grainId, SiloHandle siloHandle)
         {
-            var siloControl = GrainClient.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.ProxyAddress);
+            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.ProxyAddress);
             return siloControl.GetDetailedGrainReport(grainId);
         }
     }

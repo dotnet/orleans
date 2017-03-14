@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using TesterInternal;
 using UnitTests;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
@@ -176,7 +177,7 @@ namespace AWSUtils.Tests.StorageTests
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
             var storage = new DynamoDBStorageProvider();
-            storage.InitLogger(logger);
+            storage.InitLogger(this.HostedCluster.Client.Logger);
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
@@ -202,7 +203,7 @@ namespace AWSUtils.Tests.StorageTests
             }
             var entity = new GrainStateRecord();
             var storage = new DynamoDBStorageProvider();
-            storage.InitLogger(logger);
+            storage.InitLogger(this.HostedCluster.Client.Logger);
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.NotNull(convertedState);

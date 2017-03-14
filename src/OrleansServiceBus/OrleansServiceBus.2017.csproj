@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
+    <Title>Microsoft Orleans ServiceBus Utilities</Title>
+    <Description>
+      Library of utility types for Microsoft Azure ServiceBus of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>OrleansServiceBus</AssemblyName>
+    <RootNamespace>OrleansServiceBus</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAzure.ConfigurationManager" Version="3.1.0" />
+    <PackageReference Include="WindowsAzure.ServiceBus" Version="3.3.2" />
+    <PackageReference Include="WindowsAzure.Storage" Version="7.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.2017.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.2017.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />
+  </ItemGroup>
+</Project>

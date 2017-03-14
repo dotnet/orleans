@@ -1,19 +1,22 @@
-﻿
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers
 {
     [Serializable]
-    internal class MemoryBatchContainer<TSerializer> : IBatchContainer
-        where TSerializer : IMemoryMessageBodySerializer, new()
+    internal class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
+        where TSerializer : class, IMemoryMessageBodySerializer
     {
+        [NonSerialized]
+        private TSerializer serializer;
+
         private readonly EventSequenceToken realToken;
+
         public Guid StreamGuid => MessageData.StreamGuid;
         public string StreamNamespace => MessageData.StreamNamespace;
         public StreamSequenceToken SequenceToken => realToken;
@@ -22,20 +25,15 @@ namespace Orleans.Providers
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized] private MemoryMessageBody payload;
-        [NonSerialized] private IMemoryMessageBodySerializer serializer;
-
+         
         private MemoryMessageBody Payload()
         {
-            if (serializer == null)
-            {
-                serializer = new TSerializer();
-            }
             return payload ?? (payload = serializer.Deserialize(MessageData.Payload));
         }
-
-        public MemoryBatchContainer(MemoryMessageData messageData)
+        
+        public MemoryBatchContainer(MemoryMessageData messageData, TSerializer serializer)
         {
-            serializer = new TSerializer();
+            this.serializer = serializer;
             MessageData = messageData;
             realToken = new EventSequenceToken(messageData.SequenceNumber);
         }
@@ -59,6 +57,11 @@ namespace Orleans.Providers
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
             return true;
+        }
+
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        {
+            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);
         }
     }
 }

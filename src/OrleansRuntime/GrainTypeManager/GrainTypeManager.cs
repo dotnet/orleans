@@ -21,7 +21,8 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
-        private static readonly object lockable = new object();
+        private readonly SerializationManager serializationManager;
+        private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
@@ -29,35 +30,24 @@ namespace Orleans.Runtime
             get { return grainInterfaceMapsBySilo; }
         }
 
-        public static GrainTypeManager Instance { get; private set; }
-
         public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData { get { return grainTypes; } }
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
-
-        public static void Stop()
-        {
-            Instance = null;
-        }
-
-        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
-            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy)
+        
+        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
+            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager, multiClusterRegistrationStrategyManager)
         {
         }
 
-        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
+        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
         {
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
+            this.serializationManager = serializationManager;
+            this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
-            lock (lockable)
-            {
-                if (Instance != null)
-                    throw new InvalidOperationException("An attempt to create a second insance of GrainTypeManager.");
-                Instance = this;
-            }
         }
 
         public void Start(bool strict = true)
@@ -67,7 +57,7 @@ namespace Orleans.Runtime
             // 2. We load those assemblies into memory. In the official distribution of Orleans, this is usually 4 assemblies.
 
             // (no more assemblies should be loaded into memory, so now is a good time to log all types registered with the serialization manager)
-            SerializationManager.LogRegisteredTypes();
+            this.serializationManager.LogRegisteredTypes();
 
             // 3. We scan types in memory for GrainTypeData objects that describe grain classes and their corresponding grain state classes.
             InitializeGrainClassData(loader, strict);
@@ -161,6 +151,7 @@ namespace Orleans.Runtime
         private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
         {
             grainTypes = loader.GetGrainClassTypes(strict);
+            LogManager.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
         private void InitializeInvokerMap(SiloAssemblyLoader loader, bool strict)
@@ -182,25 +173,17 @@ namespace Orleans.Runtime
 
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
-            var grainTypeInfo = grainClass.GetTypeInfo();
-            var grainClassCompleteName = TypeUtils.GetFullName(grainTypeInfo);
-            var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
-            var grainClassTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
             var placement = GrainTypeData.GetPlacementStrategy(grainClass, this.defaultPlacementStrategy);
-            var registrationStrategy = GrainTypeData.GetMultiClusterRegistrationStrategy(grainClass);
+            var registrationStrategy = this.multiClusterRegistrationStrategyManager.GetMultiClusterRegistrationStrategy(grainClass);
 
             foreach (var iface in grainInterfaces)
             {
-                var ifaceCompleteName = TypeUtils.GetFullName(iface);
-                var ifaceName = TypeUtils.GetRawClassName(ifaceCompleteName);
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
-                var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
-                grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName,
-                    grainTypeInfo.Assembly.CodeBase, isGenericGrainClass, placement, registrationStrategy, isPrimaryImplementor);
+                grainInterfaceMap.AddEntry(iface, grainClass, placement, registrationStrategy, isPrimaryImplementor);
             }
 
             if (isUnordered)
-                grainInterfaceMap.AddToUnorderedList(grainClassTypeCode);
+                grainInterfaceMap.AddToUnorderedList(grainClass);
         }
 
 

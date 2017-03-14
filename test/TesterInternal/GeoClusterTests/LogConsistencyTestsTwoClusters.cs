@@ -32,37 +32,37 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_SharedStateStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainSharedStateStorage", true, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainSharedStateStorage", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_SharedLogStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainSharedLogStorage", true, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainSharedLogStorage", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_GsiDefaultStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.GsiLogConsistentGrain", true, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.GsiLogTestGrain", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_MemoryStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainMemoryStorage", true, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainMemoryStorage", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_CustomStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainCustomStorage", true, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainCustomStorage", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_CustomStorageProvider_PrimaryCluster()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainCustomStoragePrimaryCluster", false, phases);
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainCustomStoragePrimaryCluster", false, phases);
         }
 
 

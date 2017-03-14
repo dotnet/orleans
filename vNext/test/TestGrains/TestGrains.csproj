@@ -1,20 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="..\..\..\test\TestGrains\**\*.cs" Exclude="..\..\..\test\TestGrains\GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;..\..\..\test\TestGrains\obj\**\*.cs;..\..\..\test\TestGrains\bin\**\*.cs;..\..\..\test\TestGrains\Properties\*.cs" />
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />

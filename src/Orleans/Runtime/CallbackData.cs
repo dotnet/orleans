@@ -16,12 +16,19 @@ namespace Orleans.Runtime
         TimeSpan RequestedTimeout();
     }
 
-    internal class CallbackData : ITimebound, IDisposable
+    internal interface CallbackData : ITimebound, IDisposable
     {
-        private readonly Action<Message, TaskCompletionSource<object>> callback;
+        void DoCallback(Message response);
+        Message Message { get; set; }
+        void OnTargetSiloFail();
+    }
+
+    internal class CallbackData<T> : CallbackData
+    {
+        private readonly Action<Message, TaskCompletionSource<T>> callback;
         private readonly Func<Message, bool> resendFunc;
         private readonly Action<Message> unregister;
-        private readonly TaskCompletionSource<object> context;
+        private readonly TaskCompletionSource<T> context;
         private readonly IMessagingConfiguration config;
 
         private bool alreadyFired;
@@ -33,9 +40,9 @@ namespace Orleans.Runtime
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
         public CallbackData(
-            Action<Message, TaskCompletionSource<object>> callback, 
+            Action<Message, TaskCompletionSource<T>> callback, 
             Func<Message, bool> resendFunc, 
-            TaskCompletionSource<object> ctx, 
+            TaskCompletionSource<T> ctx, 
             Message msg, 
             Action<Message> unregisterDelegate,
             IMessagingConfiguration config)
@@ -96,7 +103,7 @@ namespace Orleans.Runtime
             string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
-            var error = msg.CreatePromptExceptionResponse(new TimeoutException(errorMsg));
+            var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
         }
 
@@ -111,7 +118,7 @@ namespace Orleans.Runtime
                 $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
-            var error = msg.CreatePromptExceptionResponse(new SiloUnavailableException(errorMsg));
+            var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             OnFail(msg, error, "On silo fail - Resend {0} for {1}");
         }
 

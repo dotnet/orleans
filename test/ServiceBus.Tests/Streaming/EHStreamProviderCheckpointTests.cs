@@ -23,6 +23,7 @@ using Xunit;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(EventHubStreamProvider).FullName;
@@ -38,7 +39,7 @@ namespace ServiceBus.Tests.StreamingTests
                 EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.EventHubConnectionString,
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
                 EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
@@ -147,7 +148,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, List<Guid> streamGuids, int eventsInStream, int payloadSize)
         {
-            IStreamProvider streamProvider = GrainClient.GetStreamProvider(StreamProviderName);
+            IStreamProvider streamProvider = this.Client.GetStreamProvider(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers = streamGuids
                     .Select(streamGuid => streamProvider.GetStream<GeneratedEvent>(streamGuid, streamNamespace))
                     .ToArray();

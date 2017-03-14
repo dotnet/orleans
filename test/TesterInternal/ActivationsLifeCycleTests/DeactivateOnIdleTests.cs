@@ -17,6 +17,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     {
         private readonly ITestOutputHelper output;
         private TestCluster testCluster;
+        private Logger logger;
 
         public DeactivateOnIdleTests(ITestOutputHelper output)
         {
@@ -31,6 +32,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             testCluster = new TestCluster(options);
             testCluster.Deploy();
+            this.logger = testCluster.Client.Logger;
         }
         
         public void Dispose()
@@ -226,7 +228,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // Its activation is located on the non Gateway silo as well.
                 ICollectionTestGrain grain = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(i);
                 GrainId grainId = ((GrainReference)await grain.GetGrainReference()).GrainId;
-                SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(grainId, this.testCluster.Primary)).PrimaryForGrain;
+                SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(this.testCluster.InternalGrainFactory, grainId, this.testCluster.Primary)).PrimaryForGrain;
                 if (primaryForGrain.Equals(this.testCluster.Primary.SiloAddress))
                 {
                     continue;
@@ -287,7 +289,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             await MissingActivation_Runner(1, lazyDeregistrationDelay, true);
         }
 
-        private async Task MissingActivation_Runner(int grainId, TimeSpan lazyDeregistrationDelay, bool forceCreationInSecondary = false)
+        private async Task MissingActivation_Runner(
+            int grainId,
+            TimeSpan lazyDeregistrationDelay,
+            bool forceCreationInSecondary = false)
         {
             logger.Info("\n\n\n SMissingActivation_Runner.\n\n\n");
 
@@ -299,12 +304,15 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             if (!isMultipleSilosPresent && forceCreationInSecondary)
             {
-                throw new InvalidOperationException("If 'forceCreationInSecondary' is true multiple silos must be present, check the test!");
+                throw new InvalidOperationException(
+                          "If 'forceCreationInSecondary' is true multiple silos must be present, check the test!");
             }
 
             var grainSiloAddress = String.Empty;
             var primarySiloAddress = testCluster.Primary.SiloAddress.ToString();
-            var secondarySiloAddress = isMultipleSilosPresent ? testCluster.SecondarySilos[0].SiloAddress.ToString() : String.Empty;
+            var secondarySiloAddress = isMultipleSilosPresent
+                                           ? testCluster.SecondarySilos[0].SiloAddress.ToString()
+                                           : String.Empty;
 
             //
             // We only doing this for multiple silos.
@@ -353,23 +361,35 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
-            int primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grainReference);
+            int primaryActivation =
+                await
+                    this.testCluster.Client.GetTestHooks(testCluster.Primary)
+                        .UnregisterGrainForTesting(grainReference);
             int secondaryActivation = 0;
 
             if (isMultipleSilosPresent)
             {
-                secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grainReference);
+                secondaryActivation =
+                    await
+                        this.testCluster.Client.GetTestHooks(testCluster.SecondarySilos[0])
+                            .UnregisterGrainForTesting(grainReference);
             }
 
             Assert.Equal(1, primaryActivation + secondaryActivation);
 
             // If we try again, we shouldn't find any
-            primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grainReference);
+            primaryActivation =
+                await
+                    this.testCluster.Client.GetTestHooks(testCluster.Primary)
+                        .UnregisterGrainForTesting(grainReference);
             secondaryActivation = 0;
 
             if (isMultipleSilosPresent)
             {
-                secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grainReference);
+                secondaryActivation =
+                    await
+                        this.testCluster.Client.GetTestHooks(testCluster.SecondarySilos[0])
+                            .UnregisterGrainForTesting(grainReference);
             }
 
             Assert.Equal(0, primaryActivation + secondaryActivation);
@@ -403,17 +423,21 @@ namespace UnitTests.ActivationsLifeCycleTests
                 {
                     grainSiloAddress = await grain.GetRuntimeInstanceId();
 
-                    output.WriteLine(grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
-                    logger.Info(grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
+                    output.WriteLine(
+                        grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
+                    logger.Info(
+                        grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
                 }
             }
             else
             {
                 var secondEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
                 logger.Info("Got 2nd exception - " + secondEx.GetBaseException().Message);
-                Assert.True(secondEx.Message.Contains("duplicate activation") || secondEx.Message.Contains("Non-existent activation")
-                               || secondEx.Message.Contains("Forwarding failed"),
-                        "2nd exception message: " + secondEx);
+                Assert.True(
+                    secondEx.Message.Contains("duplicate activation")
+                    || secondEx.Message.Contains("Non-existent activation")
+                    || secondEx.Message.Contains("Forwarding failed"),
+                    "2nd exception message: " + secondEx);
                 logger.Info("Got 2nd exception, as expected.");
             }
         }

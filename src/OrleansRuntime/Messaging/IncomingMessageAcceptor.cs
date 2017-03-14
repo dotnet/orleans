@@ -1,20 +1,15 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Messaging;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAcceptor : AsynchAgent
     {
-        private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(CreateSocketReceiveAsyncEventArgsPoolWrapper);
+        private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;
         private const int SocketBufferSize = 1024 * 128; // 128 kb
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
@@ -22,11 +17,13 @@ namespace Orleans.Runtime.Messaging
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
+        protected readonly MessageFactory MessageFactory;
 
         private static readonly CounterStatistic allocatedSocketEventArgsCounter 
             = CounterStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_ALLOCATED_SOCKET_EVENT_ARGS, false);
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
+        private readonly SerializationManager serializationManager;
 
         public Action<Message> SniffIncomingMessage
         {
@@ -44,10 +41,13 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection)
+        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager)
         {
             MessageCenter = msgCtr;
             listenAddress = here;
+            this.MessageFactory = messageFactory;
+            this.receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(() => this.CreateSocketReceiveAsyncEventArgsPoolWrapper());
+            this.serializationManager = serializationManager;
             if (here == null)
                 listenAddress = MessageCenter.MyAddress.Endpoint;
 
@@ -401,7 +401,7 @@ namespace Orleans.Runtime.Messaging
             return saea.SocketAsyncEventArgs;
         }
 
-        private static SaeaPoolWrapper CreateSocketReceiveAsyncEventArgsPoolWrapper()
+        private SaeaPoolWrapper CreateSocketReceiveAsyncEventArgsPoolWrapper()
         {
             SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs();
             readEventArgs.Completed += OnReceiveCompleted;
@@ -413,7 +413,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -505,14 +505,14 @@ namespace Orleans.Runtime.Messaging
                 if (!msg.TargetSilo.Equals(MessageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable,
+                    Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                         $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {MessageCenter.MyAddress.ToLongString()}. " +
                         $"The rejected ping message is {msg}.");
                     MessageCenter.OutboundQueue.SendMessage(rejection);
                 }
                 else
                 {
-                    var response = msg.CreateResponseMessage();
+                    var response = this.MessageFactory.CreateResponseMessage(msg);
                     response.BodyObject = Response.Done;
                     MessageCenter.SendMessage(response);
                 }
@@ -537,7 +537,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request) return;
 
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                var reject = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                var reject = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
                 MessageCenter.SendMessage(reject);
                 return;
             }
@@ -567,7 +567,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.Direction == Message.Directions.Request)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Transient,
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
                     string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
                         msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
                 MessageCenter.OutboundQueue.SendMessage(rejection);
@@ -601,8 +601,10 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
+            private readonly MessageFactory messageFactory;
             private readonly IncomingMessageBuffer _buffer;
             private Socket socket;
+
             public Socket Socket {
                 get { return socket; }
                 internal set
@@ -615,10 +617,11 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper)
+            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager)
             {
+                this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;
-                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime));
+                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime), serializationManager);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)
@@ -664,7 +667,7 @@ namespace Orleans.Runtime.Messaging
                             // The message body was not successfully decoded, but the headers were.
                             // Send a fast fail to the caller.
                             MessagingStatisticsGroup.OnRejectedMessage(msg);
-                            var response = msg.CreateResponseMessage();
+                            var response = this.messageFactory.CreateResponseMessage(msg);
                             response.Result = Message.ResponseTypes.Error;
                             response.BodyObject = Response.ExceptionResponse(exception);
                             

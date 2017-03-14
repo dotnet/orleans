@@ -17,6 +17,7 @@ namespace Orleans.Providers
         /// <param name="body"></param>
         /// <returns></returns>
         ArraySegment<byte> Serialize(MemoryMessageBody body);
+
         /// <summary>
         /// Deserialize an array segment into a MemoryMessageBody
         /// </summary>
@@ -29,26 +30,35 @@ namespace Orleans.Providers
     /// Default IMemoryMessageBodySerializer
     /// </summary>
     [Serializable]
-    public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer
+    public class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
     {
-        /// <summary>
-        /// Serialize MemoryMessageBody to an array segment of bytes.
-        /// </summary>
-        /// <param name="body"></param>
-        /// <returns></returns>
-        public ArraySegment<byte> Serialize(MemoryMessageBody body)
-        {
-            return new ArraySegment<byte>(SerializationManager.SerializeToByteArray(body));
-        }
+        [NonSerialized]
+        private SerializationManager serializationManager;
 
         /// <summary>
-        /// Deserialize an array segment into a MemoryMessageBody
+        /// Initializes a new instance of the <see cref="DefaultMemoryMessageBodySerializer"/> class.
         /// </summary>
-        /// <param name="bodyBytes"></param>
-        /// <returns></returns>
+        /// <param name="serializationManager"></param>
+        public DefaultMemoryMessageBodySerializer(SerializationManager serializationManager)
+        {
+            this.serializationManager = serializationManager;
+        }
+
+        /// <inheritdoc />
+        public ArraySegment<byte> Serialize(MemoryMessageBody body)
+        {
+            return new ArraySegment<byte>(serializationManager.SerializeToByteArray(body));
+        }
+
+        /// <inheritdoc />
         public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
         {
-            return SerializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
+            return serializationManager.DeserializeFromByteArray<MemoryMessageBody>(bodyBytes.ToArray());
+        }
+
+        void IOnDeserialized.OnDeserialized(ISerializerContext context)
+        {
+            this.serializationManager = context.SerializationManager;
         }
     }
 
@@ -74,6 +84,7 @@ namespace Orleans.Providers
         /// Events in message
         /// </summary>
         public List<object> Events { get; }
+
         /// <summary>
         /// Message context
         /// </summary>

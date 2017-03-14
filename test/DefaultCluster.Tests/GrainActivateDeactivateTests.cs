@@ -269,7 +269,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
             catch(Exception exc)
             {
-                logger.Info("Thrown as expected:", exc);
+                this.Logger.Info("Thrown as expected:", exc);
                 Exception e = exc.GetBaseException();
                 Assert.True(e.Message.Contains("Forwarding failed"),
                         "Did not get expected exception message returned: " + e.Message);

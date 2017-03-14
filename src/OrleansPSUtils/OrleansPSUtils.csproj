@@ -10,8 +10,7 @@
       <Reference Include="System.Core" />
       <Using Namespace="System" />
       <Using Namespace="System.IO" />
-      <Code Type="Fragment" Language="cs">
-                  <![CDATA[
+      <Code Type="Fragment" Language="cs"><![CDATA[
                 var version = File.ReadAllText(InputFilename)                                    
                                     .Replace("\r\n", "")
                                     .Replace("\n", "")
@@ -73,6 +72,7 @@
     </Compile>
     <Compile Include="GetGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SessionHelper.cs" />
     <Compile Include="StartGrainClient.cs" />
     <Compile Include="StopGrainClient.cs" />
   </ItemGroup>
@@ -97,7 +97,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
-  </ItemGroup>   
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
@@ -107,6 +107,6 @@
   </Target>
   -->
   <Target Name="AfterBuild">
-        <UpdateVersion InputFilename="$(SolutionDir)Build\Version.txt" OutputFilename="$(OutDir)Orleans.psd1" />
+    <UpdateVersion InputFilename="$(SolutionDir)Build\Version.txt" OutputFilename="$(OutDir)Orleans.psd1" />
   </Target>
 </Project>

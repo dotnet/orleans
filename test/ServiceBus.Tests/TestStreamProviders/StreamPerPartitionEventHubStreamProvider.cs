@@ -1,14 +1,22 @@
 ﻿
 using System;
 using System.Text;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
+using TestExtensions;
+using Xunit;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class StreamPerPartitionEventHubStreamProvider : PersistentStreamProvider<StreamPerPartitionEventHubStreamProvider.AdapterFactory>
     {
         public class AdapterFactory : EventHubAdapterFactory
@@ -27,7 +35,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
                     timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 }
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.SerializationManager);
                 return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, log);
             }
         }
@@ -36,8 +44,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             private readonly Guid partitionStreamGuid;
 
-            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
-                : base(bufferPool, timePurge)
+            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
+                : base(serializationManager, bufferPool, timePurge)
             {
                 partitionStreamGuid = GetPartitionGuid(partitionKey);
             }
@@ -45,7 +53,12 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             public override StreamPosition GetStreamPosition(EventData queueMessage)
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
-                StreamSequenceToken token = new EventSequenceTokenV2(queueMessage.SequenceNumber, 0);
+                StreamSequenceToken token =
+#if NETSTANDARD
+                new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
+#else
+                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
+#endif
                 return new StreamPosition(stremIdentity, token);
             }
         }

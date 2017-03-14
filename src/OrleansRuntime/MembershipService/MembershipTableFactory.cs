@@ -36,20 +36,22 @@ namespace Orleans.Runtime.MembershipService
                         result = await this.GetMembershipTableGrain();
                         break;
                     case LivenessProviderType.SqlServer:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger);
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
                         break;
                     case LivenessProviderType.AzureTable:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger);
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
                         break;
                     case LivenessProviderType.ZooKeeper:
                         result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
                             Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
-                            this.logger);
+                            this.logger,
+                            this.serviceProvider);
                         break;
                     case LivenessProviderType.Custom:
                         result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
                             globalConfig.MembershipTableAssembly,
-                            this.logger);
+                            this.logger,
+                            this.serviceProvider);
                         break;
                     default:
                         throw new NotImplementedException(
@@ -77,7 +79,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-            var result = grainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+            var result = grainFactory.GetGrain<IMembershipTableGrain>(Constants.SystemMembershipTableId);
 
             if (isPrimarySilo)
             {

@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -16,7 +17,7 @@ namespace AWSUtils.Tests.MembershipTests
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")] 
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture) : base(fixture)
+        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride("DynamoDBDataManager", Severity.Verbose3);
             LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
@@ -36,9 +37,9 @@ namespace AWSUtils.Tests.MembershipTests
             return new DynamoDBGatewayListProvider();
         }
 
-        protected override string GetConnectionString()
+        protected override Task<string> GetConnectionString()
         {
-            return "Service=http://localhost:8000;";
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? "Service=http://localhost:8000;" : null);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -81,6 +82,12 @@ namespace AWSUtils.Tests.MembershipTests
         public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);
+        }
+
+        [SkippableFact]
+        public async Task MembershipTable_DynamoDB_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive(false);
         }
     }
 }

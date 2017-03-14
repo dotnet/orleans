@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.CodeGeneration
 {
     using System;
@@ -9,7 +11,7 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// Methods for invoking code generation.
     /// </summary>
-    internal static class CodeGeneratorManager
+    internal class CodeGeneratorManager
     {
         /// <summary>
         /// The name of the code generator assembly.
@@ -30,20 +32,27 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// The runtime code generator.
         /// </summary>
-        private static IRuntimeCodeGenerator codeGeneratorInstance;
+        private IRuntimeCodeGenerator codeGeneratorInstance;
 
         /// <summary>
         /// The code generator cache.
         /// </summary>
         private static ICodeGeneratorCache codeGeneratorCacheInstance;
 
+        private readonly IServiceProvider serviceProvider;
+
+        public CodeGeneratorManager(IServiceProvider serviceProvider)
+        {
+            this.serviceProvider = serviceProvider;
+        }
+
         /// <summary>
         /// Loads the code generator on demand
         /// </summary>
-        public static void Initialize()
+        public void Initialize()
         {
-            codeGeneratorInstance = LoadCodeGenerator();
-            codeGeneratorCacheInstance = codeGeneratorInstance as ICodeGeneratorCache;
+            this.codeGeneratorInstance = this.serviceProvider.GetService<IRuntimeCodeGenerator>() ?? this.LoadCodeGenerator();
+            codeGeneratorCacheInstance = this.codeGeneratorInstance as ICodeGeneratorCache;
         }
 
         /// <summary>
@@ -52,7 +61,7 @@ namespace Orleans.CodeGeneration
         /// <param name="input">
         /// The input assembly.
         /// </param>
-        public static GeneratedAssembly GenerateAndCacheCodeForAssembly(Assembly input)
+        public GeneratedAssembly GenerateAndCacheCodeForAssembly(Assembly input)
         {
             return codeGeneratorInstance?.GenerateAndLoadForAssembly(input);
         }
@@ -61,7 +70,7 @@ namespace Orleans.CodeGeneration
         /// Ensures code for all currently loaded assemblies has been generated and loaded.
         /// </summary>
         /// <param name="inputs">The assemblies to generate code for.</param>
-        public static IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(Assembly[] inputs)
+        public IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(Assembly[] inputs)
         {
             return codeGeneratorInstance?.GenerateAndLoadForAssemblies(inputs);
         }
@@ -107,12 +116,12 @@ namespace Orleans.CodeGeneration
         /// Loads the code generator.
         /// </summary>
         /// <returns>The code generator.</returns>
-        private static IRuntimeCodeGenerator LoadCodeGenerator()
+        private IRuntimeCodeGenerator LoadCodeGenerator()
         {
-            IRuntimeCodeGenerator result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log);
+            IRuntimeCodeGenerator result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log, this.serviceProvider);
             if (result == null)
             {
-                Log.Warn(
+                Log.Info(
                     ErrorCode.CodeGenDllMissing,
                     "Code generator assembly (" + CodeGenAssemblyName + ".dll) not present.");
             }

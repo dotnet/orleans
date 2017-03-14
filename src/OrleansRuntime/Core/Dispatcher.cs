@@ -22,6 +22,7 @@ namespace Orleans.Runtime
         private readonly ClusterConfiguration config;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly MessageFactory messagefactory;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -33,7 +34,8 @@ namespace Orleans.Runtime
             Catalog catalog, 
             ClusterConfiguration config,
             PlacementDirectorsManager placementDirectorsManager,
-            ILocalGrainDirectory localGrainDirectory)
+            ILocalGrainDirectory localGrainDirectory,
+            MessageFactory messagefactory)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -41,6 +43,7 @@ namespace Orleans.Runtime
             this.config = config;
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
+            this.messagefactory = messagefactory;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -205,7 +208,7 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = message.CreateRejectionResponse(rejectType, str, exc as OrleansException);
+                Message rejection = this.messagefactory.CreateRejectionResponse(message, rejectType, str, exc as OrleansException);
                 SendRejectionMessage(rejection);
             }
             else
@@ -244,7 +247,7 @@ namespace Orleans.Runtime
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 if (Transport.TryDeliverToProxy(message)) return;
 
-                RuntimeClient.Current.ReceiveResponse(message);
+               this.catalog.RuntimeClient.ReceiveResponse(message);
             }
         }
 
@@ -375,10 +378,9 @@ namespace Orleans.Runtime
 
                 // Now we can actually scheduler processing of this request
                 targetActivation.RecordRunning(message);
-                var context = new SchedulingContext(targetActivation);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context, this), context);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this), targetActivation.SchedulingContext);
             }
         }
 
@@ -499,7 +501,7 @@ namespace Orleans.Runtime
                     message.AddToCacheInvalidationHeader(oldAddress);
                 }
 
-                forwardingSucceded = InsideRuntimeClient.Current.TryForwardMessage(message, forwardingAddress);
+                forwardingSucceded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
             {
@@ -515,6 +517,59 @@ namespace Orleans.Runtime
                     logger.Warn(ErrorCode.Messaging_Dispatcher_TryForwardFailed, str, exc);
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Reroute a message coming in through a gateway
+        /// </summary>
+        /// <param name="message"></param>
+        internal void RerouteMessage(Message message)
+        {
+            ResendMessageImpl(message);
+        }
+
+        internal bool TryResendMessage(Message message)
+        {
+            if (!message.MayResend(this.config.Globals)) return false;
+
+            message.ResendCount = message.ResendCount + 1;
+            MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
+            ResendMessageImpl(message);
+            return true;
+        }
+
+        internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
+        {
+            if (!message.MayForward(this.config.Globals)) return false;
+
+            message.ForwardCount = message.ForwardCount + 1;
+            MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);
+            ResendMessageImpl(message, forwardingAddress);
+            return true;
+        }
+
+        private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
+        {
+            if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
+            message.TargetHistory = message.GetTargetHistory();
+
+            if (message.TargetGrain.IsSystemTarget)
+            {
+                this.SendSystemTargetMessage(message);
+            }
+            else if (forwardingAddress != null)
+            {
+                message.TargetAddress = forwardingAddress;
+                message.IsNewPlacement = false;
+                this.Transport.SendMessage(message);
+            }
+            else
+            {
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
+                this.SendMessage(message);
             }
         }
 
@@ -602,7 +657,7 @@ namespace Orleans.Runtime
         internal void SendResponse(Message request, Response response)
         {
             // create the response
-            var message = request.CreateResponseMessage();
+            var message = this.messagefactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
             if (message.TargetGrain.IsSystemTarget)

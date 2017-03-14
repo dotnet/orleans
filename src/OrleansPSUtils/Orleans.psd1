@@ -6,7 +6,7 @@
 	CompanyName = 'Microsoft'
 	Copyright = 'Copyright Microsoft 2016'
 	Description = 'Orleans Client Powershell module'
-	PowerShellVersion = '3.0'
+	PowerShellVersion = '5.0'
 	CLRVersion = '4.0'
 	FunctionsToExport = '*'
 	VariablesToExport = '*'

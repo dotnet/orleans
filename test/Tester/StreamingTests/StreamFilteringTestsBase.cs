@@ -17,8 +17,8 @@ namespace Tester.StreamingTests
         private readonly BaseTestClusterFixture fixture;
         protected Guid StreamId;
         protected string StreamNamespace;
+        private readonly Logger logger;
         protected string streamProviderName;
-
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
 
         protected StreamFilteringTestsBase(BaseTestClusterFixture fixture)
@@ -26,6 +26,7 @@ namespace Tester.StreamingTests
             this.fixture = fixture;
             StreamId = Guid.NewGuid();
             StreamNamespace = Guid.NewGuid().ToString();
+            this.logger = this.fixture.Logger;
         }
 
         // Test support functions

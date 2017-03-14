@@ -52,7 +52,7 @@
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
-    <Compile Include="HostedTestClusterBase.cs" />
+    <Compile Include="GrainStateContainingGrainReferences.cs" />
     <Compile Include="MembershipTests\ClientIdPartitionDataRebuildTests.cs" />
     <Compile Include="StorageTests\CommonStorageTests.cs" />
     <Compile Include="StorageTests\CommonStorageUtilities.cs" />
@@ -80,7 +80,7 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
-    <Compile Include="GeoClusterTests\BasicLogConsistentGrainTests.cs" />
+    <Compile Include="GeoClusterTests\BasicLogTestGrainTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
@@ -119,7 +119,6 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
-    <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />

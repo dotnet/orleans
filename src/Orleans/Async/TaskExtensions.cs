@@ -39,11 +39,48 @@ namespace Orleans
             }
         }
 
-        /// <summary>
-        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
-        /// </summary>
-        /// <param name="task">The task.</param>
-        public static Task<object> Box(this Task task)
+	    public static void ContinueWithOptimized(
+			this Task task,
+			Action onSuccess,
+			Action onException = null, //<Exception> no exception passing for now
+			Action onCancel = null)
+	    {
+			switch (task.Status)
+			{
+				case TaskStatus.RanToCompletion:
+					onSuccess();
+					return ;
+
+				case TaskStatus.Faulted:
+					onException?.Invoke(); //task.Exception
+					return;
+
+				case TaskStatus.Canceled:
+					onCancel?.Invoke();
+					return ;
+
+				default:
+					Continue(task, onSuccess, onException, onCancel);
+					return;
+			}
+		}
+	
+		private static void Continue(Task task,
+			Action onSuccess,
+			Action onException = null,
+			Action onCancel = null)
+		{
+			task.ContinueWith(task1 =>
+			{
+				ContinueWithOptimized(task1, onSuccess, onException, onCancel);
+			});
+		}
+
+		/// <summary>
+		/// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
+		/// </summary>
+		/// <param name="task">The task.</param>
+		public static Task<object> Box(this Task task)
         {
             switch (task.Status)
             {

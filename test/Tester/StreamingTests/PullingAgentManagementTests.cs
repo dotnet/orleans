@@ -35,7 +35,9 @@ namespace UnitTests.StreamingTests
         }
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+#pragma warning disable 618
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+#pragma warning restore 618
 
         public PullingAgentManagementTests(Fixture fixture)
         {
@@ -79,7 +81,7 @@ namespace UnitTests.StreamingTests
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
             if (expectedState == PersistentStreamProviderState.AgentsStarted)
             {
-                Assert.Equal(AzureQueueAdapterFactory.NumQueuesDefaultValue, totalNumAgents);
+                Assert.Equal(AzureQueueAdapterConstants.NumQueuesDefaultValue, totalNumAgents);
             }
             else
             {

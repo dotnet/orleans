@@ -18,7 +18,6 @@ namespace DefaultCluster.Tests
     public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
-        private readonly Logger Logger = LogManager.GetLogger("AssemblyLoaderTests", Orleans.Runtime.LoggerType.Application);
         private readonly ITestOutputHelper output;
 
         public ErrorGrainTest(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)

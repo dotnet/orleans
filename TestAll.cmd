@@ -13,14 +13,14 @@ set exitcode=%errorlevel%
 GOTO END
 
 :VNEXT
-cmd /c "%~dp0vNext\src\TestAll.cmd"
+cmd /c "%~dp0vNext\TestAll.cmd"
 set exitcode=%errorlevel%
 GOTO END
 
 :ALL
 cmd /c "%~dp0src\TestAll.cmd"
 set exitcode=%errorlevel%
-cmd /c "%~dp0vNext\src\TestAll.cmd"
+cmd /c "%~dp0vNext\TestAll.cmd"
 set /a exitcode=%errorlevel%+%exitcode%
 
 :END

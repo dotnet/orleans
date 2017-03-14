@@ -52,6 +52,7 @@
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterFactory.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterReceiver.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubBatchContainer.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubConstants.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubDataAdapter.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubCheckpointer.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubPartitionCheckpointEntity.cs" />

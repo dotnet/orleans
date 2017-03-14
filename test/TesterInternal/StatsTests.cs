@@ -12,7 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using System.Collections;
-using Orleans.Providers.SqlServer;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Stats
 {
@@ -54,13 +54,13 @@ namespace UnitTests.Stats
         {
             ClientConfiguration config = this.HostedCluster.ClientConfiguration;
 
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics);
+            var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
+            Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
             Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
+            Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 
             // Check we got some stats & metrics callbacks on both client and server.
             var siloStatsCollector = this.fixture.GrainFactory.GetGrain<IStatsCollectorGrain>(0);

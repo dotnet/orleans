@@ -63,10 +63,12 @@ namespace Orleans.AzureUtils
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private StatsTableDataManager()
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatsTableDataManager"/> class.
+        /// </summary>
+        public StatsTableDataManager()
         {
             logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
-            
         }
 
         async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)

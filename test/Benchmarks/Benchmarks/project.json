@@ -1,0 +1,15 @@
+﻿{
+  "dependencies": {
+    "BenchmarkDotNet": "0.9.9",
+    "BenchmarkDotNet.Diagnostics.Windows": "0.9.9",
+    "BenchmarkDotNet.Toolchains.Roslyn": "0.9.9",
+    "xunit.extensibility.core": "2.1.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}
