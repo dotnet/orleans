@@ -92,26 +92,26 @@ namespace Orleans.Runtime
 
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
-        #region Implementation of IRuntimeClient
+		#region Implementation of IRuntimeClient
 
-        public void SendRequest(
-            GrainReference target,
-            InvokeMethodRequest request,
-            TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
-            string debugContext,
-            InvokeMethodOptions options,
-            string genericArguments = null)
-        {
+		public void SendRequest<T>(
+			GrainReference target,
+			InvokeMethodRequest request,
+			TaskCompletionSource<T> context,
+			Action<Message, TaskCompletionSource<T>> callback,
+			string debugContext,
+			InvokeMethodOptions options,
+			string genericArguments = null)
+		{
             var message = this.messageFactory.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 
-        private void SendRequestMessage(
+        private void SendRequestMessage<T>(
             GrainReference target,
             Message message,
-            TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
+            TaskCompletionSource<T> context,
+            Action<Message, TaskCompletionSource<T>> callback,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
@@ -181,7 +181,7 @@ namespace Orleans.Runtime
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(
+                var callbackData = new CallbackData<T>(
                     callback,
                     tryResendMessage,
                     context,
