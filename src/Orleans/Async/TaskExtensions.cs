@@ -42,7 +42,7 @@ namespace Orleans
 	    public static void ContinueWithOptimized(
 			this Task task,
 			Action onSuccess,
-			Action<Exception> onException= null,
+			Action onException = null, //<Exception> no exception passing for now
 			Action onCancel = null)
 	    {
 			switch (task.Status)
@@ -52,7 +52,7 @@ namespace Orleans
 					return ;
 
 				case TaskStatus.Faulted:
-					onException?.Invoke(task.Exception);
+					onException?.Invoke(); //task.Exception
 					return;
 
 				case TaskStatus.Canceled:
@@ -67,7 +67,7 @@ namespace Orleans
 	
 		private static void Continue(Task task,
 			Action onSuccess,
-			Action<Exception> onException = null,
+			Action onException = null,
 			Action onCancel = null)
 		{
 			task.ContinueWith(task1 =>
