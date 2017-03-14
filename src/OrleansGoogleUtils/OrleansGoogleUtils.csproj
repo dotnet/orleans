@@ -58,10 +58,6 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
-      <Name>OrleansRuntime</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>

@@ -1,15 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<VSTemplate Version="3.0.0" Type="Item" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:sdk="http://schemas.microsoft.com/developer/vstemplate-sdkextension/2010">
+<VSTemplate Version="3.0.0" Type="Item" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
   <TemplateData>
     <Name>Orleans Grain Class</Name>
     <Description>An empty Orleans grain class</Description>
-    <Icon>Orleans.ico</Icon>
-    <TemplateID>37320fcc-3ef4-4945-b4ca-cc489e3c7667</TemplateID>
-    <SortOrder>1000</SortOrder>
-    <DefaultName>MyGrain.vb</DefaultName>
+    <Icon>GrainImplementationVB.ico</Icon>
     <ProjectType>VisualBasic</ProjectType>
+    <TemplateID>37320fcc-3ef4-4945-b4ca-cc489e3c7667</TemplateID>
     <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
+    <DefaultName>MyGrain.vb</DefaultName>
   </TemplateData>
   <TemplateContent>
     <References>

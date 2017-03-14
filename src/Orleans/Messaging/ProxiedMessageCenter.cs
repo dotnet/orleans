@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Messaging
 {
@@ -59,6 +60,8 @@ namespace Orleans.Messaging
     // </summary>
     internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
+        internal readonly SerializationManager SerializationManager;
+
         #region Constants
 
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
@@ -66,6 +69,7 @@ namespace Orleans.Messaging
 
         #endregion
         internal GrainId ClientId { get; private set; }
+        public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
@@ -84,12 +88,28 @@ namespace Orleans.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         public ManualResetEvent Completion { get; }
         private readonly QueueTrackingStatistic queueTracking;
+        private int numberOfConnectedGateways = 0;
+        private readonly MessageFactory messageFactory;
+        private readonly IClusterConnectionStatusListener connectionStatusListener;
 
-        public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
+        public ProxiedMessageCenter(
+            ClientConfiguration config,
+            IPAddress localAddress,
+            int gen,
+            GrainId clientId,
+            IGatewayListProvider gatewayListProvider,
+            SerializationManager serializationManager,
+            IRuntimeClient runtimeClient,
+            MessageFactory messageFactory,
+            IClusterConnectionStatusListener connectionStatusListener)
         {
+            this.SerializationManager = serializationManager;
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
+            this.RuntimeClient = runtimeClient;
+            this.messageFactory = messageFactory;
+            this.connectionStatusListener = connectionStatusListener;
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
@@ -99,7 +119,9 @@ namespace Orleans.Messaging
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
             logger = LogManager.GetLogger("Messaging.ProxiedMessageCenter", LoggerType.Runtime);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
-            IntValueStatistic.FindOrCreate(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, () =>
+            IntValueStatistic.FindOrCreate(
+                StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
+                () =>
                 {
                     lock (gatewayConnections)
                     {
@@ -161,7 +183,7 @@ namespace Orleans.Messaging
                 {
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
@@ -192,7 +214,7 @@ namespace Orleans.Messaging
                     Uri addr = gatewayNames[msgNumber % numGateways];
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
@@ -228,7 +250,7 @@ namespace Orleans.Messaging
                         if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
-                            gatewayConnection = new GatewayConnection(addr, this);
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
                             gatewayConnections[addr] = gatewayConnection;
                             if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));
@@ -280,13 +302,13 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
+        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
@@ -367,7 +389,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
                 QueueIncomingMessage(error);
             }
         }
@@ -377,7 +399,10 @@ namespace Orleans.Messaging
         /// </summary>
         public void Disconnect()
         {
-            throw new NotImplementedException("Disconnect");
+            foreach (var connection in gatewayConnections.Values)
+            {
+                connection.Stop();
+            }
         }
 
         /// <summary>
@@ -402,7 +427,7 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private IClusterTypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
+        private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
             return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
         }
@@ -428,6 +453,19 @@ namespace Orleans.Messaging
                 throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
 
             ClientId = clientId;
+        }
+
+        internal void OnGatewayConnectionOpen()
+        {
+            Interlocked.Increment(ref numberOfConnectedGateways);
+        }
+
+        internal void OnGatewayConnectionClosed()
+        {
+            if (Interlocked.Decrement(ref numberOfConnectedGateways) == 0)
+            {
+                this.connectionStatusListener.NotifyClusterConnectionLost();
+            }
         }
 
         public void Dispose()

@@ -11,6 +11,7 @@ using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
 using OrleansAWSUtils;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using OrleansAWSUtils.Storage;
 
 namespace Orleans.Storage
@@ -60,6 +61,7 @@ namespace Orleans.Storage
         public Logger Log { get; private set; }
 
         private DynamoDBStorage storage;
+        private SerializationManager serializationManager;
 
         /// <summary>
         /// Default Constructor
@@ -76,6 +78,7 @@ namespace Orleans.Storage
         {
             Name = name;
             serviceId = providerRuntime.ServiceId.ToString();
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 
             if (config.Properties.ContainsKey(TABLE_NAME_PROPERTY_NAME))
                 tableName = config.Properties[TABLE_NAME_PROPERTY_NAME];
@@ -91,7 +94,8 @@ namespace Orleans.Storage
             if (config.Properties.ContainsKey(USE_JSON_FORMAT_PROPERTY_NAME))
                 useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
 
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
+            var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
 
             initMsg = string.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
@@ -312,7 +316,7 @@ namespace Orleans.Storage
                 if (binaryData?.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = SerializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
@@ -359,7 +363,7 @@ namespace Orleans.Storage
             else
             {
                 // Convert to binary format
-                entity.BinaryState = SerializationManager.SerializeToByteArray(grainState);
+                entity.BinaryState = this.serializationManager.SerializeToByteArray(grainState);
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",

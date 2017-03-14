@@ -99,7 +99,10 @@ namespace Orleans.Storage
 #if !NETSTANDARD
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
-        { }
+        {
+            this.StoredEtag = info.GetString("StoredEtag");
+            this.CurrentEtag = info.GetString("CurrentEtag");
+        }
 #endif
 
         public InconsistentStateException(
@@ -134,6 +137,10 @@ namespace Orleans.Storage
 #if !NETSTANDARD
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            if (info == null) throw new ArgumentNullException(nameof(info));
+
+            info.AddValue("StoredEtag", this.StoredEtag);
+            info.AddValue("CurrentEtag", this.CurrentEtag);
             base.GetObjectData(info, context);
         }
 #endif

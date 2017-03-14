@@ -8,9 +8,14 @@ namespace Orleans.Runtime.ReminderService
 {
     internal class AzureBasedReminderTable : IReminderTable
     {
+        private readonly IGrainReferenceConverter grainReferenceConverter;
         private Logger logger;
         private RemindersTableManager remTableManager;
 
+        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        {
+            this.grainReferenceConverter = grainReferenceConverter;
+        }
 
         public async Task Init(GlobalConfiguration config, Logger logger)
         {
@@ -44,7 +49,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return new ReminderEntry
                 {
-                    GrainRef = GrainReference.FromKeyString(tableEntry.GrainReference),
+                    GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(tableEntry.GrainReference),
                     ReminderName = tableEntry.ReminderName,
                     StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
                     Period = TimeSpan.Parse(tableEntry.Period),

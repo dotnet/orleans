@@ -9,29 +9,38 @@ namespace Orleans.Messaging
 {
     internal class GatewayProviderFactory
     {
-        private static readonly Logger logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
+        private readonly ClientConfiguration cfg;
+        private readonly IServiceProvider serviceProvider;
+        private readonly Logger logger;
 
-        internal static async Task<IGatewayListProvider> CreateGatewayListProvider(ClientConfiguration cfg)
+        public GatewayProviderFactory(ClientConfiguration cfg, IServiceProvider serviceProvider)
         {
-            IGatewayListProvider listProvider = null;
-            ClientConfiguration.GatewayProviderType gatewayProviderToUse = cfg.GatewayProviderToUse;
+            this.cfg = cfg;
+            this.serviceProvider = serviceProvider;
+            this.logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
+        }
 
+        internal IGatewayListProvider CreateGatewayListProvider()
+        {
+            IGatewayListProvider listProvider;
+            ClientConfiguration.GatewayProviderType gatewayProviderToUse = cfg.GatewayProviderToUse;
+            
             switch (gatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_SQL_UTILS_DLL, logger, this.serviceProvider);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Custom:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(cfg.CustomGatewayProviderAssemblyName, logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(cfg.CustomGatewayProviderAssemblyName, logger, this.serviceProvider);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger, this.serviceProvider);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:
@@ -42,7 +51,6 @@ namespace Orleans.Messaging
                     throw new NotImplementedException(gatewayProviderToUse.ToString());
             }
 
-            await listProvider.InitializeGatewayListProvider(cfg, LogManager.GetLogger(listProvider.GetType().Name));
             return listProvider;
         }
     }

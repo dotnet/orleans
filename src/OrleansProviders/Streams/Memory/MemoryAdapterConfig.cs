@@ -24,7 +24,6 @@ namespace Orleans.Providers
         /// Total queue count default value.
         /// </summary>
         private const int TotalQueueCountDefault = 4;
-        private static int cacheSizeMbDefault = 10;
 
         /// <summary>
         /// Actual total queue count.
@@ -34,7 +33,7 @@ namespace Orleans.Providers
         /// <summary>
         /// Cache size of FixedSizeObjectPool measured in Mb
         /// </summary>
-        public int CacheSizeMb { get; set; } = cacheSizeMbDefault;
+        public int CacheSizeMb { get; set; } = 10;
 
         /// <summary>
         /// Constructor

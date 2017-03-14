@@ -24,9 +24,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansZooKeeperUtils.XML" target="lib\net451" />
     <file src="OrleansZooKeeperUtils.dll" target="lib\net451" />
     <file src="OrleansZooKeeperUtils.pdb" target="lib\net451" />
+    <file src="OrleansZooKeeperUtils.xml" target="lib\net451" />
     <file src="$SRC_DIR$OrleansZooKeeperUtils\**\*.cs" target="src" />
   </files>
 </package>

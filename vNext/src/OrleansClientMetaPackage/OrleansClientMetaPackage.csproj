@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.Client</PackageId>
+    <Title>Microsoft Orleans Client Libraries</Title>
+    <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+  </ItemGroup>
+</Project>

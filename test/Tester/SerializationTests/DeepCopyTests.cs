@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using Orleans.Serialization;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -10,11 +10,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Test the deep copy of built-in and user-defined types
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DeepCopyTests
     {
-        public DeepCopyTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public DeepCopyTests(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -22,19 +25,19 @@ namespace UnitTests.Serialization
         {
             {
                 var original = new int[] { 0, 1, 2 };
-                var copy = (int[])SerializationManager.DeepCopy(original);
+                var copy = (int[])this.fixture.SerializationManager.DeepCopy(original);
                 copy[2] = 0;
                 Assert.Equal(original[2], 2);
             }
             {
                 var original = new int[] { 0, 1, 2 }.ToList();
-                var copy = (List<int>)SerializationManager.DeepCopy(original);
+                var copy = (List<int>)this.fixture.SerializationManager.DeepCopy(original);
                 copy[2] = 0;
                 Assert.Equal(original[2], 2);
             }
             {
                 var original = new int[][] { new int[] { 0, 1 }, new int[] { 2, 3 } };
-                var copy = (int[][])SerializationManager.DeepCopy(original);
+                var copy = (int[][])this.fixture.SerializationManager.DeepCopy(original);
                 copy[1][0] = 0;
                 Assert.Equal(original[1][0], 2);
             }
@@ -42,7 +45,7 @@ namespace UnitTests.Serialization
                 var original = new Dictionary<int, int>();
                 original[0] = 1;
                 original[1] = 2;
-                var copy = (Dictionary<int, int>)SerializationManager.DeepCopy(original);
+                var copy = (Dictionary<int, int>)this.fixture.SerializationManager.DeepCopy(original);
                 copy[1] = 0;
                 Assert.Equal(original[1], 2);
             }
@@ -51,7 +54,7 @@ namespace UnitTests.Serialization
                 original["a"] = new Dictionary<string, string>();
                 original["a"]["0"] = "1";
                 original["a"]["1"] = "2";
-                var copy = (Dictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(original);
+                var copy = (Dictionary<string, Dictionary<string, string>>)this.fixture.SerializationManager.DeepCopy(original);
                 copy["a"]["1"] = "";
                 Assert.Equal(original["a"]["1"], "2");
             }
@@ -67,27 +70,27 @@ namespace UnitTests.Serialization
                     {"1","2" }
                 });
                 var dict = original.ToImmutable();
-                var copy = (ImmutableDictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(dict);
+                var copy = (ImmutableDictionary<string, Dictionary<string, string>>)this.fixture.SerializationManager.DeepCopy(dict);
                 Assert.Same(dict, copy);
             }
             {
                 var original = ImmutableArray.Create<string>("1", "2", "3");
-                var copy = (ImmutableArray<string>)SerializationManager.DeepCopy(original);
+                var copy = (ImmutableArray<string>)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Equal(original, copy);
             }
             {
                 var original = ImmutableHashSet.Create("1", "2", "3");
-                var copy = (ImmutableHashSet<string>)SerializationManager.DeepCopy(original);
+                var copy = (ImmutableHashSet<string>)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Same(original, copy);
             }
             {
                 var original = ImmutableList.Create("1", "2", "3");
-                var copy = (ImmutableList<string>)SerializationManager.DeepCopy(original);
+                var copy = (ImmutableList<string>)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Same(original, copy);
             }
             {
                 var original = ImmutableQueue.Create("1", "2", "3");
-                var copy = (ImmutableQueue<string>)SerializationManager.DeepCopy(original);
+                var copy = (ImmutableQueue<string>)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Same(original, copy);
             }
             {
@@ -97,12 +100,12 @@ namespace UnitTests.Serialization
                     {"1","2" }
                 });
                 var dict = original.ToImmutable();
-                var copy = (ImmutableSortedDictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(dict);
+                var copy = (ImmutableSortedDictionary<string, Dictionary<string, string>>)this.fixture.SerializationManager.DeepCopy(dict);
                 Assert.Same(dict, copy);
             }
             {
                 var original = ImmutableSortedSet.Create("1", "2", "3");
-                var copy = (ImmutableSortedSet<string>)SerializationManager.DeepCopy(original);
+                var copy = (ImmutableSortedSet<string>)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Same(original, copy);
             }
         }
@@ -116,7 +119,7 @@ namespace UnitTests.Serialization
                 original.SetNumber("b", 2);
                 original.SetEnemy(0, CampaignEnemyTestType.Enemy3);
                 original.SetBit(19);
-                var copy = (LargeTestData)SerializationManager.DeepCopy(original);
+                var copy = (LargeTestData)this.fixture.SerializationManager.DeepCopy(original);
                 Assert.Equal(1, copy.GetNumber("a"));
                 Assert.Equal(2, copy.GetNumber("b"));
                 Assert.Equal(CampaignEnemyTestType.Enemy3, copy.GetEnemy(0));

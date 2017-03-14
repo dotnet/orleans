@@ -8,28 +8,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class SystemStatus : IEquatable<SystemStatus>
     {
-        // Current system status
-        public static SystemStatus Current
-        {
-            get
-            {
-                // System should always have some status, even if it is Status==Unknown
-                return currentStatus ?? (currentStatus = SystemStatus.Unknown);
-            }
-            set
-            {
-                // System should always have some status, even if it is Status==Unknown
-                if (value == null) value = SystemStatus.Unknown;
-
-                currentStatus = value;
-
-                if (!value.Equals(SystemStatus.Creating)) // don't print Creating because the logger has not been initialzed properly yet.
-                {
-                    logger.Info(ErrorCode.Runtime_Error_100294, "SystemStatus={0}", value);
-                }
-            }
-        }
-
         private enum InternalSystemStatus
         {
             Unknown = 0,
@@ -40,11 +18,7 @@ namespace Orleans.Runtime
             Stopping,
             ShuttingDown,
             Terminated,
-        }
-
-        private static SystemStatus currentStatus;
-
-        private static readonly Logger logger = LogManager.GetLogger("SystemStatus", LoggerType.Runtime);
+        };
 
         /// <summary>Status = Unknown</summary>
         [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]

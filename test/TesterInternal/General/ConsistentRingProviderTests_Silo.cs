@@ -198,16 +198,17 @@ namespace UnitTests.General
         private uint PickKey(SiloAddress responsibleSilo)
         {
             int iteration = 10000;
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             for (int i = 0; i < iteration; i++)
             {
                 double next = random.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
-                SiloAddress s = this.HostedCluster.Primary.TestHook.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
+                SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
                     return randomKey;
             }
             throw new Exception(String.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
-                responsibleSilo, this.HostedCluster.Primary.TestHook.GetConsistentRingProviderDiagnosticInfo().Result));
+                responsibleSilo, testHooks.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 
         private void VerificationScenario(uint testKey)
@@ -240,7 +241,8 @@ namespace UnitTests.General
 
         private void VerifyKey(uint key, List<SiloAddress> silos)
         {
-            SiloAddress truth = this.HostedCluster.Primary.TestHook.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
+            var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
+            SiloAddress truth = testHooks.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
             //if (truth == null) // if the truth isn't passed, we compute it here
             //{
             //    truth = silos.Find(siloAddr => (key <= siloAddr.GetConsistentHashCode()));
@@ -253,7 +255,7 @@ namespace UnitTests.General
             // lookup for 'key' should return 'truth' on all silos
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
-                SiloAddress s = siloHandle.TestHook.GetConsistentRingPrimaryTargetSilo((uint)key).Result;
+                SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo((uint)key).Result;
                 Assert.Equal(truth, s);
             }
         }
@@ -265,11 +267,11 @@ namespace UnitTests.General
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
             bool usingReminderGrain = this.HostedCluster.ClusterConfiguration.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
-            IReminderTable tableGrain = GrainClient.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+            IReminderTable tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
-            SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
+            SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
-            var addresses = (await TestUtils.GetDetailedGrainReport(tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddresses;
+            var addresses = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddresses;
             ActivationAddress reminderGrainActivation = addresses.FirstOrDefault();
 
             SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();

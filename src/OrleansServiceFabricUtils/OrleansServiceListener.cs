@@ -1,8 +1,8 @@
 namespace Microsoft.Orleans.ServiceFabric
 {
-    using global::Orleans.Runtime.Configuration;
-
     using Microsoft.ServiceFabric.Services.Communication.Runtime;
+
+    using global::Orleans.Runtime.Configuration;
 
     /// <summary>
     /// Creates Service Fabric listeners for Orleans silos.
@@ -21,7 +21,21 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
         public static ServiceInstanceListener CreateStateless(ClusterConfiguration configuration)
         {
-            return new ServiceInstanceListener(context => new OrleansCommunicationListener(context, configuration), OrleansServiceFabricEndpointName);
+            return new ServiceInstanceListener(
+                context => new OrleansCommunicationListener(context, configuration),
+                OrleansServiceFabricEndpointName);
+        }
+
+        /// <summary>
+        /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
+        /// </summary>
+        /// <param name="configuration">The Orleans cluster configuration.</param>
+        /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
+        public static ServiceReplicaListener CreateStateful(ClusterConfiguration configuration)
+        {
+            return new ServiceReplicaListener(
+                context => new OrleansCommunicationListener(context, configuration),
+                OrleansServiceFabricEndpointName);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using Orleans.GrainDirectory;
+
 namespace Orleans
 {
     namespace Concurrency
@@ -120,7 +121,7 @@ namespace Orleans
 
             internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
             {
-                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+                this.RegistrationStrategy = strategy;
             }
         }
 
@@ -224,7 +225,36 @@ namespace Orleans
             {
                 TypeCode = typeCode;
             }
-    }
+        }
+
+        /// <summary>
+        /// Specifies the method id for the interface method which this attribute is declared on.
+        /// </summary>
+        /// <remarks>
+        /// Method ids must be unique for all methods in a given interface.
+        /// This attribute is only applicable for interface method declarations, not for method definitions on classes.
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class MethodIdAttribute : Attribute
+        {
+            /// <summary>
+            /// Gets the method id for the interface method this attribute is declared on.
+            /// </summary>
+            public int MethodId { get; }
+
+            /// <summary>
+            /// Specifies the method id for the interface method which this attribute is declared on.
+            /// </summary>
+            /// <remarks>
+            /// Method ids must be unique for all methods in a given interface.
+            /// This attribute is only valid only on interface method declarations, not on method definitions.
+            /// </remarks>
+            /// <param name="methodId">The method id.</param>
+            public MethodIdAttribute(int methodId)
+            {
+                this.MethodId = methodId;
+            }
+        }
 
     /// <summary>
     /// Used to mark a method as providing a copier function for that type.
@@ -254,6 +284,7 @@ namespace Orleans
     /// Used to make a class for auto-registration as a serialization helper.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
+    [Obsolete("[RegisterSerializer] is obsolete, please use [Serializer(typeof(TargetType))] instead. Note that the signature of Register has changed to 'void Register(SerializationManager sm)'.")]
     public sealed class RegisterSerializerAttribute : Attribute
     {
     }
@@ -272,15 +303,42 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StorageProviderAttribute : Attribute
         {
-            public StorageProviderAttribute()
-            {
-                    ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
-            }
             /// <summary>
-            /// The name of the storage provider to ne used for persisting state for this grain.
+            /// The name of the provider to be used for persisting of grain state
             /// </summary>
             public string ProviderName { get; set; }
+
+            public StorageProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
+            }
         }
+
+        /// <summary>
+        /// The [Orleans.Providers.LogConsistencyProvider] attribute is used to define which consistency provider to use for grains using the log-view state abstraction.
+        /// <para>
+        /// Specifying [Orleans.Providers.LogConsistencyProvider] property is recommended for all grains that derive
+        /// from ILogConsistentGrain, such as JournaledGrain.
+        /// If no [Orleans.Providers.LogConsistencyProvider] attribute is  specified, then the runtime tries to locate
+        /// one as follows. First, it looks for a 
+        /// "Default" provider in the configuration file, then it checks if the grain type defines a default.
+        /// If a consistency provider cannot be located for this grain, then the grain will fail to load into the Silo.
+        /// </para>
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class LogConsistencyProviderAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the provider to be used for consistency
+            /// </summary>
+            public string ProviderName { get; set; }
+
+            public LogConsistencyProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;
+            }
+        }
+
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]

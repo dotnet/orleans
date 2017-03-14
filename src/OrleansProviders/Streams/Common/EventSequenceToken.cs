@@ -42,15 +42,6 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Sequence number of next event batch in the stream
-        /// </summary>
-        /// <returns></returns>
-        public EventSequenceToken NextSequenceNumber()
-        {
-            return new EventSequenceToken(SequenceNumber + 1, EventIndex);
-        }
-
-        /// <summary>
         /// Creates a sequence token for a specific event in the current batch
         /// </summary>
         /// <param name="eventInd"></param>
@@ -58,11 +49,6 @@ namespace Orleans.Providers.Streams.Common
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
             return new EventSequenceToken(SequenceNumber, eventInd);
-        }
-
-        internal static long Distance(EventSequenceToken first, EventSequenceToken second)
-        {
-            return first.SequenceNumber - second.SequenceNumber;
         }
 
         /// <summary>

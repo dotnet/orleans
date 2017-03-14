@@ -69,7 +69,7 @@ namespace UnitTests.Grains
         {
             if (extender == null)
             {
-                extender = new GenericTestExtension<T>(this);
+                extender = new GenericTestExtension<T>(this, this.GrainFactory);
                 if (!runtimeClient.TryAddExtension(extender))
                 {
                     throw new SystemException("Unable to add new extension");

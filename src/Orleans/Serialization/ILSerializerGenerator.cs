@@ -12,21 +12,26 @@ namespace Orleans.Serialization
     {
         private static readonly RuntimeTypeHandle IntPtrTypeHandle = typeof(IntPtr).TypeHandle;
 
-        private static readonly RuntimeTypeHandle UintPtrTypeHandle = typeof(UIntPtr).TypeHandle;
+        private static readonly RuntimeTypeHandle UIntPtrTypeHandle = typeof(UIntPtr).TypeHandle;
 
         private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
         
-        private readonly Dictionary<RuntimeTypeHandle, SimpleTypeSerializer> directSerializers;
+        private static readonly Dictionary<RuntimeTypeHandle, SimpleTypeSerializer> DirectSerializers;
 
-        private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
+        private static readonly ReflectedSerializationMethodInfo SerializationMethodInfos = new ReflectedSerializationMethodInfo();
 
-        private readonly SerializationManager.DeepCopier immutableTypeCopier = (obj, context) => obj;
+        private static readonly SerializationManager.DeepCopier ImmutableTypeCopier = (obj, context) => obj;
 
-        private readonly ILFieldBuilder fieldBuilder = new ILFieldBuilder();
-        
-        public ILSerializerGenerator()
+        private static readonly ILFieldBuilder FieldBuilder = new ILFieldBuilder();
+
+        private static readonly Type OnDeserializedLifecycleType = typeof(IOnDeserialized);
+
+        private static readonly MethodInfo OnDeserializedMethod =
+            TypeUtils.Method((IOnDeserialized i) => i.OnDeserialized(default(ISerializerContext)));
+
+        static ILSerializerGenerator()
         {
-            this.directSerializers = new Dictionary<RuntimeTypeHandle, SimpleTypeSerializer>
+            DirectSerializers = new Dictionary<RuntimeTypeHandle, SimpleTypeSerializer>
             {
                 [typeof(int).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(int)), r => r.ReadInt()),
                 [typeof(uint).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(uint)), r => r.ReadUInt()),
@@ -70,15 +75,17 @@ namespace Orleans.Serialization
         /// <param name="copyFieldsFilter">
         /// The predicate used in addition to the default logic to select which fields are included in copying.
         /// </param>
+        /// <param name="fieldComparer">The comparer used to sort fields, or <see langword="null"/> to use the default.</param>
         /// <returns>The generated serializer.</returns>
         public SerializationManager.SerializerMethods GenerateSerializer(
             Type type,
             Func<FieldInfo, bool> serializationFieldsFilter = null,
-            Func<FieldInfo, bool> copyFieldsFilter = null)
+            Func<FieldInfo, bool> copyFieldsFilter = null,
+            IComparer<FieldInfo> fieldComparer = null)
         {
             try
             {
-                var serializationFields = this.GetFields(type, serializationFieldsFilter);
+                var serializationFields = this.GetFields(type, serializationFieldsFilter, fieldComparer);
                 List<FieldInfo> copyFields;
                 if (copyFieldsFilter == serializationFieldsFilter)
                 {
@@ -86,11 +93,11 @@ namespace Orleans.Serialization
                 }
                 else
                 {
-                    copyFields = this.GetFields(type, copyFieldsFilter);
+                    copyFields = this.GetFields(type, copyFieldsFilter, fieldComparer);
                 }
                 
                 SerializationManager.DeepCopier copier;
-                if (type.IsOrleansShallowCopyable()) copier = this.immutableTypeCopier;
+                if (type.IsOrleansShallowCopyable()) copier = ImmutableTypeCopier;
                 else copier = this.EmitCopier(type, copyFields).CreateDelegate();
 
                 var serializer = this.EmitSerializer(type, serializationFields);
@@ -109,10 +116,9 @@ namespace Orleans.Serialization
         private ILDelegateBuilder<SerializationManager.DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
         {
             var il = new ILDelegateBuilder<SerializationManager.DeepCopier>(
-                this.fieldBuilder,
+                FieldBuilder,
                 type.Name + "DeepCopier",
-                this.methods,
-                this.methods.DeepCopierDelegate);
+                SerializationMethodInfos.DeepCopierDelegate);
 
             // Declare local variables.
             var result = il.DeclareLocal(type);
@@ -124,14 +130,14 @@ namespace Orleans.Serialization
             il.StoreLocal(typedInput);
 
             // Construct the result.
-            il.CreateInstance(type, result);
+            il.CreateInstance(type, result, SerializationMethodInfos.GetUninitializedObject);
 
             // Record the object.
             il.LoadArgument(1); // Load 'context' parameter.
             il.LoadArgument(0); // Load 'original' parameter.
             il.LoadLocal(result); // Load 'result' local.
             il.BoxIfValueType(type);
-            il.Call(this.methods.RecordObjectWhileCopying);
+            il.Call(SerializationMethodInfos.RecordObjectWhileCopying);
 
             // Copy each field.
             foreach (var field in fields)
@@ -144,7 +150,7 @@ namespace Orleans.Serialization
                 // Deep-copy the field if needed, otherwise just leave it as-is.
                 if (!field.FieldType.IsOrleansShallowCopyable())
                 {
-                    var copyMethod = this.methods.DeepCopyInner;
+                    var copyMethod = SerializationMethodInfos.DeepCopyInner;
 
                     il.BoxIfValueType(field.FieldType);
                     il.LoadArgument(1);
@@ -165,10 +171,9 @@ namespace Orleans.Serialization
         private ILDelegateBuilder<SerializationManager.Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
         {
             var il = new ILDelegateBuilder<SerializationManager.Serializer>(
-                this.fieldBuilder,
+                FieldBuilder,
                 type.Name + "Serializer",
-                this.methods,
-                this.methods.SerializerDelegate);
+                SerializationMethodInfos.SerializerDelegate);
 
             // Declare local variables.
             var typedInput = il.DeclareLocal(type);
@@ -189,10 +194,10 @@ namespace Orleans.Serialization
                     typeHandle = fieldType.GetEnumUnderlyingType().TypeHandle;
                 }
                 
-                if (this.directSerializers.TryGetValue(typeHandle, out serializer))
+                if (DirectSerializers.TryGetValue(typeHandle, out serializer))
                 {
                     il.LoadArgument(1);
-                    il.Call(this.methods.GetStreamFromSerializationContext);
+                    il.Call(SerializationMethodInfos.GetStreamFromSerializationContext);
                     il.LoadLocal(typedInput);
                     il.LoadField(field);
 
@@ -200,7 +205,7 @@ namespace Orleans.Serialization
                 }
                 else
                 {
-                    var serializeMethod = this.methods.SerializeInner;
+                    var serializeMethod = SerializationMethodInfos.SerializeInner;
 
                     // Load the field.
                     il.LoadLocal(typedInput);
@@ -222,22 +227,21 @@ namespace Orleans.Serialization
         private ILDelegateBuilder<SerializationManager.Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
         {
             var il = new ILDelegateBuilder<SerializationManager.Deserializer>(
-                this.fieldBuilder,
+                FieldBuilder,
                 type.Name + "Deserializer",
-                this.methods,
-                this.methods.DeserializerDelegate);
+                SerializationMethodInfos.DeserializerDelegate);
 
             // Declare local variables.
             var result = il.DeclareLocal(type);
 
             // Construct the result.
-            il.CreateInstance(type, result);
+            il.CreateInstance(type, result, SerializationMethodInfos.GetUninitializedObject);
 
             // Record the object.
             il.LoadArgument(1); // Load the 'context' parameter.
             il.LoadLocal(result);
             il.BoxIfValueType(type);
-            il.Call(this.methods.RecordObjectWhileDeserializing);
+            il.Call(SerializationMethodInfos.RecordObjectWhileDeserializing);
 
             // Deserialize each field.
             foreach (var field in fields)
@@ -251,22 +255,22 @@ namespace Orleans.Serialization
                     il.LoadLocalAsReference(type, result);
                     
                     il.LoadArgument(1);
-                    il.Call(this.methods.GetStreamFromDeserializationContext);
-                    il.Call(this.directSerializers[typeHandle].ReadMethod);
+                    il.Call(SerializationMethodInfos.GetStreamFromDeserializationContext);
+                    il.Call(DirectSerializers[typeHandle].ReadMethod);
                     il.StoreField(field);
                 }
-                else if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                else if (DirectSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
                 {
                     il.LoadLocalAsReference(type, result);
                     il.LoadArgument(1);
-                    il.Call(this.methods.GetStreamFromDeserializationContext);
+                    il.Call(SerializationMethodInfos.GetStreamFromDeserializationContext);
                     il.Call(serializer.ReadMethod);
 
                     il.StoreField(field);
                 }
                 else
                 {
-                    var deserializeMethod = this.methods.DeserializeInner;
+                    var deserializeMethod = SerializationMethodInfos.DeserializeInner;
 
                     il.LoadLocalAsReference(type, result);
                     il.LoadType(field.FieldType);
@@ -277,6 +281,14 @@ namespace Orleans.Serialization
                     il.CastOrUnbox(field.FieldType);
                     il.StoreField(field);
                 }
+            }
+
+            // If the type implements the IOnDeserialized lifecycle handler, call that method now.
+            if (OnDeserializedLifecycleType.IsAssignableFrom(type))
+            {
+                il.LoadLocal(result);
+                il.LoadArgument(1);
+                il.Call(OnDeserializedMethod);
             }
 
             il.LoadLocal(result);
@@ -290,18 +302,23 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <param name="fieldFilter">The predicate used in addition to the default logic to select which fields are included.</param>
+        /// <param name="fieldInfoComparer">The comparer used to sort fields, or <see langword="null"/> to use the default.</param>
         /// <returns>A sorted list of the fields of the provided type.</returns>
-        private List<FieldInfo> GetFields(Type type, Func<FieldInfo, bool> fieldFilter = null)
+        private List<FieldInfo> GetFields(
+            Type type,
+            Func<FieldInfo, bool> fieldFilter = null,
+            IComparer<FieldInfo> fieldInfoComparer = null)
         {
             var result =
                 type.GetAllFields()
                     .Where(
                         field =>
-                        field.GetCustomAttribute<NonSerializedAttribute>() == null && !field.IsStatic
-                        && IsSupportedFieldType(field.FieldType.GetTypeInfo())
-                        && (fieldFilter == null || fieldFilter(field)))
+                            !field.IsNotSerialized()
+                            && !field.IsStatic
+                            && IsSupportedFieldType(field.FieldType.GetTypeInfo())
+                            && (fieldFilter == null || fieldFilter(field)))
                     .ToList();
-            result.Sort(FieldInfoComparer.Instance);
+            result.Sort(fieldInfoComparer ?? FieldInfoComparer.Instance);
             return result;
         }
 
@@ -316,7 +333,7 @@ namespace Orleans.Serialization
 
             var handle = type.AsType().TypeHandle;
             if (handle.Equals(IntPtrTypeHandle)) return false;
-            if (handle.Equals(UintPtrTypeHandle)) return false;
+            if (handle.Equals(UIntPtrTypeHandle)) return false;
             if (DelegateTypeInfo.IsAssignableFrom(type)) return false;
 
             return true;

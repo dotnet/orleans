@@ -1,6 +1,6 @@
-
 using System;
 using System.Collections.Generic;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -9,6 +9,7 @@ namespace Orleans.Runtime
         private const int Kb = 1024;
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
+        private static readonly ArraySegment<byte>[] EmptyBuffers = {new ArraySegment<byte>(new byte[0]), };
         private readonly List<ArraySegment<byte>> readBuffer;
         private readonly int maxSustainedBufferSize;
         private int currentBufferSize;
@@ -23,12 +24,20 @@ namespace Orleans.Runtime
 
         private readonly bool supportForwarding;
         private Logger Log;
+        private readonly SerializationManager serializationManager;
+        private readonly DeserializationContext deserializationContext;
 
         internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
 
-        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        public IncomingMessageBuffer(
+            Logger logger,
+            SerializationManager serializationManager,
+            bool supportForwarding = false,
+            int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
+            int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = logger;
+            this.serializationManager = serializationManager;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
@@ -38,6 +47,10 @@ namespace Orleans.Runtime
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
+            deserializationContext = new DeserializationContext(this.serializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(EmptyBuffers)
+            };
         }
 
         public List<ArraySegment<byte>> BuildReceiveBuffer()
@@ -154,7 +167,14 @@ namespace Orleans.Runtime
             List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
             
             // build message
-            msg = new Message(header);
+
+            this.deserializationContext.Reset();
+            this.deserializationContext.StreamReader.Reset(header);
+
+            msg = new Message
+            {
+                Headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext)
+            };
             try
             {
                 if (this.supportForwarding)
@@ -166,14 +186,14 @@ namespace Orleans.Runtime
                 else
                 {
                     // Attempt to deserialize the body immediately.
-                    msg.DeserializeBodyObject(body);
+                    msg.DeserializeBodyObject(this.serializationManager, body);
                 }
             }
             finally
             {
                 MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
-                if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
+                if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
                 {
                     Log.Info(
                         ErrorCode.Messaging_LargeMsg_Incoming,

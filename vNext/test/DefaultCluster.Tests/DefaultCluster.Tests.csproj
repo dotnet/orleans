@@ -1,23 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\DefaultCluster.Tests\**\*.cs" Exclude="..\..\..\test\DefaultCluster.Tests\FSharpGrainTests.cs;..\..\..\test\DefaultCluster.Tests\obj\**\*.cs;..\..\..\test\DefaultCluster.Tests\bin\**\*.cs;..\..\..\test\DefaultCluster.Tests\Properties\*.cs" />
@@ -29,16 +18,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\..\test\DefaultCluster.Tests\DefaultCluster.Tests..xunit.runner.json">
-      <Link>DefaultCluster.Tests..xunit.runner.json</Link>
+    <Content Include="..\..\..\test\DefaultCluster.Tests\DefaultCluster.Tests.xunit.runner.json">
+      <Link>DefaultCluster.Tests.xunit.runner.json</Link>
     </Content>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="1.1.0" />
-    <PackageReference Include="xunit" Version="2.1.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
   </ItemGroup>
 

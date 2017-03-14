@@ -250,9 +250,11 @@ namespace Orleans.Runtime
             return Name;
         }
 
+        internal static bool IsStarting { get; set; }
+
         private static void LogStatus(Logger log, string msg, params object[] args)
         {
-            if (SystemStatus.Current.Equals(SystemStatus.Creating))
+            if (IsStarting)
             {
                 // Reduce log noise during silo startup
                 if (log.IsVerbose) log.Verbose(msg, args);

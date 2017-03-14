@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.StreamingTests;
+using Xunit;
 
 namespace UnitTests.Streaming
 {
@@ -13,13 +16,15 @@ namespace UnitTests.Streaming
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
-        private Logger logger;
+        private readonly Logger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
+        private readonly IInternalClusterClient client;
 
-        public MultipleStreamsTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
+        internal MultipleStreamsTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
         {
+            this.client = client;
             this.streamProviderName = streamProvider;
             this.logger = LogManager.GetLogger("MultipleStreamsTestRunner", LoggerType.Application);
             this.testNumber = testNum;
@@ -38,7 +43,7 @@ namespace UnitTests.Streaming
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
-                runners.Add(new SingleStreamTestRunner(this.streamProviderName, i, runFullTest));
+                runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
             }
             foreach (var runner in runners)
             {

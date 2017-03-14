@@ -11,5 +11,12 @@ namespace GrainInterfaces
         Task<double> Multiply(double value);
         Task<double> Set(double value);
         Task<double> Get();
+
+        Task Subscribe(ICalculatorObserver observer);
+    }
+
+    public interface ICalculatorObserver : IGrainObserver
+    {
+        void CalculationUpdated(double value);
     }
 }

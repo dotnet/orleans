@@ -1,12 +1,13 @@
 ﻿using System.Threading.Tasks;
 using Orleans.SqlUtils;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.SqlStatisticsPublisherTests
 {
     public class PostgreSqlStatisticsPublisherTests : SqlStatisticsPublisherTestsBase
     {
-        public PostgreSqlStatisticsPublisherTests(ConnectionStringFixture fixture) : base(fixture)
+        public PostgreSqlStatisticsPublisherTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
         }
         protected override string AdoInvariant

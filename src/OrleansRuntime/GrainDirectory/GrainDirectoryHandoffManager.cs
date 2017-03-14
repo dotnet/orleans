@@ -16,16 +16,18 @@ namespace Orleans.Runtime.GrainDirectory
         private const int HANDOFF_CHUNK_SIZE = 500;
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly Logger logger;
 
-        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, ISiloStatusOracle siloStatusOracle)
+        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory)
         {
             logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
+            this.grainFactory = grainFactory;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
             lastPromise = new Dictionary<SiloAddress, Task>();
@@ -131,7 +133,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsVerbose) logger.Verbose("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
-                    localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
+                    localDirectory.DirectoryPartition.Merge(this.grainFactory, directoryPartitionsMap[removedSilo]);
                     // no need to send our new partition to all others, as they
                     // will realize the change and combine their copies without any additional communication (see below)
                 }
@@ -139,7 +141,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsVerbose) logger.Verbose("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
                     // adjust copy for the predecessor of the failed silo
-                    directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
+                    directoryPartitionsMap[predecessor].Merge(this.grainFactory, directoryPartitionsMap[removedSilo]);
                 }
                 localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);

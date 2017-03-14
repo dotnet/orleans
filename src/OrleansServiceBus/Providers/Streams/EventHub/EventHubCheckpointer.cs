@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
 using Orleans.AzureUtils;
 using Orleans.Streams;
 
@@ -22,7 +21,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Indicates if a checkpoint exists
         /// </summary>
-        public bool CheckpointExists => entity != null && entity.Offset != EventHubConsumerGroup.StartOfStream;
+        public bool CheckpointExists => entity != null && entity.Offset != EventHubConstants.StartOfStream;
 
         /// <summary>
         /// Factory function that creates and initializes the checkpointer
@@ -85,7 +84,7 @@ namespace Orleans.ServiceBus.Providers
         public void Update(string offset, DateTime utcNow)
         {
             // if offset has not changed, do nothing
-            if (string.Compare(entity.Offset, offset, StringComparison.InvariantCulture)==0)
+            if (string.Compare(entity.Offset, offset, StringComparison.Ordinal) == 0)
             {
                 return;
             }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -126,6 +127,8 @@ namespace UnitTests.GrainInterfaces
         private int PrivateValue { get; set; }
         public readonly int ReadonlyField;
 
+        public IEchoGrain SomeGrainReference { get; set; }
+
         public SomeStruct(int readonlyField)
             : this()
         {
@@ -172,9 +175,10 @@ namespace UnitTests.GrainInterfaces
 
         [Obsolete("This field should be serialized")]
         public int ObsoleteInt { get; set; }
-        
 
-        #pragma warning disable 618
+        public IEchoGrain SomeGrainReference { get; set; }
+        
+#pragma warning disable 618
         public int GetObsoleteInt() => this.ObsoleteInt;
         public void SetObsoleteInt(int value)
         {
@@ -286,5 +290,22 @@ namespace UnitTests.GrainInterfaces
         where T : struct
     {
         public T Value { get; set; }
+    }
+
+    // This class should not have a serializer generated for it, since the serializer would not be able to access
+    // the nested private class.
+    [Serializable]
+    public class ClassWithNestedPrivateClassInListField
+    {
+        private readonly List<NestedPrivateClass> coolBeans = new List<NestedPrivateClass>
+        {
+            new NestedPrivateClass()
+        };
+
+        public IEnumerable CoolBeans => this.coolBeans;
+
+        private class NestedPrivateClass
+        {
+        }
     }
 }

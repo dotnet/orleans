@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory
 {
@@ -9,27 +13,7 @@ namespace Orleans.GrainDirectory
     [Serializable]
     internal class GlobalSingleInstanceRegistration : MultiClusterRegistrationStrategy
     {
-        private static GlobalSingleInstanceRegistration singleton;
-
-        internal static GlobalSingleInstanceRegistration Singleton
-        {
-            get
-            {
-                if (singleton == null)
-                {
-                    Initialize();
-                }
-                return singleton;
-            }
-        }
-
-        internal static void Initialize()
-        {
-            singleton = new GlobalSingleInstanceRegistration();
-        }
-
-        private GlobalSingleInstanceRegistration()
-        { }
+        internal static GlobalSingleInstanceRegistration Singleton { get; } = new GlobalSingleInstanceRegistration();
 
         public override bool Equals(object obj)
         {
@@ -38,12 +22,12 @@ namespace Orleans.GrainDirectory
 
         public override int GetHashCode()
         {
-            return GetType().GetHashCode();
+            return this.GetType().GetHashCode();
         }
 
-        internal override bool IsSingleInstance()
+        public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)
         {
-            return true;
+            return Enumerable.Empty<string>(); // there is only one instance, so no remote instances
         }
     }
 }

@@ -10,18 +10,19 @@ namespace Orleans.Runtime.Scheduler
         private readonly Message message;
         private readonly Dispatcher dispatcher;
 
-        public InvokeWorkItem(ActivationData activation, Message message, ISchedulingContext context, Dispatcher dispatcher)
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher)
         {
-            this.activation = activation;
-            this.message = message;
-            this.dispatcher = dispatcher;
-            SchedulingContext = context;
-            if (activation == null || activation.GrainInstance==null)
+            if (activation?.GrainInstance == null)
             {
-                var str = String.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);
+                var str = string.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);
                 logger.Warn(ErrorCode.SchedulerNullActivation, str);
                 throw new ArgumentException(str);
             }
+
+            this.activation = activation;
+            this.message = message;
+            this.dispatcher = dispatcher;
+            this.SchedulingContext = activation.SchedulingContext;
             activation.IncrementInFlightCount();
         }
 
@@ -41,8 +42,9 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                IAddressable grain = activation.GrainInstance;
-                Task task = InsideRuntimeClient.Current.Invoke(grain, activation, message);
+                var grain = activation.GrainInstance;
+                var runtimeClient = (ISiloRuntimeClient)grain.GrainReference.RuntimeClient;
+                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
                 task.ContinueWith(t =>
                 {
                     // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault

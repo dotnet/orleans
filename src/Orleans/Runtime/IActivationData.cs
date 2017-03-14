@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         ActivationAddress Address { get; }
         void DelayDeactivation(TimeSpan timeSpan);
         IStorageProvider StorageProvider { get; }
-        IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
+        void OnTimerCreated(IGrainTimer timer);
         void OnTimerDisposed(IGrainTimer timer);
     }
 }

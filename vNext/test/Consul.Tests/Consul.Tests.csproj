@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="FluentAssertions" Version="4.19.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansConsulUtils\OrleansConsulUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\test\Consul.Tests\LivenessTests.cs">
+      <Link>LivenessTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Consul.Tests\ConsulMembershipTableTest.cs">
+      <Link>ConsulMembershipTableTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Consul.Tests\ConsulTestUtils.cs">
+      <Link>ConsulTestUtils.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="Consul.Tests.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

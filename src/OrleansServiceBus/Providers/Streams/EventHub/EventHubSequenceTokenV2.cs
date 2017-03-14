@@ -1,9 +1,8 @@
 ﻿using System;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers;
 
-namespace OrleansServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.
@@ -12,9 +11,8 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
     ///   The SequenceNumber is required for uniqueness and ordering of EventHub messages within a partition.
     /// event Index - Since each EventHub message may contain more than one application layer event, this value
     ///   indicates which application layer event this token is for, within an EventHub message.  It is required for uniqueness
-    ///   and ordering of aplication layer events within an EventHub message.
+    ///   and ordering of application layer events within an EventHub message.
     /// </summary>
-    [RegisterSerializer]
     public class EventHubSequenceTokenV2 : EventHubSequenceToken
     {
         /// <summary>
@@ -27,13 +25,6 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
             : base(eventHubOffset, sequenceNumber, eventIndex)
         {
         }
-        /// <summary>
-        /// Register the serializers
-        /// </summary>
-        public static void Register()
-        {
-            SerializationManager.Register(typeof(EventHubSequenceTokenV2), DeepCopy, Serialize, Deserialize);
-        }
 
         /// <summary>
         /// Create a deep copy of the token.
@@ -41,6 +32,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
         /// <param name="original">The token to copy</param>
         /// <param name="context">The serialization context.</param>
         /// <returns>A copy</returns>
+        [CopierMethod]
         public static object DeepCopy(object original, ICopyContext context)
         {
             var source = original as EventHubSequenceTokenV2;
@@ -60,6 +52,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
         /// <param name="untypedInput">The object to serialize.</param>
         /// <param name="context">The serialization context.</param>
         /// <param name="expected">The expected type.</param>
+        [SerializerMethod]
         public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
             var typed = untypedInput as EventHubSequenceTokenV2;
@@ -81,6 +74,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
         /// <param name="expected">The expected type.</param>
         /// <param name="context">The deserialization context.</param>
         /// <returns></returns>
+        [DeserializerMethod]
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
             var reader = context.StreamReader;

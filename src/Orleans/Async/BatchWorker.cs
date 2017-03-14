@@ -16,12 +16,14 @@ namespace Orleans
         /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
 
+        protected object lockable = new object();
+
         /// <summary>
         /// Notify the worker that there is more work.
         /// </summary>
         public void Notify()
         {
-            lock (this)
+            lock (lockable)
             {
                 if (currentWorkCycle != null)
                 {
@@ -62,7 +64,7 @@ namespace Orleans
             TaskCompletionSource<Task> signal = null;
             Task taskToSignal = null;
 
-            lock (this)
+            lock (lockable)
             {
                 if (moreWork)
                 {
@@ -109,7 +111,7 @@ namespace Orleans
             Task waitfortask = null;
 
             // figure out exactly what we need to wait for
-            lock (this)
+            lock (lockable)
             {
                 if (!moreWork)
                     // just wait for current work cycle
@@ -131,6 +133,54 @@ namespace Orleans
 
             else if (waitfortask != null)
                 await waitfortask;
+        }
+
+        /// <summary>
+        /// Notify the worker that there is more work, and wait for the current work cycle, and also the next work cycle if there is currently unserviced work.
+        /// </summary>
+        public async Task NotifyAndWaitForWorkToBeServiced()
+        {
+            Task<Task> waitForTaskTask = null;
+            Task waitForTask = null;
+
+            lock (lockable)
+            {
+                if (currentWorkCycle != null)
+                {
+                    moreWork = true;
+                    if (nextWorkCyclePromise == null)
+                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                    waitForTaskTask = nextWorkCyclePromise.Task;
+                }
+                else
+                {
+                    Start();
+                    waitForTask = currentWorkCycle;
+                }
+            }
+
+            if (waitForTaskTask != null)
+                await await waitForTaskTask;
+
+            else if (waitForTask != null)
+                await waitForTask;
+        }
+    }
+
+    /// A convenient variant of a batch worker 
+    /// that allows the work function to be passed as a constructor argument
+    public class BatchWorkerFromDelegate : BatchWorker
+    {
+        public BatchWorkerFromDelegate(Func<Task> work)
+        {
+            this.work = work;
+        }
+
+        private Func<Task> work;
+
+        protected override Task Work()
+        {
+            return work();
         }
     }
 }

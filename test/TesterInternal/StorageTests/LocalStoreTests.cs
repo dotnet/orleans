@@ -23,31 +23,17 @@ namespace UnitTests.StorageTests
         File,
         Sql
     }
-
-    public class LocalStoreTestsFixture : IDisposable
-    {
-        public LocalStoreTestsFixture()
-        {
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
-        }
-
-        public void Dispose()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-    }
-
-    public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
+    
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class LocalStoreTests
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-        public LocalStoreTests(ITestOutputHelper output)
+        public LocalStoreTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            LocalDataStoreInstance.LocalDataStore = null;
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -57,7 +43,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
             var stateProperties = AsDictionary(state);
             var keys = GetKeys(name, reference);
@@ -79,7 +65,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -103,7 +89,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
 
             output.WriteLine("Using store = {0}", store.GetType().FullName);
@@ -189,7 +175,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
             Stopwatch sw = new Stopwatch();

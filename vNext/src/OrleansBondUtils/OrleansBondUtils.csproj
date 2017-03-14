@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.Serialization.Bond</PackageId>
+    <Title>Microsoft Orleans Bond Serializer</Title>
+    <Description>Referencing this package allows Bond types to be serialized using the Bond Simple Binary serializer.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Azure Bond</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansBondUtils\**\*.cs" Exclude="..\..\..\src\OrleansBondUtils\Properties\*.cs;..\..\..\src\OrleansBondUtils\obj\**\*.cs;..\..\..\src\OrleansBondUtils\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\NuGet\BondSerializerInstall.ps1">
+      <Pack>true</Pack>
+      <PackagePath>tools\Install.ps1</PackagePath>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="..\NuGet\BondSerializerUninstall.ps1">
+      <Pack>true</Pack>
+      <PackagePath>tools\Uninstall.ps1</PackagePath>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bond.Core.CSharp" Version="5.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+  </ItemGroup>
+</Project>

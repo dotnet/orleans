@@ -9,11 +9,15 @@ namespace DefaultCluster.Tests.General
 {
     public class DeactivationTests : HostedTestClusterEnsureDefaultStarted
     {
+        public DeactivationTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DeactivateReactivateTiming()
         {
             var x = GetRandomGrainId();
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x);
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(x);
             var originalVersion = await grain.GetVersion();
 
             var sw = Stopwatch.StartNew();
@@ -25,7 +29,7 @@ namespace DefaultCluster.Tests.General
             sw.Stop();
 
             Assert.True(sw.ElapsedMilliseconds < 1000);
-            logger.Info("Took {0}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
+            this.Logger.Info("Took {0}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
 
             var a = await grain.GetA();
             Assert.Equal(99, a); // value of A survive deactivation and reactivation of the grain

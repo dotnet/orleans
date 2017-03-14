@@ -16,7 +16,7 @@ namespace UnitTests
             this.HostedCluster = fixture.HostedCluster;
             if (!GrainClient.IsInitialized)
             {
-                this.HostedCluster.InitializeClient();
+                GrainClient.Initialize(fixture.HostedCluster.ClientConfiguration);
             }
         }
 

@@ -14,6 +14,8 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.TestHooks;
 using Orleans.Storage;
+using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.MultiCluster;
 
 namespace Orleans.TestingHost
 {
@@ -35,10 +37,7 @@ namespace Orleans.TestingHost
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => silo.SiloAddress;
-
-        /// <summary>Gets the Silo test hook</summary>
-        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.SiloAddress);
-
+        
         internal AppDomainTestHooks AppDomainTestHook { get; }
 
         /// <summary>Methods for optimizing the code generator.</summary>
@@ -172,7 +171,21 @@ namespace Orleans.TestingHost
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
         }
-        
+
+        internal Func<ILogConsistencyProtocolMessage,bool> ProtocolMessageFilterForTesting
+        {
+            get
+            {
+                var mco = this.silo.LocalMultiClusterOracle;
+                return mco.ProtocolMessageFilterForTesting;
+            }
+            set
+            {
+                var mco = this.silo.LocalMultiClusterOracle;
+                mco.ProtocolMessageFilterForTesting = value;
+            }
+        }
+
         private bool ShouldDrop(Message msg)
         {
             if (simulatedMessageLoss != null)

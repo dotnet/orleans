@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
@@ -16,6 +17,10 @@ namespace UnitTests.StreamingTests
     [TestCategory("Streaming")]
     public class SampleSmsStreamingTests : OrleansTestingBase, IClassFixture<SampleSmsStreamingTests.Fixture>
     {
+        private readonly Fixture fixture;
+
+        private Logger logger;
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -32,38 +37,44 @@ namespace UnitTests.StreamingTests
 
         private const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
+        public SampleSmsStreamingTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+            logger = this.fixture.Logger;
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SampleStreamingTests_1()
         {
-            logger.Info("************************ SampleStreamingTests_1 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger);
+            this.logger.Info("************************ SampleStreamingTests_1 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_2()
         {
-            logger.Info("************************ SampleStreamingTests_2 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger);
+            this.logger.Info("************************ SampleStreamingTests_2 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_3()
         {
-            logger.Info("************************ SampleStreamingTests_3 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger);
+            this.logger.Info("************************ SampleStreamingTests_3 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.fixture.HostedCluster);
             await runner.StreamingTests_Producer_InlineConsumer(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MultipleImplicitSubscriptionTest()
         {
-            logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
+            this.logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
             var streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
-            var provider = GrainClient.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            var provider = this.fixture.HostedCluster.StreamProviderManager.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             var redStream = provider.GetStream<int>(streamId, "red");
             var blueStream = provider.GetStream<int>(streamId, "blue");
 
@@ -72,7 +83,7 @@ namespace UnitTests.StreamingTests
             for (int i = 0; i < nBlueEvents; i++)
                 await blueStream.OnNextAsync(i);
 
-            var grain = GrainClient.GrainFactory.GetGrain<IMultipleImplicitSubscriptionGrain>(streamId);
+            var grain = this.fixture.GrainFactory.GetGrain<IMultipleImplicitSubscriptionGrain>(streamId);
             var counters = await grain.GetCounters();
 
             Assert.Equal(nRedEvents, counters.Item1);
@@ -87,20 +98,22 @@ namespace UnitTests.StreamingTests
 
         private readonly string streamProvider;
         private readonly Logger logger;
+        private readonly TestCluster cluster;
 
-        public SampleStreamingTests( string streamProvider, Logger logger)
+        public SampleStreamingTests(string streamProvider, Logger logger, TestCluster cluster)
         {
             this.streamProvider = streamProvider;
             this.logger = logger;
+            this.cluster = cluster;
         }
 
         public async Task StreamingTests_Consumer_Producer(Guid streamId)
         {
             // consumer joins first, producer later
-            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
@@ -117,10 +130,10 @@ namespace UnitTests.StreamingTests
         public async Task StreamingTests_Producer_Consumer(Guid streamId)
         {
             // producer joins first, consumer later
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
@@ -138,10 +151,10 @@ namespace UnitTests.StreamingTests
         public async Task StreamingTests_Producer_InlineConsumer(Guid streamId)
         {
             // producer joins first, consumer later
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
+            var consumer = this.cluster.GrainFactory.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
@@ -160,7 +173,7 @@ namespace UnitTests.StreamingTests
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            this.logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);

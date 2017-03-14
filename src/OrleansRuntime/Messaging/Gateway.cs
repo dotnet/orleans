@@ -7,12 +7,14 @@ using System.Net.Sockets;
 using System.Threading;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class Gateway
     {
         private readonly MessageCenter messageCenter;
+        private readonly MessageFactory messageFactory;
         private readonly GatewayAcceptor acceptor;
         private readonly Lazy<GatewaySender>[] senders;
         private readonly GatewayClientCleanupAgent dropper;
@@ -28,14 +30,18 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
+        private readonly SerializationManager serializationManager;
+
         private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
         
-        internal Gateway(MessageCenter msgCtr, IPEndPoint gatewayAddress)
+        internal Gateway(MessageCenter msgCtr, IPEndPoint gatewayAddress, MessageFactory messageFactory, SerializationManager serializationManager)
         {
             messageCenter = msgCtr;
-            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress);
+            this.messageFactory = messageFactory;
+            this.serializationManager = serializationManager;
+            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress, this.messageFactory, this.serializationManager);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
@@ -56,7 +62,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<GatewaySender>(() =>
                 {
-                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this);
+                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory, this.serializationManager);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -349,12 +355,16 @@ namespace Orleans.Runtime.Messaging
         private class GatewaySender : AsynchQueueAgent<OutgoingClientMessage>
         {
             private readonly Gateway gateway;
+            private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
-
-            internal GatewaySender(string name, Gateway gateway)
+            private readonly SerializationManager serializationManager;
+            
+            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager)
                 : base(name, gateway.MessagingConfiguration)
             {
                 this.gateway = gateway;
+                this.messageFactory = messageFactory;
+                this.serializationManager = serializationManager;
                 gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
                 OnFault = FaultBehavior.RestartOnFault;
             }
@@ -386,7 +396,10 @@ namespace Orleans.Runtime.Messaging
                     if (msg.Direction == Message.Directions.Request)
                     {
                         MessagingStatisticsGroup.OnRejectedMessage(msg);
-                        Message error = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable, "Unknown client " + client);
+                        Message error = this.messageFactory.CreateRejectionResponse(
+                            msg,
+                            Message.RejectionTypes.Unrecoverable,
+                            "Unknown client " + client);
                         gateway.SendMessage(error);
                     }
                     else
@@ -461,11 +474,18 @@ namespace Orleans.Runtime.Messaging
                 int headerLength;
                 try
                 {
-                    data = msg.Serialize(out headerLength);
+                    int bodyLength;
+                    data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
+                    if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
+                    {
+                        logger.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                            headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
+                        if (logger.IsVerbose3) logger.Verbose3("Sending large message {0}", msg.ToLongString());
+                    }
                 }
                 catch (Exception exc)
                 {
-                    OnMessageSerializationFailure(msg, exc);
+                    this.OnMessageSerializationFailure(msg, exc);
                     return true;
                 }
 

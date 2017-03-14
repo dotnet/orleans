@@ -40,14 +40,14 @@ namespace Orleans.Runtime
 
         internal static void OnAppRequestsEnd(TimeSpan timeSpan)
         {
-            appRequestsLatencyHistogram.AddData(timeSpan);
-            appRequestsTotalLatency.IncrementBy(timeSpan.Ticks);
-            totalAppRequests.Increment();
+            appRequestsLatencyHistogram?.AddData(timeSpan);
+            appRequestsTotalLatency?.IncrementBy(timeSpan.Ticks);
+            totalAppRequests?.Increment();
         }
 
         internal static void OnAppRequestsTimedOut()
         {
-            timedOutRequests.Increment();
+            timedOutRequests?.Increment();
         }
     }
 }

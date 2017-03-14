@@ -209,7 +209,7 @@ namespace Orleans.Serialization
                 // Guard against invalid type constraints, which appear when generating code for some languages.
                 foreach (var parameter in typeInfo.GenericTypeParameters)
                 {
-                    if (parameter.GetTypeInfo().GetGenericParameterConstraints().Any(IsSpecialClass))
+                    if (parameter.GetTypeInfo().GetGenericParameterConstraints().Any(t => IsSpecialClass(t)))
                     {
                         return true;
                     }

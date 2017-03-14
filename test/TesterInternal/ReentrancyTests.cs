@@ -37,18 +37,20 @@ namespace UnitTests
         }
 
         private readonly ITestOutputHelper output;
+        private readonly Fixture fixture;
         private readonly TestCluster hostedCluster;
 
         public ReentrancyTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             hostedCluster = fixture.HostedCluster;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {
-            var reentrant = GrainClient.GrainFactory.GetGrain<IReentrantGrain>(GetRandomGrainId());
+            var reentrant = this.fixture.GrainFactory.GetGrain<IReentrantGrain>(GetRandomGrainId());
             reentrant.SetSelf(reentrant).Wait();
             try
             {
@@ -58,13 +60,13 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            logger.Info("Reentrancy ReentrantGrain Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy ReentrantGrain Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain()
         {
-            INonReentrantGrain nonreentrant = GrainClient.GrainFactory.GetGrain<INonReentrantGrain>(GetRandomGrainId());
+            INonReentrantGrain nonreentrant = this.fixture.GrainFactory.GetGrain<INonReentrantGrain>(GetRandomGrainId());
             nonreentrant.SetSelf(nonreentrant).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -92,13 +94,13 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
-            logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -126,13 +128,13 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -142,13 +144,13 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SubscribeToStream().Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -176,13 +178,13 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout on stream item delivery to itself when CanInterleave predicate returns false");
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SubscribeToStream().Wait();
             try
             {
@@ -192,13 +194,13 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -212,13 +214,13 @@ namespace UnitTests
                 Assert.True(ex.GetBaseException().InnerException?.Message == "boom", 
                     "Should fail with Orleans runtime exception having all of neccessary details");
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void UnorderedNonReentrantGrain()
         {
-            IUnorderedNonReentrantGrain unonreentrant = GrainClient.GrainFactory.GetGrain<IUnorderedNonReentrantGrain>(GetRandomGrainId());
+            IUnorderedNonReentrantGrain unonreentrant = this.fixture.GrainFactory.GetGrain<IUnorderedNonReentrantGrain>(GetRandomGrainId());
             unonreentrant.SetSelf(unonreentrant).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -247,13 +249,13 @@ namespace UnitTests
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
 
-            logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
+            this.fixture.Logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task IsReentrant()
         {
-            IReentrantTestSupportGrain grain = GrainClient.GrainFactory.GetGrain<IReentrantTestSupportGrain>(0);
+            IReentrantTestSupportGrain grain = this.fixture.GrainFactory.GetGrain<IReentrantTestSupportGrain>(0);
 
             var grainFullName = typeof(ReentrantGrain).FullName;
             Assert.True(await grain.IsReentrant(grainFullName));
@@ -267,16 +269,16 @@ namespace UnitTests
         public void Reentrancy_Deadlock_1()
         {
             List<Task> done = new List<Task>();
-            var grain1 = GrainClient.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(1);
+            var grain1 = this.fixture.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(1);
             grain1.SetDestination(2).Wait();
             done.Add(grain1.Ping(15));
 
-            var grain2 = GrainClient.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(2);
+            var grain2 = this.fixture.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(2);
             grain2.SetDestination(1).Wait();
             done.Add(grain2.Ping(15));
 
             Task.WhenAll(done).Wait();
-            logger.Info("ReentrancyTest_Deadlock_1 OK - no deadlock.");
+            this.fixture.Logger.Info("ReentrancyTest_Deadlock_1 OK - no deadlock.");
         }
 
         // TODO: [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -284,19 +286,19 @@ namespace UnitTests
         public void Reentrancy_Deadlock_2()
         {
             List<Task> done = new List<Task>();
-            var grain1 = GrainClient.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(1);
+            var grain1 = this.fixture.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(1);
             grain1.SetDestination(2).Wait();
 
-            var grain2 = GrainClient.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(2);
+            var grain2 = this.fixture.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(2);
             grain2.SetDestination(1).Wait();
 
-            logger.Info("ReentrancyTest_Deadlock_2 is about to call grain1.Ping()");
+            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 is about to call grain1.Ping()");
             done.Add(grain1.Ping(15));
-            logger.Info("ReentrancyTest_Deadlock_2 is about to call grain2.Ping()");
+            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 is about to call grain2.Ping()");
             done.Add(grain2.Ping(15));
 
             Task.WhenAll(done).Wait();
-            logger.Info("ReentrancyTest_Deadlock_2 OK - no deadlock.");
+            this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 OK - no deadlock.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -394,7 +396,7 @@ namespace UnitTests
             int id = random.Next();
             if (doNonReentrant)
             {
-                IFanOutGrain grain = GrainClient.GrainFactory.GetGrain<IFanOutGrain>(id);
+                IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutNonReentrant_Chain(offset*num, num);
@@ -406,7 +408,7 @@ namespace UnitTests
             }
             else
             {
-                IFanOutGrain grain = GrainClient.GrainFactory.GetGrain<IFanOutGrain>(id);
+                IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutReentrant_Chain(offset*num, num);
@@ -424,7 +426,7 @@ namespace UnitTests
             int id = random.Next();
             if (doNonReentrant)
             {
-                IFanOutACGrain grain = GrainClient.GrainFactory.GetGrain<IFanOutACGrain>(id);
+                IFanOutACGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutACNonReentrant_Chain(offset * num, num);
@@ -436,7 +438,7 @@ namespace UnitTests
             }
             else
             {
-                IFanOutACGrain grain = GrainClient.GrainFactory.GetGrain<IFanOutACGrain>(id);
+                IFanOutACGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutACReentrant_Chain(offset * num, num);

@@ -34,11 +34,6 @@ namespace Orleans.CodeGenerator
         /// The suffix appended to the name of generated classes.
         /// </summary>
         private const string ClassSuffix = "Serializer";
-        
-        /// <summary>
-        /// The suffix appended to the name of the generic serializer registration class.
-        /// </summary>
-        private const string RegistererClassSuffix = "Registerer";
 
         /// <summary>
         /// Generates the class for the provided grain types.
@@ -50,7 +45,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        internal static IEnumerable<TypeDeclarationSyntax> GenerateClass(Type type, Action<Type> onEncounteredType)
+        internal static TypeDeclarationSyntax GenerateClass(Type type, Action<Type> onEncounteredType)
         {
             var typeInfo = type.GetTypeInfo();
             var genericTypes = typeInfo.IsGenericTypeDefinition
@@ -84,14 +79,7 @@ namespace Orleans.CodeGenerator
                 GenerateSerializerMethod(type, fields),
                 GenerateDeserializerMethod(type, fields),
             };
-
-            if (typeInfo.IsConstructedGenericType() || !typeInfo.IsGenericTypeDefinition)
-            {
-                members.Add(GenerateRegisterMethod(type));
-                members.Add(GenerateConstructor(className));
-                attributes.Add(SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax()));
-            }
-
+            
             var classDeclaration =
                 SF.ClassDeclaration(className)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
@@ -103,41 +91,7 @@ namespace Orleans.CodeGenerator
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
 
-            var classes = new List<TypeDeclarationSyntax> { classDeclaration };
-
-            if (typeInfo.IsGenericTypeDefinition)
-            {
-                // Create a generic representation of the serializer type.
-                var serializerType =
-                    SF.GenericName(classDeclaration.Identifier)
-                        .WithTypeArgumentList(
-                            SF.TypeArgumentList()
-                                .AddArguments(
-                                    type.GetTypeInfo().GetGenericArguments()
-                                        .Select(_ => SF.OmittedTypeArgument())
-                                        .Cast<TypeSyntax>()
-                                        .ToArray()));
-                var registererClassName = className + "_" +
-                                          string.Join("_",
-                                              type.GetTypeInfo().GenericTypeParameters.Select(_ => _.Name)) + "_" +
-                                          RegistererClassSuffix;
-                classes.Add(
-                    SF.ClassDeclaration(registererClassName)
-                        .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
-                        .AddAttributeLists(
-                            SF.AttributeList()
-                                .AddAttributes(
-                                    CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
-#if !NETSTANDARD
-                                    SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
-#endif
-                                    SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
-                        .AddMembers(
-                            GenerateMasterRegisterMethod(type, serializerType),
-                            GenerateConstructor(registererClassName)));
-            }
-
-            return classes;
+            return classDeclaration;
         }
 
         /// <summary>
@@ -187,6 +141,17 @@ namespace Orleans.CodeGenerator
                         field.GetSetter(
                             resultVariable,
                             SF.CastExpression(field.Type, deserialized))));
+            }
+
+            // If the type implements the internal IOnDeserialized lifecycle method, invoke it's method now.
+            if (typeof(IOnDeserialized).IsAssignableFrom(type))
+            {
+                Expression<Action<IOnDeserialized>> onDeserializedMethod = _ => _.OnDeserialized(default(ISerializerContext));
+
+                // C#: ((IOnDeserialized)result).OnDeserialized(context);
+                var typedResult = SF.ParenthesizedExpression(SF.CastExpression(typeof(IOnDeserialized).GetTypeSyntax(), resultVariable));
+                var invokeOnDeserialized = onDeserializedMethod.Invoke(typedResult).AddArgumentListArguments(SF.Argument(contextParameter));
+                body.Add(SF.ExpressionStatement(invokeOnDeserialized));
             }
 
             body.Add(SF.ReturnStatement(SF.CastExpression(type.GetTypeSyntax(), resultVariable)));
@@ -473,72 +438,6 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Returns syntax for the serializer registration method.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <returns>Syntax for the serializer registration method.</returns>
-        private static MemberDeclarationSyntax GenerateRegisterMethod(Type type)
-        {
-            Expression<Action> register =
-                () =>
-                SerializationManager.Register(
-                    default(Type),
-                    default(SerializationManager.DeepCopier),
-                    default(SerializationManager.Serializer),
-                    default(SerializationManager.Deserializer));
-            return
-                SF.MethodDeclaration(typeof(void).GetTypeSyntax(), "Register")
-                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters()
-                    .AddBodyStatements(
-                        SF.ExpressionStatement(
-                            register.Invoke()
-                                .AddArgumentListArguments(
-                                    SF.Argument(SF.TypeOfExpression(type.GetTypeSyntax())),
-                                    SF.Argument(SF.IdentifierName("DeepCopier")),
-                                    SF.Argument(SF.IdentifierName("Serializer")),
-                                    SF.Argument(SF.IdentifierName("Deserializer")))));
-        }
-
-        /// <summary>
-        /// Returns syntax for the constructor.
-        /// </summary>
-        /// <param name="className">The name of the class.</param>
-        /// <returns>Syntax for the constructor.</returns>
-        private static ConstructorDeclarationSyntax GenerateConstructor(string className)
-        {
-            return
-                SF.ConstructorDeclaration(className)
-                    .AddModifiers(SF.Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters()
-                    .AddBodyStatements(
-                        SF.ExpressionStatement(
-                            SF.InvocationExpression(SF.IdentifierName("Register")).AddArgumentListArguments()));
-        }
-
-        /// <summary>
-        /// Returns syntax for the generic serializer registration method for the provided type..
-        /// </summary>
-        /// <param name="type">The type which is supported by this serializer.</param>
-        /// <param name="serializerType">The type of the serializer.</param>
-        /// <returns>Syntax for the generic serializer registration method for the provided type..</returns>
-        private static MemberDeclarationSyntax GenerateMasterRegisterMethod(Type type, TypeSyntax serializerType)
-        {
-            Expression<Action> register = () => SerializationManager.Register(default(Type), default(Type));
-            return
-                SF.MethodDeclaration(typeof(void).GetTypeSyntax(), "Register")
-                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters()
-                    .AddBodyStatements(
-                        SF.ExpressionStatement(
-                            register.Invoke()
-                                .AddArgumentListArguments(
-                                    SF.Argument(
-                                        SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))),
-                                    SF.Argument(SF.TypeOfExpression(serializerType)))));
-        }
-
-        /// <summary>
         /// Returns a sorted list of the fields of the provided type.
         /// </summary>
         /// <param name="type">The type.</param>
@@ -547,7 +446,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
+                    .Where(field => !field.IsNotSerialized())
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -712,18 +611,22 @@ namespace Orleans.CodeGenerator
                         this.FieldInfo.FieldType);
 
                     // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
-                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    // C#: (value == null || value is GrainReference) ? value : value.AsReference<TInterface>()
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
-                            SF.PrefixUnaryExpression(
-                                SyntaxKind.LogicalNotExpression,
-                                SF.ParenthesizedExpression(
+                            SF.ParenthesizedExpression(
+                                SF.BinaryExpression(
+                                    SyntaxKind.LogicalOrExpression,
+                                    SF.BinaryExpression(
+                                        SyntaxKind.EqualsExpression,
+                                        getValueExpression,
+                                        SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     SF.BinaryExpression(
                                         SyntaxKind.IsExpression,
                                         getValueExpression,
                                         typeof(GrainReference).GetTypeSyntax()))),
-                            SF.InvocationExpression(getAsReference),
-                            getValueExpression);
+                            getValueExpression,
+                            SF.InvocationExpression(getAsReference));
                 }
                 else
                 {

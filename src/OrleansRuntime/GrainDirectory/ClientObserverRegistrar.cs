@@ -9,7 +9,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar
+    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ISiloStatusListener
     {
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromSeconds(30);
@@ -20,7 +20,6 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
-        private IGrainTimer clientRefreshTimer;
         private Gateway gateway;
 
 
@@ -50,13 +49,12 @@ namespace Orleans.Runtime
         {
             var random = new SafeRandom();
             var randomOffset = random.NextTimeSpan(orleansConfig.Globals.ClientRegistrationRefresh);
-            clientRefreshTimer = GrainTimer.FromTaskCallback(
-                    OnClientRefreshTimer, 
-                    null, 
-                    randomOffset, 
-                    orleansConfig.Globals.ClientRegistrationRefresh, 
-                    "ClientObserverRegistrar.ClientRefreshTimer");
-            clientRefreshTimer.Start();
+            this.RegisterTimer(
+                this.OnClientRefreshTimer,
+                null,
+                randomOffset,
+                orleansConfig.Globals.ClientRegistrationRefresh,
+                "ClientObserverRegistrar.ClientRefreshTimer");
             if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
         }
 
@@ -135,7 +133,17 @@ namespace Orleans.Runtime
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
             return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetClientGWActivation(clientId, myAddress));
         }
-     }
+
+        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            if (status != SiloStatus.Dead)
+            {
+                return;
+            }
+
+            scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
+        }
+    }
 }
 
 

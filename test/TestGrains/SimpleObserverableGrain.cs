@@ -89,6 +89,11 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
+        public Task<string> GetRuntimeInstanceId()
+        {
+            return Task.FromResult(RuntimeIdentity);
+        }
+
         protected void RaiseStateUpdateEvent()
         {
             Observers.Notify((ISimpleGrainObserver observer) =>

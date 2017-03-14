@@ -11,7 +11,9 @@ namespace Tester.AzureUtils.General
 {
     public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -21,10 +23,15 @@ namespace Tester.AzureUtils.General
             }
         }
 
+        public GenericGrainsInAzureStorageTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
-            var grain = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());
+            var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());
             await grain.EchoAsync(42);
 
             //ClearState() also exhibits the error, even with the shorter named grain
@@ -35,7 +42,7 @@ namespace Tester.AzureUtils.General
         //This test is identical to the one above, with a shorter name, and passes
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {
-            var grain = GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
+            var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
             await grain.EchoAsync(42);
 
             //ClearState() also exhibits the error, even with the shorter named grain

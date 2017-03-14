@@ -1,23 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="      ..\..\..\test\TestInternalGrains\obj\**\*.cs;       ..\..\..\test\TestInternalGrains\bin\**\*.cs;       ..\..\..\test\TestInternalGrains\Properties\*.cs" />
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
@@ -30,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.assert" Version="2.1.0" />
+    <PackageReference Include="xunit.assert" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>

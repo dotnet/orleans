@@ -23,30 +23,33 @@ namespace Tests.GeoClusterTests
         // This allows us to create multiple clients that are connected to different silos.
         public class ClientWrapper : ClientWrapperBase
         {
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer) : base(name, gatewayport, clusterId, customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+                this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
             IManagementGrain systemManagement;
 
             public MultiClusterConfiguration InjectMultiClusterConf(params string[] clusters)
             {
-                return systemManagement.InjectMultiClusterConfiguration(clusters).Result;
+                return systemManagement.InjectMultiClusterConfiguration(clusters).GetResult();
             }
 
             public MultiClusterConfiguration GetMultiClusterConfiguration()
             {
-                return systemManagement.GetMultiClusterConfiguration().Result;
+                return systemManagement.GetMultiClusterConfiguration().GetResult();
             }
 
             public List<IMultiClusterGatewayInfo> GetMultiClusterGateways()
             {
-                return systemManagement.GetMultiClusterGateways().Result;
+                return systemManagement.GetMultiClusterGateways().GetResult();
             }
 
             public Dictionary<SiloAddress,SiloStatus> GetHosts()
             {
-                return systemManagement.GetHosts().Result;
+                return systemManagement.GetHosts().GetResult();
             }
         }
 
@@ -61,7 +64,7 @@ namespace Tests.GeoClusterTests
             var clusterA = "A";
             NewGeoCluster(globalserviceid, clusterA, 1);
             var siloA = Clusters[clusterA].Silos[0].SiloAddress.Endpoint;
-            var clientA = NewClient<ClientWrapper>(clusterA, 0);
+            var clientA = this.NewClient<ClientWrapper>(clusterA, 0, ClientWrapper.Factory);
 
             var cur = clientA.GetMultiClusterConfiguration();
             Assert.Null(cur); //no configuration should be there yet
@@ -81,7 +84,7 @@ namespace Tests.GeoClusterTests
             var clusterB = "B";
             NewGeoCluster(globalserviceid, clusterB, 1);
             var siloB = Clusters[clusterB].Silos[0].SiloAddress.Endpoint;
-            var clientB = NewClient<ClientWrapper>(clusterB, 0);
+            var clientB = NewClient<ClientWrapper>(clusterB, 0, ClientWrapper.Factory);
 
             cur = clientB.GetMultiClusterConfiguration();
             Assert.Null(cur); //no configuration should be there yet
@@ -165,14 +168,14 @@ namespace Tests.GeoClusterTests
       
             // create cluster A and clientA
             NewGeoCluster(globalserviceid, clusterA, 3, configcustomizer);
-            var clientA = NewClient<ClientWrapper>(clusterA, 0);
+            var clientA = this.NewClient<ClientWrapper>(clusterA, 0, ClientWrapper.Factory);
             var portA0 = Clusters[clusterA].Silos[0].SiloAddress.Endpoint.Port;
             var portA1 = Clusters[clusterA].Silos[1].SiloAddress.Endpoint.Port;
             var portA2 = Clusters[clusterA].Silos[2].SiloAddress.Endpoint.Port;
 
             // create cluster B and clientB
             NewGeoCluster(globalserviceid, clusterB, 3, configcustomizer);
-            var clientB = NewClient<ClientWrapper>(clusterB, 0);
+            var clientB = this.NewClient<ClientWrapper>(clusterB, 0, ClientWrapper.Factory);
             var portB0 = Clusters[clusterB].Silos[0].SiloAddress.Endpoint.Port;
             var portB1 = Clusters[clusterB].Silos[1].SiloAddress.Endpoint.Port;
             var portB2 = Clusters[clusterB].Silos[2].SiloAddress.Endpoint.Port;

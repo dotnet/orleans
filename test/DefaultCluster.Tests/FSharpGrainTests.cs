@@ -1,3 +1,4 @@
+#if !EXCLUDEFSHARP
 using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
@@ -13,10 +14,14 @@ namespace DefaultCluster.Tests.General
     /// </summary>
     public class FSharpGrainTests : HostedTestClusterEnsureDefaultStarted
     {
+        public FSharpGrainTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         private async Task PingTest<T>(T input)
         {
             var id = Guid.NewGuid();
-            var grain = GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var grain = this.GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var output = await grain.Ping(input);
             Assert.Equal(input, output);
         }
@@ -90,3 +95,4 @@ namespace DefaultCluster.Tests.General
         }
     }
 }
+#endif

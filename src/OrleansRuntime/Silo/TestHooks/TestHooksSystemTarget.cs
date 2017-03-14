@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Storage;
+using Orleans.Streams;
 
 namespace Orleans.Runtime.TestHooks
 {
@@ -36,6 +39,37 @@ namespace Orleans.Runtime.TestHooks
         public Task<bool> HasStatisticsProvider() => Task.FromResult(silo.StatisticsProviderManager != null);
 
         public Task<Guid> GetServiceId() => Task.FromResult(silo.GlobalConfig.ServiceId);
+
+        public Task<bool> HasStorageProvider(string providerName)
+        {
+            IStorageProvider tmp;
+            return Task.FromResult(silo.StorageProviderManager.TryGetProvider(providerName, out tmp));
+        }
+
+        public Task<bool> HasStreamProvider(string providerName)
+        {
+            try
+            {
+                silo.StreamProviderManager.GetStreamProvider(providerName);
+                return Task.FromResult(true);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Task.FromResult(false);
+            }
+        }
+
+        public Task<bool> HasBoostraperProvider(string providerName)
+        {
+            foreach (var provider in silo.BootstrapProviders)
+            {
+                if (String.Equals(providerName, provider.Name))
+                {
+                    return Task.FromResult(true);
+                }
+            }
+            return Task.FromResult(false);
+        }
 
         public Task<ICollection<string>> GetStorageProviderNames() => Task.FromResult<ICollection<string>>(silo.StorageProviderManager.GetProviderNames().ToList());
 

@@ -397,6 +397,31 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
+
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, IClientMetricsDataPublisher
+        {
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                providerTypeInfo.IsGenericType ||
+                !(
+                typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)) &&
+                typeof(IClientMetricsDataPublisher).IsAssignableFrom(typeof(T))
+                ))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, IClientMetricsDataPublisher interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+        }
+
+        public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+
+
+
+
         /// <summary>
         /// Retrieves an existing provider configuration
         /// </summary>
@@ -541,7 +566,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Retuurns a ClientConfiguration object for connecting to a local silo (for testing).
+        /// Returns a ClientConfiguration object for connecting to a local silo (for testing).
         /// </summary>
         /// <param name="gatewayPort">Client gateway TCP port</param>
         /// <returns>ClientConfiguration object that can be passed to GrainClient class for initialization</returns>

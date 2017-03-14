@@ -4,6 +4,8 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -23,6 +25,7 @@ namespace OrleansAWSUtils.Streams
         private int numQueues;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
+        private SerializationManager serializationManager;
 
         /// <summary>"DataConnectionString".</summary>
         public const string DataConnectionStringPropertyName = "DataConnectionString";
@@ -50,6 +53,7 @@ namespace OrleansAWSUtils.Streams
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
             adapterCache = new SimpleQueueAdapterCache(cacheSize, logger);
+            this.serializationManager = serviceProvider.GetRequiredService<SerializationManager>();
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
@@ -60,7 +64,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName);
+            var adapter = new SQSAdapter(this.serializationManager, streamQueueMapper, dataConnectionString, deploymentId, providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloStatusOracle statusOracle;
         private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly OrleansTaskScheduler scheduler;
         private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
@@ -23,7 +24,8 @@ namespace Orleans.Runtime
             ISiloStatusOracle oracle,
             OrleansTaskScheduler scheduler,
             TimeSpan refreshClusterMapTimeout,
-            ImplicitStreamSubscriberTable implicitStreamSubscriberTable)
+            ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
+            IInternalGrainFactory grainFactory)
             : base(Constants.TypeManagerId, myAddr)
         {
             if (grainTypeManager == null)
@@ -38,6 +40,7 @@ namespace Orleans.Runtime
             this.grainTypeManager = grainTypeManager;
             this.statusOracle = oracle;
             this.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
+            this.grainFactory = grainFactory;
             this.scheduler = scheduler;
             this.hasToRefreshClusterGrainInterfaceMap = true;
             this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
@@ -123,7 +126,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var remoteTypeManager = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerId, siloAddress);
+                var remoteTypeManager = this.grainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerId, siloAddress);
                 var siloTypeCodeMap = await scheduler.QueueTask(() => remoteTypeManager.GetSiloTypeCodeMap(), SchedulingContext);
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, siloTypeCodeMap);
             }

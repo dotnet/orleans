@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -13,21 +15,35 @@ using Orleans.Storage;
 namespace UnitTests.StorageTests
 {
     [DebuggerDisplay("MockStorageProvider:{Name}")]
-    public class MockStorageProvider : MarshalByRefObject, IStorageProvider
+    public class MockStorageProvider : IControllable, IStorageProvider
     {
+        public enum Commands
+        {
+            InitCount,
+            SetValue,
+            GetProvideState,
+            SetErrorInjection,
+            GetLastState,
+            ResetHistory
+        }
+        [Serializable]
+        public class StateForTest 
+        {
+            public int InitCount { get; set; }
+            public int CloseCount { get; set; }
+            public int ReadCount { get; set; }
+            public int WriteCount { get; set; }
+            public int DeleteCount { get; set; }
+        }
+
         private static int _instanceNum;
         private readonly int _id;
 
         private int initCount, closeCount, readCount, writeCount, deleteCount;
 
-        public int InitCount { get { return initCount; } }
-        public int CloseCount { get { return closeCount; } }
-        public int ReadCount { get { return readCount; } }
-        public int WriteCount { get { return writeCount; } }
-        public int DeleteCount { get { return deleteCount; } }
-
         private readonly int numKeys;
         private ILocalDataStore StateStore;
+        private SerializationManager serializationManager;
         private const string stateStoreKey = "State";
 
         public string LastId { get; private set; }
@@ -45,7 +61,34 @@ namespace UnitTests.StorageTests
             this.numKeys = numKeys;
         }
 
-        public virtual void SetValue<TState>(string grainType, GrainReference grainReference, string name, object val)
+        public StateForTest GetProviderState()
+        {
+            var state = new StateForTest();
+            state.InitCount = initCount;
+            state.CloseCount = closeCount;
+            state.DeleteCount = deleteCount;
+            state.ReadCount = readCount;
+            state.WriteCount = writeCount;
+            return state;
+        }
+
+        [Serializable]
+        public class SetValueArgs
+        {
+            public Type StateType { get; set; }
+            public string GrainType { get; set; }
+            public GrainReference GrainReference { get; set; }
+            public string Name { get; set; }
+            public object Val { get; set; }
+
+        }
+
+        public void SetValue(SetValueArgs args)
+        {
+            SetValue(args.StateType, args.GrainType, args.GrainReference, args.Name, args.Val);
+        }
+
+        private void SetValue(Type stateType, string grainType, GrainReference grainReference, string name, object val)
         {
             lock (StateStore)
             {
@@ -54,7 +97,7 @@ namespace UnitTests.StorageTests
                 var storedDict = StateStore.ReadRow(keys);
                 if (!storedDict.ContainsKey(stateStoreKey))
                 {
-                    storedDict[stateStoreKey] = Activator.CreateInstance<TState>();
+                    storedDict[stateStoreKey] = Activator.CreateInstance(stateType);
                 } 
 
                 var storedState = storedDict[stateStoreKey];
@@ -63,6 +106,11 @@ namespace UnitTests.StorageTests
                 LastId = GetId(grainReference);
                 LastState = storedState;
             }
+        }
+
+        public object GetLastState()
+        {
+            return LastState;
         }
 
         public T GetLastState<T>()
@@ -96,21 +144,12 @@ namespace UnitTests.StorageTests
             Log = providerRuntime.GetLogger(loggerName);
 
             Log.Info(0, "Init Name={0} Config={1}", name, config);
+            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
             Interlocked.Increment(ref initCount);
-
-            if (LocalDataStoreInstance.LocalDataStore != null)
-            {
-                // Attached to shared local key store
-                StateStore = LocalDataStoreInstance.LocalDataStore;
-            }
-            else
-            {
-
-                //blocked by port HierarchicalKeyStore to coreclr
-                StateStore = new HierarchicalKeyStore(numKeys);
-
-            }
-
+            
+            //blocked by port HierarchicalKeyStore to coreclr
+            StateStore = new HierarchicalKeyStore(numKeys);
+            
             Log.Info(0, "Finished Init Name={0} Config={1}", name, config);
             return TaskDone.Done;
         }
@@ -130,7 +169,7 @@ namespace UnitTests.StorageTests
             lock (StateStore)
             {
                 var storedState = GetLastState(grainType, grainReference, grainState);
-                grainState.State = SerializationManager.DeepCopy(storedState); // Read current state data
+                grainState.State = this.serializationManager.DeepCopy(storedState); // Read current state data
             }
             return TaskDone.Done;
         }
@@ -141,7 +180,7 @@ namespace UnitTests.StorageTests
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
-                var storedState = SerializationManager.DeepCopy(grainState.State); // Store current state data
+                var storedState = this.serializationManager.DeepCopy(grainState.State); // Store current state data
                 var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainReference), stateStore, grainState.ETag);
 
@@ -186,5 +225,33 @@ namespace UnitTests.StorageTests
             LastId = null;
             LastState = null;
         }
+
+        #region IControllable interface methods
+        /// <summary>
+        /// A function to execute a control command.
+        /// </summary>
+        /// <param name="command">A serial number of the command.</param>
+        /// <param name="arg">An opaque command argument</param>
+        public virtual Task<object> ExecuteCommand(int command, object arg)
+        {
+            switch ((Commands)command)
+            {
+                case Commands.InitCount:
+                    return Task.FromResult<object>(initCount);
+                case Commands.SetValue:
+                    SetValue((SetValueArgs) arg);
+                    return Task.FromResult<object>(true); 
+                case Commands.GetProvideState:
+                    return Task.FromResult<object>(GetProviderState());
+                case Commands.GetLastState:
+                    return Task.FromResult(GetLastState());
+                case Commands.ResetHistory:
+                    ResetHistory();
+                    return Task.FromResult<object>(true);
+                default:
+                    return Task.FromResult<object>(true); 
+            }
+        }
+        #endregion
     }
 }

@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
+    <Title>Microsoft Orleans Azure Utilities</Title>
+    <Description>
+      Support library for hosting Orleans on Microsoft Azure.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>OrleansAzureUtils</AssemblyName>
+    <RootNamespace>OrleansAzureUtils</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WindowsAzure.Storage" Version="7.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.2017.csproj" />
+  </ItemGroup>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

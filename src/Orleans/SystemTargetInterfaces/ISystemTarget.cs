@@ -21,5 +21,6 @@ namespace Orleans
     {
         SiloAddress Silo { get; }
         GrainId GrainId { get; }
+        IRuntimeClient RuntimeClient { get; }
     }
 }

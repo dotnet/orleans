@@ -2,14 +2,18 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
+using Orleans.LogConsistency;
 using Orleans.Storage;
+using Orleans.Runtime.LogConsistency;
+using Orleans.GrainDirectory;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Helper classe used to create local instances of grains.
+    /// Helper class used to create local instances of grains.
     /// </summary>
-    public class GrainCreator
+    internal class GrainCreator
     {
         private readonly Lazy<IGrainRuntime> grainRuntime;
 
@@ -19,16 +23,21 @@ namespace Orleans.Runtime
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
+        private readonly SerializationManager serializationManager;
+        private readonly IInternalGrainFactory grainFactory;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainCreator"/> class.
         /// </summary>
         /// <param name="services">Service provider used to create new grains</param>
-        /// <param name="getGrainRuntime">
-        /// The delegate used to get the grain runtime.
-        /// </param>
-        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime)
+        /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
+        /// <param name="serializationManager">The serialization manager.</param>
+        /// <param name="grainFactory"></param>
+        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime, SerializationManager serializationManager, IInternalGrainFactory grainFactory)
         {
             this.services = services;
+            this.serializationManager = serializationManager;
+            this.grainFactory = grainFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
             this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
@@ -54,30 +63,52 @@ namespace Orleans.Runtime
         /// <summary>
         /// Create a new instance of a grain
         /// </summary>
-        /// <param name="grainType">The grain type.</param>
+        /// <param name="grainType"></param>
         /// <param name="identity">Identity for the new grain</param>
         /// <param name="stateType">If the grain is a stateful grain, the type of the state it persists.</param>
-        /// <param name="storageProvider">If the grain is a stateful grain, the storage provider used to persist the state.</param>
-        /// <returns>The newly created grain.</returns>
-        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType, IStorageProvider storageProvider)
-        {
-            // Create a new instance of the grain
-            var grain = this.CreateGrainInstance(grainType, identity);
+        /// <param name="storage">If the grain is a stateful grain, the storage used to persist the state.</param>
+        /// <returns></returns>
+        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType, IStorage storage)
+		{
+            //Create a new instance of the grain
+            var grain = CreateGrainInstance(grainType, identity);
 
             var statefulGrain = grain as IStatefulGrain;
 
             if (statefulGrain == null)
-            {
                 return grain;
-            }
-
-            var storage = new GrainStateStorageBridge(grainType.FullName, statefulGrain, storageProvider);
 
             //Inject state and storage data into the grain
             statefulGrain.GrainState.State = Activator.CreateInstance(stateType);
             statefulGrain.SetStorage(storage);
 
             return grain;
+        }
+
+
+        /// <summary>
+        /// Install the log-view adaptor into a log-consistent grain.
+        /// </summary>
+        /// <param name="grain">The grain.</param>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="stateType">The type of the grain state.</param>
+        /// <param name="mcRegistrationStrategy">The multi-cluster registration strategy.</param>
+        /// <param name="factory">The consistency adaptor factory</param>
+        /// <param name="storageProvider">The storage provider, or null if none needed</param>
+        /// <returns>The newly created grain.</returns>
+        public void InstallLogViewAdaptor(Grain grain, Type grainType, 
+            Type stateType, IMultiClusterRegistrationStrategy mcRegistrationStrategy,
+            ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
+        {
+            // try to find a suitable logger that we can use to trace consistency protocol information
+            var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
+           
+            // encapsulate runtime services used by consistency adaptors
+            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy, this.serializationManager, this.grainFactory);
+
+            var state = Activator.CreateInstance(stateType);
+
+            ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, svc);
         }
     }
 }

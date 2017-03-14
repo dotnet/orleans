@@ -2,18 +2,23 @@ using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 
-
 namespace Orleans.Runtime.ReminderService
 {
     internal class SqlReminderTable: IReminderTable
     {
+        private readonly IGrainReferenceConverter grainReferenceConverter;
         private string serviceId;
         private RelationalOrleansQueries orleansQueries;
+
+        public SqlReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        {
+            this.grainReferenceConverter = grainReferenceConverter;
+        }
 
         public async Task Init(GlobalConfiguration config, Logger logger)
         {
             serviceId = config.ServiceId.ToString();
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders, this.grainReferenceConverter);
         }
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)

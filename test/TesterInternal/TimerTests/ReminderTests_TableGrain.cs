@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -16,15 +17,12 @@ namespace UnitTests.TimerTests
 {
     public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrain.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
-                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-                });
+                var options = new TestClusterOptions();
+                return new TestCluster(options);
             }
         }
 
@@ -32,7 +30,7 @@ namespace UnitTests.TimerTests
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
-            var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
 
@@ -54,7 +52,7 @@ namespace UnitTests.TimerTests
         public async Task Rem_Grain_MultipleReminders()
         {
             //log.Info(TestContext.TestName);
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
 

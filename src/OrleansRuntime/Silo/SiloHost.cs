@@ -140,7 +140,6 @@ namespace Orleans.Runtime.Host
         {
             Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
             Utils.SafeExecute(LogManager.UnInitialize);
-            Utils.SafeExecute(GrainTypeManager.Stop);
         }
 
         /// <summary>

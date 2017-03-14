@@ -23,9 +23,15 @@ namespace UnitTests.Grains
         }
     }
 
-    public class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
+    internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
     {
+        private readonly Catalog catalog;
         private int burstCount = 0;
+
+        public BusyActivationGcTestGrain1(Catalog catalog)
+        {
+            this.catalog = catalog;
+        }
 
         public Task Nop()
         {
@@ -50,7 +56,7 @@ namespace UnitTests.Grains
             }
 
             burstCount = count;
-            InsideRuntimeClient.Current.Catalog.ActivationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
+            this.catalog.ActivationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
             return TaskDone.Done;
         }
 

@@ -7,6 +7,10 @@ namespace DefaultCluster.Tests
 {
     public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
+        public SerializationTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("BVT"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()
         {
@@ -19,10 +23,10 @@ namespace DefaultCluster.Tests
             data.SetBit(13);
             data.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
-            object obj = SerializationManager.DeepCopy(data);
+            object obj = this.HostedCluster.SerializationManager.DeepCopy(data);
             Assert.IsAssignableFrom<LargeTestData>(obj);
 
-            object copy = SerializationManager.RoundTripSerializationForTesting(obj);
+            object copy = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(obj);
             Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 
@@ -31,7 +35,7 @@ namespace DefaultCluster.Tests
         {
             ValueTypeTestData data = new ValueTypeTestData(4);
 
-            object obj = SerializationManager.DeepCopy(data);
+            object obj = this.HostedCluster.SerializationManager.DeepCopy(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(obj);
             Assert.Equal<int>(4, ((ValueTypeTestData)obj).GetValue());
@@ -42,7 +46,7 @@ namespace DefaultCluster.Tests
         {
             ValueTypeTestData data = new ValueTypeTestData(4);
 
-            object copy = SerializationManager.RoundTripSerializationForTesting(data);
+            object copy = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(copy);
             Assert.Equal<int>(4, ((ValueTypeTestData)copy).GetValue());

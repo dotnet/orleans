@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -11,11 +12,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationTestsJsonTypes
     {
-        public SerializationTestsJsonTypes()
+        private readonly TestEnvironmentFixture fixture;
+
+        public SerializationTestsJsonTypes(TestEnvironmentFixture fixture)
         {
-            SerializationTestEnvironment.Initialize();
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
@@ -30,18 +34,16 @@ namespace UnitTests.Serialization
                    }"; 
  
             JObject input = JObject.Parse(json);
-            JObject output = SerializationManager.RoundTripSerializationForTesting(input);
+            JObject output = fixture.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [RegisterSerializerAttribute]
+#pragma warning disable 618
+        [RegisterSerializer]
+#pragma warning restore 618
         public class JObjectSerializationExample1
         {
-            static JObjectSerializationExample1()
-            {
-                Register();
-            }
-
+            public static bool RegisterWasCalled;
             public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
@@ -53,21 +55,28 @@ namespace UnitTests.Serialization
             {
                 var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, context.StreamWriter);
+                context.SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
 
-            public static void Register()
+            public static void Register(SerializationManager serializationManager)
             {
-                SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
+                RegisterWasCalled = true;
+                serializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }
-        
+
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void SerializationTests_RegisterMethod_IsCalled()
+        {
+            Assert.True(JObjectSerializationExample1.RegisterWasCalled);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_InnerTypes_TypeNameHandling()
         {
@@ -80,7 +89,7 @@ namespace UnitTests.Serialization
             Assert.Equal(original, jsonDeser);
 
             // Orleans's SerializationManager also deserializes everything correctly, but it serializes it into its own binary format
-            var orleansDeser = SerializationManager.RoundTripSerializationForTesting(original);
+            var orleansDeser = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
             Assert.Equal(typeof(InnerType), jsonDeser.MyDictionary["obj1"].GetType());
             Assert.Equal(original, orleansDeser);
         }
@@ -108,7 +117,7 @@ namespace UnitTests.Serialization
             // in GrainInterfaces assembly and markled as [Serializable].
             // JObject that is referenced from RootType will be serialized with JsonSerialization_Example2 below.
 
-            var orleansJsonDeser = SerializationManager.RoundTripSerializationForTesting(jsonDeser);
+            var orleansJsonDeser = this.fixture.SerializationManager.RoundTripSerializationForTesting(jsonDeser);
             Assert.Equal(typeof(JObject), orleansJsonDeser.MyDictionary["obj1"].GetType());
             // The below assert fails, but only since JObject does not correctly implement Equals.
             //Assert.Equal(jsonDeser, orleansJsonDeser);
@@ -118,7 +127,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_Json_POCO()
         {
             var obj = new SimplePOCO();
-            var deepCopied = SerializationManager.RoundTripSerializationForTesting(obj);
+            var deepCopied = this.fixture.SerializationManager.RoundTripSerializationForTesting(obj);
             Assert.Equal(typeof(SimplePOCO), deepCopied.GetType());
         }
 
@@ -132,7 +141,12 @@ namespace UnitTests.Serialization
         /// <summary>
         /// A different way to configure Json serializer.
         /// </summary>
-        [RegisterSerializer]
+        [Serializer(typeof(JObject))]
+        [Serializer(typeof(JArray))]
+        [Serializer(typeof(JToken))]
+        [Serializer(typeof(JValue))]
+        [Serializer(typeof(JProperty))]
+        [Serializer(typeof(JConstructor))]
         public class JsonSerializationExample2
         {
             internal static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
@@ -141,11 +155,7 @@ namespace UnitTests.Serialization
                 TypeNameHandling = TypeNameHandling.All
             };
 
-            static JsonSerializationExample2()
-            {
-                Register();
-            }
-
+            [CopierMethod]
             public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
@@ -153,27 +163,18 @@ namespace UnitTests.Serialization
                 return original;
             }
 
+            [SerializerMethod]
             public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
-                SerializationManager.Serialize(str, context.StreamWriter);
+                context.SerializationManager.Serialize(str, context.StreamWriter);
             }
 
+            [DeserializerMethod]
             public static object Deserialize(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
-            }
-
-            public static void Register()
-            {
-                foreach (var type in new[]
-                    {
-                        typeof(JObject), typeof(JArray), typeof(JToken), typeof(JValue), typeof(JProperty), typeof(JConstructor), 
-                    })
-                {
-                    SerializationManager.Register(type, DeepCopier, Serialize, Deserialize);
-                }
             }
         }
     }

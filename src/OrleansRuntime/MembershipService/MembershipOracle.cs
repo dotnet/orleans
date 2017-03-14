@@ -11,6 +11,7 @@ namespace Orleans.Runtime.MembershipService
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
         private readonly MembershipTableFactory membershipTableFactory;
+        private readonly IInternalGrainFactory grainFactory;
         private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
@@ -27,8 +28,8 @@ namespace Orleans.Runtime.MembershipService
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = SiloMessageSender.CONNECTION_RETRY_DELAY;
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
-        private static TimeSpan EXP_BACKOFF_ERROR_MAX;
-        private static TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
+        private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
+        private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
 
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
@@ -37,10 +38,11 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
-        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory)
+        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {
             this.membershipTableFactory = membershipTableFactory;
+            this.grainFactory = grainFactory;
             logger = LogManager.GetLogger("MembershipOracle");
             membershipOracleData = new MembershipOracleData(silo, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
@@ -148,7 +150,12 @@ namespace Orleans.Runtime.MembershipService
                         timerGetTableUpdates.Dispose();
 
                     timerGetTableUpdates = GrainTimer.FromTimerCallback(
-                        OnGetTableUpdateTimer, null, randomTableOffset, orleansConfig.Globals.TableRefreshTimeout, "Membership.ReadTableTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnGetTableUpdateTimer,
+                        null,
+                        randomTableOffset,
+                        orleansConfig.Globals.TableRefreshTimeout,
+                        "Membership.ReadTableTimer");
                     
                     timerGetTableUpdates.Start();
 
@@ -156,12 +163,17 @@ namespace Orleans.Runtime.MembershipService
                         timerProbeOtherSilos.Dispose();
 
                     timerProbeOtherSilos = GrainTimer.FromTimerCallback(
-                        OnProbeOtherSilosTimer, null, randomProbeOffset, orleansConfig.Globals.ProbeTimeout, "Membership.ProbeTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnProbeOtherSilosTimer,
+                        null,
+                        randomProbeOffset,
+                        orleansConfig.Globals.ProbeTimeout,
+                        "Membership.ProbeTimer");
                     
                     timerProbeOtherSilos.Start();
                 };
                 orleansConfig.OnConfigChange(
-                    "Globals/Liveness", () => InsideRuntimeClient.Current.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
+                    "Globals/Liveness", () => this.RuntimeClient.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
 
                 configure();
                 logger.Info(ErrorCode.MembershipFinishBecomeActive, "-Finished BecomeActive.");
@@ -181,7 +193,12 @@ namespace Orleans.Runtime.MembershipService
                 timerIAmAliveUpdateInTable.Dispose();
 
             timerIAmAliveUpdateInTable = GrainTimer.FromTimerCallback(
-                OnIAmAliveUpdateInTableTimer, null, TimeSpan.Zero, orleansConfig.Globals.IAmAliveTablePublishTimeout, "Membership.IAmAliveTimer");
+                this.RuntimeClient.Scheduler,
+                OnIAmAliveUpdateInTableTimer,
+                null,
+                TimeSpan.Zero,
+                orleansConfig.Globals.IAmAliveTablePublishTimeout,
+                "Membership.IAmAliveTimer");
 
             timerIAmAliveUpdateInTable.Start();
         }
@@ -322,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
 
         #region Table update/insert processing
 
-        private static Task<bool> MembershipExecuteWithRetries(
+        private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction, 
             TimeSpan timeout)
         {
@@ -333,8 +350,8 @@ namespace Orleans.Runtime.MembershipService
                     (result, i) => result == false,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
             );
         }
 
@@ -1117,9 +1134,9 @@ namespace Orleans.Runtime.MembershipService
 
         #endregion
 
-        private static IMembershipService GetOracleReference(SiloAddress silo)
+        private IMembershipService GetOracleReference(SiloAddress silo)
         {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
+            return this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
         }
     }
 }

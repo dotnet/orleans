@@ -1,8 +1,13 @@
 ﻿
 using System;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -222,8 +227,9 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="bufferPool">buffer pool cache should use for raw buffers</param>
         /// <param name="timePurge">predicate used to trigger time based purges</param>
         /// <param name="logger">cache logger</param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger)
-            : this(checkpointer, new EventHubDataAdapter(bufferPool, timePurge), EventHubDataComparer.Instance, logger)
+        /// <param name="serializationManager"></param>
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger, SerializationManager serializationManager)
+            : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool, timePurge), EventHubDataComparer.Instance, logger)
         {
         }
 
@@ -266,6 +272,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 log.Verbose($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
             }
+            base.OnPurge(lastItemPurged, newestItem);
         }
 
         /// <summary>

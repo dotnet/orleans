@@ -233,28 +233,28 @@ namespace Orleans.Runtime
 
         public void Stop()
         {
-            if (cpuUsageTimer != null)
-                cpuUsageTimer.Dispose();
+            cpuUsageTimer?.Dispose();
             cpuUsageTimer = null;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed")]
         public void Dispose()
         {
-            cpuCounterPF.Dispose();
-            availableMemoryCounterPF.Dispose();
+            cpuCounterPF?.Dispose();
+            availableMemoryCounterPF?.Dispose();
 
-            timeInGCPF.Dispose();
+            timeInGCPF?.Dispose();
             if (genSizesPF != null)
                 foreach (var item in genSizesPF)
                 {
                     item?.Dispose();
                 }
-            allocatedBytesPerSecPF.Dispose();
-            promotedMemoryFromGen1PF.Dispose();
-            numberOfInducedGCsPF.Dispose();
-            largeObjectHeapSizePF.Dispose();
-            promotedFinalizationMemoryFromGen0PF.Dispose();
-            cpuUsageTimer.Dispose();
+            allocatedBytesPerSecPF?.Dispose();
+            promotedMemoryFromGen1PF?.Dispose();
+            numberOfInducedGCsPF?.Dispose();
+            largeObjectHeapSizePF?.Dispose();
+            promotedFinalizationMemoryFromGen0PF?.Dispose();
+            cpuUsageTimer?.Dispose();
         }
     }
 }

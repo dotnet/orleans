@@ -1,18 +1,15 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Security.Principal;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-
+using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.Counter.Control
 {
-    using System.Collections.Generic;
-    using Orleans.Serialization;
-    using OrleansTelemetryConsumers.Counters;
-
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>
@@ -32,6 +29,9 @@ namespace Orleans.Counter.Control
             var userIdent = WindowsIdentity.GetCurrent();
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
+            
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
+            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes(true).Keys.ToList();
             perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer();
         }
 
@@ -107,9 +107,7 @@ namespace Orleans.Counter.Control
                 ConsoleText.WriteError("Need to be running in Administrator role to perform the requested operations.");
                 return 1;
             }
-
-            SerializationTestEnvironment.Initialize();
-
+            
             InitConsoleLogging();
 
             try
@@ -140,7 +138,7 @@ namespace Orleans.Counter.Control
         }
 
         /// <summary>
-        /// Initialize log infrastrtucture for Orleans runtime sub-components
+        /// Initialize log infrastructure for Orleans runtime sub-components
         /// </summary>
         private static void InitConsoleLogging()
         {
@@ -174,12 +172,6 @@ namespace Orleans.Counter.Control
                     UnregisterWindowsPerfCounters(true);
                 }
 
-                if (GrainTypeManager.Instance == null)
-                {
-                    var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                    var typeManager = new GrainTypeManager(false, loader, new RandomPlacementDefaultStrategy()); 
-                    GrainTypeManager.Instance.Start(false);
-                }
                 // Register perf counters
                 perfCounterConsumer.InstallCounters();
 
@@ -220,14 +212,6 @@ namespace Orleans.Counter.Control
                     ConsoleText.WriteStatus("Ignoring error deleting Orleans counters due to brute-force mode");
                 else
                     throw;
-            }
-        }
-
-        private class RandomPlacementDefaultStrategy : DefaultPlacementStrategy
-        {
-            public RandomPlacementDefaultStrategy()
-                : base(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY)
-            {
             }
         }
     }

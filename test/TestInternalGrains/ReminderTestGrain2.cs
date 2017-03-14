@@ -18,6 +18,8 @@ namespace UnitTests.Grains
     // NOTE: if you make any changes here, copy them to ReminderTestCopyGrain
     public class ReminderTestGrain2 : Grain, IReminderTestGrain2, IRemindable
     {
+        private readonly IReminderTable reminderTable;
+
         private readonly IReminderRegistry unvalidatedReminderRegistry;
         Dictionary<string, IGrainReminder> allReminders;
         Dictionary<string, long> sequence;
@@ -30,8 +32,9 @@ namespace UnitTests.Grains
 
         private string filePrefix;
 
-        public ReminderTestGrain2(IServiceProvider services)
+        public ReminderTestGrain2(IServiceProvider services, IReminderTable reminderTable)
         {
+            this.reminderTable = reminderTable;
             this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
         }
 
@@ -212,7 +215,7 @@ namespace UnitTests.Grains
 
         public async Task EraseReminderTable()
         {
-            await ReminderTable.TestOnlyClearTable();
+            await this.reminderTable.TestOnlyClearTable();
         }
     }
 

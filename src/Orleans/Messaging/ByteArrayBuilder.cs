@@ -192,7 +192,7 @@ namespace Orleans.Runtime
             }
 
             completedBuffers.AddRange(b);
-            completedLength += b.Select(buff => buff.Count).Sum();
+            completedLength += b.Sum(buff => buff.Count);
 
             currentBuffer = null;
             currentOffset = 0;

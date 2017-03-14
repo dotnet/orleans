@@ -4,10 +4,12 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 
@@ -23,8 +25,11 @@ namespace UnitTests.MembershipTests
         internal static readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
         internal static readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
     }
+
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
+        private readonly TestEnvironmentFixture environment;
         private static readonly string hostName = Dns.GetHostName();
         private readonly Logger logger;
         private readonly IMembershipTable membershipTable;
@@ -33,19 +38,17 @@ namespace UnitTests.MembershipTests
 
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
 
-        protected MembershipTableTestsBase(ConnectionStringFixture fixture)
+        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
+            this.environment = environment;
             LogManager.Initialize(new NodeConfiguration());
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
             deploymentId = "test-" + Guid.NewGuid();
 
             logger.Info("DeploymentId={0}", deploymentId);
 
-            lock (fixture.SyncRoot)
-            {
-                if (fixture.ConnectionString == null)
-                    fixture.ConnectionString = GetConnectionString();
-            }
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
+
             var globalConfiguration = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
@@ -67,6 +70,12 @@ namespace UnitTests.MembershipTests
             gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
+        public IGrainFactory GrainFactory => this.environment.GrainFactory;
+
+        public IGrainReferenceConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<IGrainReferenceConverter>();
+
+        public IServiceProvider Services => this.environment.Services;
+
         public void Dispose()
         {
             if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
@@ -77,7 +86,7 @@ namespace UnitTests.MembershipTests
 
         protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);
         protected abstract IMembershipTable CreateMembershipTable(Logger logger);
-        protected abstract string GetConnectionString();
+        protected abstract Task<string> GetConnectionString();
 
         protected virtual string GetAdoInvariant()
         {
@@ -108,8 +117,13 @@ namespace UnitTests.MembershipTests
 
             var entries = new List<string>(gateways.Select(g => g.ToString()));
 
+            // only members with a non-zero Gateway port
+            Assert.False(entries.Contains(membershipEntries[3].SiloAddress.ToGatewayUri().ToString()));
+
+            // only Active members
             Assert.True(entries.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString()));
             Assert.True(entries.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString()));
+            Assert.Equal(2, entries.Count);
         }
 
         protected async Task MembershipTable_ReadAll_EmptyTable()
@@ -363,12 +377,39 @@ namespace UnitTests.MembershipTests
             Assert.Equal(1, tableData.Members.Count);
         }
 
+        protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
+        {
+            MembershipTableData tableData = await membershipTable.ReadAll();
+
+            TableVersion newTableVersion = tableData.Version.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            bool ok = await membershipTable.InsertRow(newEntry, newTableVersion);
+            Assert.True(ok);
+            
+            
+            var amAliveTime = DateTime.UtcNow;
+            
+            // This mimics the arguments MembershipOracle.OnIAmAliveUpdateInTableTimer passes in
+            var entry = new MembershipEntry
+            {
+                SiloAddress = newEntry.SiloAddress,
+                IAmAliveTime = amAliveTime
+            };
+
+            await membershipTable.UpdateIAmAlive(entry);
+
+            tableData = await membershipTable.ReadAll();
+            Tuple<MembershipEntry, string> member = tableData.Members.First();
+            // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
+            // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
+            Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
+        }
+
         private static int generation;
         // Utility methods
         private static MembershipEntry CreateMembershipEntryForTest()
         {
             SiloAddress siloAddress = CreateSiloAddressForTest();
-
 
             var membershipEntry = new MembershipEntry
             {

@@ -200,7 +200,7 @@ namespace UnitTests.General
         {
             while (true)
             {
-                IPlacementTestGrain grain = GrainClient.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
+                IPlacementTestGrain grain = this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
                 SiloAddress address = await grain.GetLocation();
                 if (address.Equals(silo))
                     return grain;
@@ -233,7 +233,7 @@ namespace UnitTests.General
                 Enumerable.Range(0, (int)sampleSize).
                 Select(
                     n =>
-                        GrainClient.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid()));
+                        this.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid()));
 
             // make the grain's silo undesirable for new grains.
             taint(taintedGrain).Wait();
@@ -265,8 +265,8 @@ namespace UnitTests.General
             var promises = new List<Task>();
             for (var i = 0; i < amount; i++)
             {
-                IActivationCountBasedPlacementTestGrain grain = GrainClient.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
-                grains.Add(grain);
+                IActivationCountBasedPlacementTestGrain grain = this.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
+                this.grains.Add(grain);
                 // Make sure we activate grain:
                 promises.Add(grain.Nop());
             }
@@ -287,7 +287,7 @@ namespace UnitTests.General
         {
             string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
 
             return this.HostedCluster.GetActiveSilos()

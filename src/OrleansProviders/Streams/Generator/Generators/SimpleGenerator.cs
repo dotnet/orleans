@@ -21,7 +21,7 @@ namespace Orleans.Providers.Streams.Generator
             var cfg = generatorConfig as SimpleGeneratorConfig;
             if (cfg == null)
             {
-                throw new ArgumentOutOfRangeException("generatorConfig");
+                throw new ArgumentOutOfRangeException(nameof(generatorConfig));
             }
             config = cfg;
             sequenceId = 0;
@@ -55,7 +55,7 @@ namespace Orleans.Providers.Streams.Generator
                 // If this is the last event generated, mark it as such, so test grains know to report results.
                 EventType = (sequenceId != config.EventsInStream)
                         ? GeneratedEvent.GeneratedEventType.Fill
-                        : GeneratedEvent.GeneratedEventType.Report,
+                        : GeneratedEvent.GeneratedEventType.Report
             };
             return new GeneratedBatchContainer(streamGuid, config.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
         }

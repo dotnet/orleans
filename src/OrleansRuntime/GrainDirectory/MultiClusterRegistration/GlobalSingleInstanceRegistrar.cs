@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -22,17 +21,18 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GlobalSingleInstanceRegistrar : IGrainRegistrar
     {
         private readonly int numRetries;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly Logger logger;
         private readonly GrainDirectoryPartition directoryPartition;
         private readonly GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer;
 
-        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, int numRetries)
-             
+        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, int numRetries, IInternalGrainFactory grainFactory)
         {
             this.directoryPartition = partition;
             this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
             this.numRetries = numRetries;
+            this.grainFactory = grainFactory;
         }
 
         public bool IsSynchronous { get { return false; } }
@@ -57,13 +57,13 @@ namespace Orleans.Runtime.GrainDirectory
             if (!singleActivation)
                 throw new OrleansException("global single instance protocol is incompatible with using multiple activations");
 
-            var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
             {
                 // no multicluster network. Go to owned state directly.
                 return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, GrainDirectoryEntryStatus.Owned);
             }
+
+            var myClusterId = Silo.CurrentSilo.ClusterId;
 
             // examine the multicluster configuration
             var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
@@ -192,12 +192,12 @@ namespace Orleans.Runtime.GrainDirectory
             if (formerActivationsInThisCluster == null)
                 return TaskDone.Done;
 
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+                return TaskDone.Done; // single cluster - no broadcast required
+
             // we must also remove cached references to former activations in this cluster
             // from remote clusters; thus, we broadcast the unregistration
             var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
-                return TaskDone.Done; // single cluster - no broadcast required
 
             // target clusters in current configuration, other than this one
             var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration().Clusters
@@ -211,7 +211,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 if (clusterGatewayAddress != null)
                 {
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                     // try to send request
 
@@ -241,11 +241,11 @@ namespace Orleans.Runtime.GrainDirectory
         {   
             directoryPartition.RemoveGrain(gid);
 
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+                return TaskDone.Done; // single cluster - no broadcast required
+
             // broadcast deletion to all other clusters
             var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
-                return TaskDone.Done; // single cluster - no broadcast required
 
             // target ALL clusters, not just clusters in current configuration
             var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetActiveClusters()
@@ -259,7 +259,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 if (clusterGatewayAddress != null)
                 {
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                     // try to send request
                     tasks.Add(clusterGrainDir.ProcessDeletion(gid));
@@ -293,7 +293,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // find gateway
                 var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
                 var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
-                var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
                 return await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);

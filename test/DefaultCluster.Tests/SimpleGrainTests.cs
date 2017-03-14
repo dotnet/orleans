@@ -11,9 +11,13 @@ namespace DefaultCluster.Tests.General
     /// </summary>
     public class SimpleGrainTests : HostedTestClusterEnsureDefaultStarted
     {
+        public SimpleGrainTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         public ISimpleGrain GetSimpleGrain()
         {
-            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
+            return this.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -55,7 +59,7 @@ namespace DefaultCluster.Tests.General
         [TestCategory("BVT"), TestCategory("Functional")]
         public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
         {
-            ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
+            ISimpleGrain grain = this.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
 
             var actual = await grain.GetA();
             Assert.Equal(MultipleConstructorsSimpleGrain.ValueUsedByParameterlessConstructor, actual);

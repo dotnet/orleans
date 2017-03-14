@@ -1,23 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
@@ -32,7 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
     <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
   </ItemGroup>
@@ -52,70 +42,8 @@
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureGossipTableTests.cs">
-      <Link>AzureGossipTableTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureMembershipTableTests.cs">
-      <Link>AzureMembershipTableTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureQueueDataManagerTests.cs">
-      <Link>AzureQueueDataManagerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureRemindersTableTests.cs">
-      <Link>AzureRemindersTableTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureStorageBasicTestFixture.cs">
-      <Link>AzureStorageBasicTestFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureTableDataManagerStressTests.cs">
-      <Link>AzureTableDataManagerStressTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureTableDataManagerTests.cs">
-      <Link>AzureTableDataManagerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\AzureTableErrorCodeTests.cs">
-      <Link>AzureTableErrorCodeTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Deployment\AzureSiloTests.cs">
-      <Link>Deployment\AzureSiloTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\GenericGrainsInAzureStorageTests.cs">
-      <Link>GenericGrainsInAzureStorageTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Persistence\PersistenceProviderTests.cs">
-      <Link>Persistence\PersistenceProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\SiloInstanceTableManagerTests.cs">
-      <Link>SiloInstanceTableManagerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\AQClientStreamTests.cs">
-      <Link>Streaming\AQClientStreamTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\AQStreamFilteringTests.cs">
-      <Link>Streaming\AQStreamFilteringTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\AQStreamingTests.cs">
-      <Link>Streaming\AQStreamingTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\AQSubscriptionMultiplicityTests.cs">
-      <Link>Streaming\AQSubscriptionMultiplicityTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\AzureQueueAdapterTests.cs">
-      <Link>Streaming\AzureQueueAdapterTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\SampleAzureQueueStreamingTests.cs">
-      <Link>Streaming\SampleAzureQueueStreamingTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Streaming\TestAzureQueueStreamProvider.cs">
-      <Link>Streaming\TestAzureQueueStreamProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\UnitTestAzureTableDataManager.cs">
-      <Link>UnitTestAzureTableDataManager.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\StreamTypeSerializationTests.cs">
-      <Link>StreamTypeSerializationTests.cs</Link>
-    </Compile>
+    <ItemGroup>
+    <Compile Include="..\..\..\test\TesterAzureUtils\**\*.cs" Exclude="..\..\..\test\TesterAzureUtils\obj\**\*.cs;..\..\..\test\TesterAzureUtils\bin\**\*.cs;..\..\..\test\TesterAzureUtils\Properties\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

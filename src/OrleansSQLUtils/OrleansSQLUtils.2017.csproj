@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansSqlUtils</PackageId>
+    <Title>Microsoft Orleans Sql Utilities</Title>
+    <Description>
+      Library of utility types for relational storage of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>OrleansSQLUtils</AssemblyName>
+    <RootNamespace>OrleansSQLUtils</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CreateOrleansTables_MySql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\MySql\</PackagePath>
+    </None>
+    <None Include="CreateOrleansTables_PostgreSql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\PostgreSql\</PackagePath>
+    </None>
+    <None Include="CreateOrleansTables_SqlServer.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
+    </None>
+  </ItemGroup>
+</Project>

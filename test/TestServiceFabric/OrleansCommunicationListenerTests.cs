@@ -15,6 +15,10 @@ using Xunit;
 
 namespace TestServiceFabric
 {
+    using Microsoft.Orleans.ServiceFabric.Models;
+    using Microsoft.Orleans.ServiceFabric.Utilities;
+
+    [TestCategory("ServiceFabric")]
     public class OrleansCommunicationListenerTests
     {
         private readonly ICodePackageActivationContext activationContext = Substitute.For<ICodePackageActivationContext>();
@@ -42,13 +46,13 @@ namespace TestServiceFabric
                 9823);
         }
 
-        [Fact, TestCategory("ServiceFabric")]
+        [Fact]
         public async Task SimpleUsageScenarioTest()
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint("OrleansSiloEndpoint", 9082),
-                CreateEndpoint("OrleansProxyEndpoint", 8888)
+                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
+                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
@@ -61,7 +65,7 @@ namespace TestServiceFabric
             siloHost.NodeConfig.Returns(_ => clusterConfig.CreateNodeConfigurationForSilo(listener.SiloName));
 
             var result = await listener.OpenAsync(CancellationToken.None);
-            var publishedEndpoints = JsonConvert.DeserializeObject<OrleansFabricEndpoints>(result);
+            var publishedEndpoints = JsonConvert.DeserializeObject<FabricSiloInfo>(result);
 
             var siloAddress = publishedEndpoints.SiloAddress;
             siloAddress.Generation.ShouldBeEquivalentTo(864);
@@ -80,7 +84,7 @@ namespace TestServiceFabric
             siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
         }
 
-        [Fact, TestCategory("ServiceFabric")]
+        [Fact]
         public void MissingEndpointsCauseException()
         {
             var endpoints = new EndpointsCollection();
@@ -88,21 +92,21 @@ namespace TestServiceFabric
 
             // Check for the silo endpoint.
             var exception = Assert.Throws<KeyNotFoundException>(() => new OrleansCommunicationListener(serviceContext, clusterConfig));
-            Assert.Contains("OrleansSiloEndpoint", exception.Message);
+            Assert.Contains(OrleansCommunicationListener.SiloEndpointName, exception.Message);
 
             // Check for the proxy endpoint.
-            endpoints.Add(CreateEndpoint("OrleansSiloEndpoint", 9082));
+            endpoints.Add(CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082));
             exception = Assert.Throws<KeyNotFoundException>(() => new OrleansCommunicationListener(serviceContext, clusterConfig));
-            Assert.Contains("OrleansProxyEndpoint", exception.Message);
+            Assert.Contains(OrleansCommunicationListener.GatewayEndpointName, exception.Message);
         }
 
-        [Fact, TestCategory("ServiceFabric")]
+        [Fact]
         public void AbortStopAndDisposesSilo()
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint("OrleansSiloEndpoint", 9082),
-                CreateEndpoint("OrleansProxyEndpoint", 8888)
+                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
+                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
@@ -120,13 +124,13 @@ namespace TestServiceFabric
             siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
         }
 
-        [Fact, TestCategory("ServiceFabric")]
+        [Fact]
         public async Task CloseStopsSilo()
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint("OrleansSiloEndpoint", 9082),
-                CreateEndpoint("OrleansProxyEndpoint", 8888)
+                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
+                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);

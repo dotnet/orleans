@@ -51,6 +51,7 @@
     </Compile>
     <Compile Include="AppDomainSiloHandle.cs" />
     <Compile Include="AppDomainSiloHost.cs" />
+    <Compile Include="ClientExtensions.cs" />
     <Compile Include="Extensions\ConfigurationExtensions.cs" />
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -59,6 +60,7 @@
     <Compile Include="TestStorageProviders\FaultyMemoryStorage.cs" />
     <Compile Include="TestStorageProviders\IStorageFaultGrain.cs" />
     <Compile Include="TestStorageProviders\StorageFaultGrain.cs" />
+    <Compile Include="LogConsistencyProviderConfiguration.cs" />
     <Compile Include="Utils\AsyncResultHandle.cs" />
     <Compile Include="Utils\NoOpTestLogger.cs" />
     <Compile Include="Utils\StorageEmulator.cs" />
@@ -78,10 +80,6 @@
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj">
-      <Project>{69f40a37-4a2f-44d4-a994-cc165c12fb91}</Project>
-      <Name>OrleansTelemetryConsumers.Counters</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>

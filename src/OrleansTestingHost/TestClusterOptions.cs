@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -87,8 +88,9 @@ namespace Orleans.TestingHost
         /// <param name="extendedFallbackOptions">Fallback options to use when they are not explicitly specified in the <see cref="ClusterConfiguration"/>.</param>
         public TestClusterOptions(FallbackOptions extendedFallbackOptions)
         {
-            this.BaseSiloPort = ThreadSafeRandom.Next(22300, 30000);
-            this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
+            var basePorts = GetAvailableConsecutiveServerPortsPair();
+            this.BaseSiloPort = basePorts.Item1;
+            this.BaseGatewayPort = basePorts.Item2;
             this.ExtendedFallbackOptions = extendedFallbackOptions;
         }
 
@@ -174,6 +176,7 @@ namespace Orleans.TestingHost
             }
 
             config.Globals.ExpectedClusterSize = silosCount;
+            config.Globals.AssumeHomogenousSilosForTesting = true;
 
             config.AdjustForTestEnvironment(extendedOptions.DataConnectionString);
             return config;
@@ -266,7 +269,6 @@ namespace Orleans.TestingHost
 
             config.LargeMessageWarningThreshold = clusterConfig.Defaults.LargeMessageWarningThreshold;
 
-            // TODO: copy test environment config from globals instead of from constants
             config.AdjustForTestEnvironment(clusterConfig.Globals.DataConnectionString);
             return config;
         }
@@ -279,6 +281,41 @@ namespace Orleans.TestingHost
             string DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
             string depId = $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{baseSiloPort}-{randomSuffix}";
             return depId;
+        }
+
+
+        private static Tuple<int, int> GetAvailableConsecutiveServerPortsPair()
+        {
+            // Evaluate current system tcp connections
+            IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+
+            // each returned port in the pair will have to have at least this amount of available ports following it
+            const int consecutivePortsToCheck = 5;
+
+            return Tuple.Create(
+                GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 22300, 30000, consecutivePortsToCheck),
+                GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 40000, 50000, consecutivePortsToCheck));
+        }
+
+        private static int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
+        {
+            const int MaxAttempts = 10;
+
+            for (int attempts = 0; attempts < MaxAttempts; attempts++)
+            {
+                int basePort = ThreadSafeRandom.Next(portStartRange, portEndRange);
+
+                // get ports in buckets, so we don't interfere with parallel runs of this same function
+                basePort = basePort - (basePort % consecutivePortsToCheck);
+                int endPort = basePort + consecutivePortsToCheck;
+                
+                // make sure non of the ports in the sub range are in use
+                if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
+                    return basePort;
+            }
+
+            throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
         }
     }
 }

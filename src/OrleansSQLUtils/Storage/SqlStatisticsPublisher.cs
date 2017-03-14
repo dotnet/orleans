@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
@@ -26,7 +27,8 @@ namespace Orleans.Providers.SqlServer
         private long generation;                
         private RelationalOrleansQueries orleansQueries;
         private Logger logger;
-        
+        private IGrainReferenceConverter grainReferenceConverter;
+
         /// <summary>
         /// Name of the provider
         /// </summary>
@@ -43,12 +45,13 @@ namespace Orleans.Providers.SqlServer
         {
             Name = name;
             logger = providerRuntime.GetLogger("SqlStatisticsPublisher");
+            this.grainReferenceConverter = providerRuntime.ServiceProvider.GetRequiredService<IGrainReferenceConverter>();
 
             string adoInvariant = AdoNetInvariants.InvariantNameSqlServer;
             if (config.Properties.ContainsKey("AdoInvariant"))
                 adoInvariant = config.Properties["AdoInvariant"];
 
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(adoInvariant, config.Properties["ConnectionString"]);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(adoInvariant, config.Properties["ConnectionString"], this.grainReferenceConverter);
         }
 
         /// <summary>
@@ -100,10 +103,9 @@ namespace Orleans.Providers.SqlServer
             }
         }
 
-
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
         {
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
         }
 
         /// <summary>

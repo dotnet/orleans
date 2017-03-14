@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public StreamFilteringTests_AQ(Fixture fixture)
+        public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             this.deploymentId = fixture.HostedCluster.DeploymentId;
             streamProviderName = Fixture.StreamProvider;

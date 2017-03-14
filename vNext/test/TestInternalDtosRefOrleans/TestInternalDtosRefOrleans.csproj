@@ -1,22 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Include="**\*.cs" />
-    <EmbeddedResource Include="**\*.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\..\test\TestInternalDtosRefOrleans\**\*.cs" Exclude="..\..\..\test\TestInternalDtosRefOrleans\obj\**\*.cs;..\..\..\test\TestInternalDtosRefOrleans\bin\**\*.cs;..\..\..\test\TestInternalDtosRefOrleans\Properties\*.cs" />
@@ -33,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" Version="4.0.0.1" />
+    <PackageReference Include="FSharp.Core" Version="4.1.0" />
   </ItemGroup>
 
   <ItemGroup>

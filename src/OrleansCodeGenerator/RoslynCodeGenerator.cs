@@ -25,7 +25,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The compiled assemblies.
         /// </summary>
-        private static readonly ConcurrentDictionary<string, CachedAssembly> CompiledAssemblies =
+        private readonly ConcurrentDictionary<string, CachedAssembly> CompiledAssemblies =
             new ConcurrentDictionary<string, CachedAssembly>();
 
         /// <summary>
@@ -36,8 +36,17 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The serializer generation manager.
         /// </summary>
-        private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
-        
+        private readonly SerializerGenerationManager serializerGenerationManager;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RoslynCodeGenerator"/> class.
+        /// </summary>
+        /// <param name="serializationManager">The serialization manager.</param>
+        public RoslynCodeGenerator(SerializationManager serializationManager)
+        {
+            this.serializerGenerationManager = new SerializerGenerationManager(serializationManager);
+        }
+
         /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
@@ -243,7 +252,7 @@ namespace Orleans.CodeGenerator
         /// <param name="targetAssembly">
         /// The target assembly which the cached counterpart is generated for.
         /// </param>
-        private static CachedAssembly TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
+        private CachedAssembly TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
         {
             CachedAssembly cached;
             if (!CompiledAssemblies.TryGetValue(targetAssembly.GetName().FullName, out cached)
@@ -310,7 +319,7 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblies">The assemblies to generate code for.</param>
         /// <param name="runtime">Whether or not runtime code generation is being performed.</param>
         /// <returns>The generated syntax tree.</returns>
-        private static GeneratedSyntax GenerateForAssemblies(List<Assembly> assemblies, bool runtime)
+        private GeneratedSyntax GenerateForAssemblies(List<Assembly> assemblies, bool runtime)
         {
             if (Logger.IsVerbose)
             {
@@ -358,7 +367,7 @@ namespace Orleans.CodeGenerator
                 foreach (var attribute in assembly.GetCustomAttributes<ConsiderForCodeGenerationAttribute>())
                 {
                     ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes, considerForSerialization: true);
-                    if (attribute.ThrowOnFailure && !SerializerGenerationManager.IsTypeRecorded(attribute.Type))
+                    if (attribute.ThrowOnFailure && !serializerGenerationManager.IsTypeRecorded(attribute.Type))
                     {
                         throw new CodeGenerationException(
                             $"Found {attribute.GetType().Name} for type {attribute.Type.GetParseableName()}, but code"
@@ -391,7 +400,7 @@ namespace Orleans.CodeGenerator
                     Action<Type> onEncounteredType = encounteredType =>
                     {
                         // If a type was encountered which can be accessed, process it for serialization.
-                        SerializerGenerationManager.RecordTypeToGenerate(encounteredType, module, targetAssembly);
+                        serializerGenerationManager.RecordTypeToGenerate(encounteredType, module, targetAssembly);
                     };
 
                     if (Logger.IsVerbose2)
@@ -417,7 +426,7 @@ namespace Orleans.CodeGenerator
                     // Generate serializers.
                     var first = true;
                     Type toGen;
-                    while (SerializerGenerationManager.GetNextTypeToProcess(out toGen))
+                    while (serializerGenerationManager.GetNextTypeToProcess(out toGen))
                     {
                         if (!runtime)
                         {
@@ -439,7 +448,7 @@ namespace Orleans.CodeGenerator
                                 toGen.GetParseableName());
                         }
 
-                        namespaceMembers.AddRange(SerializerGenerator.GenerateClass(toGen, onEncounteredType));
+                        namespaceMembers.Add(SerializerGenerator.GenerateClass(toGen, onEncounteredType));
                     }
                 }
 
@@ -469,7 +478,7 @@ namespace Orleans.CodeGenerator
             };
         }
 
-        private static void ConsiderType(
+        private void ConsiderType(
             Type type,
             bool runtime,
             Assembly targetAssembly,
@@ -503,15 +512,15 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static void RecordType(Type type, Module module, Assembly targetAssembly, ISet<Type> includedTypes)
+        private void RecordType(Type type, Module module, Assembly targetAssembly, ISet<Type> includedTypes)
         {
-            if (SerializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
+            if (serializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
             {
                 includedTypes.Add(type);
             }
         }
 
-        private static void ConsiderGenericBaseTypeArguments(
+        private void ConsiderGenericBaseTypeArguments(
             TypeInfo typeInfo,
             Module module,
             Assembly targetAssembly,
@@ -526,7 +535,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static void ConsiderGenericInterfacesArguments(
+        private void ConsiderGenericInterfacesArguments(
             TypeInfo typeInfo,
             Module module,
             Assembly targetAssembly,
@@ -570,7 +579,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="assembly">The assembly.</param>
         /// <returns>A value indicating whether or not code should be generated for the provided assembly.</returns>
-        private static bool ShouldGenerateCodeForAssembly(Assembly assembly)
+        private bool ShouldGenerateCodeForAssembly(Assembly assembly)
         {
             return !assembly.IsDynamic && !CompiledAssemblies.ContainsKey(assembly.GetName().FullName)
                    && TypeUtils.IsOrleansOrReferencesOrleans(assembly)
@@ -582,7 +591,7 @@ namespace Orleans.CodeGenerator
         /// Registers the input assembly with this class.
         /// </summary>
         /// <param name="input">The assembly to register.</param>
-        private static void RegisterGeneratedCodeTargets(Assembly input)
+        private void RegisterGeneratedCodeTargets(Assembly input)
         {
             var targets = input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>();
             foreach (var target in targets)

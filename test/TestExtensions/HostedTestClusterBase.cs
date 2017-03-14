@@ -1,5 +1,6 @@
 using System;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -13,13 +14,15 @@ namespace TestExtensions
     {
         protected TestCluster HostedCluster { get; private set; }
 
+        protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
+
+        protected IClusterClient Client => this.HostedCluster.Client;
+        protected Logger Logger => this.Client.Logger;
+        protected Logger logger => this.Logger;
+
         public HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
             this.HostedCluster = fixture.HostedCluster;
-        }
-
-        public HostedTestClusterEnsureDefaultStarted()
-        {
         }
     }
 
@@ -32,9 +35,17 @@ namespace TestExtensions
 
         protected TestCluster HostedCluster { get; private set; }
 
+        internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
+
+        public IClusterClient Client => this.HostedCluster.Client;
+
+        protected IGrainFactory GrainFactory => this.Client;
+
+        protected Logger Logger => this.Client.Logger;
+        protected Logger logger => this.Logger;
+
         public TestClusterPerTest()
         {
-            GrainClient.Uninitialize();
             var testCluster = this.CreateTestCluster();
             if (testCluster.Primary == null)
             {

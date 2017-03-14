@@ -35,12 +35,13 @@ namespace Orleans.Serialization
                 return true;
             }
 
-            if (itemType.IsGenericType && itemType.IsConstructedGenericType == false)
+            var typeInfo = itemType.GetTypeInfo();
+            if (typeInfo.IsGenericType && itemType.IsConstructedGenericType == false)
             {
                 return false;
             }
 
-            if (itemType.GetCustomAttribute<SchemaAttribute>() == null)
+            if (typeInfo.GetCustomAttribute<SchemaAttribute>() == null)
             {
                 return false;
             }

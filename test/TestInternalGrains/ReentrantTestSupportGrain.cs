@@ -5,12 +5,19 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ReentrantTestSupportGrain : Grain, IReentrantTestSupportGrain
+    internal class ReentrantTestSupportGrain : Grain, IReentrantTestSupportGrain
     {
+        private readonly GrainTypeManager grainTypeManager;
+
+        public ReentrantTestSupportGrain(GrainTypeManager grainTypeManager)
+        {
+            this.grainTypeManager = grainTypeManager;
+        }
+
         public Task<bool> IsReentrant(string fullTypeName)
         {
             GrainTypeData data;
-            GrainTypeManager.Instance.TryGetData(fullTypeName, out data);
+            this.grainTypeManager.TryGetData(fullTypeName, out data);
             return Task.FromResult(data.IsReentrant);
         }
     }

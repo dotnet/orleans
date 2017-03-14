@@ -47,7 +47,7 @@ namespace UnitTests.StorageTests
         }
     }
 
-    public class ErrorInjectionStorageProvider : MockStorageProvider
+    public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
     {
         public ErrorInjectionPoint ErrorInjection { get; private set; }
 
@@ -121,5 +121,24 @@ namespace UnitTests.StorageTests
                 throw;
             }
         }
+
+        #region IControllable interface methods
+        /// <summary>
+        /// A function to execute a control command.
+        /// </summary>
+        /// <param name="command">A serial number of the command.</param>
+        /// <param name="arg">An opaque command argument</param>
+        public override Task<object> ExecuteCommand(int command, object arg)
+        { 
+            switch ((Commands)command)
+            {
+                case Commands.SetErrorInjection:
+                    SetErrorInjection((ErrorInjectionPoint)arg);
+                    return Task.FromResult<object>(true);
+                default:
+                    return base.ExecuteCommand(command, arg);
+            }
+        }
+        #endregion
     }
 }

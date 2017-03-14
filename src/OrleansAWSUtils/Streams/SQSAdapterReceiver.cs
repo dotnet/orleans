@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Serialization;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -19,21 +20,22 @@ namespace OrleansAWSUtils.Streams
         private long lastReadMessage;
         private Task outstandingTask;
         private readonly Logger logger;
-        
+        private readonly SerializationManager serializationManager;
+
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(QueueId queueId, string dataConnectionString, string deploymentId)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, QueueId queueId, string dataConnectionString, string deploymentId)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
 
             var queue = new SQSStorage(queueId.ToString(), dataConnectionString, deploymentId);
-            return new SQSAdapterReceiver(queueId, queue);
+            return new SQSAdapterReceiver(serializationManager, queueId, queue);
         }
 
-        private SQSAdapterReceiver(QueueId queueId, SQSStorage queue)
+        private SQSAdapterReceiver(SerializationManager serializationManager, QueueId queueId, SQSStorage queue)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (queue == null) throw new ArgumentNullException("queue");
@@ -41,6 +43,7 @@ namespace OrleansAWSUtils.Streams
             Id = queueId;
             this.queue = queue;
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
+            this.serializationManager = serializationManager;
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -82,7 +85,7 @@ namespace OrleansAWSUtils.Streams
                 IEnumerable<SQSMessage> messages = await task;
 
                 List<IBatchContainer> azureQueueMessages = messages
-                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(msg, lastReadMessage++)).ToList();
+                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(this.serializationManager, msg, lastReadMessage++)).ToList();
 
                 return azureQueueMessages;
             }

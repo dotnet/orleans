@@ -134,7 +134,7 @@ namespace OrleansSQLUtils.Storage
                     record.GetValue<string>("QueryText"));
             }
 
-            internal static ReminderEntry GetReminderEntry(IDataRecord record)
+            internal static ReminderEntry GetReminderEntry(IDataRecord record, IGrainReferenceConverter grainReferenceConverter)
             {
                 //Having non-null field, GrainId, means with the query filter options, an entry was found.
                 string grainId = record.GetValueOrDefault<string>(nameof(Columns.GrainId));
@@ -142,7 +142,7 @@ namespace OrleansSQLUtils.Storage
                 {
                     return new ReminderEntry
                     {
-                        GrainRef = GrainReference.FromKeyString(grainId),
+                        GrainRef = grainReferenceConverter.GetGrainFromKeyString(grainId),
                         ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
                         StartAt = record.GetValue<DateTime>(nameof(Columns.StartTime)),
                         Period = TimeSpan.FromMilliseconds(record.GetValue<int>(nameof(Columns.Period))),

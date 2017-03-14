@@ -9,11 +9,15 @@ namespace DefaultCluster.Tests.General
 {
     public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
+        public PolymorphicInterfaceTest(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_SimpleTest()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
-            IA IARef = GrainClient.GrainFactory.GetGrain<IA>(GetRandomGrainId(), grainFullName);
+            IA IARef = this.GrainFactory.GetGrain<IA>(GetRandomGrainId(), grainFullName);
             Assert.Equal("A1", IARef.A1Method().Result);
             Assert.Equal("A2", IARef.A2Method().Result);
             Assert.Equal("A3", IARef.A3Method().Result);
@@ -23,7 +27,7 @@ namespace DefaultCluster.Tests.General
         public void Polymorphic_UpCastTest()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
-            IC ICRef = GrainClient.GrainFactory.GetGrain<IC>(GetRandomGrainId(), grainFullName);
+            IC ICRef = this.GrainFactory.GetGrain<IC>(GetRandomGrainId(), grainFullName);
             IA IARef = ICRef; // cast to polymorphic interface
             Assert.Equal("A1", IARef.A1Method().Result);
             Assert.Equal("A2", IARef.A2Method().Result);
@@ -34,7 +38,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("B2", IBRef.B2Method().Result);
             Assert.Equal("B3", IBRef.B3Method().Result);
 
-            IF IFRef = GrainClient.GrainFactory.GetGrain<IF>(GetRandomGrainId(), grainFullName);
+            IF IFRef = this.GrainFactory.GetGrain<IF>(GetRandomGrainId(), grainFullName);
 
             Assert.Equal("F1", IFRef.F1Method().Result);
             Assert.Equal("F2", IFRef.F2Method().Result);
@@ -51,10 +55,10 @@ namespace DefaultCluster.Tests.General
         public void Polymorphic_FactoryMethods()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
-            IC ICRef = GrainClient.GrainFactory.GetGrain<IF>(GetRandomGrainId(), grainFullName); // FRef factory method returns a polymorphic reference to ICRef
+            IC ICRef = this.GrainFactory.GetGrain<IF>(GetRandomGrainId(), grainFullName); // FRef factory method returns a polymorphic reference to ICRef
             Assert.Equal("B2", ICRef.B2Method().Result);
 
-            IA IARef = GrainClient.GrainFactory.GetGrain<ID>(GetRandomGrainId(), grainFullName); // DRef factory method returns a polymorphic reference to IARef
+            IA IARef = this.GrainFactory.GetGrain<ID>(GetRandomGrainId(), grainFullName); // DRef factory method returns a polymorphic reference to IARef
             Assert.Equal("A1", IARef.A1Method().Result);
         }
 
@@ -62,7 +66,7 @@ namespace DefaultCluster.Tests.General
         public void Polymorphic_ServiceType()
         {
             var grainFullName = typeof(ServiceType).FullName;
-            IServiceType serviceRef = GrainClient.GrainFactory.GetGrain<IServiceType>(GetRandomGrainId(), grainFullName);
+            IServiceType serviceRef = this.GrainFactory.GetGrain<IServiceType>(GetRandomGrainId(), grainFullName);
             Assert.Equal("A1", serviceRef.A1Method().Result);
             Assert.Equal("A2", serviceRef.A2Method().Result);
             Assert.Equal("A3", serviceRef.A3Method().Result);
@@ -78,7 +82,7 @@ namespace DefaultCluster.Tests.General
         public void Polymorphic__DerivedServiceType()
         {
             var grainFullName = typeof(DerivedServiceType).FullName;
-            IDerivedServiceType derivedRef = GrainClient.GrainFactory.GetGrain<IDerivedServiceType>(GetRandomGrainId(), grainFullName);
+            IDerivedServiceType derivedRef = this.GrainFactory.GetGrain<IDerivedServiceType>(GetRandomGrainId(), grainFullName);
 
             IA IARef = derivedRef;
             Assert.Equal("A1", IARef.A1Method().Result);

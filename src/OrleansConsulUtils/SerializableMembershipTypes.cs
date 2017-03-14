@@ -86,9 +86,9 @@ namespace Orleans.Runtime.Host
     /// </summary>
     internal class ConsulSiloRegistrationAssembler
     {
-        private static String DeploymentKVPrefix = "orleans";  //Ensures a root KV namespace for orleans in Consul
-        private static Char KeySeparator = '/';
-        internal static String SiloIAmAliveSuffix = "iamalive";
+        private const string DeploymentKVPrefix = "orleans";  //Ensures a root KV namespace for orleans in Consul
+        private const char KeySeparator = '/';
+        internal const string SiloIAmAliveSuffix = "iamalive";
 
         internal static String ParseDeploymentKVPrefix(String deploymentId)
         {
@@ -140,7 +140,7 @@ namespace Orleans.Runtime.Host
                 StartTime = entry.StartTime,
                 Status = entry.Status,
                 SiloName = entry.SiloName,
-                SuspectingSilos = entry.SuspectTimes.Select(silo => new SuspectingSilo { Id = silo.Item1.ToParsableString(), Time = silo.Item2 }).ToList()
+                SuspectingSilos = entry.SuspectTimes?.Select(silo => new SuspectingSilo { Id = silo.Item1.ToParsableString(), Time = silo.Item2 }).ToList()
             };
 
             return ret;
@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Host
                 Status = siloRegistration.Status,
                 ProxyPort = siloRegistration.ProxyPort,
                 StartTime = siloRegistration.StartTime,
-                SuspectTimes = siloRegistration.SuspectingSilos.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(silo.Id), silo.Time)).ToList(),
+                SuspectTimes = siloRegistration.SuspectingSilos?.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(silo.Id), silo.Time)).ToList(),
                 IAmAliveTime = siloRegistration.IAmAliveTime,
                 SiloName = siloRegistration.SiloName,
 

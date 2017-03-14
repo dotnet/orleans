@@ -18,6 +18,10 @@ namespace UnitTests.SqlStatisticsPublisherTests
             });
         }
 
+        public void AddChildConfiguration(IProviderConfiguration config)
+        {
+            throw new NotImplementedException();
+        }
         public string Type
         {
             get { throw new NotImplementedException(); }

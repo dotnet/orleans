@@ -58,6 +58,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="MySqlMembershipTableTests.cs" />
     <Compile Include="MySqlRemindersTableTests.cs" />
     <Compile Include="PostgreSqlMembershipTableTests.cs" />
@@ -69,6 +70,7 @@
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTests_SqlServer.cs" />
     <Compile Include="LivenessTests.cs" />
+    <Compile Include="SqlClientInitTests.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
     <Compile Include="StorageTests\Relational\AdotNetProviderFunctionalityTests.cs" />
     <Compile Include="StorageTests\Relational\CommonFixture.cs" />

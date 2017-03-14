@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -18,5 +19,11 @@ namespace Orleans
         Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         Task DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
+
+        /// <summary>
+        /// Binds the provided grain reference to this instance.
+        /// </summary>
+        /// <param name="grain">The grain reference.</param>
+        void BindGrainReference(IAddressable grain);
     }
 }

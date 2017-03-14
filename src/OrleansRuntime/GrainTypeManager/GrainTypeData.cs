@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
@@ -25,8 +26,9 @@ namespace Orleans.Runtime
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
+        internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
    
-        public GrainTypeData(Type type, Type stateObjectType)
+        public GrainTypeData(Type type, Type stateObjectType, MultiClusterRegistrationStrategyManager registrationManager)
         {
             var typeInfo = type.GetTypeInfo();
             Type = type;
@@ -37,6 +39,7 @@ namespace Orleans.Runtime
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
             MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
+            MultiClusterRegistrationStrategy = registrationManager?.GetMultiClusterRegistrationStrategy(type);
         }
 
         /// <summary>
@@ -111,25 +114,6 @@ namespace Orleans.Runtime
             }
 
             return defaultPlacement;
-        }
-
-        internal static MultiClusterRegistrationStrategy GetMultiClusterRegistrationStrategy(Type grainClass)
-        {
-            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<Orleans.MultiCluster.RegistrationAttribute>(inherit: true).ToArray();
-
-            switch (attribs.Length)
-            {
-                case 0:
-                    return MultiClusterRegistrationStrategy.GetDefault(); // no strategy is specified
-                case 1:
-                    return attribs[0].RegistrationStrategy;
-                default:
-                    throw new InvalidOperationException(
-                        string.Format(
-                            "More than one {0} cannot be specified for grain interface {1}",
-                            typeof(MultiClusterRegistrationStrategy).Name,
-                            grainClass.Name));
-            }
         }
 
         /// <summary>

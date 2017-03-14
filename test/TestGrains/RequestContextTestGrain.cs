@@ -35,10 +35,14 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
+#if NETSTANDARD
+            return Task.FromResult(RequestContext.ActivityId.Value);
+#else
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
+#endif
         }
 
-        #endregion
+#endregion
     }
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
@@ -51,7 +55,7 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
-        #region Implementation of IRequestContextTaskGrain
+#region Implementation of IRequestContextTaskGrain
 
         public Task<string> TraceIdEcho()
         {
@@ -130,7 +134,11 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
+#if NETSTANDARD
+            return Task.FromResult(RequestContext.ActivityId.Value);
+#else
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
+#endif
         }
 
         public async Task<Tuple<string, string>> TestRequestContext()
@@ -156,7 +164,7 @@ namespace UnitTests.Grains
         }
 
 
-        #endregion
+#endregion
     }
 
     public class RequestContextProxyGrain : Grain, IRequestContextProxyGrain

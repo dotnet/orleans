@@ -40,55 +40,62 @@ namespace Orleans.TestingHost
 
             var appDomain = AppDomain.CreateDomain(siloName, null, setup);
 
-            // Load each of the additional assemblies.
-            AppDomainSiloHost.CodeGeneratorOptimizer optimizer = null;
-            foreach (var assembly in additionalAssemblies.Where(asm => asm.Value != null))
+            try
             {
-                if (optimizer == null)
+                // Load each of the additional assemblies.
+                AppDomainSiloHost.CodeGeneratorOptimizer optimizer = null;
+                foreach (var assembly in additionalAssemblies.Where(asm => asm.Value != null))
                 {
-                    optimizer =
-                        (AppDomainSiloHost.CodeGeneratorOptimizer)
-                        appDomain.CreateInstanceAndUnwrap(
-                            typeof(AppDomainSiloHost.CodeGeneratorOptimizer).Assembly.FullName, typeof(AppDomainSiloHost.CodeGeneratorOptimizer).FullName, false,
-                            BindingFlags.Default,
-                            null,
-                            null,
-                            CultureInfo.CurrentCulture,
-                            new object[] { });
+                    if (optimizer == null)
+                    {
+                        optimizer =
+                            (AppDomainSiloHost.CodeGeneratorOptimizer)
+                            appDomain.CreateInstanceAndUnwrap(
+                                typeof(AppDomainSiloHost.CodeGeneratorOptimizer).Assembly.FullName, typeof(AppDomainSiloHost.CodeGeneratorOptimizer).FullName, false,
+                                BindingFlags.Default,
+                                null,
+                                null,
+                                CultureInfo.CurrentCulture,
+                                new object[] { });
+                    }
+
+                    optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
                 }
 
-                optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
-            }
+                var args = new object[] { siloName, type, config };
 
-            var args = new object[] { siloName, type, config };
+                var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
+                    typeof(AppDomainSiloHost).Assembly.FullName, typeof(AppDomainSiloHost).FullName, false,
+                    BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
+                    new object[] { });
 
-            var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
-                typeof(AppDomainSiloHost).Assembly.FullName, typeof(AppDomainSiloHost).FullName, false,
-                BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
-                new object[] { });
+                appDomain.UnhandledException += ReportUnobservedException;
 
-            appDomain.UnhandledException += ReportUnobservedException;
-            appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
+                siloHost.Start();
 
-            siloHost.Start();
-
-            var retValue = new AppDomainSiloHandle
-            {
-                Name = siloName,
-                SiloHost = siloHost,
-                NodeConfiguration = nodeConfiguration,
-                SiloAddress = siloHost.SiloAddress,
-                Type = type,
-                AppDomain = appDomain,
-                additionalAssemblies = additionalAssemblies,
+                var retValue = new AppDomainSiloHandle
+                {
+                    Name = siloName,
+                    SiloHost = siloHost,
+                    NodeConfiguration = nodeConfiguration,
+                    SiloAddress = siloHost.SiloAddress,
+                    Type = type,
+                    AppDomain = appDomain,
+                    additionalAssemblies = additionalAssemblies,
 #if !NETSTANDARD_TODO
-                AppDomainTestHook = siloHost.AppDomainTestHook,
+                    AppDomainTestHook = siloHost.AppDomainTestHook,
 #endif
-            };
+                };
 
-            retValue.ImportGeneratedAssemblies();
+                retValue.ImportGeneratedAssemblies();
 
-            return retValue;
+                return retValue;
+            }
+            catch (Exception)
+            {
+                UnloadAppDomain(appDomain);
+                throw;
+            }
         }
 
 
@@ -163,11 +170,16 @@ namespace Orleans.TestingHost
 
         private void UnloadAppDomain()
         {
-            if (this.AppDomain != null)
+            UnloadAppDomain(this.AppDomain);
+            this.AppDomain = null;
+        }
+
+        private static void UnloadAppDomain(AppDomain appDomain)
+        {
+            if (appDomain != null)
             {
-                this.AppDomain.UnhandledException -= ReportUnobservedException;
-                AppDomain.Unload(this.AppDomain);
-                this.AppDomain = null;
+                appDomain.UnhandledException -= ReportUnobservedException;
+                AppDomain.Unload(appDomain);
             }
         }
 
@@ -214,13 +226,6 @@ namespace Orleans.TestingHost
         {
             // TODO: replace
             Console.WriteLine(value.ToString());
-        }
-
-        private static void RegisterPerfCountersTelemetryConsumer()
-        {
-#if !NETSTANDARD_TODO
-            LogManager.TelemetryConsumers.Add(new OrleansTelemetryConsumers.Counters.OrleansPerfCounterTelemetryConsumer());
-#endif
         }
 
         internal static AppDomainSetup GetAppDomainSetupInfo()

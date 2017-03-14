@@ -31,7 +31,6 @@ namespace Tester.StreamingTests
 
             protected override TestCluster CreateTestCluster()
             {
-                GrainClient.Uninitialize();
                 var options = new TestClusterOptions(2);
                 AdjustConfig(options.ClusterConfiguration);
                 AdjustConfig(options.ClientConfiguration);
@@ -64,22 +63,25 @@ namespace Tester.StreamingTests
         private readonly ITestOutputHelper output = null;
         private readonly ClientStreamTestRunner runner;
 
+        private Fixture fixture;
+
         public MemoryStreamProviderClientTests(Fixture fixture)
         {
+            this.fixture = fixture;
             runner = new ClientStreamTestRunner(fixture.HostedCluster);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task MemoryStreamProducerOnDroppedClientTest()
         {
-            logger.Info("************************ MemoryStreamProducerOnDroppedClientTest *********************************");
+            this.fixture.Logger.Info("************************ MemoryStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task MemoryStreamConsumerOnDroppedClientTest()
         {
-            logger.Info("************************ MemoryStreamConsumerOnDroppedClientTest *********************************");
+            this.fixture.Logger.Info("************************ MemoryStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace, output,
                     null, true);
         }

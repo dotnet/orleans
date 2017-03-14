@@ -1,9 +1,8 @@
 using System.Threading.Tasks;
+using org.apache.zookeeper;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using Xunit;
 
@@ -12,73 +11,99 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
     /// </summary>
+    [TestCategory("Membership"), TestCategory("ZooKeeper")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
-        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
+            : base(fixture, environment)
         {
-            LogManager.AddTraceLevelOverride(typeof (ZookeeperMembershipTableTests).Name, Severity.Verbose3);
+            LogManager.AddTraceLevelOverride(typeof(ZookeeperMembershipTableTests).Name, Severity.Verbose3);
         }
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+            return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger,
+                this.Services);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+                logger, this.Services);
         }
 
-        protected override string GetConnectionString()
+        protected override async Task<string> GetConnectionString()
         {
-            return TestDefaultConfiguration.ZooKeeperConnectionString;
+            var connectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString)) return null;
+
+            bool isReachable = false;
+            await ZooKeeper.Using(connectionString, 2000, null, async zk =>
+            {
+                try
+                {
+                    await zk.existsAsync("/test", false);
+                    isReachable = true;
+                }
+                catch (KeeperException.ConnectionLossException)
+                {
+                }
+            });
+
+            return isReachable ? connectionString : null;
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public void MembershipTable_ZooKeeper_Init()
         {
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact]
         public async Task MembershipTable_ZooKeeper_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
+        }
+
+        [SkippableFact]
+        public async Task MembershipTable_ZooKeeper_UpdateIAmAlive()
+        {
+            await MembershipTable_UpdateIAmAlive();
         }
     }
 }

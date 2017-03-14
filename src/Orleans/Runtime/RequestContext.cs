@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 #if !NETSTANDARD
 using System.Runtime.Remoting.Messaging;
+#else
+using System.Threading;
 #endif
 using Orleans.Serialization;
 
@@ -133,7 +134,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static Dictionary<string, object> Export()
+        public static Dictionary<string, object> Export(SerializationManager serializationManager)
         {
             Dictionary<string, object> values = GetContextData();
 
@@ -153,7 +154,7 @@ namespace Orleans.Runtime
                 }
             }
             if (values != null && values.Count != 0)
-                return values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
+                return (Dictionary<string, object>)serializationManager.DeepCopy(values);
             return null;
         }
 

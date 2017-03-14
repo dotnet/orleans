@@ -63,7 +63,7 @@ namespace Orleans.CodeGenerator
 #endif
             };
 
-            var members = new List<MemberDeclarationSyntax>
+            var members = new List<MemberDeclarationSyntax>(GenerateGenericInvokerFields(grainType))
             {
                 GenerateInvokeMethod(grainType),
                 GenerateInterfaceIdProperty(grainType)
@@ -75,7 +75,7 @@ namespace Orleans.CodeGenerator
                 baseTypes.Add(SF.SimpleBaseType(typeof(IGrainExtensionMethodInvoker).GetTypeSyntax()));
                 members.Add(GenerateExtensionInvokeMethod(grainType));
             }
-
+            
             var classDeclaration =
                 SF.ClassDeclaration(
                     CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix)
@@ -169,7 +169,7 @@ namespace Orleans.CodeGenerator
 
             var grainArgument = parameters[0].Name.ToIdentifierName();
             var requestArgument = parameters[1].Name.ToIdentifierName();
-            
+
             // Store the relevant values from the request in local variables.
             var interfaceIdDeclaration =
                 SF.LocalDeclarationStatement(
@@ -227,7 +227,7 @@ namespace Orleans.CodeGenerator
                         grainArgument,
                         SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                     SF.ThrowStatement(argumentNullException));
-            
+
             return methodDeclaration.AddBodyStatements(grainArgumentCheck, interfaceIdSwitch);
         }
 
@@ -271,18 +271,30 @@ namespace Orleans.CodeGenerator
                 parameters.Add(arg);
             }
 
+            // If the method is a generic method definition, use the generic method invoker field to invoke the method.
+            if (method.IsGenericMethodDefinition)
+            {
+                var invokerFieldName = GetGenericMethodInvokerFieldName(method);
+                var invokerCall = SF.InvocationExpression(
+                                        SF.IdentifierName(invokerFieldName)
+                                          .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, null)))
+                                    .AddArgumentListArguments(SF.Argument(grain), SF.Argument(arguments));
+                return new StatementSyntax[] { SF.ReturnStatement(invokerCall) };
+            }
+
             // Invoke the method.
             var grainMethodCall =
                 SF.InvocationExpression(castGrain.Member(method.Name))
                     .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
-            
+
             // For void methods, invoke the method and return a completed task.
             if (method.ReturnType == typeof(void))
             {
                 var completed = (Expression<Func<Task<object>>>)(() => TaskUtility.Completed());
                 return new StatementSyntax[]
                 {
-                    SF.ExpressionStatement(grainMethodCall), SF.ReturnStatement(completed.Invoke())
+                    SF.ExpressionStatement(grainMethodCall),
+                    SF.ReturnStatement(completed.Invoke())
                 };
             }
 
@@ -298,6 +310,64 @@ namespace Orleans.CodeGenerator
             {
                 SF.ReturnStatement(SF.InvocationExpression(grainMethodCall.Member((Task _) => _.Box())))
             };
+        }
+
+        /// <summary>
+        /// Generates <see cref="GenericMethodInvoker"/> fields for the generic methods in <paramref name="grainType"/>.
+        /// </summary>
+        /// <param name="grainType">The grain type.</param>
+        /// <returns>The generated fields.</returns>
+        private static MemberDeclarationSyntax[] GenerateGenericInvokerFields(Type grainType)
+        {
+            var methods = GrainInterfaceUtils.GetMethods(grainType);
+
+            var result = new List<MemberDeclarationSyntax>();
+            foreach (var method in methods)
+            {
+                if (!method.IsGenericMethodDefinition) continue;
+                result.Add(GenerateGenericInvokerField(method));
+            }
+
+            return result.ToArray();
+        }
+
+        /// <summary>
+        /// Generates a <see cref="GenericMethodInvoker"/> field for the provided generic method.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns>The generated field.</returns>
+        private static MemberDeclarationSyntax GenerateGenericInvokerField(MethodInfo method)
+        {
+            var fieldInfoVariable =
+                SF.VariableDeclarator(GetGenericMethodInvokerFieldName(method))
+                  .WithInitializer(
+                      SF.EqualsValueClause(
+                          SF.ObjectCreationExpression(typeof(GenericMethodInvoker).GetTypeSyntax())
+                            .AddArgumentListArguments(
+                                SF.Argument(SF.TypeOfExpression(method.DeclaringType.GetTypeSyntax())),
+                                SF.Argument(method.Name.GetLiteralExpression()),
+                                SF.Argument(
+                                    SF.LiteralExpression(
+                                        SyntaxKind.NumericLiteralExpression,
+                                        SF.Literal(method.GetGenericArguments().Length))))));
+
+            return
+                SF.FieldDeclaration(
+                      SF.VariableDeclaration(typeof(GenericMethodInvoker).GetTypeSyntax()).AddVariables(fieldInfoVariable))
+                  .AddModifiers(
+                      SF.Token(SyntaxKind.PrivateKeyword),
+                      SF.Token(SyntaxKind.StaticKeyword),
+                      SF.Token(SyntaxKind.ReadOnlyKeyword));
+        }
+
+        /// <summary>
+        /// Returns the name of the <see cref="GenericMethodInvoker"/> field corresponding to <paramref name="method"/>.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns>The name of the invoker field corresponding to the provided method.</returns>
+        private static string GetGenericMethodInvokerFieldName(MethodInfo method)
+        {
+            return method.Name + string.Join("_", method.GetGenericArguments().Select(arg => arg.Name));
         }
     }
 }

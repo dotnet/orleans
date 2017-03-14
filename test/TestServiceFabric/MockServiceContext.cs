@@ -1,6 +1,5 @@
 using System;
 using System.Fabric;
-using NSubstitute;
 
 namespace TestServiceFabric
 {

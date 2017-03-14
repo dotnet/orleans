@@ -5,9 +5,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
+using Orleans.LogConsistency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-
 
 namespace Orleans.Runtime
 {
@@ -16,15 +17,17 @@ namespace Orleans.Runtime
         private readonly List<string> excludedGrains;
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
         private List<string> discoveredAssemblyLocations;
-        private Dictionary<string, SearchOption> directories;
+        private readonly Dictionary<string, SearchOption> directories;
+        private readonly MultiClusterRegistrationStrategyManager registrationManager;
 
-        public SiloAssemblyLoader(NodeConfiguration nodeConfig)
-            : this(nodeConfig.AdditionalAssemblyDirectories, nodeConfig.ExcludedGrainTypes)
+        public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager)
+            : this(nodeConfig.AdditionalAssemblyDirectories, registrationManager, nodeConfig.ExcludedGrainTypes)
         {
         }
 
-        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories, IEnumerable<string> excludedGrains = null)
+        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories, MultiClusterRegistrationStrategyManager registrationManager, IEnumerable<string> excludedGrains = null)
         {
+            this.registrationManager = registrationManager;
             this.excludedGrains = excludedGrains != null
                 ? new List<string>(excludedGrains)
                 : new List<string>();
@@ -102,7 +105,7 @@ namespace Orleans.Runtime
                     if (parentTypeInfo.IsGenericType)
                     {
                         var definition = parentTypeInfo.GetGenericTypeDefinition();
-                        if (definition == typeof(Grain<>))
+                        if (definition == typeof(Grain<>) || definition == typeof(LogConsistentGrainBase<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
                             if (stateArg.GetTypeInfo().IsClass || stateArg.GetTypeInfo().IsValueType)
@@ -116,7 +119,7 @@ namespace Orleans.Runtime
                     parentType = parentTypeInfo.BaseType;
                 }
 
-                GrainTypeData typeData = GetTypeData(grainType, grainStateType);
+                GrainTypeData typeData = this.GetTypeData(grainType, grainStateType);
                 result.Add(className, typeData);
             }
 
@@ -147,11 +150,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Get type data for the given grain type
         /// </summary>
-        private static GrainTypeData GetTypeData(Type grainType, Type stateObjectType)
+        private GrainTypeData GetTypeData(Type grainType, Type stateObjectType)
         {
             return grainType.GetTypeInfo().IsGenericTypeDefinition ?
-                new GenericGrainTypeData(grainType, stateObjectType) :
-                new GrainTypeData(grainType, stateObjectType);
+                new GenericGrainTypeData(grainType, stateObjectType, this.registrationManager) :
+                new GrainTypeData(grainType, stateObjectType, this.registrationManager);
         }
 
         private static void LogGrainTypesFound(LoggerImpl logger, Dictionary<string, GrainTypeData> grainTypeData)

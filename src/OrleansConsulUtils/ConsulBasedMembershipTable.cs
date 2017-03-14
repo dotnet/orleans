@@ -67,7 +67,7 @@ namespace Orleans.Runtime.Host
             _connectionString = dataConnectionString;
 
             _consulClient =
-                new ConsulClient( config => config.Address = new Uri(dataConnectionString));
+                new ConsulClient( config => config.Address = new Uri(_connectionString));
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Host
             if (deploymentKVAddresses.Response == null)
             {
                 _logger.Verbose("Could not find any silo registrations for deployment {0}.", _deploymentId);
-                return new MembershipTableData(null);
+                return new MembershipTableData(_tableVersion);
             }
 
             var allSiloRegistrations =
