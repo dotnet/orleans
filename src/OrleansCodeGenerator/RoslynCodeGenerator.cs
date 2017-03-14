@@ -439,7 +439,7 @@ namespace Orleans.CodeGenerator
                                 toGen.GetParseableName());
                         }
 
-                        namespaceMembers.AddRange(SerializerGenerator.GenerateClass(toGen, onEncounteredType));
+                        namespaceMembers.Add(SerializerGenerator.GenerateClass(toGen, onEncounteredType));
                     }
                 }
 

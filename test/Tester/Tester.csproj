@@ -46,30 +46,17 @@
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
-    <Compile Include="DeploymentTests\DeployTest.cs" />
+    <Compile Include="EventSourcingTests\JournaledGrainTests.cs" />
     <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
     <Compile Include="GrainServiceTests\CustomGrainService.cs" />
     <Compile Include="GrainServiceTests\GrainServiceTests.cs" />
-    <Compile Include="PSClientTests\PSClientTests.cs" />
-    <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
     <Compile Include="SiloInitializationTests.cs" />
-    <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
-    <Compile Include="StreamingTests\EHSubscriptionMultiplicityTests.cs" />
-    <Compile Include="StreamingTests\SQSClientStreamTests.cs" />
-    <Compile Include="StreamingTests\SQSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
-    <Compile Include="StreamingTests\EHClientStreamTests.cs" />
-    <Compile Include="StreamingTests\EHImplicitSubscriptionStreamRecoveryTests.cs" />
-    <Compile Include="StreamingTests\EHStreamPerPartitionTests.cs" />
-    <Compile Include="StreamingTests\EHStreamProviderCheckpointTests.cs" />
-    <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
-    <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
-    <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="GeoClusterTests\MultiClusterDataTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="DuplicateActivationsTests.cs" />
@@ -81,9 +68,6 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="InvocationInterceptTests.cs" />
-    <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
-    <Compile Include="SerializationTests\ProtobufSerializationTests\Counter.cs" />
-    <Compile Include="SerializationTests\ProtobufSerializationTests\ProtobufSerializationTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="StreamingTests\ControllableStreamGeneratorProviderTests.cs" />
@@ -101,10 +85,7 @@
     <Compile Include="StreamingTests\StreamFilteringTests_SMS.cs" />
     <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
-    <Compile Include="StreamingTests\TimePurgePredicateTests.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
-    <Compile Include="TestStreamProviders\EventHub\StreamPerPartitionEventHubStreamProvider.cs" />
-    <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\FailureInjectionStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="TestUtils.cs" />
@@ -147,41 +128,21 @@
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj">
-      <Project>{67738e6c-f292-46a2-994d-5b52e745205b}</Project>
-      <Name>OrleansAWSUtils</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansBondUtils\OrleansBondUtils.csproj">
-      <Project>{7a6b8051-5d99-483c-b9b7-444ed57918ec}</Project>
-      <Name>OrleansBondUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
       <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
       <Name>OrleansCodeGenerator</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansGoogleUtils\OrleansGoogleUtils.csproj">
-      <Project>{b9196cb5-d356-4228-b73f-143f2eb80c64}</Project>
-      <Name>OrleansGoogleUtils</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
       <Name>OrleansProviders</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansPSUtils\OrleansPSUtils.csproj">
-      <Project>{6ad37425-7cb4-4d23-80c3-a9d143329a66}</Project>
-      <Name>OrleansPSUtils</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.csproj">
-      <Project>{8bff0092-15d2-4425-80c0-29e381702f2b}</Project>
-      <Name>OrleansServiceBus</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
@@ -226,13 +187,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="PSClientTests\PSClientTests.ps1">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="ReadMe.md" />
-    <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
-    <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
-    <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -95,7 +95,7 @@ namespace Tester.AzureUtils.Streaming
                         {
                             continue;
                         }
-                        foreach (AzureQueueBatchContainer message in messages.Cast<AzureQueueBatchContainer>())
+                        foreach (IBatchContainer message in messages)
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
                                 id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },

@@ -53,16 +53,7 @@
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
-    <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
-    <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
-    <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTestFixture.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageStressTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\PersistenceGrainTests_AWSDynamoDBStore.cs" />
-    <Compile Include="StorageTests\AWSUtils\UnitTestDynamoDBStorage.cs" />
+    <Compile Include="MembershipTests\ClientIdPartitionDataRebuildTests.cs" />
     <Compile Include="StorageTests\CommonStorageTests.cs" />
     <Compile Include="StorageTests\CommonStorageUtilities.cs" />
     <Compile Include="StorageTests\SymbolSet.cs" />
@@ -89,9 +80,13 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
+    <Compile Include="GeoClusterTests\BasicLogConsistentGrainTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestFixture.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestsFourClusters.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestsTwoClusters.cs" />
     <Compile Include="GeoClusterTests\MultiClusterNetworkTests.cs" />
     <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
@@ -117,16 +112,10 @@
     <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
     <Compile Include="StreamingTests\DynamicStreamProviderConfigurationTests.cs" />
-    <Compile Include="StreamingTests\HaloStreamSubscribeTests.cs" />
     <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
     <Compile Include="StreamingTests\SingleStreamTestRunner.cs" />
     <Compile Include="StreamingTests\SMSStreamingTests.cs" />
-    <Compile Include="StreamingTests\SQSAdapterTests.cs" />
-    <Compile Include="StreamingTests\SQSStreamTests.cs" />
-    <Compile Include="StreamingTests\StreamLifecycleTests.cs" />
-    <Compile Include="StreamingTests\StreamLimitTests.cs" />
     <Compile Include="StreamingTests\StreamPubSubReliabilityTests.cs" />
-    <Compile Include="StreamingTests\StreamReliabilityTests.cs" />
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
@@ -134,8 +123,6 @@
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
-    <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
-    <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />
     <Compile Include="TimerTests\ReminderTests_Base.cs" />
   </ItemGroup>
@@ -144,10 +131,6 @@
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj">
-      <Project>{67738E6C-F292-46A2-994D-5B52E745205B}</Project>
-      <Name>OrleansAWSUtils</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
@@ -155,6 +138,10 @@
     <ProjectReference Include="..\..\src\OrleansCounterControl\OrleansCounterControl.csproj">
       <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
       <Name>OrleansCounterControl</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj">
+      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
+      <Name>OrleansEventSourcing</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
@@ -167,6 +154,10 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
+      <Project>{47E9AE37-4EAE-48D5-A778-2C80E9A6375F}</Project>
+      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
@@ -219,15 +210,6 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="ReadMe.md" />
-    <None Include="ClientConfig_SQSStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <Content Include="Config_AWS_DynamoDB_Storage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="Config_SQSStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -245,27 +227,6 @@
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml">
       <Link>OrleansConfigurationForTesting.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_AzureWebRole.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_AzureStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_StreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_DevStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageErrors.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ClientConfiguration.xml">

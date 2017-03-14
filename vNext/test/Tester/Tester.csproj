@@ -1,24 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="**\*.cs" />
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -29,7 +25,6 @@
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.1.0" />
@@ -39,7 +34,6 @@
     <PackageReference Include="FluentAssertions" Version="4.17.0" />
     <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
@@ -53,7 +47,6 @@
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\..\test\Tester\FakeSerializer.cs">
       <Link>FakeSerializer.cs</Link>
@@ -88,20 +81,13 @@
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\RuntimeCodeGenerationTests.cs">
-      <Link>CodeGenTests\RuntimeCodeGenerationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\GeneratorGrainTest.cs">
-      <Link>CodeGenTests\GeneratorGrainTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\IRuntimeCodeGenGrain.cs">
-      <Link>CodeGenTests\IRuntimeCodeGenGrain.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
       <Link>SerializationTests\SerializationTestsUtils.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\EventSourcingTests\JournaledGrainTests.cs">
+      <Link>EventSourcingTests\JournaledGrainTests.cs</Link>
+    </Compile>
   </ItemGroup>
-
   <ItemGroup>
     <None Include="App.config" />
     <None Include="..\..\..\test\Tester\Tester.xunit.runner.json">
@@ -109,7 +95,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>

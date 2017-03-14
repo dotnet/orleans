@@ -4,10 +4,13 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
+using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Tester;
+using UnitTests.General;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -19,16 +22,17 @@ namespace UnitTests.TimerTests
 #if USE_SQL_SERVER || DEBUG
     public class ReminderTests_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_SqlServer.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(),
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
-                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-                });
+                var options = new TestClusterOptions();
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansRemiderTestSQL")
+                            .Result.CurrentConnectionString;
+                options.ClusterConfiguration.Globals.DataConnectionString = connectionString;
+                options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
+
+                return new TestCluster(options);
             }
         }
 
@@ -36,7 +40,7 @@ namespace UnitTests.TimerTests
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
-            var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
         

@@ -13,6 +13,8 @@ namespace Orleans.Providers
     /// </summary>
     /// <seealso cref="Orleans.Providers.IBootstrapProvider"/>
     /// <seealso cref="Orleans.Storage.IStorageProvider"/>
+    /// <seealso cref="Orleans.LogConsistency.ILogConsistencyProvider"/>
+
     public interface IProvider
     {
         /// <summary>The name of this provider instance, as given to it in the config.</summary>
@@ -61,6 +63,7 @@ namespace Orleans.Providers
         /// </summary>
         string Name { get; }
 
+        void AddChildConfiguration(IProviderConfiguration config);
         /// <summary>
         /// Configuration properties for this provider instance, as name-value pairs.
         /// </summary>

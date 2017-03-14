@@ -15,7 +15,9 @@ namespace UnitTests.General
     [TestCategory("DI")]
     public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -25,10 +27,15 @@ namespace UnitTests.General
             }
         }
 
+        public DependencyInjectionGrainTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task CanGetGrainWithInjectedDependencies()
         {
-            IDIGrainWithInjectedServices grain = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             long ignored = await grain.GetTicksFromService();
         }
 
@@ -37,15 +44,15 @@ namespace UnitTests.General
         {
             // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
             // since we are currently not supporting replacing IGrainFactory 
-            IDIGrainWithInjectedServices grain = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             long ignored = await grain.GetGrainFactoryId();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task CanResolveSingletonDependencies()
         {
-            var grain1 = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
-            var grain2 = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain2 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
 
             // the injected service will return the same value only if it's the same instance
             Assert.Equal(
@@ -56,8 +63,8 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task CanResolveSingletonGrainFactory()
         {
-            var grain1 = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
-            var grain2 = GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain2 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
 
             // the injected grain factory will return the same value only if it's the same instance,
             Assert.Equal(
@@ -68,7 +75,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task CannotGetExplictlyRegisteredGrain()
         {
-            ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetTicksFromService());
             Assert.Contains("Error creating activation for", exception.Message);
             Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);

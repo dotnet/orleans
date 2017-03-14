@@ -8,6 +8,10 @@ namespace DefaultCluster.Tests
 {
     public class GrainInterfaceHierarchyTests : HostedTestClusterEnsureDefaultStarted
     {
+        public GrainInterfaceHierarchyTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey
         {
             return GrainFactory.GetGrain<T>(GetRandomGrainId());

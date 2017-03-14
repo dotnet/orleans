@@ -46,10 +46,12 @@ namespace UnitTests.Grains
     public class GenericTestExtension<T> : IGenericTestExtension<T>
     {
         private readonly GenericExtensionTestGrain<T> grain;
+        private readonly IGrainFactory grainFactory;
 
-        public GenericTestExtension(GenericExtensionTestGrain<T> g)
+        public GenericTestExtension(GenericExtensionTestGrain<T> g, IGrainFactory grainFactory)
         {
             grain = g;
+            this.grainFactory = grainFactory;
         }
 
         public Task<T> CheckExtension_1()
@@ -60,7 +62,7 @@ namespace UnitTests.Grains
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()
         {
-            ITestGrain g = GrainClient.GrainFactory.GetGrain<ITestGrain>(24);
+            ITestGrain g = this.grainFactory.GetGrain<ITestGrain>(24);
             return g.GetLabel();
         }
     }

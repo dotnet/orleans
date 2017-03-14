@@ -13,6 +13,10 @@ namespace DefaultCluster.Tests.General
     {
         private readonly Random rand = new Random();
 
+        public StateClassTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StateClassTests_StateClass()
         {
@@ -21,7 +25,7 @@ namespace DefaultCluster.Tests.General
 
         private async Task StateClassTests_Test(string grainClass)
         {
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(GetRandomGrainId(), grainClass);
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(GetRandomGrainId(), grainClass);
             var originalVersion = await grain.GetVersion();
             await grain.SetA(98, true); // deactivate grain after setting A
 

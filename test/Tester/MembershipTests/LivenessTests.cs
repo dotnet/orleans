@@ -9,12 +9,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-#if !NETSTANDARD_TODO
-using OrleansAWSUtils.Storage;
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
-#endif
 using Tester;
 using TestExtensions;
 using UnitTests.General;
@@ -41,7 +35,7 @@ namespace UnitTests.MembershipTests
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
             Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
@@ -163,7 +157,7 @@ namespace UnitTests.MembershipTests
         {
             try
             {
-                ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
+                ILivenessTestGrain grain = this.GrainFactory.GetGrain<ILivenessTestGrain>(key);
                 Assert.Equal(key, grain.GetPrimaryKeyLong());
                 Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);
@@ -231,137 +225,4 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_3();
         }
     }
-
-#if !NETSTANDARD_TODO
-    public class LivenessTests_AzureTable : LivenessTestsBase
-    {
-        public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)
-        {
-            TestUtils.CheckForAzureStorage();
-        }
-
-        public override TestCluster CreateTestCluster()
-        {
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
-        public async Task Liveness_Azure_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
-        public async Task Liveness_Azure_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
-        public async Task Liveness_Azure_3_Restart_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
-        public async Task Liveness_Azure_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
-        public async Task Liveness_Azure_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
-    }
-
-    [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
-    public class LivenessTests_DynamoDB : LivenessTestsBase
-    {
-        private static Lazy<bool> isDynamoDbAvailable = new Lazy<bool>(() =>
-        {
-            try
-            {
-                DynamoDBStorage storage;
-                try
-                {
-                    storage = new DynamoDBStorage($"Service=http://localhost:8000", null);
-                }
-                catch (AmazonServiceException)
-                {
-                    return false;
-                }
-                storage.InitializeTable("TestTable", new List<KeySchemaElement> {
-                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
-                }, new List<AttributeDefinition> {
-                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                }).WithTimeout(TimeSpan.FromSeconds(2), "Unable to connect to AWS DynamoDB simulator").Wait();
-                return true;
-            }
-            catch (Exception exc)
-            {
-                if (exc.InnerException is TimeoutException)
-                    return false;
-
-                throw;
-            }
-        });
-
-        public LivenessTests_DynamoDB(ITestOutputHelper output) : base(output)
-        {
-        }
-
-        public override TestCluster CreateTestCluster()
-        {
-            if (!isDynamoDbAvailable.Value)
-                throw new SkipException("Unable to connect to DynamoDB simulator");
-
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = "Service=http://localhost:8000;"; ;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansAWSUtils";
-            options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Liveness_AWS_DynamoDB_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Liveness_AWS_DynamoDB_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Liveness_AWS_DynamoDB_3_Restart_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Liveness_AWS_DynamoDB_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Liveness_AWS_DynamoDB_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
-    }
-    
-#endif
 }

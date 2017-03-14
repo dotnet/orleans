@@ -10,6 +10,7 @@ using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.LogConsistency;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -436,6 +437,7 @@ namespace Orleans.Runtime.Configuration
 
         public int ActivationCountBasedPlacementChooseOutOf { get; set; }
 
+        public bool AssumeHomogenousSilosForTesting { get; set; }
 
         /// <summary>
         /// Determines if ADO should be used for storage of Membership and Reminders info.
@@ -571,6 +573,7 @@ namespace Orleans.Runtime.Configuration
             NumVirtualBucketsConsistentRing = DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
             UseMockReminderTable = false;
             MockReminderTableTimeout = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
+            AssumeHomogenousSilosForTesting = false;
 
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
             GrainServiceConfigurations = new GrainServiceConfigurations();
@@ -771,9 +774,20 @@ namespace Orleans.Runtime.Configuration
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
                                 ReminderServiceProviderType reminderServiceProviderType;
-                                SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
-                                    ? reminderServiceProviderType
-                                    : ReminderServiceProviderType.Disabled);
+                                if (LivenessType == LivenessProviderType.MembershipTableGrain)
+                                {
+                                    // Special case for MembershipTableGrain -> ReminderTableGrain since we use the same setting
+                                    // for LivenessType and ReminderServiceType even if the enum are not 100% compatible
+                                    reminderServiceProviderType = ReminderServiceProviderType.ReminderTableGrain;
+                                }
+                                else
+                                {
+                                    // If LivenessType = ZooKeeper then we set ReminderServiceType to disabled
+                                    reminderServiceProviderType = Enum.TryParse(sst, out reminderServiceProviderType)
+                                        ? reminderServiceProviderType
+                                        : ReminderServiceProviderType.Disabled;
+                                }
+                                SetReminderServiceType(reminderServiceProviderType);
                             }
                         }
                         if (child.HasAttribute("MembershipTableAssembly"))
@@ -795,7 +809,10 @@ namespace Orleans.Runtime.Configuration
                         if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
                             throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
                         if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
-                            throw new FormatException("ReminderTableAssembly should be set when ReminderServiceType is \"Custom\"");
+                        { 
+                            logger.Info("No ReminderTableAssembly specified with SystemStoreType set to Custom: ReminderService will be disabled");
+                            SetReminderServiceType(ReminderServiceProviderType.Disabled);
+                        }
 
                         if (child.HasAttribute("ServiceId"))
                         {
@@ -1092,6 +1109,57 @@ namespace Orleans.Runtime.Configuration
         {
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
+
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, ISiloMetricsDataPublisher
+        {
+            Type providerType = typeof(T);
+            var providerTypeInfo = providerType.GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                !(
+                typeof(IStatisticsPublisher).IsAssignableFrom(providerType) &&
+                typeof(ISiloMetricsDataPublisher).IsAssignableFrom(providerType)
+                ))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, ISiloMetricsDataPublisher interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+        }
+
+        public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given log-consistency provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the log-consistency provider type</param>
+        /// <param name="providerName">Name of the log-consistency provider</param>
+        /// <param name="properties">Properties that will be passed to the log-consistency provider upon initialization </param>
+        public void RegisterLogConsistencyProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is a log-consistency provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="ILogConsistencyProvider"/> a log-consistency storage interface</typeparam>
+        /// <param name="providerName">Name of the log-consistency provider</param>
+        /// <param name="properties">Properties that will be passed to log-consistency provider upon initialization</param>
+        public void RegisterLogConsistencyProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : ILogConsistencyProvider
+        {
+            Type providerType = typeof(T);
+            var providerTypeInfo = providerType.GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                !typeof(ILogConsistencyProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements ILogConsistencyProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        } 
+        
 
         /// <summary>
         /// Retrieves an existing provider configuration

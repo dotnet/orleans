@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.SqlUtils;
+using TestExtensions;
 using UnitTests.General;
 using Xunit;
 
@@ -13,7 +14,7 @@ namespace UnitTests.RemindersTest
     /// </summary>
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
-        public MySqlRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride(nameof(MySqlRemindersTableTests), Severity.Verbose3);
         }

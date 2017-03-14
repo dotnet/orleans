@@ -46,10 +46,11 @@
   <ItemGroup>
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
-    <Compile Include="CodeGeneratorTests_AccessibilityChecks.cs" />
-    <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
-    <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
-    <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
+    <Compile Include="CodeGenTests\CodeGeneratorTests_AccessibilityChecks.cs" />
+    <Compile Include="CodeGenTests\CodeGeneratorTests_KnownAssemblyAttribute.cs" />
+    <Compile Include="CodeGenTests\CodeGeneratorTests_RequiringSilo.cs" />
+    <Compile Include="CodeGenTests\CodeGeneratorTests_TakeSerializedData.cs" />
+    <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="DeactivationTests.cs" />
@@ -57,6 +58,7 @@
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ExternalTypesTests.cs" />
     <Compile Include="FSharpGrainTests.cs" />
+    <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs" />

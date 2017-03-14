@@ -77,7 +77,7 @@ namespace Orleans.Runtime
         public Catalog Catalog { get; private set; }
 
         public SiloAddress MySilo { get; private set; }
-        
+
         public ClusterConfiguration Config { get; private set; }
 
         public OrleansTaskScheduler Scheduler { get; }
@@ -105,11 +105,11 @@ namespace Orleans.Runtime
         }
 
         private void SendRequestMessage(
-            GrainReference target, 
-            Message message, 
+            GrainReference target,
+            Message message,
             TaskCompletionSource<object> context,
             Action<Message, TaskCompletionSource<object>> callback,
-            string debugContext, 
+            string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
         {
@@ -119,7 +119,7 @@ namespace Orleans.Runtime
             if (!String.IsNullOrEmpty(genericArguments))
                 message.GenericGrainType = genericArguments;
 
-            SchedulingContext schedulingContext = RuntimeContext.Current != null ? 
+            SchedulingContext schedulingContext = RuntimeContext.Current != null ?
                 RuntimeContext.Current.ActivationContext as SchedulingContext : null;
 
             ActivationData sendingActivation = null;
@@ -158,7 +158,7 @@ namespace Orleans.Runtime
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
                 message.TargetSilo = targetSilo;
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
-                message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ? 
+                message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
             }
             if (target.IsObserverReference)
@@ -175,12 +175,12 @@ namespace Orleans.Runtime
 
             if (message.IsExpirableMessage(Config.Globals))
                 message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
-            
+
             if (!oneWay)
             {
                 var callbackData = new CallbackData(
                     callback,
-                    tryResendMessage, 
+                    tryResendMessage,
                     context,
                     message,
                     unregisterCallback,
@@ -286,7 +286,7 @@ namespace Orleans.Runtime
                         directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
-   
+
 #if false
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
@@ -338,7 +338,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.BodyObject;
+                    var request = (InvokeMethodRequest)message.BodyObject;
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, logger, this);
@@ -353,14 +353,14 @@ namespace Orleans.Runtime
                         // -- most likely reason is that the dynamic extension is not installed for this grain
                         // So throw a specific exception here rather than a general InvalidCastException
                         var error = String.Format(
-                            "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}", 
+                            "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}",
                             target.GetType().FullName, invoker.GetType().FullName, invokable.GetType().FullName);
                         var exc = new GrainExtensionNotInstalledException(error);
                         string extraDebugInfo = null;
 #if DEBUG
                         extraDebugInfo = Utils.GetStackTrace();
 #endif
-                        logger.Warn(ErrorCode.Stream_ExtensionNotInstalled, 
+                        logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
                             string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
 
                         throw exc;
@@ -390,7 +390,7 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
                 if (message.Direction != Message.Directions.OneWay)
-                    SafeSendExceptionResponse(message, exc2);             
+                    SafeSendExceptionResponse(message, exc2);
             }
         }
 
@@ -400,11 +400,11 @@ namespace Orleans.Runtime
             // call.
             var siloWideInterceptor = this.CurrentStreamProviderRuntime.GetInvokeInterceptor();
             var grainWithInterceptor = target as IGrainInvokeInterceptor;
-            
+
             // Silo-wide interceptors do not operate on system targets.
             var hasSiloWideInterceptor = siloWideInterceptor != null && target is IGrain;
             var hasGrainLevelInterceptor = grainWithInterceptor != null;
-            
+
             if (!hasGrainLevelInterceptor && !hasSiloWideInterceptor)
             {
                 // The call is not intercepted at either the silo or the grain level, so call the invoker
@@ -460,11 +460,11 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.IGC_SendResponseFailed,
                     "Exception trying to send a response: " + exc.Message, exc);
-                SendResponse(message, Response.ExceptionResponse(exc)); 
+                SendResponse(message, Response.ExceptionResponse(exc));
             }
         }
 
-        private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy = 
+        private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
 
 
@@ -473,6 +473,11 @@ namespace Orleans.Runtime
             var methodInfo = typeof(Exception).GetMethod(
                 "PrepForRemoting",
                 BindingFlags.Instance | BindingFlags.NonPublic);
+
+            //This was added to avoid failure on .Net Core since Remoting APIs aren't available there.
+            if (methodInfo == null)
+                return exc => exc;
+
             var method = new DynamicMethod(
                 "PrepForRemoting",
                 typeof(Exception),
@@ -573,7 +578,7 @@ namespace Orleans.Runtime
                         break;
 
                     default:
-                        logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType, 
+                        logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
                             "Missing enum in switch: " + message.RejectionType);
                         break;
                 }
@@ -621,7 +626,7 @@ namespace Orleans.Runtime
         {
             get { return MySilo; }
         }
-        
+
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             // Schedule call back to grain context
@@ -722,19 +727,19 @@ namespace Orleans.Runtime
                 }
             }
         }
-        
+
         public StreamDirectory GetStreamDirectory()
         {
             var currentActivation = GetCurrentActivationData();
             return currentActivation.GetStreamDirectory();
         }
-        
+
         public string ExecutingEntityIdentity()
         {
             var currentActivation = GetCurrentActivationData();
             return currentActivation.Address.ToString();
         }
-        
+
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
@@ -752,7 +757,7 @@ namespace Orleans.Runtime
 
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
         }
-        
+
         public bool TryAddExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
@@ -762,13 +767,13 @@ namespace Orleans.Runtime
 
             return currentActivation.TryAddExtension(invoker, handler);
         }
-        
+
         public void RemoveExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
             currentActivation.RemoveExtension(handler);
         }
-        
+
         public bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension
         {
             var currentActivation = GetCurrentActivationData();
@@ -778,7 +783,7 @@ namespace Orleans.Runtime
                 result = (TExtension)untypedResult;
                 return true;
             }
-            
+
             result = default(TExtension);
             return false;
         }

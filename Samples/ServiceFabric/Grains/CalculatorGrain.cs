@@ -6,16 +6,21 @@ namespace Grains
 {
     public class CalculatorGrain : Grain, ICalculatorGrain
     {
+        private readonly ObserverSubscriptionManager<ICalculatorObserver> observers = new ObserverSubscriptionManager<ICalculatorObserver>();
         private double current;
 
         public Task<double> Add(double value)
         {
-            return Task.FromResult(current += value);
+            var result = this.current += value;
+            this.observers.Notify(observer => observer.CalculationUpdated(result));
+            return Task.FromResult(result);
         }
 
         public Task<double> Divide(double value)
         {
-            return Task.FromResult(current /= value);
+            var result = this.current /= value;
+            this.observers.Notify(observer => observer.CalculationUpdated(result));
+            return Task.FromResult(result);
         }
 
         public Task<double> Get()
@@ -25,17 +30,29 @@ namespace Grains
 
         public Task<double> Multiply(double value)
         {
-            return Task.FromResult(current *= value);
+            var result = current *= value;
+            this.observers.Notify(observer => observer.CalculationUpdated(result));
+            return Task.FromResult(result);
         }
 
         public Task<double> Set(double value)
         {
-            return Task.FromResult(current = value);
+            var result = current = value;
+            this.observers.Notify(observer => observer.CalculationUpdated(result));
+            return Task.FromResult(result);
         }
 
         public Task<double> Subtract(double value)
         {
-            return Task.FromResult(current -= value);
+            var result = this.current -= value;
+            this.observers.Notify(observer => observer.CalculationUpdated(result));
+            return Task.FromResult(result);
+        }
+
+        public Task Subscribe(ICalculatorObserver observer)
+        {
+            if (!this.observers.IsSubscribed(observer)) observers.Subscribe(observer);
+            return Task.FromResult(0);
         }
     }
 }

@@ -47,6 +47,7 @@
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
     <Compile Include="CodeGeneratorTests.cs" />
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterTests.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
@@ -102,6 +103,9 @@
     <Content Include="Config_BootstrapProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Config_Custom_Membership_No_Reminders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_Different_Membership_Reminders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -130,6 +134,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_StorageProvider_SomeConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_TableGrain.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_TestSiloConfig.xml">

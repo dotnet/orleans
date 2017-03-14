@@ -44,7 +44,7 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
         public async Task SiloUngracefulShutdown_ClientOutstandingRequestsBreak()
         {
-            var grain = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
             var task = grain.LongRunningTask(true, TimeSpan.FromSeconds(7));
             await Task.Delay(500);
 
@@ -59,7 +59,7 @@ namespace UnitTests.MembershipTests
             const int maxRetry = 5;
             for (int i = 0; i < maxRetry; i++)
             {
-                var grain = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+                var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
                 {

@@ -1,10 +1,12 @@
 ﻿using System.Threading.Tasks;
 using Orleans;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Tester;
 using Tester.AzureUtils;
 using TestExtensions;
+using UnitTests.MembershipTests;
 using UnitTests.StorageTests;
 using Xunit;
 
@@ -15,11 +17,18 @@ namespace UnitTests.RemindersTest
     /// </summary>
     public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTestFixture>
     {
-        public AzureRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
             LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
             LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+        }
+
+        public override void Dispose()
+        {
+            // Reset init timeout after tests
+            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+            base.Dispose();
         }
 
         protected override IReminderTable CreateRemindersTable()

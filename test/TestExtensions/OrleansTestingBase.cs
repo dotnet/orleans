@@ -8,9 +8,7 @@ namespace TestExtensions
     {
         protected static readonly Random random = new Random();
 
-        public Logger logger => GrainClient.Logger;
-
-        protected static IGrainFactory GrainFactory => GrainClient.GrainFactory;
+        protected Logger logger => GrainClient.Logger;
 
         protected static long GetRandomGrainId()
         {

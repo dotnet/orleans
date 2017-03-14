@@ -976,6 +976,8 @@ namespace Orleans
         Provider_ProviderLoadedOk               = ProviderManagerBase + 14,
         Provider_ProviderNotFound               = ProviderManagerBase + 15,
         Provider_ProviderNotControllable        = ProviderManagerBase + 16,
+        Provider_CatalogNoLogConsistencyProvider       = ProviderManagerBase + 17,
+        Provider_CatalogLogConsistencyProviderAllocated = ProviderManagerBase + 18,
 
         AzureQueueBase = Runtime + 3200,
         AzureQueue_01 = AzureQueueBase + 1,
@@ -1098,6 +1100,16 @@ namespace Orleans
 
         TypeManagerBase = Runtime + 4200,
         TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
+
+        LogConsistencyBase = Runtime + 4300,
+        LogConsistency_UserCodeException = LogConsistencyBase + 1,
+        LogConsistency_CaughtException = LogConsistencyBase + 2,
+        LogConsistency_ProtocolError = LogConsistencyBase + 3,
+        LogConsistency_ProtocolFatalError = LogConsistencyBase + 4,
+        
+        // Note: individual Service Fabric error codes are defined in
+        // Microsoft.Orleans.ServiceFabric.Utilities.ErrorCode.
+        ServiceFabricBase = Runtime + 4400,
     }
 }
 // ReSharper restore InconsistentNaming

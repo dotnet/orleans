@@ -23,6 +23,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
             options.ClusterConfiguration.Overrides[Silo.PrimarySiloName].ExcludedGrainTypes = typesName;
@@ -42,11 +43,11 @@ namespace Tester.HeterogeneousSilosTests
             SetupAndDeployCluster("RandomPlacement", typeof(TestGrain));
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => GrainFactory.GetGrain<ITestGrain>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
 
             // Should not fail
-            GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
+            this.cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
 
@@ -65,7 +66,7 @@ namespace Tester.HeterogeneousSilosTests
             var delayTimeout = refreshInterval.Add(refreshInterval);
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => GrainFactory.GetGrain<ITestGrain>(0));
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
 
             // Start a new silo with TestGrain
@@ -79,7 +80,7 @@ namespace Tester.HeterogeneousSilosTests
             for (var i = 0; i < 5; i++)
             {
                 // Success
-                var g = GrainFactory.GetGrain<ITestGrain>(i);
+                var g = this.cluster.GrainFactory.GetGrain<ITestGrain>(i);
                 await g.SetLabel("Hello world");
             }
 
@@ -87,7 +88,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster.StopSecondarySilos();
             await Task.Delay(delayTimeout);
 
-            var grain = GrainFactory.GetGrain<ITestGrain>(0);
+            var grain = this.cluster.GrainFactory.GetGrain<ITestGrain>(0);
             var orleansException = await Assert.ThrowsAsync<OrleansException>(() => grain.SetLabel("Hello world"));
             Assert.Contains("Cannot find an implementation class for grain interface", orleansException.Message);
 
@@ -96,7 +97,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster.InitializeClient();
 
             // Should fail
-            exception = Assert.Throws<ArgumentException>(() => GrainFactory.GetGrain<ITestGrain>(0));
+            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
         }
     }

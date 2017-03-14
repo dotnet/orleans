@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Immutable;
 using System.Collections;
+using TestExtensions;
 
 namespace Tester.SerializationTests
 {

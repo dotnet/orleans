@@ -60,20 +60,20 @@ namespace Tests.GeoClusterTests
         {
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer) : base(name, gatewayport, clusterId, customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+                this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
 
             public int CallGrain(int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
-                return toWait.Result;
+                return toWait.GetResult();
             }
 
             public void InjectMultiClusterConf(params string[] args)
             {
-                systemManagement.InjectMultiClusterConfiguration(args).Wait();
+                systemManagement.InjectMultiClusterConfiguration(args).GetResult();
             }
 
             IManagementGrain systemManagement;

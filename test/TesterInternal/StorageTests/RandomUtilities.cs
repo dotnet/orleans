@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
-
+using Orleans;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -37,9 +37,9 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <remarks>This switch could take the key generator function as a parameter, so the called could use this same code to
         /// create known grain ID values.</remarks>
-        private static Dictionary<Type, Func<Type, bool, object, GrainReference>> GrainReferenceTypeSwitch { get; } = new Dictionary<Type, Func<Type, bool, object, GrainReference>>
+        private static Dictionary<Type, Func<IInternalGrainFactory, Type, bool, object, GrainReference>> GrainReferenceTypeSwitch { get; } = new Dictionary<Type, Func<IInternalGrainFactory, Type, bool, object, GrainReference>>
         {
-            [typeof(Guid)] = (type, keyExtension, state) =>
+            [typeof(Guid)] = (grainFactory, type, keyExtension, state) =>
             {
                 var range = ((Tuple<Range<long>, SymbolSet>)state).Item1;
                 var symbolSet = ((Tuple<Range<long>, SymbolSet>)state).Item2;
@@ -53,7 +53,7 @@ namespace UnitTests.StorageTests.Relational
 
                 return GrainReference.FromGrainId(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
             },
-            [typeof(long)] = (type, keyExtension, state) =>
+            [typeof(long)] = (grainFactory, type, keyExtension, state) =>
             {
                 var range = ((Tuple<Range<long>, SymbolSet>)state).Item1;
                 var symbolSet = ((Tuple<Range<long>, SymbolSet>)state).Item2;
@@ -67,7 +67,7 @@ namespace UnitTests.StorageTests.Relational
 
                 return GrainReference.FromGrainId(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
             },
-            [typeof(string)] = (type, keyExtension, state) =>
+            [typeof(string)] = (grainFactory, type, keyExtension, state) =>
             {
                 var range = ((Tuple<Range<long> , SymbolSet>)state).Item1;
                 var symbolSet = ((Tuple<Range<long>, SymbolSet>)state).Item2;
@@ -194,12 +194,13 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <typeparam name="TGrainKey">The grain key type.</typeparam>
         /// <typeparam name="TGrainGeneric">The type of the generic part of a grain.</typeparam>
+        /// <param name="grainFactory">The grain factory.</param>
         /// <param name="keyExtension">Should an extension key be defined or not.</param>
         /// <returns>Random value of the given type.</returns>
         /// <exception cref="ArgumentException"/>.
-        internal static GrainReference GetRandomGrainReference<TGrainKey, TGrainGeneric>(bool keyExtension)
+        internal static GrainReference GetRandomGrainReference<TGrainKey, TGrainGeneric>(IInternalGrainFactory grainFactory, bool keyExtension)
         {
-            Func<Type, bool, object, GrainReference> func;
+            Func<IInternalGrainFactory, Type, bool, object, GrainReference> func;
             if(GrainReferenceTypeSwitch.TryGetValue(typeof(TGrainKey), out func))
             {
                 //If this a string type, some symbol set from which to draw the symbols needs to given
@@ -207,7 +208,7 @@ namespace UnitTests.StorageTests.Relational
                 const long SymbolsDefaultCount = 15;
                 var symbols = new SymbolSet(SymbolSet.Latin1);
 
-                return func(typeof(TGrainGeneric), keyExtension, Tuple.Create(new Range<long>(SymbolsDefaultCount, SymbolsDefaultCount), symbols));
+                return func(grainFactory, typeof(TGrainGeneric), keyExtension, Tuple.Create(new Range<long>(SymbolsDefaultCount, SymbolsDefaultCount), symbols));
             }
 
             throw new ArgumentException(typeof(TGrainKey).Name);
@@ -219,20 +220,21 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <typeparam name="TGrainKey">The grain key type.</typeparam>
         /// <typeparam name="TGrainGeneric">The type of the generic part of a grain.</typeparam>
+        /// <param name="grainFactory">The grain factory.</param>
         /// <param name="keyExtension">Should an extension key be defined or not.</param>
         /// <returns>Random value of the given type.</returns>
         /// <exception cref="ArgumentException"/>.
-        internal static GrainReference GetRandomGrainReference<TGrainKey, TGrainGeneric>(SymbolSet symbolSet, long symbolCount = 15, bool keyExtension = false)
+        internal static GrainReference GetRandomGrainReference<TGrainKey, TGrainGeneric>(IInternalGrainFactory grainFactory, SymbolSet symbolSet, long symbolCount = 15, bool keyExtension = false)
         {
             if(symbolSet == null)
             {
                 throw new ArgumentNullException(nameof(symbolSet));
             }
 
-            Func<Type, bool, object, GrainReference> func;
+            Func<IInternalGrainFactory, Type, bool, object, GrainReference> func;
             if(GrainReferenceTypeSwitch.TryGetValue(typeof(TGrainKey), out func))
             {
-                return func(typeof(TGrainGeneric), keyExtension, Tuple.Create(new Range<long>(symbolCount, symbolCount), symbolSet));
+                return func(grainFactory, typeof(TGrainGeneric), keyExtension, Tuple.Create(new Range<long>(symbolCount, symbolCount), symbolSet));
             }
 
             throw new ArgumentException(typeof(TGrainKey).Name);
@@ -242,12 +244,13 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// Get a random grain reference.
         /// </summary>
-        /// <typeparam name="TGrainKey">The grain key type.</typeparam>
+        /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="extensionKey">The grain extension key.</param>
         /// <returns>Random value of the given type.</returns>
         /// <exception cref="ArgumentException"/>.
-        internal static GrainReference GetRandomGrainReference<T>(bool extensionKey = false)
+        internal static GrainReference GetRandomGrainReference<T>(IInternalGrainFactory grainFactory, bool extensionKey = false)
         {
-            return GetRandomGrainReference<T, NotApplicable>(extensionKey);
+            return GetRandomGrainReference<T, NotApplicable>(grainFactory, extensionKey);
         }
     }
 }

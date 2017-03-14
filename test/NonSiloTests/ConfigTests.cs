@@ -1008,6 +1008,20 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_Custom_Membership_No_Reminders()
+        {
+            const string filename = "Config_Custom_Membership_No_Reminders.xml";
+
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.True(config.Globals.MembershipTableAssembly == "MembershipTableDLL");
+            Assert.True(config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.Disabled);
+            Assert.True(config.Globals.AdoInvariant == "AdoInvariantValue");
+            Assert.True(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
+            Assert.True(config.Globals.DataConnectionString == "MembershipConnectionString");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_Different_Membership_And_Reminders()
         {
             const string filename = "Config_Different_Membership_Reminders.xml";
@@ -1020,6 +1034,17 @@ namespace UnitTests
             Assert.True(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
             Assert.True(config.Globals.DataConnectionString == "MembershipConnectionString");
             Assert.True(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_TableGrain()
+        {
+            const string filename = "Config_TableGrain.xml";
+
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.True(config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
+            Assert.True(config.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.MembershipTableGrain);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]

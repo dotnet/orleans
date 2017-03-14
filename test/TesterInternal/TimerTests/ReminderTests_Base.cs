@@ -13,6 +13,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -21,7 +22,7 @@ namespace UnitTests.TimerTests
 {
     public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
         internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
 
@@ -36,9 +37,10 @@ namespace UnitTests.TimerTests
 
         protected Logger log;
 
-        public ReminderTests_Base(BaseClusterFixture fixture)
+        public ReminderTests_Base(BaseTestClusterFixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
+            GrainFactory = fixture.GrainFactory;
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             LogManager.Initialize(cfg);
@@ -49,11 +51,13 @@ namespace UnitTests.TimerTests
             log = LogManager.GetLogger(this.GetType().Name, LoggerType.Application);
         }
 
+        public IGrainFactory GrainFactory { get; }
+
         public void Dispose()
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
-            var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
 
@@ -61,7 +65,7 @@ namespace UnitTests.TimerTests
         #region Basic test
         public async Task Test_Reminders_Basic_StopByRef()
         {
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             IGrainReminder r1 = await grain.StartReminder(DR);
             IGrainReminder r2 = await grain.StartReminder(DR);
@@ -94,7 +98,7 @@ namespace UnitTests.TimerTests
         {
             Guid id = Guid.NewGuid();
             log.Info("Start Grain Id = {0}", id);
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(id);
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(id);
             const int count = 5;
             Task<IGrainReminder>[] startReminderTasks = new Task<IGrainReminder>[count];
             for (int i = 0; i < count; i++)
@@ -135,11 +139,11 @@ namespace UnitTests.TimerTests
         #region Single join ... multi grain, multi reminders
         public async Task Test_Reminders_1J_MultiGrainMultiReminders()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -164,7 +168,7 @@ namespace UnitTests.TimerTests
 
         public async Task Test_Reminders_ReminderNotFound()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             // request a reminder that does not exist
             IGrainReminder reminder = await g1.GetReminderObject("blarg");

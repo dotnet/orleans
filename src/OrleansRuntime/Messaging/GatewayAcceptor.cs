@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 //convert handshake cliendId to a GeoClient ID 
-                if (!string.IsNullOrEmpty(Silo.CurrentSilo.ClusterId))
+                if (Silo.CurrentSilo.HasMultiClusterNetwork)
                 {
                     client = GrainId.NewClientId(client.PrimaryKey, Silo.CurrentSilo.ClusterId);
                 }
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Messaging
             gatewayTrafficCounter.Increment();
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (! string.IsNullOrEmpty(Silo.CurrentSilo.ClusterId) && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
+            if (Silo.CurrentSilo.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
                 msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, Silo.CurrentSilo.ClusterId);
             }

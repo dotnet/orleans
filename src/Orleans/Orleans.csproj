@@ -81,10 +81,13 @@
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
+    <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />
     <Compile Include="Logging\LogFormatter.cs" />
     <Compile Include="Logging\LogManager.cs" />
+    <Compile Include="LogConsistency\ConnectionIssues.cs" />
+    <Compile Include="LogConsistency\IConnectionIssueListener.cs" />
     <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
@@ -104,6 +107,7 @@
     <Compile Include="Core\InterceptedMethodInvokerCache.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
+    <Compile Include="LogConsistency\ILogViewAdaptorHost.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Runtime\OrleansThreadPool.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
@@ -116,6 +120,9 @@
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="MultiCluster\MultiClusterConfiguration.cs" />
+    <Compile Include="MultiCluster\IProtocolParticipant.cs" />
+    <Compile Include="LogConsistency\ILogViewAdaptor.cs" />
+    <Compile Include="LogConsistency\ILogConsistentGrain.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistrationStrategy.cs" />
@@ -129,7 +136,9 @@
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\IControllable.cs" />
+    <Compile Include="LogConsistency\ILogConsistencyProvider.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="LogConsistency\ILogConsistencyProtocolServices.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
     <Compile Include="AssemblyLoader\AssemblyLoader.cs" />
@@ -148,9 +157,9 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Services\IGrainServiceClient.cs" />
     <Compile Include="Services\IGrainService.cs" />
+    <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
-    <Compile Include="Serialization\SerializationTestEnvironment.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
@@ -161,6 +170,7 @@
     <Compile Include="Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="SystemTargetInterfaces\IClusterGrainDirectory.cs" />
+    <Compile Include="SystemTargetInterfaces\ILogConsistencyProtocolGateway.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Streams\QueueAdapters\IQueueFlowController.cs" />

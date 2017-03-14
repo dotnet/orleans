@@ -10,10 +10,9 @@ namespace Orleans.Runtime.Startup
     /// </summary>
     internal class StartupBuilder
     {
-        internal static IServiceProvider ConfigureStartup(string startupTypeName, Action<IServiceCollection, bool> registerSystemTypes)
+        internal static IServiceProvider ConfigureStartup(string startupTypeName, IServiceCollection serviceCollection)
         {
             var usingCustomServiceProvider = false;
-            IServiceCollection serviceCollection = new ServiceCollection();
             ConfigureServicesBuilder servicesMethod = null;
             Type startupType = null;
 
@@ -31,9 +30,7 @@ namespace Orleans.Runtime.Startup
                     usingCustomServiceProvider = true;
                 }
             }
-
-            registerSystemTypes(serviceCollection, usingCustomServiceProvider);
-
+            
             if (usingCustomServiceProvider)
             {
                 var instance = Activator.CreateInstance(startupType);

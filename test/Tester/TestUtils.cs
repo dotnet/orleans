@@ -91,11 +91,11 @@ namespace Tester
             ServicePointManager.UseNagleAlgorithm = false;
         }
 
-        public static async Task<int> GetActivationCount(string fullTypeName)
+        public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string fullTypeName)
         {
             int result = 0;
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
             foreach (var stat in stats)
             {

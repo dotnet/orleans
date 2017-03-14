@@ -14,6 +14,11 @@ using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Runtime.Configuration;
+using System.Collections.Generic;
+using Orleans.Providers;
+using System.Linq;
+using TestExtensions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -26,23 +31,48 @@ namespace Tester.AzureUtils.Persistence
     /// </summary>
     public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableStore.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
                 TestUtils.CheckForAzureStorage();
 
                 Guid serviceId = Guid.NewGuid();
-                return new TestingSiloHost(new TestingSiloOptions
+                var options = new TestClusterOptions(initialSilosCount: 4);
+
+                options.ClusterConfiguration.Globals.ServiceId = serviceId;
+
+                options.ClusterConfiguration.Globals.MaxResendCount = 0;
+
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore1", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore2", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore3", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedAzureStore");
+
+
+                IProviderConfiguration providerConfig;
+                if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedAzureStore", out providerConfig))
                 {
-                    SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    AdjustConfig = config =>
-                    {
-                        config.Globals.ServiceId = serviceId;
-                    }
-                });
+                    var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
+
+                    var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
+
+                    IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore1");
+                    IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore2");
+                    IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore3");
+                    providerConfig.AddChildConfiguration(provider1);
+                    providerConfig.AddChildConfiguration(provider2);
+                    providerConfig.AddChildConfiguration(provider3);
+                }
+
+                return new TestCluster(options);
             }
         }
 
@@ -133,7 +163,7 @@ namespace Tester.AzureUtils.Persistence
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid id = Guid.NewGuid();
-            IUser grain = GrainClient.GrainFactory.GetGrain<IUser>(id);
+            IUser grain = this.GrainFactory.GetGrain<IUser>(id);
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new DynamicTableEntity();
@@ -152,9 +182,9 @@ namespace Tester.AzureUtils.Persistence
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
             IUser[] grains = new IUser[3];
-            grains[0] = GrainClient.GrainFactory.GetGrain<IUser>(ids[0]);
-            grains[1] = GrainClient.GrainFactory.GetGrain<IUser>(ids[1]);
-            grains[2] = GrainClient.GrainFactory.GetGrain<IUser>(ids[2]);
+            grains[0] = this.GrainFactory.GetGrain<IUser>(ids[0]);
+            grains[1] = this.GrainFactory.GetGrain<IUser>(ids[1]);
+            grains[2] = this.GrainFactory.GetGrain<IUser>(ids[2]);
 
             var initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)

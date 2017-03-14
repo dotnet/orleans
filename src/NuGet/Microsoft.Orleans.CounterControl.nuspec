@@ -28,7 +28,8 @@
   <files>
     <file src="OrleansCounterControl.exe" target="lib\net451" />
     <file src="OrleansCounterControl.pdb" target="lib\net451" />
-    <file src="OrleansCounterControl.exe.config" target="lib\net451" />
+    <file src="OrleansCounterControl.exe.config" target="tools" />
     <file src="$SRC_DIR$OrleansCounterControl\**\*.cs" target="src" />
+    <file src="Microsoft.Orleans.CounterControl.targets" target="build" />
   </files>
 </package>

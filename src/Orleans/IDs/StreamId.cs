@@ -42,7 +42,7 @@ namespace Orleans.Streams
 
         private static StreamId FindOrCreateStreamId(StreamIdInternerKey key)
         {
-            return streamIdInternCache.Value.FindOrCreate(key, () => new StreamId(key));
+            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
         }
 
         #region IComparable<StreamId> Members

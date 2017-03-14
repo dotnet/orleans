@@ -16,7 +16,9 @@ namespace UnitTests.StuckGrainTests
     /// </summary>
     public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -30,17 +32,22 @@ namespace UnitTests.StuckGrainTests
             }
         }
 
+        public StuckGrainTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_Basic()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = GrainClient.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout
             await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
 
-            var cleaner = GrainClient.GrainFactory.GetGrain<IStuckCleanGrain>(id);
+            var cleaner = this.fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
             await cleaner.Release(id);
 
             // Should complete now
@@ -56,7 +63,7 @@ namespace UnitTests.StuckGrainTests
         public async Task StuckGrainTest_StuckDetectionAndForward()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = GrainClient.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout

@@ -1,0 +1,31 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansTelemetryConsumers.AI</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Telemetry Consumer - Azure Application Insights</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Microsoft Orleans Telemetry Consumer for Azure Application Insights
+    </summary>
+    <description>
+      Azure Application Insights implementation of Orleans Telemetry API.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.ApplicationInsights" version="2.2.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansTelemetryConsumers.AI.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansTelemetryConsumers.AI.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansTelemetryConsumers.AI.xml" target="lib\netstandard1.5" />
+    <file src="$SRC_DIR$OrleansTelemetryConsumers.AI\**\*.cs" exclude="$SRC_DIR$OrleansTelemetryConsumers.AI\obj\**\*.*;$SRC_DIR$OrleansTelemetryConsumers.AI\bin\**\*.*" target="src" />
+  </files>
+</package>

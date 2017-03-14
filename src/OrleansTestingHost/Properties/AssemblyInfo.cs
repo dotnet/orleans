@@ -21,3 +21,5 @@ using System.Runtime.InteropServices;
 [assembly: Guid("40ee3b00-d381-485f-9c69-ff706837deed")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]

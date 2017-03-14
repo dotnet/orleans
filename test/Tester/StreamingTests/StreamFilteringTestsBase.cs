@@ -14,14 +14,16 @@ namespace Tester.StreamingTests
 {
     public abstract class StreamFilteringTestsBase : OrleansTestingBase
     {
+        private readonly BaseTestClusterFixture fixture;
         protected Guid StreamId;
         protected string StreamNamespace;
         protected string streamProviderName;
 
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
 
-        protected StreamFilteringTestsBase()
+        protected StreamFilteringTestsBase(BaseTestClusterFixture fixture)
         {
+            this.fixture = fixture;
             StreamId = Guid.NewGuid();
             StreamNamespace = Guid.NewGuid().ToString();
         }
@@ -38,17 +40,17 @@ namespace Tester.StreamingTests
             var promises = new List<Task>();
             for (int loopCount = 0; loopCount < numConsumers; loopCount++)
             {
-                IFilteredStreamConsumerGrain grain = GrainClient.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(Guid.NewGuid());
+                IFilteredStreamConsumerGrain grain = this.fixture.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(Guid.NewGuid());
                 consumers[loopCount] = grain;
 
                 bool isEven = allCheckEven || loopCount % 2 == 0;
-                Task promise = grain.BecomeConsumer(StreamId, StreamNamespace, streamProviderName, isEven);
+                Task promise = grain.BecomeConsumer(this.StreamId, this.StreamNamespace, this.streamProviderName, isEven);
                 promises.Add(promise);
             }
             await Task.WhenAll(promises);
 
             // Producer
-            IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            IStreamLifecycleProducerGrain producer = this.fixture.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(StreamId, StreamNamespace, streamProviderName);
 
             if (StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME.Equals(streamProviderName))
@@ -111,7 +113,7 @@ namespace Tester.StreamingTests
             streamProviderName.Should().NotBeNull("Stream provider name not set.");
 
             Guid id = Guid.NewGuid();
-            IFilteredStreamConsumerGrain grain = GrainClient.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id);
+            IFilteredStreamConsumerGrain grain = this.fixture.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id);
             try
             {
                 await grain.Ping();
@@ -133,11 +135,11 @@ namespace Tester.StreamingTests
             Guid id2 = Guid.NewGuid();
 
             // Same consumer grain subscribes twice, with two different filters
-            IFilteredStreamConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id1);
+            IFilteredStreamConsumerGrain consumer = this.fixture.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id1);
             await consumer.BecomeConsumer(StreamId, StreamNamespace, streamProviderName, true); // Even
             await consumer.BecomeConsumer(StreamId, StreamNamespace, streamProviderName, false); // Odd
 
-            IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(id2);
+            IStreamLifecycleProducerGrain producer = this.fixture.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(id2);
             await producer.BecomeProducer(StreamId, StreamNamespace, streamProviderName);
             int expectedCount = 1; // Producer always sends first message when it becomes active
 
@@ -183,11 +185,11 @@ namespace Tester.StreamingTests
             Guid id2 = Guid.NewGuid();
 
             // Same consumer grain subscribes twice, with two identical filters
-            IFilteredStreamConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id1);
+            IFilteredStreamConsumerGrain consumer = this.fixture.GrainFactory.GetGrain<IFilteredStreamConsumerGrain>(id1);
             await consumer.BecomeConsumer(StreamId, StreamNamespace, streamProviderName, true); // Even
             await consumer.BecomeConsumer(StreamId, StreamNamespace, streamProviderName, true); // Even
 
-            IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(id2);
+            IStreamLifecycleProducerGrain producer = this.fixture.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(id2);
             await producer.BecomeProducer(StreamId, StreamNamespace, streamProviderName);
             int expectedCount = 2; // When Producer becomes active, it always sends first message to each subscriber
 

@@ -303,7 +303,7 @@ namespace Orleans.ServiceBus.Providers
                 return true;
             }
 
-            public void Refresh()
+            public void Refresh(StreamSequenceToken token)
             {
             }
 

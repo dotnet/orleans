@@ -38,7 +38,7 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
         /// </summary>
-        protected CommonStorageTests PersistenceStorageTests { get; }
+        internal CommonStorageTests PersistenceStorageTests { get; }
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.
@@ -57,7 +57,7 @@ namespace UnitTests.StorageTests.Relational
             var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant).GetAwaiter().GetResult();
             if(persistenceStorage != null)
             {
-                PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
+                PersistenceStorageTests = new CommonStorageTests(fixture.InternalGrainFactory, persistenceStorage);
             }
         }
 

@@ -26,7 +26,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        public StreamFilteringTests_SMS()
+        public StreamFilteringTests_SMS(Fixture fixture) : base(fixture)
         {
             streamProviderName = Fixture.StreamProvider;
         }

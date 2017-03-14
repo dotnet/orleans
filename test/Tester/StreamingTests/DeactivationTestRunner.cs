@@ -14,6 +14,7 @@ namespace UnitTests.StreamingTests
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
         private readonly string streamProviderName;
         private readonly Logger logger;
+        private readonly IGrainFactory grainFactory;
 
         private class Counter
         {
@@ -31,7 +32,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        public DeactivationTestRunner(string streamProviderName, Logger logger)
+        public DeactivationTestRunner(string streamProviderName, Logger logger, IGrainFactory grainFactory)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
@@ -39,13 +40,14 @@ namespace UnitTests.StreamingTests
             }
             this.streamProviderName = streamProviderName;
             this.logger = logger;
+            this.grainFactory = grainFactory;
         }
 
         public async Task DeactivationTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
+            var producer = this.grainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = this.grainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // subscribe (PubSubRendezvousGrain will have one consumer)
             StreamSubscriptionHandle<int> subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -76,7 +78,7 @@ namespace UnitTests.StreamingTests
         public async Task DeactivationTest_ClientConsumer(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.grainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
 
             var count = new Counter();
             // get stream and subscribe

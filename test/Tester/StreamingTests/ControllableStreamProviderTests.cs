@@ -33,7 +33,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public ControllableStreamProviderTests(Fixture fixture)
         {
@@ -59,7 +59,7 @@ namespace UnitTests.StreamingTests
         private async Task ControllableAdapterEchoTest(ControllableTestStreamProviderCommands command, object echoArg)
         {
             logger.Info("************************ ControllableAdapterEchoTest *********************************");
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
             Assert.Equal(2, results.Length);

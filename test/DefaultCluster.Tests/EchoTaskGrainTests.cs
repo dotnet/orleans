@@ -33,7 +33,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
         public void EchoGrain_GetGrain()
         {
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests.General
             Stopwatch clock = new Stopwatch();
 
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("CreateGrain took " + clock.Elapsed);
 
             clock.Restart();
@@ -55,7 +55,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
         public void EchoGrain_EchoError()
         {
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
             bool ok = promise.ContinueWith(t =>
@@ -73,7 +73,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
         public void EchoGrain_Timeout_Wait()
         {
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
             TimeSpan delay30 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
             TimeSpan delay45 = TimeSpan.FromSeconds(45);
@@ -98,7 +98,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
         public async Task EchoGrain_Timeout_Await()
         {
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
             TimeSpan delay30 = TimeSpan.FromSeconds(30);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
@@ -122,7 +122,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Result()
         {
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
             TimeSpan delay30 = TimeSpan.FromSeconds(30);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
@@ -172,7 +172,7 @@ namespace DefaultCluster.Tests.General
 
             string what = "CreateGrain";
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.Ping";
@@ -189,7 +189,7 @@ namespace DefaultCluster.Tests.General
 
             string what = "CreateGrain";
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingLocalSilo";
@@ -205,7 +205,7 @@ namespace DefaultCluster.Tests.General
 
             string what = "CreateGrain";
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             SiloAddress silo1 = HostedCluster.Primary.SiloAddress;
@@ -229,7 +229,7 @@ namespace DefaultCluster.Tests.General
 
             string what = "CreateGrain";
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingOtherSilo";
@@ -245,7 +245,7 @@ namespace DefaultCluster.Tests.General
 
             string what = "CreateGrain";
             clock.Start();
-            grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             what = "EchoGrain.PingOtherSiloMembership";
@@ -257,7 +257,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await()
         {
-            IBlockingEchoTaskGrain g = GrainClient.GrainFactory.GetGrain<IBlockingEchoTaskGrain>(GetRandomGrainId());
+            IBlockingEchoTaskGrain g = this.GrainFactory.GetGrain<IBlockingEchoTaskGrain>(GetRandomGrainId());
 
             string received = await g.Echo(expectedEcho);
             Assert.Equal(expectedEcho, received); // Echo
@@ -272,7 +272,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await_Reentrant()
         {
-            IReentrantBlockingEchoTaskGrain g = GrainClient.GrainFactory.GetGrain<IReentrantBlockingEchoTaskGrain>(GetRandomGrainId());
+            IReentrantBlockingEchoTaskGrain g = this.GrainFactory.GetGrain<IReentrantBlockingEchoTaskGrain>(GetRandomGrainId());
 
             string received = await g.Echo(expectedEcho);
             Assert.Equal(expectedEcho, received); // Echo

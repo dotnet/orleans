@@ -45,8 +45,24 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="CustomStorage\LogViewAdaptor.cs" />
+    <Compile Include="CustomStorage\LogConsistencyProvider.cs" />
+    <Compile Include="CustomStorage\ICustomStorageInterface.cs" />
+    <Compile Include="LogStorage\DefaultAdaptorFactory.cs" />
+    <Compile Include="LogStorage\LogConsistencyProvider.cs" />
+    <Compile Include="LogStorage\LogViewAdaptor.cs" />
+    <Compile Include="Common\StringEncodedWriteVector.cs" />
+    <Compile Include="StateStorage\DefaultAdaptorFactory.cs" />
+    <Compile Include="StateStorage\GrainStateWithMetaData.cs" />
+    <Compile Include="StateStorage\LogConsistencyProvider.cs" />
     <Compile Include="JournaledGrain.cs" />
-    <Compile Include="JournaledGrainState.cs" />
+    <Compile Include="Common\ConnectionIssues.cs" />
+    <Compile Include="LogStorage\LogStateWithMetaData.cs" />
+    <Compile Include="Common\NotificationMessage.cs" />
+    <Compile Include="Common\NotificationTracker.cs" />
+    <Compile Include="Common\PrimaryBasedLogViewAdaptor.cs" />
+    <Compile Include="Common\RecordedConnectionIssue.cs" />
+    <Compile Include="StateStorage\LogViewAdaptor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

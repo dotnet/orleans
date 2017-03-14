@@ -1,7 +1,6 @@
 using System.Linq;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Runtime
 {
@@ -16,7 +15,7 @@ namespace Orleans.Runtime
         /// <typeparam name="TService">The service type being provided.</typeparam>
         /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
         /// <param name="services">The service collection.</param>
-        public static void TryAddExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
+        public static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(TImplementation));
             if (registration != null)
@@ -25,7 +24,7 @@ namespace Orleans.Runtime
                     typeof(TService),
                     sp => sp.GetRequiredService<TImplementation>(),
                     registration.Lifetime);
-                services.TryAdd(newRegistration);
+                services.Add(newRegistration);
             }
         }
     }

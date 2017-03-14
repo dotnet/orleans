@@ -15,13 +15,17 @@ namespace DefaultCluster.Tests.General
 {
     public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
     {
+        public BasicActivationTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ActivateAndUpdate()
         {
             long g1Key = GetRandomGrainId();
             long g2Key = GetRandomGrainId();
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
-            ITestGrain g2 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g2Key);
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(g1Key);
+            ITestGrain g2 = this.GrainFactory.GetGrain<ITestGrain>(g2Key);
             Assert.Equal(g1Key, g1.GetPrimaryKeyLong());
             Assert.Equal(g1Key, g1.GetKey().Result);
             Assert.Equal(g1Key.ToString(), g1.GetLabel().Result);
@@ -32,7 +36,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", g1.GetLabel().Result);
             Assert.Equal(g2Key.ToString(), g2.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
+            ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>(g1Key);
             Assert.Equal("one", g1a.GetLabel().Result);
         }
 
@@ -42,8 +46,8 @@ namespace DefaultCluster.Tests.General
             Guid guid1 = Guid.NewGuid();
             Guid guid2 = Guid.NewGuid();
 
-            IGuidTestGrain g1 = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
-            IGuidTestGrain g2 = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid2);
+            IGuidTestGrain g1 = this.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
+            IGuidTestGrain g2 = this.GrainFactory.GetGrain<IGuidTestGrain>(guid2);
             Assert.Equal(guid1, g1.GetPrimaryKey());
             Assert.Equal(guid1, g1.GetKey().Result);
             Assert.Equal(guid1.ToString(), g1.GetLabel().Result);
@@ -54,7 +58,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", g1.GetLabel().Result);
             Assert.Equal(guid2.ToString(), g2.GetLabel().Result);
 
-            IGuidTestGrain g1a = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
+            IGuidTestGrain g1a = this.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
             Assert.Equal("one", g1a.GetLabel().Result);
         }
 
@@ -66,7 +70,7 @@ namespace DefaultCluster.Tests.General
             try
             {
                 // Key values of -2 are not allowed in this case
-                ITestGrain fail = GrainClient.GrainFactory.GetGrain<ITestGrain>(-2);
+                ITestGrain fail = this.GrainFactory.GetGrain<ITestGrain>(-2);
                 key = fail.GetKey().Result;
                 failed = false;
             }
@@ -85,7 +89,7 @@ namespace DefaultCluster.Tests.General
             ulong key1AsUlong = UInt64.MaxValue; // == -1L
             long key1 = (long)key1AsUlong;
 
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
             Assert.Equal(key1, g1.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
             Assert.Equal(key1, g1.GetKey().Result);
@@ -94,7 +98,7 @@ namespace DefaultCluster.Tests.General
             g1.SetLabel("MaxValue").Wait();
             Assert.Equal("MaxValue", g1.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
+            ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
             Assert.Equal("MaxValue", g1a.GetLabel().Result);
             Assert.Equal(key1, g1a.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
@@ -106,7 +110,7 @@ namespace DefaultCluster.Tests.General
             ulong key1AsUlong = UInt64.MinValue; // == zero
             long key1 = (long)key1AsUlong;
 
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
             Assert.Equal(key1, g1.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
             Assert.Equal(key1, g1.GetPrimaryKeyLong());
@@ -116,7 +120,7 @@ namespace DefaultCluster.Tests.General
             g1.SetLabel("MinValue").Wait();
             Assert.Equal("MinValue", g1.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
+            ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
             Assert.Equal("MinValue", g1a.GetLabel().Result);
             Assert.Equal(key1, g1a.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
@@ -128,7 +132,7 @@ namespace DefaultCluster.Tests.General
             long key1 = Int32.MaxValue;
             ulong key1AsUlong = (ulong)key1;
 
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
             Assert.Equal(key1, g1.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
             Assert.Equal(key1, g1.GetKey().Result);
@@ -137,7 +141,7 @@ namespace DefaultCluster.Tests.General
             g1.SetLabel("MaxValue").Wait();
             Assert.Equal("MaxValue", g1.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
+            ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
             Assert.Equal("MaxValue", g1a.GetLabel().Result);
             Assert.Equal(key1, g1a.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
@@ -149,7 +153,7 @@ namespace DefaultCluster.Tests.General
             long key1 = Int64.MinValue;
             ulong key1AsUlong = (ulong)key1;
 
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
             Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
             Assert.Equal(key1, g1.GetPrimaryKeyLong());
             Assert.Equal(key1, g1.GetKey().Result);
@@ -158,7 +162,7 @@ namespace DefaultCluster.Tests.General
             g1.SetLabel("MinValue").Wait();
             Assert.Equal("MinValue", g1.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
+            ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
             Assert.Equal("MinValue", g1a.GetLabel().Result);
             Assert.Equal(key1, g1a.GetPrimaryKeyLong());
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
@@ -167,7 +171,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
         public void BasicActivation_MultipleGrainInterfaces()
         {
-            ITestGrain simple = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+            ITestGrain simple = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
 
             simple.GetMultipleGrainInterfaces_List().Wait();
             logger.Info("GetMultipleGrainInterfaces_List() worked");
@@ -187,7 +191,7 @@ namespace DefaultCluster.Tests.General
             TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
             GrainClient.SetResponseTimeout(shortTimeout);
 
-            ITestGrain grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+            ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             int num = 10;
             for (long i = 0; i < num; i++)
             {
@@ -216,7 +220,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext"), TestCategory("GetGrain")]
         public void BasicActivation_TestRequestContext()
         {
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+            ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             Task<Tuple<string, string>> promise1 = g1.TestRequestContext();
             Tuple<string, string> requstContext = promise1.Result;
             logger.Info("Request Context is: " + requstContext);

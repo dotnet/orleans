@@ -10,42 +10,49 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
+using System.Collections;
+using Orleans.Providers.SqlServer;
 
 namespace UnitTests.Stats
 {
     public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTests.Fixture>
     {
         private readonly ITestOutputHelper output;
+        private readonly Fixture fixture;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-                }, new TestingClientOptions
-                {
-                    ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
-                });
+                var options = new TestClusterOptions(initialSilosCount: 1);
+
+                options.ClusterConfiguration.Globals.RegisterStatisticsProvider<UnitTests.Stats.MockStatsSiloCollector>("MockStats");
+                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1));
+                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1));
+
+                options.ClientConfiguration.RegisterStatisticsProvider<UnitTests.Stats.MockStatsClientCollector>("MockStats");
+                options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1);
+                options.ClientConfiguration.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1);
+
+                return new TestCluster(options);
             }
+
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         public StatsInitTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
-            HostedCluster = fixture.HostedCluster;
+            this.fixture = fixture;
+            this.HostedCluster = fixture.HostedCluster;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
         public async Task Stats_Init_Mock()
         {
-            ClientConfiguration config = this.HostedCluster.ClientConfig;
+            ClientConfiguration config = this.HostedCluster.ClientConfiguration;
 
             OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
             Assert.NotNull(ogc.ClientStatistics);
@@ -56,7 +63,7 @@ namespace UnitTests.Stats
             Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = GrainFactory.GetGrain<IStatsCollectorGrain>(0);
+            var siloStatsCollector = this.fixture.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
@@ -132,62 +139,4 @@ namespace UnitTests.Stats
             output.WriteLine("Done. "+ sw.ElapsedMilliseconds);
         }
     }
-
-#if DEBUG || USE_SQL_SERVER
-
-    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTests.Fixture>, IDisposable
-    {
-        public class Fixture : BaseClusterFixture
-        {
-            protected override TestingSiloHost CreateClusterHost()
-            {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-                }, new TestingClientOptions
-                {
-                    ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
-                });
-            }
-        }
-
-        protected TestingSiloHost HostedCluster { get; private set; }
-
-        public SqlClientInitTests(Fixture fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
-        }
-        
-        public void Dispose()
-        {
-            //output.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            // ResetAllAdditionalRuntimes();
-            HostedCluster.StopAdditionalSilos();
-        }
-
-        [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
-        public async Task ClientInit_SqlServer_WithStats()
-        {
-            Assert.True(GrainClient.IsInitialized);
-
-            ClientConfiguration config = this.HostedCluster.ClientConfig;
-
-            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer,  config.GatewayProvider);  // "GatewayProviderType"
-
-            Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
-
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
-
-            Assert.Equal("SQL",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
-
-            SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
-            Assert.Equal("SQL",  silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
-        }
-    }
-#endif
 }

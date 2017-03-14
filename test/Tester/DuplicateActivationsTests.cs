@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -14,7 +12,9 @@ namespace UnitTests.CatalogTests
 {
     public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -23,6 +23,11 @@ namespace UnitTests.CatalogTests
                 options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.MaxActiveThreads = 1);
                 return new TestCluster(options);
             }
+        }
+
+        public DuplicateActivationsTests(Fixture fixture)
+        {
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Catalog"), TestCategory("Functional")]
@@ -38,7 +43,7 @@ namespace UnitTests.CatalogTests
             var promises = new List<Task>();
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                runnerGrains[i] = GrainClient.GrainFactory.GetGrain<ICatalogTestGrain>(i.ToString(CultureInfo.InvariantCulture));
+                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(i.ToString(CultureInfo.InvariantCulture));
                 promises.Add(runnerGrains[i].Initialize());
             }
 

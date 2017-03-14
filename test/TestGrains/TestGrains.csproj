@@ -41,6 +41,7 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
@@ -114,9 +115,11 @@
     <Compile Include="ObserverGrain.cs" />
     <Compile Include="SimpleGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="LogConsistentGrain.cs" />
     <Compile Include="SimplePersistentGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
+    <Compile Include="LogConsistentGrainVariations.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
     <Compile Include="StatsCollectorGrain.cs" />
     <Compile Include="StreamCheckpoint.cs" />
