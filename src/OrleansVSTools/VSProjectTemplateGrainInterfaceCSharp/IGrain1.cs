@@ -6,8 +6,8 @@ namespace $safeprojectname$
     /// <summary>
     /// Grain interface $safeitemname$
     /// </summary>
-	public interface $safeitemname$ : IGrainWithGuidKey
-	{
-
-	}
+    public interface $safeitemname$ : IGrainWithGuidKey
+    {
+        
+    }
 }

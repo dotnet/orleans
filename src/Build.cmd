@@ -1,9 +1,39 @@
-@REM NOTE: This script must be run from a Visual Studio command prompt window
-
-@setlocal
-@ECHO off
+@if not defined _echo @echo off
+setlocal
 
 SET CMDHOME=%~dp0.
+
+@REM Locate VS 2017 with the proper method
+
+SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.55/vswhere.exe
+SET VSWHERE_LOCAL_PATH=%CMDHOME%\vswhere.exe
+
+if NOT exist "%VSWHERE_LOCAL_PATH%" (
+  echo Downloading vswhere.exe from %VSWHERE_REMOTE_PATH%.
+  powershell -NoProfile -ExecutionPolicy unrestricted -Command "$retryCount = 0; $success = $false; do { try { (New-Object Net.WebClient).DownloadFile('%VSWHERE_REMOTE_PATH%', '%VSWHERE_LOCAL_PATH%'); $success = $true; } catch { if ($retryCount -ge 6) { throw; } else { $retryCount++; Start-Sleep -Seconds (5 * $retryCount); } } } while ($success -eq $false);"
+  if NOT exist "%VSWHERE_LOCAL_PATH%" (
+    echo ERROR: Could not install vswhere correctly.
+    exit /b 1
+  )
+)
+
+set pre=Microsoft.VisualStudio.Product.
+set ids=%pre%Community %pre%Professional %pre%Enterprise %pre%BuildTools
+for /f "usebackq tokens=1* delims=: " %%i in (`%VSWHERE_LOCAL_PATH% -latest -products %ids% -requires Microsoft.Component.MSBuild`) do (
+  if /i "%%i"=="installationPath" set VS2017InstallDir=%%j
+)
+
+if NOT "%VS2017InstallDir%" == "" (
+  echo Visual Studio 2017 found at "%VS2017InstallDir%".
+
+  if exist "%VS2017InstallDir%\MSBuild\15.0\Bin\MSBuild.exe" (
+    set MSBUILDEXE="%VS2017InstallDir%\MSBuild\15.0\Bin\MSBuild.exe"
+    GOTO :MsBuildFound
+  )
+)
+
+@REM Old style VS locator
+
 if "%VisualStudioVersion%" == "" (
     @REM Try to find VS command prompt init script
     where /Q VsDevCmd.bat
@@ -32,7 +62,7 @@ if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBu
 if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 
 @REM Can't multi-block if statement when check condition contains '(' and ')' char, so do as single line checks
-if NOT "%MSBUILDEXEDIR%" == "" SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
+if NOT "%MSBUILDEXEDIR%" == "" SET MSBUILDEXE="%MSBUILDEXEDIR%\MSBuild.exe"
 if exist "%MSBUILDEXE%" GOTO :MsBuildFound
 
 @REM Try to find VS command prompt init script
@@ -45,6 +75,7 @@ if ERRORLEVEL 1 (
     SET MSBUILDEXE=MSBuild.exe
  )
 :MsBuildFound
+
 @ECHO MsBuild Location = %MSBUILDEXE%
 
 SET VERSION_FILE=%CMDHOME%\Build\Version.txt
@@ -69,7 +100,7 @@ set PROJ=%CMDHOME%\Orleans.sln
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+REM %MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -78,27 +109,27 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+REM %MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-set STEP=VSIX
+REM Build VSIX only if new tooling was found
 
-if "%VSSDK140Install%" == "" (
-    @echo Visual Studio 2015 SDK not installed - Skipping building VSIX
-    @GOTO :BuildFinished
-)
+if "%VS2017InstallDir%" == "" goto :EOF
 
 @echo Build VSIX ============================
 
+set STEP=VSIX
 set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-SET OutDir=%OutDir%\VSIX
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for VSIX package for %PROJ%
+set OutDir=%OutDir%\VSIX
 
-:BuildFinished
-@echo ===== Build succeeded for %PROJ% =====
+REM Disable CS2008 sine we've no source files in the template projects.
+
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%" /nowarn:CS2008
+
+@if ERRORLEVEL 1 GOTO :ErrorStop
+
+@echo BUILD ok for VSIX package for %PROJ%
 @GOTO :EOF
 
 :ErrorStop
@@ -106,4 +137,5 @@ set RC=%ERRORLEVEL%
 if "%STEP%" == "" set STEP=%CONFIGURATION%
 @echo ===== Build FAILED for %PROJ% -- %STEP% with error %RC% - CANNOT CONTINUE =====
 exit /B %RC%
+
 :EOF
