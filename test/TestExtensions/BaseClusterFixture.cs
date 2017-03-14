@@ -8,8 +8,6 @@ namespace TestExtensions
 
     public abstract class BaseTestClusterFixture : IDisposable
     {
-        private static int defaultsAreInitialized = 0;
-
         static BaseTestClusterFixture()
         {
             TestDefaultConfiguration.InitializeDefaults();
