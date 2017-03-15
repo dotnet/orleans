@@ -222,7 +222,7 @@ namespace Orleans.Runtime
             var services = new ServiceCollection();
             services.AddSingleton(this);
             services.AddSingleton(initializationParams);
-            services.AddSingleton<ILocalSiloDetails>(initializationParams);
+            services.AddFromExisting<ILocalSiloDetails, SiloInitializationParameters>();
             services.AddSingleton(initializationParams.ClusterConfig);
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
