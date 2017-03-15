@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
     internal class WorkItemGroup : IWorkItem
     {
-        private enum WorkGroupStatus
+		public  enum WorkGroupStatus
         {
             Waiting = 0,
             Runnable = 1,
@@ -21,10 +21,10 @@ namespace Orleans.Runtime.Scheduler
 
         private static readonly Logger appLogger = LogManager.GetLogger("Scheduler.WorkItemGroup", LoggerType.Runtime);
         private readonly Logger log;
-        private readonly OrleansTaskScheduler masterScheduler;
-        private WorkGroupStatus state;
+        public readonly OrleansTaskScheduler masterScheduler;
+		public WorkGroupStatus state;
         private readonly Object lockable;
-        private readonly Queue<Task> workItems;
+        private readonly Queue<IWorkItem> workItems;
 
         private long totalItemsEnQueued;    // equals total items queued, + 1
         private long totalItemsProcessed;
@@ -134,7 +134,7 @@ namespace Orleans.Runtime.Scheduler
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
             state = WorkGroupStatus.Waiting;
-            workItems = new Queue<Task>();
+            workItems = new Queue<IWorkItem>();
             lockable = new Object();
             totalItemsEnQueued = 0;
             totalItemsProcessed = 0;
@@ -168,12 +168,14 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
+      
+
         /// <summary>
         /// Adds a task to this activation.
         /// If we're adding it to the run list and we used to be waiting, now we're runnable.
         /// </summary>
         /// <param name="task">The work item to add.</param>
-        public void EnqueueTask(Task task)
+        public void EnqueueTask(IWorkItem task)
         {
             lock (lockable)
             {
@@ -187,7 +189,7 @@ namespace Orleans.Runtime.Scheduler
                         String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it. "
                         + "The likely reason is that the task is not being 'awaited' properly.", task),
                         ErrorCode.SchedulerNotEnqueuWorkWhenShutdown);
-                    task.Ignore(); // Ignore this Task, so in case it is faulted it will not cause UnobservedException.
+                   // task.Ignore(); // Ignore this Task, so in case it is faulted it will not cause UnobservedException.
                     return;
                 }
 
@@ -200,7 +202,7 @@ namespace Orleans.Runtime.Scheduler
                 if (StatisticsCollector.CollectGlobalShedulerStats)
                     SchedulerStatisticsGroup.OnWorkItemEnqueue();
 #endif
-                workItems.Enqueue(task);
+               workItems.Enqueue(task);
                 int maxPendingItemsLimit = masterScheduler.MaxPendingItemsLimit.SoftLimitThreshold;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
@@ -213,7 +215,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
                 if (log.IsVerbose3) log.Verbose3("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
 #endif
-                masterScheduler.RunQueue.Add(this);
+				masterScheduler.RunQueue.Add(this);
             }
         }
 
@@ -250,10 +252,10 @@ namespace Orleans.Runtime.Scheduler
                 if (StatisticsCollector.CollectShedulerQueuesStats)
                     queueTracking.OnStopExecution();
 
-                foreach (Task task in workItems)
+                foreach (var task in workItems)
                 {
                     // Ignore all queued Tasks, so in case they are faulted they will not cause UnobservedException.
-                    task.Ignore();
+                   // task.Ignore();
                 }
                 workItems.Clear();
             }
@@ -318,7 +320,7 @@ namespace Orleans.Runtime.Scheduler
                     }
 
                     // Get the first Work Item on the list
-                    Task task;
+                    IWorkItem task;
                     lock (lockable)
                     {
                         if (workItems.Count > 0)
@@ -343,7 +345,8 @@ namespace Orleans.Runtime.Scheduler
                         if (StatisticsCollector.CollectTurnsStats)
                             SchedulerStatisticsGroup.OnTurnExecutionStartsByWorkGroup(workItemGroupStatisticsNumber, thread.WorkerThreadStatisticsNumber, SchedulingContext);
 #endif
-                        TaskRunner.RunTask(task);
+                        task.Execute();
+                        //TaskRunner.RunTask(task);
                     }
                     catch (Exception ex)
                     {
@@ -365,7 +368,7 @@ namespace Orleans.Runtime.Scheduler
                         {
                             SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",
-                                OrleansTaskExtentions.ToString(task), SchedulingContext.ToString(), taskLength, OrleansTaskScheduler.TurnWarningLengthThreshold, thread.ToString());
+                               task.ToString(), SchedulingContext.ToString(), taskLength, OrleansTaskScheduler.TurnWarningLengthThreshold, thread.Name ?? string.Empty);
                         }
                     }
                     count++;

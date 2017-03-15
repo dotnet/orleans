@@ -22,6 +22,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal ActivationTaskScheduler(WorkItemGroup workGroup)
         {
+           
             myId = Interlocked.Increment(ref idCounter);
             workerGroup = workGroup;
 #if EXTRA_STATS
@@ -66,7 +67,9 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsVerbose2) logger.Verbose2(myId + " QueueTask Task Id={0}", task.Id);
 #endif
-            workerGroup.EnqueueTask(task);
+            // qqq.Post(42);
+            var todo = new TaskWorkItem(this, task, workerGroup.SchedulingContext);
+            workerGroup.EnqueueTask(todo);
         }
 
         /// <summary>

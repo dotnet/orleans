@@ -196,8 +196,11 @@ namespace Orleans.TestingHost
             {
                 // Do not attempt to unload the AppDomain in the finalizer thread itself, as it is not supported, and also not a lot of work should be done in it
                 var appDomain = this.AppDomain;
-                appDomain.UnhandledException -= ReportUnobservedException;
-                Task.Run(() => AppDomain.Unload(appDomain)).Ignore();
+                if (appDomain != null)
+                {
+                    appDomain.UnhandledException -= ReportUnobservedException;
+                    Task.Run(() => AppDomain.Unload(appDomain)).Ignore();
+                }
             }
         }
 
