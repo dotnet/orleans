@@ -1,5 +1,5 @@
-@setlocal
-@ECHO off
+@if not defined _echo @echo off
+setlocal
 
 SET CONFIGURATION=Release
 
@@ -17,7 +17,7 @@ if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=
 
 @Echo Test assemblies = %TESTS%
 @Echo Test filters = %TEST_FILTERS%
-@echo on
+@if not defined _echo @echo on
 call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
 PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%OutDir%'"
