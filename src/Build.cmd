@@ -1,29 +1,20 @@
-@REM NOTE: This script must be run from a Visual Studio command prompt window
-
-@setlocal
-@ECHO off
+@if not defined _echo @echo off
+setlocal
 
 SET CMDHOME=%~dp0.
-if "%VisualStudioVersion%" == "" (
+if not defined VisualStudioVersion (
     @REM Try to find VS command prompt init script
-    where /Q VsDevCmd.bat
-    if ERRORLEVEL 1 (
-        if exist "%VS150COMNTOOLS%" (
-            call "%VS150COMNTOOLS%VsDevCmd.bat"
-        ) else (
-            if exist "%VS140COMNTOOLS%" (
-                call "%VS140COMNTOOLS%VsDevCmd.bat"
-            )
-        )
-    ) else (
-        @REM VsDevCmd.bat is in PATH, so just exec it.
-        call VsDevCmd.bat
-    )
+	if defined VS150COMNTOOLS (
+		call "%VS150COMNTOOLS%\VsDevCmd.bat"
+	) else if defined VS140COMNTOOLS (
+		call "%VS140COMNTOOLS%\VsDevCmd.bat"
+	)
+	if not defined VisualStudioVersion (
+		echo Could not determine Visual Studio version in the system. Cannot continue.
+		exit /b 1
+	)
 )
-if "%VisualStudioVersion%" == "" (
-    echo Could not determine Visual Studio version in the system. Cannot continue.
-    exit /b 1
-)
+
 @ECHO VisualStudioVersion = %VisualStudioVersion%
 
 @REM Get path to MSBuild Binaries
