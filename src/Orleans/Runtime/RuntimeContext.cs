@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -7,6 +9,7 @@ namespace Orleans.Runtime
     {
         public TaskScheduler Scheduler { get;  set; }
         public ISchedulingContext ActivationContext { get; private set; }
+        private int ExecutionDepth;
 
         [ThreadStatic]
         private static RuntimeContext context;
@@ -38,17 +41,41 @@ namespace Orleans.Runtime
             context = new RuntimeContext {Scheduler = null};
         }
 
-        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
+        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler, bool advanceExecutionDeep) // todo: remove advanceExecutionDeep
         {
             if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
-            context.ActivationContext = shedContext;
-            context.Scheduler = scheduler;
+            if (context.ActivationContext != null)
+            {
+                if (context.ActivationContext != shedContext)
+                {
+                    throw new Exception("SetExecutionContext called on unexpected different activation");
+                }
+                else
+                {
+                    if (advanceExecutionDeep)
+                    {
+                        context.ExecutionDepth++;
+                    }
+                }
+            }
+            else
+            {
+                context.ActivationContext = shedContext;
+                context.Scheduler = scheduler;
+            }
         }
-
+        
         internal static void ResetExecutionContext()
         {
-            context.ActivationContext = null;
-            context.Scheduler = null;
+            if (context.ExecutionDepth > 0)
+            {
+                context.ExecutionDepth--;
+            }
+            else
+            {
+                context.ActivationContext = null;
+                context.Scheduler = null;
+            }
         }
 
         public override string ToString()

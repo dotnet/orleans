@@ -218,60 +218,26 @@ namespace Orleans.Runtime.Scheduler
             // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
             if (workItemGroup == null)
             {
-	            Interlocked.Increment(ref qewqeq);
                 Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, this);
-
-	            if (TaskScheduler.Current == this)
-	            {
-
-					Interlocked.Increment(ref equals);
-				}
-					t.Start(this);
+                t.Start(this);
             }
             else
-			{
-				Interlocked.Increment(ref reeq);
-				//OrleansThreadPool.QueueUserWorkItem(state =>
-				//{
-
-
-				//	if (RuntimeContext.Current == null)
-				//	{
-				//		RuntimeContext.Current = new RuntimeContext
-				//		{
-				//			Scheduler = this
-				//		};
-				//	}
-				//	TaskSchedulerUtils.RunWorkItemTask(workItem, workItemGroup.TaskRunner);
-				//});
-				//workItem.ex
-				// Create Task wrapper for this work item
-				Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
-				t.Start(workItemGroup.TaskRunner);
-
-				if (TaskScheduler.Current == workItemGroup.TaskRunner)
-				{
-
-					Interlocked.Increment(ref equals);
-				}
-			} // TaskScheduler.Current is OrleansTaskScheduler || 
-			var iseee =TaskScheduler.Current is ActivationTaskScheduler;
-	        if (iseee)
-	        {
-
-				Interlocked.Increment(ref reeeeeq);
-			}
-			//Console.WriteLine("Equals + " + equals.ToString()+  " Null: " + qewqeq.ToString() + " Not null: " + reeq.ToString() + " Sched : " + reeeeeq.ToString());
+            {
+                // no need to wrap work item in Task as we are already in such task
+                if (RuntimeContext.Current?.ActivationContext != null)
+                {
+                    workItemGroup.EnqueueTask(workItem);
+                }
+                else
+                {
+                    Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
+                    t.Start(workItemGroup.TaskRunner);
+                }
+            }
         }
 
-	    private static int qewqeq;
-
-		private static int reeq;
-		private static int reeeeeq;
-		private static int equals;
-
-		// Only required if you have work groups flagged by a context that is not a WorkGroupingContext
-		public WorkItemGroup RegisterWorkContext(ISchedulingContext context)
+        // Only required if you have work groups flagged by a context that is not a WorkGroupingContext
+        public WorkItemGroup RegisterWorkContext(ISchedulingContext context)
         {
             if (context == null) return null;
 
@@ -373,7 +339,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                RuntimeContext.SetExecutionContext(null, this);
+                RuntimeContext.SetExecutionContext(null, this, false);
                 bool done = TryExecuteTask(task);
                 if (!done)
                     logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete2, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",

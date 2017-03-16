@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(todo.SchedulingContext, sched);
+                RuntimeContext.SetExecutionContext(todo.SchedulingContext, sched, true);
                 todo.Execute();
             }
             finally
