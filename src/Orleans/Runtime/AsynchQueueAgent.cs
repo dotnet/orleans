@@ -108,7 +108,7 @@ namespace Orleans.Runtime
                 threadTracking.OnStopExecution();
             }
 #endif
-            requestQueue.CompleteAdding();
+            requestQueue?.CompleteAdding();
             base.Stop();
         }
 
@@ -143,11 +143,8 @@ namespace Orleans.Runtime
 #endif
             base.Dispose(disposing);
 
-            if (requestQueue != null)
-            {
-                requestQueue.Dispose();
-                requestQueue = null;
-            }
+            requestQueue?.Dispose();
+            requestQueue = null;
         }
 
         #endregion
