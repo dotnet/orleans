@@ -781,6 +781,7 @@ namespace Orleans
                 }
             }
             catch (Exception) { }
+            Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
             try
             {
                 LogManager.UnInitialize();
