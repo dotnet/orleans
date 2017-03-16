@@ -933,10 +933,10 @@ namespace Orleans.Runtime
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-            SafeExecute(LogManager.Close);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
             SafeExecute(() => this.assemblyProcessor?.Dispose());
             SafeExecute(() => (this.Services as IDisposable)?.Dispose());
+            SafeExecute(LogManager.Close);
 
             // Setting the event should be the last thing we do.
             // Do nothijng after that!
