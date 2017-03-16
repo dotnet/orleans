@@ -937,6 +937,7 @@ namespace Orleans.Runtime
             SafeExecute(LogManager.Close);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
             SafeExecute(() => this.assemblyProcessor?.Dispose());
+            SafeExecute(() => (this.Services as IDisposable)?.Dispose());
 
             // Setting the event should be the last thing we do.
             // Do nothijng after that!
