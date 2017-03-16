@@ -12,8 +12,8 @@ if NOT exist "%VSWHERE_LOCAL_PATH%" (
   echo Downloading vswhere.exe from %VSWHERE_REMOTE_PATH%.
   powershell -NoProfile -ExecutionPolicy unrestricted -Command "$retryCount = 0; $success = $false; do { try { (New-Object Net.WebClient).DownloadFile('%VSWHERE_REMOTE_PATH%', '%VSWHERE_LOCAL_PATH%'); $success = $true; } catch { if ($retryCount -ge 6) { throw; } else { $retryCount++; Start-Sleep -Seconds (5 * $retryCount); } } } while ($success -eq $false);"
   if NOT exist "%VSWHERE_LOCAL_PATH%" (
-    echo ERROR: Could not install vswhere correctly.
-    exit /b 1
+    echo ERROR: Could not install vswhere correctly, falling back to environment variables.
+    goto :FallbackEnvVar
   )
 )
 
@@ -34,30 +34,23 @@ if NOT "%VS2017InstallDir%" == "" (
 
 @REM Old style VS locator
 
-if "%VisualStudioVersion%" == "" (
+:FallbackEnvVar
+
+if not defined VisualStudioVersion (
     @REM Try to find VS command prompt init script
     where /Q VsDevCmd.bat
-    if ERRORLEVEL 1 (
-        if exist "%VS150COMNTOOLS%" (
-            call "%VS150COMNTOOLS%VsDevCmd.bat"
-        ) else (
-            if exist "%VS140COMNTOOLS%" (
-                call "%VS140COMNTOOLS%VsDevCmd.bat"
-            )
-        )
-    ) else (
-        @REM VsDevCmd.bat is in PATH, so just exec it.
-        call VsDevCmd.bat
-    )
+        if defined VS140COMNTOOLS (
+		call "%VS140COMNTOOLS%\VsDevCmd.bat"
+	)
+	if not defined VisualStudioVersion (
+		echo Could not determine Visual Studio version in the system. Cannot continue.
+		exit /b 1
+	)
 )
-if "%VisualStudioVersion%" == "" (
-    echo Could not determine Visual Studio version in the system. Cannot continue.
-    exit /b 1
-)
+
 @ECHO VisualStudioVersion = %VisualStudioVersion%
 
 @REM Get path to MSBuild Binaries
-if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin
 if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBuild\14.0\bin
 if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 
@@ -100,7 +93,7 @@ set PROJ=%CMDHOME%\Orleans.sln
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-REM %MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -109,7 +102,7 @@ REM %MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-REM %MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
