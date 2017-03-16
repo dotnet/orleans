@@ -23,7 +23,7 @@ for /f "usebackq tokens=1* delims=: " %%i in (`%VSWHERE_LOCAL_PATH% -latest -pro
   if /i "%%i"=="installationPath" set VS2017InstallDir=%%j
 )
 
-if NOT "%VS2017InstallDir%" == "" (
+if defined VS2017InstallDir (
   echo Visual Studio 2017 found at "%VS2017InstallDir%".
 
   if exist "%VS2017InstallDir%\MSBuild\15.0\Bin\MSBuild.exe" (
@@ -55,7 +55,7 @@ if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBu
 if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 
 @REM Can't multi-block if statement when check condition contains '(' and ')' char, so do as single line checks
-if NOT "%MSBUILDEXEDIR%" == "" SET MSBUILDEXE="%MSBUILDEXEDIR%\MSBuild.exe"
+if defined MSBUILDEXEDIR SET MSBUILDEXE="%MSBUILDEXEDIR%\MSBuild.exe"
 if exist "%MSBUILDEXE%" GOTO :MsBuildFound
 
 @REM Try to find VS command prompt init script
