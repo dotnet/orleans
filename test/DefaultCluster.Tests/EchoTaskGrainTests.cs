@@ -69,7 +69,7 @@ namespace DefaultCluster.Tests.General
             }).WithTimeout(timeout);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Wait()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -94,7 +94,7 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo")]
         public async Task EchoGrain_Timeout_Await()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -118,7 +118,7 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Result()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
