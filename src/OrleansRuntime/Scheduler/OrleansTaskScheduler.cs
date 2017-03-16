@@ -223,16 +223,9 @@ namespace Orleans.Runtime.Scheduler
             }
             else
             {
-                // no need to wrap work item in Task as we are already in such task
-                if (RuntimeContext.Current?.ActivationContext != null)
-                {
-                    workItemGroup.EnqueueTask(workItem);
-                }
-                else
-                {
-                    Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
-                    t.Start(workItemGroup.TaskRunner);
-                }
+                // no need to wrap work item in Task as it will be executed 
+                // under task with correct (activation) task scheduler
+                workItemGroup.EnqueueTask(workItem);
             }
         }
 

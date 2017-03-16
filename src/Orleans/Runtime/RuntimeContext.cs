@@ -44,38 +44,14 @@ namespace Orleans.Runtime
         internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler, bool advanceExecutionDeep) // todo: remove advanceExecutionDeep
         {
             if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
-            if (context.ActivationContext != null)
-            {
-                if (context.ActivationContext != shedContext)
-                {
-                    throw new Exception("SetExecutionContext called on unexpected different activation");
-                }
-                else
-                {
-                    if (advanceExecutionDeep)
-                    {
-                        context.ExecutionDepth++;
-                    }
-                }
-            }
-            else
-            {
-                context.ActivationContext = shedContext;
-                context.Scheduler = scheduler;
-            }
+            context.ActivationContext = shedContext;
+            context.Scheduler = scheduler;
         }
         
         internal static void ResetExecutionContext()
         {
-            if (context.ExecutionDepth > 0)
-            {
-                context.ExecutionDepth--;
-            }
-            else
-            {
-                context.ActivationContext = null;
-                context.Scheduler = null;
-            }
+            context.ActivationContext = null;
+            context.Scheduler = null;
         }
 
         public override string ToString()

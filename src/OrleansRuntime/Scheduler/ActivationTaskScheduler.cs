@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime.Scheduler
 {
     /// <summary>
-    /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
-    /// </summary>
-    [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
+        /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
+        /// </summary>
+        [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
     internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
     {
         private static readonly Logger logger = LogManager.GetLogger("Scheduler.ActivationTaskScheduler", LoggerType.Runtime);
@@ -67,8 +67,13 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsVerbose2) logger.Verbose2(myId + " QueueTask Task Id={0}", task.Id);
 #endif
-            // qqq.Post(42);
             var todo = new TaskWorkItem(this, task, workerGroup.SchedulingContext);
+            if (task is WorkItemGroupExecuteTask)
+            {
+                workerGroup.masterScheduler.RunQueue.Add(todo);
+                return;
+            }
+
             workerGroup.EnqueueTask(todo);
         }
 
