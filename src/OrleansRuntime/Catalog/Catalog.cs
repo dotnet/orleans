@@ -153,7 +153,7 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 
         public Catalog(
-            SiloInitializationParameters siloInitializationParameters,
+            ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
@@ -168,8 +168,8 @@ namespace Orleans.Runtime
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
-            LocalSilo = siloInitializationParameters.SiloAddress;
-            localSiloName = siloInitializationParameters.Name;
+            LocalSilo = localSiloDetails.SiloAddress;
+            localSiloName = localSiloDetails.Name;
             directory = grainDirectory;
             activations = activationDirectory;
             this.scheduler = scheduler;

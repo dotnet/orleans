@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
 
         public MessageCenter(
-            SiloInitializationParameters silo,
+            ILocalSiloDetails siloDetails,
             NodeConfiguration nodeConfig,
             IMessagingConfiguration config,
             SerializationManager serializationManager,
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
-            this.Initialize(silo.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
+            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
             if (nodeConfig.IsGatewayNode)
             {
                 this.InstallGateway(nodeConfig.ProxyGatewayEndpoint);

@@ -93,7 +93,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public LocalGrainDirectory(
             ClusterConfiguration clusterConfig,
-            SiloInitializationParameters siloInitializationParameters,
+            ILocalSiloDetails siloDetails,
             OrleansTaskScheduler scheduler,
             ISiloStatusOracle siloStatusOracle,
             IMultiClusterOracle multiClusterOracle,
@@ -104,7 +104,7 @@ namespace Orleans.Runtime.GrainDirectory
             var globalConfig = clusterConfig.Globals;
 
             var clusterId = globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null;
-            MyAddress = siloInitializationParameters.SiloAddress;
+            MyAddress = siloDetails.SiloAddress;
 
             Scheduler = scheduler;
             this.siloStatusOracle = siloStatusOracle;
