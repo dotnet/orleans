@@ -90,7 +90,7 @@ namespace Orleans.Runtime
                 timeSinceIssued = TimeIntervalFactory.CreateTimeInterval(true);
                 timeSinceIssued.Start();
             }
-            
+
             TimeSpan firstPeriod = timeout;
             if (config.ResendOnTimeout && config.MaxResendCount > 0)
             {
@@ -179,7 +179,7 @@ namespace Orleans.Runtime
         {
             try
             {
-              _callbackHolder.RemoveCallbackReference();
+             _callbackHolder?.RemoveCallbackReference();
               _callbackHolder = null;
             }
             catch (Exception) { } // Ignore any problems with Dispose
