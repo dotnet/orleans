@@ -24,7 +24,7 @@ namespace DefaultCluster.Tests.General
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
             var gatewaysCount = HostedCluster.ClientConfiguration.Gateways.Count;
