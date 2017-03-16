@@ -291,6 +291,11 @@ namespace Orleans.Messaging
 
 		}
 
+        public void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock)
+        {
+            messageHandler = actionBlock;
+        }
+
         private void RejectOrResend(Message msg)
         {
             if (msg.TargetSilo != null)

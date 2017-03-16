@@ -9,7 +9,9 @@ namespace Orleans.Runtime.Messaging
         void Stop();
 
         void PostMessage(Message message);
+        void PostShortCircuitMessage(Message msg);
 
         void AddTargetBlock(Message.Categories type, Action<Message> actionBlock);
+        void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock);
     }
 }

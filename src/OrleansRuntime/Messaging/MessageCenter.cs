@@ -206,6 +206,11 @@ namespace Orleans.Runtime.Messaging
            InboundQueue.AddTargetBlock(type, actionBlock);
         }
 
+        public void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock)
+        {
+            InboundQueue.AddShortCicruitTargetBlock(type, actionBlock);
+        }
+
         public void Dispose()
         {
             if (ima != null)

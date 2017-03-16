@@ -9,6 +9,8 @@ namespace Orleans.Runtime.Messaging
     internal class InboundMessageQueue : IInboundMessageQueue
     {
         private readonly Action<Message>[] messageHandlers;
+
+        private readonly Action<Message>[] messageShortCircuitHandlers;
         private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
         private readonly List<Message>[] msgs; 
@@ -33,6 +35,7 @@ namespace Orleans.Runtime.Messaging
             queueTracking = new QueueTrackingStatistic[n];
             msgs = new List<Message>[n];
             messageHandlers = new Action<Message>[n];
+            messageShortCircuitHandlers =new Action<Message>[n];
             for (int g = 0; g < n; g++)
             {
                 msgs[g] = new List<Message>();
@@ -76,6 +79,18 @@ namespace Orleans.Runtime.Messaging
            
             if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
         }
+        public void PostShortCircuitMessage(Message msg)
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking[(int)msg.Category].OnEnQueueRequest(1, messageQueues[(int)msg.Category].Count, msg);
+            }
+#endif
+            messageShortCircuitHandlers[(int)msg.Category](msg);
+
+            if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
+        }
 
         public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
         {
@@ -83,6 +98,11 @@ namespace Orleans.Runtime.Messaging
             msgs[(int)type].ForEach(actionBlock);
             msgs[(int)type] = new List<Message>();
             messageHandlers[(int) type] = actionBlock;
+        }
+
+        public void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock)
+        {
+            messageShortCircuitHandlers[(int)type] = actionBlock;
         }
 
 

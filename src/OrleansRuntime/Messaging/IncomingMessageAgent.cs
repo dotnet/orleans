@@ -52,6 +52,11 @@ namespace Orleans.Runtime.Messaging
                     OrleansThreadPool.QueueSystemWorkItem(processAction, message);
                 });
 
+                messageCenter.AddShortCicruitTargetBlock(category, message =>
+                {
+                    ReceiveMessage((Message)message);
+                });
+
                 try
                 {
                     messageCenter.Completion.WaitOne();

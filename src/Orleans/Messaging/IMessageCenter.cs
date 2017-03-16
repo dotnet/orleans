@@ -17,6 +17,7 @@ namespace Orleans.Runtime
         void SendMessage(Message msg);
 
         void AddTargetBlock(Message.Categories type, Action<Message> actionBlock);
+        void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock);
 
         int SendQueueLength { get; }
 
