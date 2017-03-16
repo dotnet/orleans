@@ -15,4 +15,3 @@ Namespace $rootnamespace$
     End Class
 
 End Namespace
-
