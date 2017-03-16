@@ -1,13 +1,12 @@
 using System.Threading.Tasks;
 using Orleans;
 
-namespace $safeprojectname$
+namespace $rootnamespace$
 {
     /// <summary>
     /// Grain interface $safeitemname$
     /// </summary>
-	public interface $safeitemname$ : IGrainWithGuidKey
-	{
-
-	}
+    public interface $safeitemname$ : IGrainWithGuidKey
+    {
+    }
 }
