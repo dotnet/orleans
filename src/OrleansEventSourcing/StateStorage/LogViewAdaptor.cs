@@ -245,7 +245,7 @@ namespace Orleans.EventSourcing.StateStorage
             /// <inheritdoc/>
             public override string ToString()
             {
-                return string.Format("v{0} ({1} updates by {2}) etag={2}", Version, Updates.Count, Origin, ETag);
+                return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
             }
          }
 
