@@ -566,6 +566,7 @@ namespace Orleans.TestingHost
                 }
                 catch
                 {
+                    this.InternalClient?.Abort();
                     this.InternalClient = null;
                     throw;
                 }
