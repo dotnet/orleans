@@ -224,7 +224,7 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
 ## Troubleshooting
 - System.SystemException: 'Failed to start Orleans silo 'YOUR-HOST-NAME' as a Secondary node':
     - Problem: The silo is trying to start but does not find a the specified file to get the configuration.
-    - Solution 1: Copy the XML file manually to the output folder.
+    - Solution 1: Set the property "Copy to Output Directory" to "Copy if newer", to set it, right click on the configuration file, then click on properites.
     - Solution 2: Add the folowing task to the csproj of the silo to copy your XML file to the output folder.
     ``` xml
     <Target Name="AfterBuild">
