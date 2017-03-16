@@ -45,16 +45,16 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task WriteRead100StatesInParallel()
+        internal void WriteRead100StatesInParallel()
         {
-            await Relational_WriteReadWriteRead100StatesInParallel();
+            Relational_WriteReadWriteRead100StatesInParallel();
         }
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task StorageDataSetGeneric_HashCollisionTests()
+        internal void StorageDataSetGeneric_HashCollisionTests()
         {
-            await Relational_HashCollisionTests();
+            Relational_HashCollisionTests();
         }
 
 
