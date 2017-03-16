@@ -62,11 +62,11 @@ namespace UnitTests.Grains
             throw new Exception("LongMethodWithError");
         }
 
-        public async Task DelayMethod(int waitTime)
+        public async Task DelayMethod(int milliseconds)
         {
             logger.Info("DelayMethod {0}.", counter);
             counter++;
-            await Task.Delay(TimeSpan.FromMilliseconds(1)).WithTimeout(TimeSpan.FromMilliseconds(50));
+            await Task.Delay(TimeSpan.FromMilliseconds(milliseconds));
         }
 
         public Task Dispose()

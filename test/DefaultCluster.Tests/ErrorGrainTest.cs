@@ -142,7 +142,7 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
-        public void StressHandlingMultipleDelayedRequests()
+        public async Task StressHandlingMultipleDelayedRequests()
         {
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
             bool once = true;
@@ -158,8 +158,7 @@ namespace DefaultCluster.Tests
                 }
 
             }
-            Task.WhenAll(tasks).Wait();
-            Logger.Info(1, "DONE.");
+            await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(15));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
