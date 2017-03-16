@@ -203,6 +203,7 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
+    <Compile Include="Utilities\FactoryUtility.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

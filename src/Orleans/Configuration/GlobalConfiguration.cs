@@ -34,6 +34,8 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class GlobalConfiguration : MessagingConfiguration
     {
+        private const string DefaultClusterId = "DefaultClusterID"; // if no id is configured, we pick a nonempty default.
+
         /// <summary>
         /// Liveness configuration that controls the type of the liveness protocol that silo use for membership.
         /// </summary>
@@ -217,6 +219,8 @@ namespace Orleans.Runtime.Configuration
 
         #region MultiClusterNetwork
 
+        private string clusterId;
+
         /// <summary>
         /// Whether this cluster is configured to be part of a multicluster network
         /// </summary>
@@ -224,14 +228,26 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return !(string.IsNullOrEmpty(ClusterId));
+                return !(string.IsNullOrEmpty(this.clusterId));
             }
         }
 
         /// <summary>
         /// Cluster id (one per deployment, unique across all the deployments/clusters)
         /// </summary>
-        public string ClusterId { get; set; }
+        public string ClusterId
+        {
+            get
+            {
+                var configuredId = this.HasMultiClusterNetwork ? this.clusterId : this.DeploymentId;
+                return string.IsNullOrEmpty(configuredId) ? DefaultClusterId : configuredId;
+            }
+
+            set
+            {
+                this.clusterId = value;
+            }
+        }
 
         /// <summary>
         ///A list of cluster ids, to be used if no multicluster configuration is found in gossip channels.

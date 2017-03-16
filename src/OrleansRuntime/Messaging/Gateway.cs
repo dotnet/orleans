@@ -36,19 +36,19 @@ namespace Orleans.Runtime.Messaging
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
         
-        internal Gateway(MessageCenter msgCtr, IPEndPoint gatewayAddress, MessageFactory messageFactory, SerializationManager serializationManager)
+        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, GlobalConfiguration globalConfig)
         {
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
             this.serializationManager = serializationManager;
-            acceptor = new GatewayAcceptor(msgCtr, this, gatewayAddress, this.messageFactory, this.serializationManager);
+            acceptor = new GatewayAcceptor(msgCtr, this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
-            this.gatewayAddress = SiloAddress.New(gatewayAddress, 0);
+            this.gatewayAddress = SiloAddress.New(nodeConfig.ProxyGatewayEndpoint, 0);
             lockable = new object();
         }
 
