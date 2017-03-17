@@ -29,6 +29,7 @@ namespace Tester.AzureUtils.Streaming
 
         public override TestCluster CreateTestCluster()
         {
+            TestUtils.CheckForAzureStorage();
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
@@ -46,14 +47,14 @@ namespace Tester.AzureUtils.Streaming
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
         }
 
-        [Fact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamConsumerOnDroppedClientTest()
         {
             logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");

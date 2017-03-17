@@ -50,7 +50,7 @@
     <Compile Include="AzureMembershipTableTests.cs" />
     <Compile Include="AzureQueueDataManagerTests.cs" />
     <Compile Include="AzureRemindersTableTests.cs" />
-    <Compile Include="AzureStorageBasicTestFixture.cs" />
+    <Compile Include="AzureStorageBasicTests.cs" />
     <Compile Include="AzureTableDataManagerStressTests.cs" />
     <Compile Include="AzureTableDataManagerTests.cs" />
     <Compile Include="AzureTableErrorCodeTests.cs" />
@@ -61,6 +61,7 @@
     <Compile Include="Persistence\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="Persistence\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="Persistence\PersistenceProviderTests.cs" />
+    <Compile Include="StorageEmulatorUtilities.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

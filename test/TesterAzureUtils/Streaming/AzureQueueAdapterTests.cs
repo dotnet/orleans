@@ -11,9 +11,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using Orleans.Streams;
-using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -21,7 +19,8 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class AzureQueueAdapterTests : IDisposable
+    [TestCategory("Azure"), TestCategory("Streaming")]
+    public class AzureQueueAdapterTests : AzureStorageBasicTests, IDisposable
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -46,7 +45,7 @@ namespace Tester.AzureUtils.Streaming
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
         public async Task SendAndReceiveFromAzureQueue()
         {
             var properties = new Dictionary<string, string>
