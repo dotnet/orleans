@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -17,6 +18,11 @@ namespace Orleans.Streams
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
         StreamHandshakeToken GetSequenceToken();
+    }
+
+    internal interface ISubscriptionChangeHandler
+    {
+        Task InvokeOnAdd(StreamId streamId, GuidId subscriptionId, bool isRewinable, IStreamProvider streamProvider);
     }
 
     /// <summary>
@@ -33,9 +39,7 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
         private readonly bool isRewindable;
-        //onSubscriptionAddAction is a Func with a type param: Func<StreamSubscriptionHandle<T>, Task>
-        private Delegate onSubscriptionAddAction;
-        private Func<string, IStreamIdentity, Guid, Task> onSubscriptinRemoveAction;
+        private Dictionary<Type, ISubscriptionChangeHandler> onSubscriptionChangeActionMap;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
 
         internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable)
@@ -44,6 +48,7 @@ namespace Orleans.Streams
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             this.isRewindable = isRewindable;
             logger = providerRuntime.GetLogger(GetType().Name);
+            onSubscriptionChangeActionMap = new Dictionary<Type, ISubscriptionChangeHandler>();
         }
 
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
@@ -67,18 +72,25 @@ namespace Orleans.Streams
             }
         }
 
-        public Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null)
+        public Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
         {
-            this.onSubscriptionAddAction = onAdd;
-            this.onSubscriptinRemoveAction = onRemove;
+            ISubscriptionChangeHandler handler;
+            if (onSubscriptionChangeActionMap.TryGetValue(typeof(T), out handler))
+            {
+                var typedHandler = handler as SubscriptionChangeHandler<T>;
+                typedHandler.OnAdd = onAdd;
+            }
+            else
+            {
+                var newHandler = new SubscriptionChangeHandler<T>(onAdd);
+                onSubscriptionChangeActionMap.Add(typeof(T), newHandler);
+            }
             return TaskDone.Done;
         }
 
-        public async Task<bool> RemoveObserver(GuidId subscriptionId, StreamId streamId)
+        public bool RemoveObserver(GuidId subscriptionId)
         {
             IStreamSubscriptionHandle ignore;
-            if(this.onSubscriptinRemoveAction != null)
-                await this.onSubscriptinRemoveAction.Invoke(streamId.ProviderName, streamId, subscriptionId.Guid);
             return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
@@ -103,11 +115,15 @@ namespace Orleans.Streams
             else
             {
                 // if no observer attached to the subscription, check if there's onSubscriptinChange actions defined
-                if (this.onSubscriptionAddAction != null)
+                ISubscriptionChangeHandler handler;
+                if (this.onSubscriptionChangeActionMap.TryGetValue(item.GetType(), out handler))
                 {
 
                     //if the onAddAction attached an observer to the subscription
-                    await DynamicInvokeOnSubscriptionAddAction(streamId, item.GetType(), subscriptionId);
+                    var streamProvider = this.providerRuntime.ServiceProvider
+                                .GetService<IStreamProviderManager>()
+                                .GetStreamProvider(streamId.ProviderName);
+                    await handler.InvokeOnAdd(streamId, subscriptionId, isRewindable, streamProvider);
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
                         return await observer.DeliverItem(item, currentToken, handshakeToken);
@@ -134,9 +150,14 @@ namespace Orleans.Streams
             else
             {
                 // if no observer attached to the subscription, check if there's onSubscriptinChange actions defined
-                if (this.onSubscriptionAddAction != null)
+                ISubscriptionChangeHandler handler;
+                if (this.onSubscriptionChangeActionMap.TryGetValue(batch.Value.GetType(), out handler))
                 {
-                    await DynamicInvokeOnSubscriptionAddAction(streamId, batch.Value.GetType(), subscriptionId);
+                    //if the onAddAction attached an observer to the subscription
+                    var streamProvider = this.providerRuntime.ServiceProvider
+                                .GetService<IStreamProviderManager>()
+                                .GetStreamProvider(streamId.ProviderName);
+                    await handler.InvokeOnAdd(streamId, subscriptionId, isRewindable, streamProvider);
                     //if the onAddAction attached an observer to the subscription
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
@@ -202,23 +223,6 @@ namespace Orleans.Streams
                 .OfType<StreamSubscriptionHandleImpl<T>>()
                 .Where(o => o != null)
                 .ToList();
-        }
-
-        private Task DynamicInvokeOnSubscriptionAddAction(StreamId streamId, Type genericType, GuidId subscriptionId)
-        {
-            //dynamic get the stream with correct type param using reflection
-            var streamProvider = this.providerRuntime.ServiceProvider
-                        .GetService<IStreamProviderManager>()
-                        .GetStreamProvider(streamId.ProviderName);
-            var getStreamMethod = streamProvider.GetType().GetMethod("GetStream");
-            var getStreamGenericMethod = getStreamMethod.MakeGenericMethod(genericType);
-            var stream = getStreamGenericMethod.Invoke(streamProvider, new object[] { streamId.Guid, streamId.Namespace });
-            //create StreamSubscriptionHandleImpl with the correct type param using reflection
-            Type constructedType = typeof(StreamSubscriptionHandleImpl<>).MakeGenericType(genericType);
-            var param = Activator.CreateInstance(constructedType, subscriptionId, stream,
-            isRewindable);
-            //dynamic invoke the delegate onSubscriptionAddAction
-            return (Task)this.onSubscriptionAddAction.DynamicInvoke(param);
         }
     }
 }

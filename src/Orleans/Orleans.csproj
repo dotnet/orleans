@@ -177,6 +177,7 @@
     <Compile Include="Streams\Core\StreamSubscription.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManagerAdmin.cs" />
+    <Compile Include="Streams\Core\SubscriptionChangeHandler.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Streams\Providers\StreamProviderUtils.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />

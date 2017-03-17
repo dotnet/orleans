@@ -39,7 +39,7 @@ namespace Tester.TestStreamProviders
             return TaskDone.Done;
         }
 
-        public Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null)
+        public Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
         {
             throw new NotImplementedException();
         }

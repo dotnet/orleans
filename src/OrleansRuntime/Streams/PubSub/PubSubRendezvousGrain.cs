@@ -277,7 +277,7 @@ namespace Orleans.Streams
             State.Producers.Remove(producer);
         }
 
-        public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, bool observerRemoved)
+        public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
             counterConsumersRemoved.Increment();
             if (State.Consumers.Any(c => c.IsFaulted && c.Equals(subscriptionId)))
@@ -285,15 +285,6 @@ namespace Orleans.Streams
 
             try
             {
-                if (!observerRemoved)
-                {
-                    //remove observer from consumer extension if not removed yet
-                    //this would happen when subscription removed by calling StreamSubscriptionManager
-                    var tasks = State.Consumers.Where(c => c.Equals(subscriptionId))
-                    .Select(c => c.Consumer.RemoveObserver(subscriptionId, streamId));
-                    await Task.WhenAll(tasks);
-                }
-
                 int numRemoved = State.Consumers.RemoveWhere(c => c.Equals(subscriptionId));
 
                 LogPubSubCounts("UnregisterSubscription {0} NumRemoved={1}", subscriptionId, numRemoved);

@@ -29,18 +29,6 @@ namespace Orleans.Streams
         {
         }
 
-        //used for create StreamSubscriptionHandleImpl using reflection in StreamConsumerExtension
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, object streamImpl, bool isRewindable)
-        {
-            if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
-            if (streamImpl == null) throw new ArgumentNullException("streamImpl");
-
-            this.subscriptionId = subscriptionId;
-            this.streamImpl = streamImpl as StreamImpl<T>;
-            this.isRewindable = isRewindable;
-            this.ProviderName = this.streamImpl.ProviderName;
-        }
-
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl,
             bool isRewindable, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {

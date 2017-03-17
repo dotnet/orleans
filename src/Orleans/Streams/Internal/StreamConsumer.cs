@@ -89,7 +89,7 @@ namespace Orleans.Streams
             } catch(Exception)
             {
                 // Undo the previous call myExtension.SetObserver.
-                await myExtension.RemoveObserver(subscriptionId, stream.StreamId);
+                myExtension.RemoveObserver(subscriptionId);
                 throw;
             }            
         }
@@ -126,13 +126,13 @@ namespace Orleans.Streams
 
             if (logger.IsVerbose) logger.Verbose("Unsubscribe StreamSubscriptionHandle={0}", handle);
 
-            await myExtension.RemoveObserver(handleImpl.SubscriptionId, StreamId.GetStreamId(handleImpl.SubscriptionId.Guid, stream.ProviderName, stream.Namespace));
+            myExtension.RemoveObserver(handleImpl.SubscriptionId);
             // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
 
             if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
                 pubSub, myGrainReference);
 
-            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName, true);
+            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
 
             handleImpl.Invalidate();
         }
@@ -156,8 +156,8 @@ namespace Orleans.Streams
             var tasks = new List<Task>();
             foreach (var handle in allHandles)
             {
-                await myExtension.RemoveObserver(handle.SubscriptionId, StreamId.GetStreamId(handle.HandleId, stream.ProviderName, stream.Namespace));
-                tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName, true));
+                myExtension.RemoveObserver(handle.SubscriptionId);
+                tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
             }
             try
             {
@@ -172,10 +172,9 @@ namespace Orleans.Streams
         }
 
         // Used in test.
-        internal async Task<bool> InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
+        internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
         {
-            return myExtension != null && await myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId, 
-                StreamId.GetStreamId(handle.HandleId, handle.ProviderName, handle.StreamIdentity.Namespace));
+            return myExtension != null && myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId);
         }
 
         internal Task<int> DiagGetConsumerObserversCount()

@@ -641,7 +641,7 @@ namespace Orleans.Streams
             {
                 logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                     "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
-                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName, true).Ignore();
+                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName).Ignore();
                 return true;
             }
 

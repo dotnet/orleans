@@ -15,13 +15,11 @@ namespace Orleans.Streams
         Task ErrorInStream(GuidId subscriptionId, Exception exc);
         Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId);
         /// <summary>
-        /// Define action to take when subscription changes from outside grain context
+        /// Set onSubscriptionChange action for susbcriptions on different streams
         /// </summary>
         /// <typeparam name="T">Type the stream subscription handle is handling</typeparam>
         /// <param name="onAdd">delegate which will be executed when subscription added</param>
-        /// <param name="onRemove">delegate which will be executed when subscription removed. Parameter of the delegate is streamProviderName, stream identity and subscription Id </param>
-        Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null);
-        Task<bool> RemoveObserver(GuidId subscriptionId, StreamId streamId);
+        Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd);
     }
 
     // This is the extension interface for stream producers

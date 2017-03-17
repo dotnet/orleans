@@ -24,25 +24,22 @@ namespace UnitTests.Grains
         internal Logger logger;
         private List<ConsumerObserver<int>> consumerObservers;
         private List<StreamSubscriptionHandle<int>> consumerHandles;
-        private int onRemoveCalledCount;
+        private List<ConsumerObserver<string>> consumerObservers2;
+        private List<StreamSubscriptionHandle<string>> consumerHandles2;
         private int onAddCalledCount;
-        
+
         public override async Task OnActivateAsync()
         {
             logger = base.GetLogger("Stateless_ConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
-            logger.Info("ResumeAsyncOnObserver");
-            onRemoveCalledCount = 0;
             onAddCalledCount = 0;
             consumerObservers = new List<ConsumerObserver<int>>();
             consumerHandles = new List<StreamSubscriptionHandle<int>>();
+            consumerObservers2 = new List<ConsumerObserver<string>>();
+            consumerHandles2 = new List<StreamSubscriptionHandle<string>>();
             IStreamProvider streamProvider = base.GetStreamProvider("SMSProvider");
-            await streamProvider.OnSubscriptionChange<int>(this.OnAdd, this.OnRemove);
-        }
-
-        public Task<int> GetCountOfOnRemoveFuncCalled()
-        {
-            return Task.FromResult(this.onRemoveCalledCount);
+            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
@@ -54,6 +51,11 @@ namespace UnitTests.Grains
         {
             int sum = 0;
             foreach (var observer in consumerObservers)
+            {
+                sum += observer.NumConsumed;
+            }
+
+            foreach (var observer in consumerObservers2)
             {
                 sum += observer.NumConsumed;
             }
@@ -69,6 +71,13 @@ namespace UnitTests.Grains
             }
             consumerHandles.Clear();
             consumerObservers.Clear();
+
+            foreach (var handle in consumerHandles2)
+            {
+                await handle.UnsubscribeAsync();
+            }
+            consumerHandles2.Clear();
+            consumerObservers2.Clear();
         }
 
         private async Task OnAdd(StreamSubscriptionHandle<int> handle)
@@ -80,10 +89,34 @@ namespace UnitTests.Grains
             this.consumerHandles.Add(newhandle);
         }
 
-        private Task OnRemove(string providerName, IStreamIdentity streamId, Guid subscriptionId)
+        private async Task OnAdd2(StreamSubscriptionHandle<string> handle)
         {
-            this.onRemoveCalledCount++;
-            return TaskDone.Done;
+            var observer = new ConsumerObserver<string>(this.logger);
+            var newhandle = await handle.ResumeAsync(observer);
+            this.consumerObservers2.Add(observer);
+            this.consumerHandles2.Add(newhandle);
+        }
+    }
+
+    public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain
+    {
+        internal Logger logger;
+        private int onAddCalledCount;
+        private int onAdd2CalledCount;
+
+        public override async Task OnActivateAsync()
+        {
+            logger = base.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
+            logger.Info("OnActivateAsync");
+            IStreamProvider streamProvider = base.GetStreamProvider("SMSProvider");
+            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+        }
+
+        //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
+        private async Task OnAdd(StreamSubscriptionHandle<int> handle)
+        {
+            this.onAddCalledCount++;
+            await handle.UnsubscribeAsync();
         }
     }
 

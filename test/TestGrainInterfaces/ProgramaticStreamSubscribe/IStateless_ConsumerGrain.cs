@@ -12,12 +12,36 @@ namespace UnitTests.GrainInterfaces
     public interface IStateless_ConsumerGrain: IGrainWithGuidKey
     {
         Task StopConsuming();
-        Task<int> GetCountOfOnRemoveFuncCalled();
         Task<int> GetCountOfOnAddFuncCalled();
         Task<int> GetNumberConsumed();
+    }
+
+    //the consumer grain marker interface which would unsubscribe on any subscription added by StreamSubscriptionManager
+    public interface IJerk_ConsumerGrain : IGrainWithGuidKey
+    {
     }
 
     public interface IImplicitSubscribeGrain: IGrainWithGuidKey
     {
     }
+
+    public interface ITypedProducerGrain: IGrainWithGuidKey
+    {
+        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
+
+        Task StartPeriodicProducing();
+
+        Task StopPeriodicProducing();
+
+        Task<int> GetNumberProduced();
+
+        Task ClearNumberProduced();
+        Task Produce();
+    }
+
+    public interface ITypedProducerGrainProducingInt : ITypedProducerGrain
+    { }
+
+    public interface ITypedProducerGrainProducingString : ITypedProducerGrain
+    { }
 }

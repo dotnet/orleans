@@ -142,10 +142,10 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
-        public async Task OnSubscriptionChange<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd, Func<string, IStreamIdentity, Guid, Task> onRemove = null)
+        public async Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
         {
             var consumerExtension = await StreamProviderUtils.BindExtensionLazy(providerRuntime, logger, IsRewindable, bindExtLock);
-            await consumerExtension.OnSubscriptionChange<T>(onAdd, onRemove);
+            await consumerExtension.SetOnSubscriptionChangeAction<T>(onAdd);
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()

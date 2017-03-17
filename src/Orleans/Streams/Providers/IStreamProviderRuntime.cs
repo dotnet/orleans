@@ -182,7 +182,7 @@ namespace Orleans.Streams
 
         Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
 
-        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, bool observerRemoved);
+        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 
         Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace);
 
