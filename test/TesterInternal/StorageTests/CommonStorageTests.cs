@@ -37,7 +37,7 @@ namespace UnitTests.StorageTests.Relational
             Storage = storage;
         }
 
-        internal void PersistenceStorage_WriteReadWriteReadStatesInParallel(string prefix = nameof(this.PersistenceStorage_WriteReadWriteReadStatesInParallel), int countOfGrains = 100)
+        internal async Task PersistenceStorage_WriteReadWriteReadStatesInParallel(string prefix = nameof(this.PersistenceStorage_WriteReadWriteReadStatesInParallel), int countOfGrains = 100)
         {
             //As data is written and read the Version numbers (ETags) are as checked for correctness (they change).
             //Additionally the Store_WriteRead tests does its validation.
@@ -52,18 +52,18 @@ namespace UnitTests.StorageTests.Relational
             //is ill chosen or the test failed due to another problem.
             var grainStates = Enumerable.Range(StartOfRange, CountOfRange).Select(i => this.GetTestReferenceAndState(string.Format(grainIdTemplate, i), null)).ToList();
 
-            // Limit parallelization of the first write to not stress out the system with deadlocks on INSERT
-            Parallel.ForEach(grainStates, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, grainData =>
+            // Avoid parallelization of the first write to not stress out the system with deadlocks on INSERT
+            foreach (var grainData in grainStates)
             {
                 //A sanity checker that the first version really has null as its state. Then it is stored
                 //to the database and a new version is acquired.
                 var firstVersion = grainData.Item2.ETag;
                 Assert.Equal(firstVersion, null);
 
-                Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2).Wait();
+                await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
                 var secondVersion = grainData.Item2.ETag;
                 Assert.NotEqual(firstVersion, secondVersion);
-            });
+            };
 
             int MaxNumberOfThreads = Environment.ProcessorCount * 3;
             // The purpose of Parallel.ForEach is to ensure the storage provider will be tested from
