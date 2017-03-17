@@ -17,7 +17,7 @@ namespace UnitTests.StorageTests.Relational
     /// optionally remove <see cref="RelationalStorageTests"/> inheritance and implement a provider and environment
     /// setup as done in <see cref="CommonFixture"/> and how it delegates it.</remarks>
     [TestCategory("SqlServer")]
-    public class SqlServerStorageTests: RelationalStorageTests, IDisposable, IClassFixture<CommonFixture>
+    public class SqlServerStorageTests: RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>
         /// The storage invariant, storage ID, or ADO.NET invariant for this test set.
@@ -30,14 +30,9 @@ namespace UnitTests.StorageTests.Relational
             Skip.If(PersistenceStorageTests == null, $"Persistence storage not available for SqlServer.");
         }
 
-        public void Dispose()
-        {
-            //XUnit.NET will automatically call this after every test method run. There is no need to always call this method.
-        }
-
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task WriteReadCyrillic()
+        public async Task WriteReadCyrillic()
         {
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
         }
@@ -45,16 +40,16 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task WriteReadWriteRead100StatesInParallel()
+        public void WriteReadWriteRead100StatesInParallel()
         {
-            await Relational_WriteReadWriteRead100StatesInParallel();
+            Relational_WriteReadWriteRead100StatesInParallel();
         }
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task StorageDataSetGeneric_HashCollisionTests()
+        public void StorageDataSetGeneric_HashCollisionTests()
         {
-            await Relational_HashCollisionTests();
+            Relational_HashCollisionTests();
         }
 
 
@@ -68,7 +63,7 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task WriteDuplicateFailsWithInconsistentStateException()
+        public async Task WriteDuplicateFailsWithInconsistentStateException()
         {
             await Relational_WriteDuplicateFailsWithInconsistentStateException();
         }
@@ -76,7 +71,7 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence")]
-        internal async Task WriteInconsistentFailsWithIncosistentStateException()
+        public async Task WriteInconsistentFailsWithIncosistentStateException()
         {
             await Relational_WriteInconsistentFailsWithIncosistentStateException();
         }
