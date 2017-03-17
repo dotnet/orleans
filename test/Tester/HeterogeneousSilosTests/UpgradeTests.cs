@@ -1,4 +1,3 @@
-#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -48,8 +47,19 @@ namespace Tester.HeterogeneousSilosTests
             // If test run from VS
             else
             {
-                assemblyGrainsV1Dir = new DirectoryInfo(AssemblyGrainsV1Vs);
-                assemblyGrainsV2Dir = new DirectoryInfo(AssemblyGrainsV2Vs);
+                // If not run from vnext
+                if (Directory.Exists(AssemblyGrainsV1Vs))
+                {
+                    assemblyGrainsV1Dir = new DirectoryInfo(AssemblyGrainsV1Vs);
+                    assemblyGrainsV2Dir = new DirectoryInfo(AssemblyGrainsV2Vs);
+                }
+                else
+                {
+                    // vnext
+                    var target = @"\net462";
+                    assemblyGrainsV1Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV1Vs + target);
+                    assemblyGrainsV2Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV2Vs + target);
+                }
             }
 
             this.options = new TestClusterOptions(2);
@@ -187,4 +197,3 @@ namespace Tester.HeterogeneousSilosTests
         }
     }
 }
-#endif
