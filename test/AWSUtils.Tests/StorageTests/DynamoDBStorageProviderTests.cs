@@ -39,15 +39,15 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        internal async Task WriteReadCyrillic()
+        public async Task WriteReadCyrillic()
         {
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        internal void WriteRead100StatesInParallel()
+        public async Task WriteRead100StatesInParallel()
         {
-            PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel();
+            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel();
         }
     }
 }
