@@ -40,7 +40,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
           AfterTargets="BeforeCompile"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansCodeGenPrecompile)'!='true'"
-          Inputs="@(ReferencePath)"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
     <Error Text="$(CodeGenToolExe) could not be found!" Condition="!Exists('$(CodeGenToolExe)')" />
