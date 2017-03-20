@@ -15,7 +15,7 @@ namespace Tester.AzureUtils
     /// Tests for operation of Orleans Membership Table using AzureStore - Requires access to external Azure storage
     /// </summary>
     [TestCategory("Membership"), TestCategory("Azure")]
-    public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTestFixture>
+    public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
         public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
@@ -26,6 +26,7 @@ namespace Tester.AzureUtils
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
+            TestUtils.CheckForAzureStorage();
             return new AzureBasedMembershipTable();
         }
 

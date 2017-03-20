@@ -2,18 +2,18 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace Tester.AzureUtils.General
 {
+    [TestCategory("Azure"), TestCategory("Generics")]
     public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTests.Fixture>
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -25,10 +25,11 @@ namespace Tester.AzureUtils.General
 
         public GenericGrainsInAzureStorageTests(Fixture fixture)
         {
+            fixture.EnsurePreconditionsMet();
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());
@@ -38,7 +39,7 @@ namespace Tester.AzureUtils.General
             await grain.ClearState();
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
+        [SkippableFact, TestCategory("Functional")]
         //This test is identical to the one above, with a shorter name, and passes
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {

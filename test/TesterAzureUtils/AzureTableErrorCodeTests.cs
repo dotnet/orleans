@@ -1,4 +1,3 @@
-
 using System;
 using System.Net;
 using Orleans.AzureUtils;
@@ -6,10 +5,11 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureTableErrorCodeTests : IClassFixture<AzureStorageBasicTestFixture>
+    [TestCategory("Azure"), TestCategory("Storage")]
+    public class AzureTableErrorCodeTests
     {
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional")]
         public void AzureTableErrorCode_IsRetriableHttpError()
         {
             Assert.True(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 503, null));
@@ -24,7 +24,7 @@ namespace Tester.AzureUtils
             Assert.False(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 200, null));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional")]
         public void AzureTableErrorCode_IsContentionError()
         {
             Assert.True(AzureStorageUtils.IsContentionError(HttpStatusCode.PreconditionFailed));
@@ -41,7 +41,7 @@ namespace Tester.AzureUtils
             Assert.False(AzureStorageUtils.IsContentionError((HttpStatusCode) 200));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional")]
         public void AzureTableErrorCode_BadTableName()
         {
             
@@ -50,7 +50,7 @@ namespace Tester.AzureUtils
             AzureStorageUtils.ValidateTableName(tableName));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional")]
         public void AzureStorageUtils_TablePropertyShouldBeSanitized()
         {
             var tableProperty = "/A\\C#?";
