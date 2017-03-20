@@ -16,11 +16,12 @@ namespace Orleans.Streams
         private IAsyncObserver<T> observer;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-
+        private string providerName;
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
 
+        public override string ProviderName { get { return this.providerName; } }
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
@@ -40,7 +41,7 @@ namespace Orleans.Streams
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
             this.isRewindable = isRewindable;
-            this.ProviderName = streamImpl.ProviderName;
+            this.providerName = streamImpl.ProviderName;
             if (IsRewindable)
             {
                 expectedToken = StreamHandshakeToken.CreateStartToken(token);
