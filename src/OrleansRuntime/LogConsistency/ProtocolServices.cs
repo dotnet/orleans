@@ -131,7 +131,7 @@ namespace Orleans.Runtime.LogConsistency
             }
         }
 
-        private string ClusterDisplayName => this.pseudoMultiClusterConfiguration == null ? string.Empty : " " + this.MyClusterId;
+        private string ClusterDisplayName => this.MultiClusterEnabled ? " " + this.MyClusterId : string.Empty;
 
         public MultiClusterConfiguration MultiClusterConfiguration
         {
