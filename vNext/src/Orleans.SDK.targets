@@ -52,7 +52,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 " />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
-      <CodeGenFilename>$(ProjectDir)$(IntermediateOutputPath)$(TargetName).codegen.cs</CodeGenFilename>
+      <CodeGenDirectory Condition="'$([System.IO.Path]::IsPathRooted($(IntermediateOutputPath)))' == 'true'">$(IntermediateOutputPath)</CodeGenDirectory>
+      <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
+      <CodeGenFilename Condition="'$(CodeGenFilename)' == ''">$(CodeGenDirectory)$(TargetName).codegen.cs</CodeGenFilename>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
     <ItemGroup>
