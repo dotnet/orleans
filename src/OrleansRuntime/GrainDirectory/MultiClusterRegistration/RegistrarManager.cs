@@ -1,6 +1,7 @@
 ﻿using System;
 using Orleans.GrainDirectory;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -14,7 +15,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly object registrarLock = new object();
         private readonly IServiceProvider serviceProvider;
 
-        private Dictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
+        private IReadOnlyDictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
 
         public RegistrarManager(IServiceProvider serviceProvider, GrainTypeManager grainTypeManager)
         {
@@ -64,7 +65,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var directorType = typeof(IGrainRegistrar<>).MakeGenericType(strategyType);
                     registrar = (IGrainRegistrar) this.serviceProvider.GetRequiredService(directorType);
-                    var newRegistrars = new Dictionary<Type, IGrainRegistrar>(this.registrars)
+                    var newRegistrars = new Dictionary<Type, IGrainRegistrar>((Dictionary<Type, IGrainRegistrar>)this.registrars)
                     {
                         [strategyType] = registrar
                     };

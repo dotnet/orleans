@@ -39,7 +39,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public ProtocolServices(
             Grain gr,
-            Logger log,
+            Func<string, Logger> logFactory,
             IMultiClusterRegistrationStrategy strategy,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
@@ -47,7 +47,7 @@ namespace Orleans.Runtime.LogConsistency
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
-            this.log = log;
+            this.log = logFactory("LogConsistencyProtocolServices");
             this.grainFactory = grainFactory;
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
@@ -131,7 +131,7 @@ namespace Orleans.Runtime.LogConsistency
             }
         }
 
-        private string ClusterDisplayName => this.ClusterDisplayName;
+        private string ClusterDisplayName => this.pseudoMultiClusterConfiguration == null ? string.Empty : " " + this.MyClusterId;
 
         public MultiClusterConfiguration MultiClusterConfiguration
         {

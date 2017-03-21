@@ -265,7 +265,7 @@ namespace Orleans.Runtime
             services.AddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
             services.AddSingleton<IGrainRegistrar<ClusterLocalRegistration>, ClusterLocalRegistrar>();
             services.AddSingleton<RegistrarManager>();
-            services.AddSingleton(FactoryUtility.Create<Grain, Logger, IMultiClusterRegistrationStrategy, ProtocolServices>);
+            services.AddSingleton(FactoryUtility.Create<Grain, IMultiClusterRegistrationStrategy, ProtocolServices>);
             services.AddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement
