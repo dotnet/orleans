@@ -101,8 +101,6 @@ namespace UnitTests.Grains
     public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain
     {
         internal Logger logger;
-        private int onAddCalledCount;
-        private int onAdd2CalledCount;
 
         public override async Task OnActivateAsync()
         {
@@ -115,7 +113,6 @@ namespace UnitTests.Grains
         //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
         private async Task OnAdd(StreamSubscriptionHandle<int> handle)
         {
-            this.onAddCalledCount++;
             await handle.UnsubscribeAsync();
         }
     }
