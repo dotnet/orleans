@@ -55,8 +55,8 @@ Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Co
 
 #### With Nuget
 
-1. Add Microsoft.Orleans.Templates.Interfaces to GrainInterfaces
-2. Add Microsoft.Orleans.Templates.Grains to GrainCollection
+1. Add Microsoft.Orleans.OrleansCodeGenerator.Build  to GrainInterfaces
+2. Add Microsoft.Orleans.OrleansCodeGenerator.Build  to GrainCollection
 3. Add Microsoft.Orleans.OrleansRuntime to Host
 
 ## Creating our Grain Interface
@@ -145,6 +145,7 @@ The Orleans samples come with a very nice class called HostWrapper, which abstra
 using Orleans.Runtime.Host;
 using Orleans;
 using System.Net;
+using System;
 
 
 class Program
@@ -219,6 +220,12 @@ At this point we should be able to run Host. A console should appear with a larg
 
 Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.
 
+
+## Troubleshooting
+- System.SystemException: 'Failed to start Orleans silo 'YOUR-HOST-NAME' as a Secondary node':
+    - Problem: The silo is trying to start but does not find a the specified file to get the configuration.
+    - Solution: Set the property "Copy to Output Directory" to "Copy if newer", to set it, right click on the configuration file, then click on properites.
+    ```
 
 ## Further Reading
 
