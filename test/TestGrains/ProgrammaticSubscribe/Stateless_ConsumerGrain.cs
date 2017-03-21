@@ -40,6 +40,11 @@ namespace UnitTests.Grains
             IStreamProvider streamProvider = base.GetStreamProvider("SMSProvider");
             await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
             await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
+
+            // adding onSubscriptionChangeAction for differnt stream provider
+            streamProvider = base.GetStreamProvider("SMSProvider2");
+            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
