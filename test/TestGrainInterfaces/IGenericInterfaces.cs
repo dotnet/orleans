@@ -35,7 +35,7 @@ namespace UnitTests.GrainInterfaces
     /// Long named grain type, which can cause issues in AzureTableStorage
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public interface ISimpleGenericGrainUsingAzureTableStorage<T> : IGrainWithGuidKey
+    public interface ISimpleGenericGrainUsingAzureStorageAndLongGrainName<T> : IGrainWithGuidKey
     {
         Task<T> EchoAsync(T entity);
 
