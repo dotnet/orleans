@@ -263,6 +263,15 @@ namespace Orleans.Runtime
             }
         }
 
+        public bool IsUsingIfaceVersion
+        {
+            get { return Headers.IsUsingIfaceVersion; }
+            set
+            {
+                Headers.IsUsingIfaceVersion = value;
+            }
+        }
+
         public ResponseTypes Result
         {
             get { return Headers.Result; }
@@ -741,6 +750,7 @@ namespace Orleans.Runtime
                 IS_UNORDERED = 1 << 23,
                 REQUEST_CONTEXT = 1 << 24,
                 IS_RETURNED_FROM_REMOTE_CLUSTER = 1 << 25,
+                IS_USING_IFACE_VERSION = 1 << 26,
                 // Do not add over int.MaxValue of these.
             }
 
@@ -761,6 +771,7 @@ namespace Orleans.Runtime
             private GrainId _sendingGrain;
             private ActivationId _sendingActivation;
             private bool _isNewPlacement;
+            private bool _isUsingIfaceVersion;
             private ResponseTypes _result;
             private DateTime? _expiration;
             private string _debugContext;
@@ -924,6 +935,15 @@ namespace Orleans.Runtime
                 }
             }
 
+            public bool IsUsingIfaceVersion
+            {
+                get { return _isUsingIfaceVersion; }
+                set
+                {
+                    _isUsingIfaceVersion = value;
+                }
+            }
+
             public ResponseTypes Result
             {
                 get { return _result; }
@@ -1042,6 +1062,7 @@ namespace Orleans.Runtime
                 headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
+                headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_IFACE_VERSION : headers | Headers.IS_USING_IFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _expiration == null ? headers & ~Headers.EXPIRATION : headers | Headers.EXPIRATION;
                 headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
@@ -1105,6 +1126,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     writer.Write(input.IsNewPlacement);
+
+                if ((headers & Headers.IS_USING_IFACE_VERSION) != Headers.NONE)
+                    writer.Write(input.IsUsingIfaceVersion);
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     writer.Write(input.IsReadOnly);
@@ -1222,6 +1246,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     result.IsNewPlacement = ReadBool(reader);
+
+                if ((headers & Headers.IS_USING_IFACE_VERSION) != Headers.NONE)
+                    result.IsUsingIfaceVersion = ReadBool(reader);
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     result.IsReadOnly = ReadBool(reader);

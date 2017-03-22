@@ -375,17 +375,12 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.Grain.IsGrain)
+                if (targetActivation.Grain.IsGrain && message.IsUsingIfaceVersion)
                 {
                     var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
-                    if (request.InterfaceVersion != 0)
-                    {
-                        var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
-                        if (supportedVersion < request.InterfaceVersion)
-                        {
-                            catalog.DeactivateActivationOnIdle(targetActivation);
-                        }
-                    }
+                    var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (supportedVersion < request.InterfaceVersion)
+                        catalog.DeactivateActivationOnIdle(targetActivation);
                 }
 
                 if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
@@ -655,7 +650,9 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-            var request = message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest;
+            var request = message.IsUsingIfaceVersion
+                ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
+                : null;
             var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
                 message.SendingAddress, target, this.catalog, strategy);

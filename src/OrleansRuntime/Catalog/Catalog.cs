@@ -223,8 +223,18 @@ namespace Orleans.Runtime
                 return AllActiveSilos;
 
             var typeCode = target.GrainId.GetTypeCode();
-            var versions = new[] {GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max()};
-            var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, versions).Intersect(AllActiveSilos).ToList();
+            IReadOnlyList<SiloAddress> silos;
+            if (target.InterfaceVersion > 0)
+            {
+                var versions = new[] { GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max() };
+                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, versions);
+            }
+            else
+            {
+                silos = GrainTypeManager.GetSupportedSilos(typeCode);
+            }
+
+            var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
             if (compatibleSilos.Count == 0)
                 throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
 
