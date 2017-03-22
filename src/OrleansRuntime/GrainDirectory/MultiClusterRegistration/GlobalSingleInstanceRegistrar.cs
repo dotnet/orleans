@@ -33,7 +33,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public GlobalSingleInstanceRegistrar(
             LocalGrainDirectory localDirectory,
-            Func<string, Logger> loggerFactory,
+            Factory<string, Logger> loggerFactory,
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,

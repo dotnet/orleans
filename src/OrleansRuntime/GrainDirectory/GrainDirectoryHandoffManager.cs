@@ -21,13 +21,13 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly Logger logger;
-        private readonly Func<GrainDirectoryPartition> createPartion;
+        private readonly Factory<GrainDirectoryPartition> createPartion;
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Func<GrainDirectoryPartition> createPartion)
+            Factory<GrainDirectoryPartition> createPartion)
         {
             logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;

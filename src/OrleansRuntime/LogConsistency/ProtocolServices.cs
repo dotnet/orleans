@@ -39,7 +39,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public ProtocolServices(
             Grain gr,
-            Func<string, Logger> logFactory,
+            Factory<string, Logger> logFactory,
             IMultiClusterRegistrationStrategy strategy,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,

@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Utilities
         /// <typeparam name="TInstance">The instance type.</typeparam>
         /// <param name="serviceProvider">The service provider.</param>
         /// <returns>A new factory.</returns>
-        public static Func<TInstance> Create<TInstance>(IServiceProvider serviceProvider)
+        public static Factory<TInstance> Create<TInstance>(IServiceProvider serviceProvider)
         {
             var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), Type.EmptyTypes);
             return () => (TInstance)factory(serviceProvider, EmptyArguments);
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Utilities
         /// <typeparam name="TInstance">The instance type.</typeparam>
         /// <param name="serviceProvider">The service provider.</param>
         /// <returns>A new factory.</returns>
-        public static Func<TParam1, TInstance> Create<TParam1, TInstance>(IServiceProvider serviceProvider)
+        public static Factory<TParam1, TInstance> Create<TParam1, TInstance>(IServiceProvider serviceProvider)
         {
             var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1) });
             return arg1 => (TInstance)factory(serviceProvider, new object[] { arg1 });
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Utilities
         /// <typeparam name="TInstance">The instance type.</typeparam>
         /// <param name="serviceProvider">The service provider.</param>
         /// <returns>A new factory.</returns>
-        public static Func<TParam1, TParam2, TInstance> Create<TParam1, TParam2, TInstance>(IServiceProvider serviceProvider)
+        public static Factory<TParam1, TParam2, TInstance> Create<TParam1, TParam2, TInstance>(IServiceProvider serviceProvider)
         {
             var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1), typeof(TParam2) });
             return (arg1, arg2) => (TInstance)factory(serviceProvider, new object[] { arg1, arg2 });
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Utilities
         /// <typeparam name="TInstance">The instance type.</typeparam>
         /// <param name="serviceProvider">The service provider.</param>
         /// <returns>A new factory.</returns>
-        public static Func<TParam1, TParam2, TParam3, TInstance> Create<TParam1, TParam2, TParam3, TInstance>(IServiceProvider serviceProvider)
+        public static Factory<TParam1, TParam2, TParam3, TInstance> Create<TParam1, TParam2, TParam3, TInstance>(IServiceProvider serviceProvider)
         {
             var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1), typeof(TParam2), typeof(TParam3) });
             return (arg1, arg2, arg3) => (TInstance)factory(serviceProvider, new object[] { arg1, arg2, arg3 });

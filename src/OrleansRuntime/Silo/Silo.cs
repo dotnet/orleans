@@ -259,7 +259,7 @@ namespace Orleans.Runtime
             services.AddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<MessageFactory>();
-            services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
             services.AddSingleton<CodeGeneratorManager>();
 
             services.AddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();

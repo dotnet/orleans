@@ -82,7 +82,7 @@ namespace Orleans
                 sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.AddSingleton<SerializationManager>();
             services.AddSingleton<MessageFactory>();
-            services.AddSingleton<Func<string, Logger>>(LogManager.GetLogger);
+            services.AddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
             services.AddSingleton<StreamProviderManager>();
             services.AddSingleton<ClientStatisticsManager>();
             services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();

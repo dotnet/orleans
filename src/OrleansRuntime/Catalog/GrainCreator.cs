@@ -25,21 +25,21 @@ namespace Orleans.Runtime
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
         
-        private readonly Func<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> getProtocolServices;
+        private readonly Factory<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> protocolServicesFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainCreator"/> class.
         /// </summary>
         /// <param name="services">Service provider used to create new grains</param>
         /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
-        /// <param name="getProtocolServices"></param>
+        /// <param name="protocolServicesFactory"></param>
         public GrainCreator(
             IServiceProvider services,
             Func<IGrainRuntime> getGrainRuntime,
-            Func<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> getProtocolServices)
+            Factory<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> protocolServicesFactory)
         {
             this.services = services;
-            this.getProtocolServices = getProtocolServices;
+            this.protocolServicesFactory = protocolServicesFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
             this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
             ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
         {
             // encapsulate runtime services used by consistency adaptors
-            var svc = this.getProtocolServices(grain, mcRegistrationStrategy);
+            var svc = this.protocolServicesFactory(grain, mcRegistrationStrategy);
 
             var state = Activator.CreateInstance(stateType);
 

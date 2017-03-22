@@ -98,7 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
             ISiloStatusOracle siloStatusOracle,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory grainFactory,
-            Func<GrainDirectoryPartition> grainDirectoryPartitionFactory,
+            Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager)
         {
             this.log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");

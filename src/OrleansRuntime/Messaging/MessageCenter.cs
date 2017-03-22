@@ -47,14 +47,14 @@ namespace Orleans.Runtime.Messaging
             SerializationManager serializationManager,
             ISiloPerformanceMetrics metrics,
             MessageFactory messageFactory,
-            Func<MessageCenter, Gateway> getGateway)
+            Factory<MessageCenter, Gateway> gatewayFactory)
         {
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
             this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
             if (nodeConfig.IsGatewayNode)
             {
-                Gateway = getGateway(this);
+                Gateway = gatewayFactory(this);
             }
         }
 
