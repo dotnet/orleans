@@ -13,13 +13,18 @@ namespace Tester.AzureUtils.General
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseAzureTestClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions();
                 options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
                 return new TestCluster(options);
+            }
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             }
         }
 
@@ -53,13 +58,19 @@ namespace Tester.AzureUtils.General
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseAzureTestClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions();
                 options.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore");
                 return new TestCluster(options);
+            }
+
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             }
         }
 
