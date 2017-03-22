@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -51,7 +53,11 @@ namespace Orleans.Streams
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
-            return TaskDone.Done;
+            if (!IsImplicitSubscriber(subscriptionId, streamId))
+            {
+                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
+            }
+            throw new OrleansException("Dynamic UnregisterConsumer are not supported on implicit subscribed consumer");
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
@@ -64,9 +70,26 @@ namespace Orleans.Streams
             return Task.FromResult(0);
         }
 
-        public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
-            return Task.FromResult(new List<GuidId> { CreateSubscriptionId(streamId, streamConsumer) });
+            if (streamConsumer != null)
+            {
+                var subscriptionId = CreateSubscriptionId(streamId, streamConsumer);
+                var grainId = streamConsumer as GrainReference;
+                return Task.FromResult(new List<StreamSubscription>
+                { new StreamSubscription(subscriptionId.Guid, streamId.ProviderName, streamId, grainId.GrainId) });
+            }
+            else
+            {
+                var implicitConsumers = this.implicitTable.GetImplicitSubscribers(streamId, grainFactory);
+                var subscriptions = implicitConsumers.Select(consumer =>
+                {
+                    var grainRef = consumer.Value as GrainReference;
+                    var subId = consumer.Key;
+                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainRef.GrainId);
+                }).ToList();
+                return Task.FromResult(subscriptions);
+            }   
         }
 
         internal bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)

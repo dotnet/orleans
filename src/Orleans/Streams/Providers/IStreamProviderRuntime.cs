@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -187,7 +188,7 @@ namespace Orleans.Streams
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
 
-        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
         GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
 

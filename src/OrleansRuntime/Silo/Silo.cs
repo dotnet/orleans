@@ -38,6 +38,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
 using Orleans.MultiCluster;
+using Orleans.Streams.Core;
 
 namespace Orleans.Runtime
 {
@@ -288,7 +289,7 @@ namespace Orleans.Runtime
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
             services.AddSingleton<GrainCreator>();
-
+            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderManager>()));
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
             {
                 services.AddSingleton<IConsistentRingProvider>(

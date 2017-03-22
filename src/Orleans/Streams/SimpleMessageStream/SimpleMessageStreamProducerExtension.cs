@@ -215,9 +215,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 try
                 {
                     if (optimizeForImmutableData)
-                        await remoteConsumer.DeliverImmutable(subscriptionId, new Immutable<object>(item), null, null);
+                        await remoteConsumer.DeliverImmutable(subscriptionId, streamId, new Immutable<object>(item), null, null);
                     else
-                        await remoteConsumer.DeliverMutable(subscriptionId, item, null, null);
+                        await remoteConsumer.DeliverMutable(subscriptionId, streamId, item, null, null);
                 }
                 catch (ClientNotAvailableException)
                 {

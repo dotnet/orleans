@@ -16,11 +16,11 @@ namespace Orleans.Streams
         private IAsyncObserver<T> observer;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
 
+        public override string ProviderName { get { return this.streamImpl.ProviderName; } }
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
