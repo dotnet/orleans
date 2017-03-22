@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         Grain GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
+        IServiceProvider ServiceProvider { get; }
         void DelayDeactivation(TimeSpan timeSpan);
         IStorageProvider StorageProvider { get; }
         void OnTimerCreated(IGrainTimer timer);

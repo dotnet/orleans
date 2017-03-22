@@ -11,6 +11,7 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
@@ -19,7 +20,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable
+    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IDisposable
     {
         // This class is used for activations that have extension invokers. It keeps a dictionary of 
         // invoker objects to use with the activation, and extend the default invoker
@@ -161,6 +162,7 @@ namespace Orleans.Runtime
         public readonly TimeSpan CollectionAgeLimit;
         private readonly Logger logger;
         private IGrainMethodInvoker lastInvoker;
+        private IServiceScope serviceScope;
 
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
@@ -205,7 +207,7 @@ namespace Orleans.Runtime
 
         public IGrainIdentity GrainIdentity => this.Identity;
 
-        public IServiceProvider ActivationServices { get; private set; }
+        public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
         #region Method invocation
 
@@ -281,7 +283,8 @@ namespace Orleans.Runtime
         internal void SetupContext(GrainTypeData typeData, IServiceProvider grainServices)
         {
             this.GrainTypeData = typeData;
-            this.ActivationServices = grainServices;
+            this.serviceScope = grainServices.CreateScope();
+
             if (typeData != null)
             {
                 var grainType = typeData.Type;
@@ -340,6 +343,8 @@ namespace Orleans.Runtime
         public ActivationId ActivationId { get { return Address.Activation; } }
 
         public ActivationAddress Address { get; private set; }
+
+        public IServiceProvider ServiceProvider => this.serviceScope?.ServiceProvider;
 
         public void OnTimerCreated(IGrainTimer timer)
         {
@@ -888,6 +893,13 @@ namespace Orleans.Runtime
         }
 
         #endregion
+
+        public void Dispose()
+        {
+            IDisposable disposable = serviceScope;
+            if (disposable != null) disposable.Dispose();
+            this.serviceScope = null;
+        }
     }
 
     internal static class StreamResourceTestControl
