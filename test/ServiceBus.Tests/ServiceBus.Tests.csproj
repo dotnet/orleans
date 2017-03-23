@@ -133,6 +133,7 @@
     <Compile Include="Streaming\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="Streaming\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="Streaming\TimePurgePredicateTests.cs" />
+    <Compile Include="TestStreamProviders\EHStreamProviderWithSlowConsumingPressureDetecting.cs" />
     <Compile Include="TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestEventHubStreamProvider.cs" />
   </ItemGroup>
