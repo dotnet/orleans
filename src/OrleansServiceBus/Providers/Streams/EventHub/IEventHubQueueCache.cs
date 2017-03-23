@@ -7,6 +7,7 @@ using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
+using OrleansServiceBus.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -36,5 +37,11 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="message"></param>
         /// <returns></returns>
         bool TryGetNextMessage(object cursorObj, out IBatchContainer message);
+
+        /// <summary>
+        /// Add cache pressure monitor to the cache's back pressure algorithm
+        /// </summary>
+        /// <param name="monitor"></param>
+        void AddCachePressureMonitor(ICachePressureMonitor monitor);
     }
 }

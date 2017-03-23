@@ -9,6 +9,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using OrleansServiceBus.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -27,7 +28,7 @@ namespace Orleans.ServiceBus.Providers
         /// Underlying message cache implementation
         /// </summary>
         protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
-        private readonly AveragingCachePressureMonitor cachePressureMonitor;
+        private readonly AggregatedCachePressureMonitor cachePressureMonitor;
 
         /// <summary>
         /// Logic used to store queue position
@@ -50,8 +51,18 @@ namespace Orleans.ServiceBus.Providers
             cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer, logger);
             cacheDataAdapter.PurgeAction = cache.Purge;
             cache.OnPurged = OnPurge;
+            
+            var avgCachePressureMonitor = new AveragingCachePressureMonitor(flowControlThreshold, logger);
+            this.cachePressureMonitor = new AggregatedCachePressureMonitor() { avgCachePressureMonitor };
+        }
 
-            cachePressureMonitor = new AveragingCachePressureMonitor(flowControlThreshold, logger);
+        /// <summary>
+        /// Add cache pressure monitor to the cache's back pressure algorithm
+        /// </summary>
+        /// <param name="monitor"></param>
+        public void AddCachePressureMonitor(ICachePressureMonitor monitor)
+        {
+            this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
         /// <summary>
@@ -148,7 +159,55 @@ namespace Orleans.ServiceBus.Providers
 
     }
 
-    internal class AveragingCachePressureMonitor
+    public class SlowConsumingPressureMonitor : ICachePressureMonitor
+    {
+        private readonly TimeSpan checkPeriod = TimeSpan.FromMinutes(1);
+        private readonly Logger logger;
+
+        private double biggestPressureInCurrentPeriod;
+        private DateTime nextCheckedTime;
+        private double flowControlThreshold;
+        private bool isUnderPressure;
+
+        public SlowConsumingPressureMonitor(double flowControlThreshold, Logger logger)
+        {
+            this.flowControlThreshold = flowControlThreshold;
+            this.logger = logger.GetSubLogger("flowcontrol-slow-consumer-pressure", "-");
+            this.nextCheckedTime = DateTime.MinValue;
+            this.biggestPressureInCurrentPeriod = 0;
+            this.isUnderPressure = false;
+        }
+
+        public void RecordCachePressureContribution(double cachePressureContribution)
+        {
+            if (cachePressureContribution > biggestPressureInCurrentPeriod)
+                biggestPressureInCurrentPeriod = cachePressureContribution;
+        }
+
+        public bool IsUnderPressure(DateTime utcNow)
+        {
+            //if any pressure contribution in current period is bigger than flowControlThreshold
+            //we see the cache is under pressure
+            bool underPressure = this.biggestPressureInCurrentPeriod > this.flowControlThreshold;
+            if (this.isUnderPressure != underPressure)
+            {
+                this.isUnderPressure = underPressure;
+                logger.Info(this.isUnderPressure
+                    ? $"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentPeriod}, Threshold: {flowControlThreshold}"
+                    : $"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentPeriod}, Threshold: {flowControlThreshold}");
+            }
+
+            if (nextCheckedTime < utcNow)
+            {
+                //at the end of each check period, reset biggestPressureInCurrentPeriod
+                this.nextCheckedTime = utcNow + this.checkPeriod;
+                this.biggestPressureInCurrentPeriod = 0;
+            }
+            return underPressure;
+        }
+    }
+
+    internal class AveragingCachePressureMonitor : ICachePressureMonitor
     {
         private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
         private readonly Logger logger;
@@ -162,7 +221,7 @@ namespace Orleans.ServiceBus.Providers
         public AveragingCachePressureMonitor(double flowControlThreshold, Logger logger)
         {
             this.flowControlThreshold = flowControlThreshold;
-            this.logger = logger.GetSubLogger("flowcontrol", "-");
+            this.logger = logger.GetSubLogger("flowcontrol-averaging-cache-pressure", "-");
             nextCheckedTime = DateTime.MinValue;
             isUnderPressure = false;
         }
