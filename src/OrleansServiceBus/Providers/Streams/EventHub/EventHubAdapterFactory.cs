@@ -143,7 +143,20 @@ namespace Orleans.ServiceBus.Providers
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
-                CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+                if (adapterSettings.SlowConsumingMonitorThreshold > 0)
+                {
+                    CacheFactory = (partition, checkpointer, cacheLogger) =>
+                    {   var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+                        var monitor = new SlowConsumingPressureMonitor(adapterSettings.SlowConsumingMonitorThreshold, log);
+                        cache.AddCachePressureMonitor(monitor);
+                        return cache;
+                    };
+                }
+                else
+                {
+                    CacheFactory = (partition, checkpointer, cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+                }
+                
             }
 
             if (StreamFailureHandlerFactory == null)

@@ -161,7 +161,8 @@ namespace Orleans.ServiceBus.Providers
 
     public class SlowConsumingPressureMonitor : ICachePressureMonitor
     {
-        private readonly TimeSpan checkPeriod = TimeSpan.FromMinutes(1);
+        private static TimeSpan defaultCheckPeriod = TimeSpan.FromMinutes(1);
+        private readonly TimeSpan checkPeriod;
         private readonly Logger logger;
 
         private double biggestPressureInCurrentPeriod;
@@ -170,12 +171,18 @@ namespace Orleans.ServiceBus.Providers
         private bool isUnderPressure;
 
         public SlowConsumingPressureMonitor(double flowControlThreshold, Logger logger)
+            :this(flowControlThreshold, logger, defaultCheckPeriod)
+        {
+        }
+
+        public SlowConsumingPressureMonitor(double flowControlThreshold, Logger logger, TimeSpan checkPeriod)
         {
             this.flowControlThreshold = flowControlThreshold;
             this.logger = logger.GetSubLogger("flowcontrol-slow-consumer-pressure", "-");
             this.nextCheckedTime = DateTime.MinValue;
             this.biggestPressureInCurrentPeriod = 0;
             this.isUnderPressure = false;
+            this.checkPeriod = checkPeriod;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)

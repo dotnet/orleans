@@ -16,6 +16,8 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public string StreamProviderName { get; }
 
+        public double SlowConsumingMonitorThreshold { get; set; }
+
         /// <summary>
         /// EventHubSettingsType setting name.
         /// </summary>

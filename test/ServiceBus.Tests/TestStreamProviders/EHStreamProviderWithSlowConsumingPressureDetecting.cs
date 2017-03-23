@@ -21,10 +21,11 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger log)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+                var blockSize = 1 << 20;
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(blockSize));
                 var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 var eventhubQueeuCache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, log, this.SerializationManager);
-                var slowConsumingPressureMonitor = new SlowConsumingPressureMonitor(0.5, log);
+                var slowConsumingPressureMonitor = new SlowConsumingPressureMonitor(0.5, log, TimeSpan.FromMinutes(1));
                 eventhubQueeuCache.AddCachePressureMonitor(slowConsumingPressureMonitor);
                 return eventhubQueeuCache;
             }
