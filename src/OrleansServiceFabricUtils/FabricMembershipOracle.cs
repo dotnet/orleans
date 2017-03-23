@@ -47,7 +47,7 @@ namespace Microsoft.Orleans.ServiceFabric
             ILocalSiloDetails localSiloDetails,
             GlobalConfiguration globalConfig,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
-            Func<string, Logger> loggerFactory)
+            Factory<string, Logger> loggerFactory)
         {
             this.log = loggerFactory("MembershipOracle");
             this.localSiloDetails = localSiloDetails;

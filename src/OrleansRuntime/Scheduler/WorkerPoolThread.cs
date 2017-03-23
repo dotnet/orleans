@@ -85,12 +85,14 @@ namespace Orleans.Runtime.Scheduler
         }
 
         internal readonly int WorkerThreadStatisticsNumber;
+        private readonly ICorePerformanceMetrics performanceMetrics;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, int threadNumber, bool system = false)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
             : base((system ? "System." : "") + threadNumber)
         {
             pool = gtp;
             scheduler = sched;
+            this.performanceMetrics = performanceMetrics;
             ownsSemaphore = false;
             IsSystem = system;
             maxWorkQueueWait = IsSystem ? Constants.INFINITE_TIMESPAN : gtp.MaxWorkQueueWait;
@@ -328,7 +330,7 @@ namespace Orleans.Runtime.Scheduler
             // Note that we only do this if the current load is reasonably low and the current thread
             // count is reasonably small.
             if (!pool.ShouldInjectWorkerThread ||
-                (Silo.CurrentSilo == null || !(Silo.CurrentSilo.Metrics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE))) return;
+                !(this.performanceMetrics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE)) return;
 
             if (Cts.IsCancellationRequested) return;
 

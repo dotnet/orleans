@@ -98,7 +98,8 @@ namespace Orleans.Runtime.GrainDirectory
             ISiloStatusOracle siloStatusOracle,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory grainFactory,
-            GrainTypeManager grainTypeManager)
+            Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
+            RegistrarManager registrarManager)
         {
             this.log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");
             var globalConfig = clusterConfig.Globals;
@@ -127,7 +128,7 @@ namespace Orleans.Runtime.GrainDirectory
                     this.DirectoryCache,
                     activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly(),
                     grainFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle);
 
             if (globalConfig.SeedNodes.Count > 0)
             {
@@ -135,12 +136,12 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
-            DirectoryPartition = new GrainDirectoryPartition(siloStatusOracle);
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory);
+            DirectoryPartition = grainDirectoryPartitionFactory();
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory);
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId);
-            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, clusterId, grainFactory);
+            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle);
 
             // add myself to the list of members
             AddServer(MyAddress);
@@ -204,7 +205,7 @@ namespace Orleans.Runtime.GrainDirectory
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_PREDECESSORS, () => Utils.EnumerableToString(this.FindPredecessors(this.MyAddress, 1), siloAddressPrint));
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_SUCCESSORS, () => Utils.EnumerableToString(this.FindSuccessors(this.MyAddress, 1), siloAddressPrint));
 
-            this.registrarManager = new RegistrarManager(this.DirectoryPartition, this.GsiActivationMaintainer, globalConfig, this.log, this.grainFactory, grainTypeManager);
+            this.registrarManager = registrarManager;
         }
 
         public void Start()

@@ -9,6 +9,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Stats
 {
@@ -102,8 +103,8 @@ namespace UnitTests.Stats
             Name = name;
             this.logger = providerRuntime.GetLogger("MockStatsSiloCollector");
             this.grain = providerRuntime.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
-            this.taskScheduler = Silo.CurrentSilo.LocalScheduler;
-            this.schedulingContext = Silo.CurrentSilo.testHook.SchedulingContext;
+            this.taskScheduler = providerRuntime.ServiceProvider.GetRequiredService<OrleansTaskScheduler>();
+            this.schedulingContext = providerRuntime.ServiceProvider.GetRequiredService<Silo>().testHook.SchedulingContext;
             logger.Info("{0} Init called", GetType().Name);
             return TaskDone.Done;
         }

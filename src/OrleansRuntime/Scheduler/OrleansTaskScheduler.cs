@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Counters;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -25,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
         
         public int RunQueueLength { get { return RunQueue.Length; } }
 
-        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads)
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics)
         {
             return new OrleansTaskScheduler(
                 maxActiveThreads,
@@ -33,17 +34,19 @@ namespace Orleans.Runtime.Scheduler
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(100),
                 NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
-                LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS));
+                LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
+                performanceMetrics);
         }
 
-        public OrleansTaskScheduler(NodeConfiguration config)
+        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+                    config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
+                    performanceMetrics)
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit)
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, ICorePerformanceMetrics performanceMetrics)
         {
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
@@ -53,7 +56,7 @@ namespace Orleans.Runtime.Scheduler
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
-            Pool = new WorkerPool(this, maxActiveThreads, injectMoreWorkerThreads);
+            Pool = new WorkerPool(this, performanceMetrics, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
