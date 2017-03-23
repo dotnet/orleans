@@ -47,7 +47,7 @@
     <WarningLevel>3</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <FSharpTargetsPath>..\packages\FSharp.Compiler.Tools.4.1.0\tools\Microsoft.FSharp.Targets</FSharpTargetsPath>
+    <FSharpTargetsPath>..\packages\FSharp.Compiler.Tools.4.1.1\tools\Microsoft.FSharp.Targets</FSharpTargetsPath>
   </PropertyGroup>
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
