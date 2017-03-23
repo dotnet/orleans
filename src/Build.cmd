@@ -6,9 +6,11 @@ SET CMDHOME=%~dp0.
 @REM Locate VS 2017 with the proper method
 
 SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.55/vswhere.exe
-SET VSWHERE_LOCAL_PATH=%CMDHOME%\vswhere.exe
+SET VSWHERE_LOCAL_DIR=%CMDHOME%\Tools
+SET VSWHERE_LOCAL_PATH=%VSWHERE_LOCAL_DIR%\vswhere.exe
 
 if NOT exist "%VSWHERE_LOCAL_PATH%" (
+  if NOT exist "%VSWHERE_LOCAL_DIR%" mkdir %VSWHERE_LOCAL_DIR%
   echo Downloading vswhere.exe from %VSWHERE_REMOTE_PATH%.
   powershell -NoProfile -ExecutionPolicy unrestricted -Command "$retryCount = 0; $success = $false; do { try { (New-Object Net.WebClient).DownloadFile('%VSWHERE_REMOTE_PATH%', '%VSWHERE_LOCAL_PATH%'); $success = $true; } catch { if ($retryCount -ge 6) { throw; } else { $retryCount++; Start-Sleep -Seconds (5 * $retryCount); } } } while ($success -eq $false);"
   if NOT exist "%VSWHERE_LOCAL_PATH%" (
