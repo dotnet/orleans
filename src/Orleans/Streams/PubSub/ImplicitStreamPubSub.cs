@@ -57,7 +57,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
             }
-            throw new OrleansException("Dynamic UnregisterConsumer are not supported on implicit subscribed consumer");
+            return TaskDone.Done;
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
