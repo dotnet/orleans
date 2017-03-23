@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Counters;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -25,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
         
         public int RunQueueLength { get { return RunQueue.Length; } }
 
-        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads)
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics)
         {
             return new OrleansTaskScheduler(
                 maxActiveThreads,
@@ -34,7 +35,7 @@ namespace Orleans.Runtime.Scheduler
                 TimeSpan.FromMilliseconds(100),
                 NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
                 LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
-                performanceMetrics: null);
+                performanceMetrics);
         }
 
         public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics)
