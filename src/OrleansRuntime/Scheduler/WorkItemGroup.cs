@@ -466,7 +466,9 @@ namespace Orleans.Runtime.Scheduler
 
         public void Dispose()
         {
+#if !NETSTANDARD
             activationParentTask.Dispose();
+#endif
         }
 
         public string DumpStatus()

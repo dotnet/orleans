@@ -176,10 +176,17 @@ namespace Orleans.TestingHost
 
         private static void UnloadAppDomain(AppDomain appDomain)
         {
-            if (appDomain != null)
+            try
             {
-                appDomain.UnhandledException -= ReportUnobservedException;
-                AppDomain.Unload(appDomain);
+                if (appDomain != null)
+                {
+                    appDomain.UnhandledException -= ReportUnobservedException;
+                    appDomain.UnhandledException += (sender, args) => { };
+                    AppDomain.Unload(appDomain);
+                }
+            }
+            catch (Exception ignore)
+            {
             }
         }
 
