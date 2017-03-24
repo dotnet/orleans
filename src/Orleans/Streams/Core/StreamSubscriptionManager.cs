@@ -9,9 +9,9 @@ namespace Orleans.Streams.Core
 {
     internal class StreamSubscriptionManager: IStreamSubscriptionManager
     {
-        private readonly StreamSubscriptionManagerType type;
+        private readonly string type;
         private readonly IStreamPubSub streamPubSub;
-        public StreamSubscriptionManager(IStreamPubSub streamPubSub, StreamSubscriptionManagerType managerType)
+        public StreamSubscriptionManager(IStreamPubSub streamPubSub, string managerType)
         {
             this.streamPubSub = streamPubSub;
             this.type = managerType;
