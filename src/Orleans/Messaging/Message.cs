@@ -1127,8 +1127,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     writer.Write(input.IsNewPlacement);
 
-                if ((headers & Headers.IS_USING_IFACE_VERSION) != Headers.NONE)
-                    writer.Write(input.IsUsingIfaceVersion);
+                // Nothing to do with Headers.IS_USING_IFACE_VERSION since the value in
+                // the header is sufficient
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     writer.Write(input.IsReadOnly);
@@ -1248,7 +1248,7 @@ namespace Orleans.Runtime
                     result.IsNewPlacement = ReadBool(reader);
 
                 if ((headers & Headers.IS_USING_IFACE_VERSION) != Headers.NONE)
-                    result.IsUsingIfaceVersion = ReadBool(reader);
+                    result.IsUsingIfaceVersion = true;
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     result.IsReadOnly = ReadBool(reader);
