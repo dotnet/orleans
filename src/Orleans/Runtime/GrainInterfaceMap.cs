@@ -80,11 +80,6 @@ namespace Orleans.Runtime
 		
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        internal IList<int> SupportedGrainTypes
-        {
-            get { return implementationIndex.Keys.ToList(); }
-        }
-
         internal IList<GrainClassData> SupportedGrainClassData
         {
             get { return implementationIndex.Values.ToList(); }
@@ -239,22 +234,6 @@ namespace Orleans.Runtime
             return table[ifaceId].InterfaceVersion;
         }
 
-        internal bool ContainsGrainInterface(int interfaceId)
-        {
-            lock (this)
-            {
-                return table.ContainsKey(interfaceId);
-            }
-        }
-
-        internal bool ContainsGrainImplementation(int typeCode)
-        {
-            lock (this)
-            {
-                return implementationIndex.ContainsKey(typeCode);
-            }
-        }
-
         internal bool TryGetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy registrationStrategy, string genericArguments = null)
         {
             lock (this)
@@ -271,19 +250,6 @@ namespace Orleans.Runtime
                 registrationStrategy = implementation.RegistrationStrategy;
                 return true;
             }
-        }
-
-        internal bool TryGetGrainClass(int grainTypeCode, out string grainClass, string genericArguments)
-        {
-            grainClass = null;
-            GrainClassData implementation;
-            if (!implementationIndex.TryGetValue(grainTypeCode, out implementation))
-            {
-                return false;
-            }
-
-            grainClass = implementation.GetClassName(genericArguments);
-            return true;
         }
 
         public bool TryGetGrainClassData(Type interfaceType, out GrainClassData implementation, string grainClassNamePrefix)
@@ -424,7 +390,6 @@ namespace Orleans.Runtime
             if (!unordered.Contains(grainClassTypeCode))
                 unordered.Add(grainClassTypeCode);
         }
-
 
         public bool IsUnordered(int grainTypeCode)
         {
