@@ -7,13 +7,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup: IWorkItem
+    internal class WorkItemGroup : IWorkItem, IDisposable
     {
+        private Task activationParentTask;
         public bool RequiresTaskCreation { get; set; }
         public List<string> addedFrom = new List<string>();
         public enum WorkGroupStatus
@@ -30,7 +32,6 @@ namespace Orleans.Runtime.Scheduler
         private WorkItemGroup.WorkGroupStatus state;
         private readonly Object lockable;
         private readonly Queue<IWorkItem> workItems;
-        private readonly Action ExecuteAction;
 
         private long totalItemsEnQueued;    // equals total items queued, + 1
         private long totalItemsProcessed;
@@ -147,7 +148,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            ExecuteAction = Execute;
+
             log = IsSystemPriority ? LogManager.GetLogger("Scheduler." + Name + ".WorkItemGroup", LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
@@ -173,6 +174,13 @@ namespace Orleans.Runtime.Scheduler
                         return sb.ToString();
                     });
             }
+
+            activationParentTask = Task.Factory.StartNew(async () =>
+            {
+                await Task.Delay(Int32.MaxValue);
+
+            }, CancellationToken.None, TaskCreationOptions.None, TaskRunner);
+            activationParentTask.Ignore();
         }
 
 
@@ -218,7 +226,7 @@ namespace Orleans.Runtime.Scheduler
                 }
                 if (state != WorkGroupStatus.Waiting) return;
 
-             
+
 #if DEBUG
                 if (log.IsVerbose3) log.Verbose3("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
 #endif
@@ -279,7 +287,7 @@ namespace Orleans.Runtime.Scheduler
         // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
         public void Execute()
         {
-               lock (lockable)
+            lock (lockable)
             {
                 if (state == WorkGroupStatus.Shutdown)
                 {
@@ -294,7 +302,7 @@ namespace Orleans.Runtime.Scheduler
             }
 
             var thread = Thread.CurrentThread;
-
+      
             try
             {
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
@@ -406,14 +414,44 @@ namespace Orleans.Runtime.Scheduler
                         }
                     }
                 }
-              }
+            }
         }
 
+        private Task executionTask;
         private void ScheduleExecution()
         {
+            //executeResetEvent
             state = WorkGroupStatus.Runnable;
-            var t = new WorkItemGroupExecuteTask(ExecuteAction);
-            t.Start(TaskRunner);
+
+            OrleansThreadPool.QueueUserWorkItem(o =>
+            {
+                if (RuntimeContext.Current == null)
+                {
+                    RuntimeContext.Current = new RuntimeContext
+                    {
+                        Scheduler = masterScheduler
+                    };
+                }
+                RuntimeContext.SetExecutionContext(SchedulingContext, TaskRunner, false);
+
+                var previousTask = TaskGetter.GetCurrentTask(activationParentTask);
+                if (previousTask != activationParentTask)
+                {
+                    TaskGetter.SetCurrentTask(activationParentTask);
+                }
+
+                try
+                {
+                    Execute();
+                }
+                finally 
+                {
+                    if (previousTask != activationParentTask)
+                    {
+                        TaskGetter.SetCurrentTask(previousTask);
+                    }
+                }
+            });
         }
 
         #endregion
@@ -424,6 +462,11 @@ namespace Orleans.Runtime.Scheduler
                 IsSystemGroup ? "System*" : "",
                 Name,
                 state);
+        }
+
+        public void Dispose()
+        {
+            activationParentTask.Dispose();
         }
 
         public string DumpStatus()
@@ -475,7 +518,7 @@ public class WorkItemGroupExecuteTask : Task
     public WorkItemGroupExecuteTask(Action action) : base(action)
     {
     }
-   
+
     public WorkItemGroupExecuteTask(Action action, CancellationToken cancellationToken) : base(action, cancellationToken)
     {
     }
@@ -504,39 +547,40 @@ public class WorkItemGroupExecuteTask : Task
     {
     }
 }
+
 public static class TaskGetter
 {
     private static string _propertyName;
     private static Type _taskType;
     private static PropertyInfo _property;
     private static Func<Task> _getter;
+    private static Action<Task> setter;
 
     static TaskGetter()
     {
         _taskType = typeof(Task);
         _propertyName = "InternalCurrent";
-        SetupGetter();
+        SetupCurrentTaskAccessors();
     }
 
-    public static void SetPropertyName(string newName)
+    public static Task GetCurrentTask(Task t)
     {
-        _propertyName = newName;
-        SetupGetter();
+      return taskGetter(t);
     }
 
-    public static Task CurrentTask => _getter();
-
-    private static void SetupGetter()
+   
+    public static void SetCurrentTask(Task t)
     {
-        _getter = () => null;
-        _property = _taskType.GetProperties(BindingFlags.Static | BindingFlags.NonPublic).FirstOrDefault(p => p.Name == _propertyName);
-        if (_property != null)
-        {
-            _getter = () =>
-            {
-                var val = _property.GetValue(null);
-                return (Task) val;
-            };
-        }
+        taskSetter(t, t);
+    }
+
+    private static Action<Task, Task> taskSetter;
+
+    private static Func<Task, Task> taskGetter;
+    private static void SetupCurrentTaskAccessors()
+    {
+        var internalCurrentTaskField = typeof(Task).GetField("t_currentTask", BindingFlags.Static | BindingFlags.NonPublic);
+        taskSetter = (Action<Task, Task>)SerializationManager.GetReferenceSetter(internalCurrentTaskField);
+        taskGetter = (Func<Task, Task>) SerializationManager.GetGetter(internalCurrentTaskField);
     }
 }
