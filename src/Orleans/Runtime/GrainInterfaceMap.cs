@@ -80,14 +80,14 @@ namespace Orleans.Runtime
 		
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        internal IList<GrainClassData> SupportedGrainClassData
+        internal IEnumerable<GrainClassData> SupportedGrainClassData
         {
-            get { return implementationIndex.Values.ToList(); }
+            get { return implementationIndex.Values; }
         }
 
-        internal IList<GrainInterfaceData> SupportedInterfaces
+        internal IEnumerable<GrainInterfaceData> SupportedInterfaces
         {
-            get { return table.Values.ToList(); }
+            get { return table.Values; }
         }
 
         public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
