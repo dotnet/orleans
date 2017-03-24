@@ -79,12 +79,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public virtual bool IsUnderPressure()
         {
-            if (cachedMessages.Count == 0) return false; // empty cache
-            if (Size < maxCacheSize) return false; // there is still space in cache
-            if (cacheCursorHistogram.Count == 0) return false;    // no cursors yet - zero consumers basically yet.
-            // cache is full. Check how many cursors we have in the oldest bucket.
-            int numCursorsInLastBucket = cacheCursorHistogram[0].NumCurrentCursors;
-            return numCursorsInLastBucket > 0;
+            return cacheCursorHistogram.Count >= NUM_CACHE_HISTOGRAM_BUCKETS;
         }
 
 
@@ -291,6 +286,8 @@ namespace Orleans.Providers.Streams.Common
         private void Add(IBatchContainer batch, StreamSequenceToken sequenceToken)
         {
             if (batch == null) throw new ArgumentNullException(nameof(batch));
+            // this should never happen, but just in case
+            if (Size >= maxCacheSize) throw new CacheFullException();
 
             CacheBucket cacheBucket;
             if (cacheCursorHistogram.Count == 0)
@@ -319,18 +316,6 @@ namespace Orleans.Providers.Streams.Common
 
             cachedMessages.AddFirst(new LinkedListNode<SimpleQueueCacheItem>(item));
             cacheBucket.UpdateNumItems(1);
-
-            if (Size > maxCacheSize)
-            {
-                //var last = cachedMessages.Last;
-                cachedMessages.RemoveLast();
-                var bucket = cacheCursorHistogram[0]; // same as:  var bucket = last.Value.CacheBucket;
-                bucket.UpdateNumItems(-1);
-                if (bucket.NumCurrentItems == 0)
-                {
-                    cacheCursorHistogram.RemoveAt(0);
-                }
-            }
         }
 
         internal static void Log(Logger logger, string format, params object[] args)
