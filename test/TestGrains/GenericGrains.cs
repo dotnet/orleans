@@ -52,7 +52,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "AzureStore")]
-    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    public class SimpleGenericGrainUsingAzureStorageAndLongGrainName<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureStorageAndLongGrainName<T>
     {
         public async Task<T> EchoAsync(T entity)
         {

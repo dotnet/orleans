@@ -69,7 +69,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             this.mySqlStorage = fixture.MySqlStorage;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
         public async Task Streaming_SqlServer_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -90,7 +90,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
         public async Task CancellationToken_SqlServer_Test()
         {
             await CancellationTokenTest(sqlServerStorage, CancellationTestTimeoutLimit);

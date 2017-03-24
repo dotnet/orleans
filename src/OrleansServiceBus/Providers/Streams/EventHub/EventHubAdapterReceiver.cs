@@ -12,6 +12,7 @@ using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -46,6 +47,7 @@ namespace Orleans.ServiceBus.Providers
         private int recieverState = ReceiverShutdown;
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
+        private readonly Func<NodeConfiguration> getNodeConfig;
 
         public int GetMaxAddCount()
         {
@@ -56,7 +58,8 @@ namespace Orleans.ServiceBus.Providers
             Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
-            IEventHubReceiverMonitor monitor)
+            IEventHubReceiverMonitor monitor,
+            Func<NodeConfiguration> getNodeConfig)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
@@ -69,6 +72,7 @@ namespace Orleans.ServiceBus.Providers
             this.baseLogger = baseLogger;
             this.logger = baseLogger.GetSubLogger("receiver", "-");
             this.monitor = monitor;
+            this.getNodeConfig = getNodeConfig;
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -91,7 +95,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
                 cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
-                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit() };
+                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
                 receiver = await CreateReceiver(settings, offset, logger);
                 monitor.TrackInitialization(true);

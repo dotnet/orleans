@@ -11,6 +11,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.ClientConnectionTests
 {
@@ -40,6 +41,8 @@ namespace Tester.ClientConnectionTests
 
     public class GatewayConnectionTests : TestClusterPerTest
     {
+        private readonly OutsideRuntimeClient runtimeClient;
+
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(1)
@@ -56,11 +59,16 @@ namespace Tester.ClientConnectionTests
             return new TestCluster(options);
         }
 
+        public GatewayConnectionTests()
+        {
+            this.runtimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+        }
+
         [Fact, TestCategory("Functional")]
         public async Task NoReconnectionToGatewayNotReturnedByManager()
         {
             // Reduce timeout for this test
-            GrainClient.SetResponseTimeout(TimeSpan.FromSeconds(1));
+            this.runtimeClient.SetResponseTimeout(TimeSpan.FromSeconds(1));
 
             var connectionCount = 0;
             var timeoutCount = 0;
@@ -91,7 +99,7 @@ namespace Tester.ClientConnectionTests
                 {
                     try
                     {
-                        var g = GrainFactory.GetGrain<ISimpleGrain>(i);
+                        var g = this.Client.GetGrain<ISimpleGrain>(i);
                         await g.SetA(i);
                     }
                     catch (TimeoutException)

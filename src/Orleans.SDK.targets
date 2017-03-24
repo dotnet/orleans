@@ -40,8 +40,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
           AfterTargets="BeforeCompile"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansCodeGenPrecompile)'!='true'"
-          Inputs="@(ReferencePath)"
-          Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs">
+          Inputs="@(Compile);@(ReferencePath)"
+          Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
     <Error Text="$(CodeGenToolExe) could not be found!" Condition="!Exists('$(CodeGenToolExe)')" />
     <Message Text="[OrleansCodeGeneration]
@@ -51,8 +51,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 - Using CodeGenToolExe location=$(CodeGenToolExe)
 " />
     <PropertyGroup>
-      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
-      <CodeGenFilename>$(ProjectDir)$(IntermediateOutputPath)$(TargetName).codegen.cs</CodeGenFilename>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).orleans.g.args.txt</ArgsFile>
+      <CodeGenDirectory Condition="'$([System.IO.Path]::IsPathRooted($(IntermediateOutputPath)))' == 'true'">$(IntermediateOutputPath)</CodeGenDirectory>
+      <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
+      <CodeGenFilename Condition="'$(CodeGenFilename)' == ''">$(CodeGenDirectory)$(TargetName).orleans.g.cs</CodeGenFilename>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
     <ItemGroup>
@@ -65,8 +67,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command="&quot;$(CodeGenToolExe)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
-       <Output TaskParameter="Outputs" ItemName="Compile" />
-       <Output TaskParameter="Outputs" ItemName="FileWrites" />
+      <Output TaskParameter="Outputs" ItemName="Compile" />
+      <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
   </Target>
 </Project>

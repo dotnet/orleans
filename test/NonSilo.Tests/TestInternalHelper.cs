@@ -6,11 +6,11 @@ namespace UnitTests.TesterInternal
 {
     public class TestInternalHelper
     {
-        internal static OrleansTaskScheduler InitializeSchedulerForTesting(ISchedulingContext context)
+        internal static OrleansTaskScheduler InitializeSchedulerForTesting(ISchedulingContext context, ICorePerformanceMetrics performanceMetrics)
         {
             StatisticsCollector.StatisticsCollectionLevel = StatisticsLevel.Info;
             SchedulerStatisticsGroup.Init();
-            var scheduler = OrleansTaskScheduler.CreateTestInstance(4);
+            var scheduler = OrleansTaskScheduler.CreateTestInstance(4, performanceMetrics);
             scheduler.Start();
             WorkItemGroup ignore = scheduler.RegisterWorkContext(context);
             return scheduler;

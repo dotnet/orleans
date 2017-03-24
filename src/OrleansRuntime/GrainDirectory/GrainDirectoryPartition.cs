@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Orleans.GrainDirectory;
-
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public bool OkToRemove(UnregistrationCause cause)
+        public bool OkToRemove(UnregistrationCause cause, GlobalConfiguration config)
         {
             switch (cause)
             {
@@ -44,7 +44,7 @@ namespace Orleans.Runtime.GrainDirectory
                         if (RegistrationStatus == GrainDirectoryEntryStatus.Cached)
                             return true; // cache entries are always removed
 
-                        var delayparameter = Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay;
+                        var delayparameter = config.DirectoryLazyDeregistrationDelay;
                         if (delayparameter <= TimeSpan.Zero)
                             return false; // no lazy deregistration
                         else
@@ -121,11 +121,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo info, out bool wasRemoved)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, GlobalConfiguration config, out IActivationInfo info, out bool wasRemoved)
         {
             info = null;
             wasRemoved = false;
-            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause))
+            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, config))
             {
                 Instances.Remove(act);
                 wasRemoved = true;
@@ -213,7 +213,9 @@ namespace Orleans.Runtime.GrainDirectory
         private Dictionary<GrainId, IGrainInfo> partitionData;
         private readonly object lockable;
         private readonly Logger log;
-        private ISiloStatusOracle siloStatusOracle;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly GlobalConfiguration globalConfig;
+        private readonly IInternalGrainFactory grainFactory;
 
         [ThreadStatic]
         private static ActivationId[] activationIdsHolder;
@@ -223,12 +225,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle)
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, GlobalConfiguration globalConfig, IInternalGrainFactory grainFactory)
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
             log = LogManager.GetLogger("DirectoryPartition");
             this.siloStatusOracle = siloStatusOracle;
+            this.globalConfig = globalConfig;
+            this.grainFactory = grainFactory;
         }
 
         private bool IsValidSilo(SiloAddress silo)
@@ -346,7 +350,7 @@ namespace Orleans.Runtime.GrainDirectory
             entry = null;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, out entry, out wasRemoved))
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, globalConfig, out entry, out wasRemoved))
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);
 
@@ -487,9 +491,8 @@ namespace Orleans.Runtime.GrainDirectory
         /// Merges one partition into another, assuming partitions are disjoint.
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
-        /// <param name="grainFactory"></param>
         /// <param name="other"></param>
-        internal void Merge(IInternalGrainFactory grainFactory, GrainDirectoryPartition other)
+        internal void Merge(GrainDirectoryPartition other)
         {
             lock (lockable)
             {
@@ -525,7 +528,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
-            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle);
+            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.globalConfig, this.grainFactory);
 
             if (modifyOrigin)
             {

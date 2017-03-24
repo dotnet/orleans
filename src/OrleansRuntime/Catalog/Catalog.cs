@@ -153,7 +153,7 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 
         public Catalog(
-            SiloInitializationParameters siloInitializationParameters,
+            ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
@@ -168,8 +168,8 @@ namespace Orleans.Runtime
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
-            LocalSilo = siloInitializationParameters.SiloAddress;
-            localSiloName = siloInitializationParameters.Name;
+            LocalSilo = localSiloDetails.SiloAddress;
+            localSiloName = localSiloDetails.Name;
             directory = grainDirectory;
             activations = activationDirectory;
             this.scheduler = scheduler;
@@ -716,12 +716,9 @@ namespace Orleans.Runtime
             {
                 Grain grain;
 
-                //Create a new instance of the given grain type
-                grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-
-                //for stateful grains, install storage bridge
-                if (grain is IStatefulGrain)
+                if (typeof(IStatefulGrain).IsAssignableFrom(grainType))
                 {
+                    //for stateful grains, install storage bridge
                     SetupStorageProvider(grainType, data);
 
                     var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
@@ -730,14 +727,19 @@ namespace Orleans.Runtime
 
                     storage.SetGrain(grain);
                 }
-
-                //for log-view grains, install log-view adaptor
-                else if (grain is ILogConsistentGrain)
-                {
-                    var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);                  
-                    grainCreator.InstallLogViewAdaptor(grain, grainType, 
-                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
-                        consistencyProvider, data.StorageProvider);
+                else
+                { 
+                    // Create a new instance of the given grain type
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
+                    
+                    // for log-view grains, install log-view adaptor
+                    if (grain is ILogConsistentGrain)
+                    {
+                        var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);
+                        grainCreator.InstallLogViewAdaptor(grain, grainType,
+                            grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
+                            consistencyProvider, data.StorageProvider);
+                    }
                 }
              
                 grain.Data = data;

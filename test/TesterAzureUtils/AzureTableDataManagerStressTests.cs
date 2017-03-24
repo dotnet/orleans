@@ -7,14 +7,14 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
-using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
-    public class AzureTableDataManagerStressTests : IClassFixture<AzureStorageBasicTestFixture>
+    [TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+    public class AzureTableDataManagerStressTests : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;
         private string PartitionKey;
@@ -31,7 +31,7 @@ namespace Tester.AzureUtils
             PartitionKey = "AzureTableDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void AzureTableDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_SinglePartition";
@@ -43,7 +43,7 @@ namespace Tester.AzureUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void AzureTableDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_MultiPartition";
@@ -55,7 +55,7 @@ namespace Tester.AzureUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void AzureTableDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_ReadAll";
@@ -76,7 +76,7 @@ namespace Tester.AzureUtils
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
         }
 
-        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void AzureTableDataManagerStressTests_ReadAllTableEntities()
         {
             const string testName = "AzureTableDataManagerStressTests_ReadAllTableEntities";

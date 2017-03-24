@@ -21,4 +21,19 @@ namespace Orleans.Streams
         }
 #endif
     }
+
+    [Serializable]
+    public class CacheFullException : OrleansException
+    {
+        public CacheFullException() : this("Queue message cache is full") { }
+        public CacheFullException(string message) : base(message) { }
+        public CacheFullException(string message, Exception inner) : base(message, inner) { }
+
+#if !NETSTANDARD
+        public CacheFullException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+#endif
+    }
 }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Microsoft.Orleans.ServiceFabric.Models;
 using Microsoft.Orleans.ServiceFabric.Utilities;
+using Orleans;
 
 namespace Microsoft.Orleans.ServiceFabric
 {
@@ -34,7 +35,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public FabricServiceSiloResolver(
             Uri serviceName,
             IFabricQueryManager queryManager,
-            Func<string, Logger> loggerFactory = null)
+            Factory<string, Logger> loggerFactory = null)
         {
             this.serviceName = serviceName;
             this.queryManager = queryManager;

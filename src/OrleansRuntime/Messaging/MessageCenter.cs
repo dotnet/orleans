@@ -43,19 +43,20 @@ namespace Orleans.Runtime.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
 
         public MessageCenter(
-            SiloInitializationParameters silo,
+            ILocalSiloDetails siloDetails,
             NodeConfiguration nodeConfig,
             IMessagingConfiguration config,
             SerializationManager serializationManager,
             ISiloPerformanceMetrics metrics,
-            MessageFactory messageFactory)
+            MessageFactory messageFactory,
+            Factory<MessageCenter, Gateway> gatewayFactory)
         {
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
-            this.Initialize(silo.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
+            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
             if (nodeConfig.IsGatewayNode)
             {
-                this.InstallGateway(nodeConfig.ProxyGatewayEndpoint);
+                Gateway = gatewayFactory(this);
             }
         }
 
@@ -69,18 +70,12 @@ namespace Orleans.Runtime.Messaging
             MessagingConfiguration = config;
             InboundQueue = new InboundMessageQueue();
             OutboundQueue = new OutboundMessageQueue(this, config, this.serializationManager);
-            Gateway = null;
             Metrics = metrics;
             
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
 
             if (log.IsVerbose3) log.Verbose3("Completed initialization.");
-        }
-
-        public void InstallGateway(IPEndPoint gatewayAddress)
-        {
-            Gateway = new Gateway(this, gatewayAddress, this.messageFactory, this.serializationManager);
         }
 
         public void Start()

@@ -4,6 +4,8 @@ using Orleans;
 using Orleans.Async;
 using Orleans.Streams;
 using Orleans.Providers;
+using Orleans.Streams.Core;
+using Orleans.Runtime;
 
 namespace Tester.TestStreamProviders
 {
@@ -35,6 +37,11 @@ namespace Tester.TestStreamProviders
         public Task Close()
         {
             return TaskDone.Done;
+        }
+
+        public Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
+        {
+            throw new NotImplementedException();
         }
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration providerConfig)

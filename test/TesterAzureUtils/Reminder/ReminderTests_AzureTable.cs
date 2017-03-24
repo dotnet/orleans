@@ -1,6 +1,4 @@
-﻿//#define USE_SQL_SERVER
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,20 +6,20 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
-using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Linq;
+using UnitTests.TimerTests;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
-namespace UnitTests.TimerTests
+namespace Tester.AzureUtils.TimerTests
 {
+    [TestCategory("ReminderService"), TestCategory("Azure")]
     public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -37,17 +35,18 @@ namespace UnitTests.TimerTests
 
         public ReminderTests_AzureTable(Fixture fixture) : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
         }
 
         // Basic tests
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -55,20 +54,20 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();
         }
 
         #region Basic test
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
@@ -89,7 +88,7 @@ namespace UnitTests.TimerTests
             Assert.Equal(last, curr);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -117,7 +116,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Basic single grain multi reminders test
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultipleReminders()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -126,7 +125,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multiple joins ... multi grain, multi reminders
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -160,7 +159,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multi grains multi reminders/grain test
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -185,7 +184,7 @@ namespace UnitTests.TimerTests
 
         #region Secondary failure ... Basic test
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -204,7 +203,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multiple failures ... multiple grains
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(2);
@@ -240,7 +239,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region 1 join 1 failure simulateneously ... multiple grains
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
@@ -287,7 +286,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Register same reminder multiple times
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -301,7 +300,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multiple grain types
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -326,7 +325,7 @@ namespace UnitTests.TimerTests
             Assert.Equal(4, curr2); // CopyGrain fault
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
@@ -371,7 +370,7 @@ namespace UnitTests.TimerTests
         #region Testing things that should fail
 
         #region Lower than allowed reminder period
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -381,7 +380,7 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region The wrong reminder grain
-        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_Grain()
         {
             IReminderGrainWrong grain = this.GrainFactory.GetGrain<IReminderGrainWrong>(0);

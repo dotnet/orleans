@@ -6,14 +6,12 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
-using Tester;
 using TestExtensions;
-using UnitTests.StorageTests;
 using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureGossipTableTests : AzureStorageBasicTestFixture 
+    public class AzureGossipTableTests : AzureStorageBasicTests 
     {
         private readonly Logger logger;
 
@@ -62,7 +60,7 @@ namespace Tester.AzureUtils
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureGossip_ConfigGossip()
         {
             // start clean
@@ -115,7 +113,7 @@ namespace Tester.AzureUtils
             Assert.Equal(conf3, answer.Configuration);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureGossip_GatewayGossip()
         {
             // start clean

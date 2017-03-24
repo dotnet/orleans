@@ -13,6 +13,7 @@ namespace Orleans.Streams
     {
         public abstract IStreamIdentity StreamIdentity { get; }
 
+        public abstract string ProviderName { get; }
         /// <summary>
         /// Unique identifier for this StreamSubscriptionHandle
         /// </summary>
