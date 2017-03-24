@@ -31,7 +31,7 @@ def branch = GithubBranchName
             if (!isPR) {
                 if (testCategory == 'bvt') {
                     // no reason to archive for every kind of test run
-                    Utilities.addArchival(newJob, 'Binaries/**')
+                    Utilities.addArchival(newJob, '**/Binaries/**')
                 }
                 Utilities.addGithubPushTrigger(newJob)
             }
