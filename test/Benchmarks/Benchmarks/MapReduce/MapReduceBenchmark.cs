@@ -1,23 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.MapReduce;
 using BenchmarkGrains.MapReduce;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 
-namespace Benchmarks.MapReduce
+namespace Benchmarks
 {
     public class MapReduceBenchmark
     {
         private static TestCluster _host;
         private readonly int _intermediateStagesCount = 15;
-        private readonly int _pipelineParallelization = 4;
-        private readonly int _repeats = 50000;
+        private readonly int _pipelineParallelization = Environment.ProcessorCount;
+        private readonly int _repeats = 70000;
         private int _currentRepeat = 0;
 
         [Setup]
@@ -25,7 +28,7 @@ namespace Benchmarks.MapReduce
         {
             var options = new TestClusterOptions(1);
             options.ExtendedFallbackOptions.TraceToConsole = false;
-            options.ClusterConfiguration.ApplyToAllNodes(c => c.DefaultTraceLevel = Severity.Warning);
+            options.ClusterConfiguration.ApplyToAllNodes(c => c.DefaultTraceLevel = Severity.Info);
             _host = new TestCluster(options);
             _host.Deploy();
         }
@@ -33,16 +36,21 @@ namespace Benchmarks.MapReduce
         [Benchmark]
         public async Task Bench()
         {
+            var stopWatch = Stopwatch.StartNew();
             var pipelines = Enumerable
-                .Range(0, this._pipelineParallelization)
+                .Range(0, _pipelineParallelization)
                 .AsParallel()
-                .WithDegreeOfParallelism(4)
+                .WithDegreeOfParallelism(_pipelineParallelization)
                 .Select(async i =>
                 {
                     await BenchCore();
                 });
 
             await Task.WhenAll(pipelines);
+            var messages = _repeats * (_intermediateStagesCount + 2) * 2 + _repeats;
+            Console.WriteLine($"Messages: {messages.ToString()}");
+
+            Console.WriteLine($"Throughput: {((float)messages / stopWatch.ElapsedMilliseconds) * 1000} msg per second");
         }
 
         public void Teardown()
@@ -61,7 +69,7 @@ namespace Benchmarks.MapReduce
 
             // used for imitation of complex processing pipelines
             var intermediateGrains = Enumerable
-                .Range(0, this._intermediateStagesCount)
+                .Range(0, _intermediateStagesCount)
                 .Select(i =>
                 {
                     var intermediateProcessor =
@@ -95,35 +103,17 @@ namespace Benchmarks.MapReduce
 
             List<Dictionary<string, int>> resultList = new List<Dictionary<string, int>>();
 
-            while (Interlocked.Increment(ref this._currentRepeat) < this._repeats)
+            while (Interlocked.Increment(ref _currentRepeat) < _repeats)
             {
-                await mapper.SendAsync(this._text);
-                while (!resultList.Any() || resultList.First().Count < 84) // rough way of checking of pipeline completition.
+                await mapper.SendAsync(_text);
+                while (!resultList.Any() || resultList.First().Count < 1) // rough way of checking of pipeline completition.
                 {
                     resultList = await collector.ReceiveAll();
                 }
             }
         }
 
-        private string _text = @"Historically, the world of data and the world of objects" +
-          @" have not been well integrated. Programmers work in C# or Visual Basic" +
-          @" and also in SQL or XQuery. On the one side are concepts such as classes," +
-          @" objects, fields, inheritance, and .NET Framework APIs. On the other side" +
-          @" are tables, columns, rows, nodes, and separate languages for dealing with" +
-          @" them. Data types often require translation between the two worlds; there are" +
-          @" different standard functions. Because the object world has no notion of query, a" +
-          @" query can only be represented as a string without compile-time type checking or" +
-          @" IntelliSense support in the IDE. Transferring data from SQL tables or XML trees to" +
-          @" objects in memory is often tedious and error-prone. Historically, the world of data and the world of objects" +
-          @" have not been well integrated. Programmers work in C# or Visual Basic" +
-          @" and also in SQL or XQuery. On the one side are concepts such as classes," +
-          @" objects, fields, inheritance, and .NET Framework APIs. On the other side" +
-          @" are tables, columns, rows, nodes, and separate languages for dealing with" +
-          @" them. Data types often require translation between the two worlds; there are" +
-          @" different standard functions. Because the object world has no notion of query, a" +
-          @" query can only be represented as a string without compile-time type checking or" +
-          @" IntelliSense support in the IDE. Transferring data from SQL tables or XML trees to" +
-          @" objects in memory is often tedious and error-prone.";
+        private string _text = @"Historically";
     }
 
 }
