@@ -30,7 +30,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = base.GetLogger("Stateless_ConsumerGrain " + base.IdentityString);
+            logger = base.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             onAddCalledCount = 0;
             consumerObservers = new List<ConsumerObserver<int>>();
@@ -41,10 +41,17 @@ namespace UnitTests.Grains
             await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
             await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
 
-            // adding onSubscriptionChangeAction for differnt stream provider
-            streamProvider = base.GetStreamProvider("SMSProvider2");
-            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
-            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
+            try
+            {
+                // adding onSubscriptionChangeAction for differnt stream provider
+                streamProvider = base.GetStreamProvider("SMSProvider2");
+                await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+                await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
+            }
+            catch (KeyNotFoundException e)
+            {
+                logger.Info("StreamProvider SMSProvider2 is not configured, skip its OnSubscriptionChangeAction configuration");
+            }
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
@@ -64,6 +71,8 @@ namespace UnitTests.Grains
             {
                 sum += observer.NumConsumed;
             }
+
+            logger.Info($"GetNumberConsumed {sum}");
             return Task.FromResult(sum);
         }
 
@@ -87,6 +96,7 @@ namespace UnitTests.Grains
 
         private async Task OnAdd(StreamSubscriptionHandle<int> handle)
         {
+            logger.Info("OnAdd");
             this.onAddCalledCount++;
             var observer = new ConsumerObserver<int>(this.logger);
             var newhandle = await handle.ResumeAsync(observer);
@@ -96,6 +106,7 @@ namespace UnitTests.Grains
 
         private async Task OnAdd2(StreamSubscriptionHandle<string> handle)
         {
+            logger.Info("OnAdd2");
             var observer = new ConsumerObserver<string>(this.logger);
             var newhandle = await handle.ResumeAsync(observer);
             this.consumerObservers2.Add(observer);

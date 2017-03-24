@@ -101,9 +101,11 @@ namespace Orleans.Providers.Streams.Common
             myConfig = new PersistentStreamProviderConfig(config);
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            if (this.myConfig.PubSubType != StreamPubSubType.ImplicitOnly)
+            if (this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+                || this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                this.streamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(this.myConfig.PubSubType), this.Name);
+                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
+                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))

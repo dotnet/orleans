@@ -29,7 +29,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task StartPeriodicProducing();
+        Task StartPeriodicProducing(TimeSpan? firePeriod = null);
 
         Task StopPeriodicProducing();
 

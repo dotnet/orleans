@@ -35,8 +35,8 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             {
                 var grainId = Guid.NewGuid();
                 var grainRef = this.GrainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
-                var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(streamIdentity.ProviderName);
-                subscriptions.Add(await subManager.AddSubscription(streamIdentity, grainRef));
+                var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+                subscriptions.Add(await subManager.AddSubscription(streamIdentity.ProviderName, streamIdentity, grainRef));
                 grainCount--;
             }
             return subscriptions;
@@ -44,8 +44,8 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public Task<bool> CanGetSubscriptionManager(string providerName)
         {
-            IStreamSubscriptionManager provider;
-            return Task.FromResult(this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(providerName).TryGetStreamSubscrptionManager(out provider));
+            IStreamSubscriptionManager manager;
+            return Task.FromResult(this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(providerName).TryGetStreamSubscrptionManager(out manager));
         }
 
         public async Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
@@ -53,20 +53,21 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
             var grainRef = this.GrainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
             var sub = await this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
-                .GetStreamSubscriptionManager(streamId.ProviderName).AddSubscription(streamId, grainRef);
+                .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly)
+                .AddSubscription(streamId.ProviderName, streamId, grainRef);
             return sub;
         }
 
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity)
         {
-            var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(streamIdentity.ProviderName);
-            return subManager.GetSubscriptions(streamIdentity);
+            var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            return subManager.GetSubscriptions(streamIdentity.ProviderName, streamIdentity);
         }
 
         public async Task RemoveSubscription(StreamSubscription subscription)
         {
-            var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(subscription.StreamProviderName);
-            await subManager.RemoveSubscription(subscription.StreamId, subscription.SubscriptionId);
+            var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            await subManager.RemoveSubscription(subscription.StreamProviderName, subscription.StreamId, subscription.SubscriptionId);
         }
     }
 

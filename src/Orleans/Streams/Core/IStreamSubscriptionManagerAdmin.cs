@@ -8,6 +8,11 @@ namespace Orleans.Streams.Core
 {
     public interface IStreamSubscriptionManagerAdmin
     {
-        IStreamSubscriptionManager GetStreamSubscriptionManager(string name);
+        IStreamSubscriptionManager GetStreamSubscriptionManager(string managerType);
+    }
+
+    public static class StreamSubscriptionManagerType
+    {
+        public readonly static string ExplicitSubscribeOnly = "ExplicitSubscribeOnly";
     }
 }

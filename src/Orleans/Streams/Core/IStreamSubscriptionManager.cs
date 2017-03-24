@@ -9,8 +9,8 @@ namespace Orleans.Streams.Core
 {
     public interface IStreamSubscriptionManager
     {
-        Task<StreamSubscription> AddSubscription(IStreamIdentity streamId, GrainReference grainRef);
-        Task RemoveSubscription(IStreamIdentity streamId, Guid subscriptionId);
-        Task<IEnumerable<StreamSubscription>> GetSubscriptions(IStreamIdentity StreamId);
+        Task<StreamSubscription> AddSubscription(string streamProviderName, IStreamIdentity streamId, GrainReference grainRef);
+        Task RemoveSubscription(string streamProviderName, IStreamIdentity streamId, Guid subscriptionId);
+        Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity StreamId);
     }
 }

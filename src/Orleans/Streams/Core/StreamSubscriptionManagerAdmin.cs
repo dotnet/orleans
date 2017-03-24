@@ -8,22 +8,29 @@ namespace Orleans.Streams.Core
 {
     internal class StreamSubscriptionManagerAdmin : IStreamSubscriptionManagerAdmin
     {
-        private IStreamProviderManager providerManager;
-        public StreamSubscriptionManagerAdmin(IStreamProviderManager providerManager)
+        private Dictionary<string, IStreamSubscriptionManager> managerStore;
+        public StreamSubscriptionManagerAdmin(IStreamProviderRuntime providerRuntime)
         {
-            this.providerManager = providerManager;
+            // using ExplicitGrainBasedAndImplicit pubsub here, so if StreamSubscriptionManager.Add(Remove)Subscription called on a implicit subscribed
+            // consumer grain, its subscription will be handled by ImplicitPubsub, and will not be messed into GrainBasedPubsub 
+            var explicitStreamSubscriptionManager = new StreamSubscriptionManager(providerRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit), 
+                StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            managerStore = new Dictionary<string, IStreamSubscriptionManager>();
+            managerStore.Add(StreamSubscriptionManagerType.ExplicitSubscribeOnly, explicitStreamSubscriptionManager);
         }
 
-        public IStreamSubscriptionManager GetStreamSubscriptionManager(string name)
+        public IStreamSubscriptionManager GetStreamSubscriptionManager(string managerType)
         {
-            // for now the name is provider name
-            var providerName = name;
-            var provider = this.providerManager.GetStreamProvider(providerName);
-            if (provider is IStreamSubscriptionManagerRetriever)
+            IStreamSubscriptionManager manager = null;
+            if (this.managerStore.TryGetValue(managerType, out manager))
             {
-                return ((IStreamSubscriptionManagerRetriever)provider).GetStreamSubscriptionManager();
+                return manager;
             }
-            throw new Runtime.OrleansException($"StreamSubscriptionManager with name {name} does not exist");
+            else
+            {
+                throw new KeyNotFoundException($"Cannot find StreamSubscriptionManager with type {managerType}.");
+            }
+                
         }
     }
 }

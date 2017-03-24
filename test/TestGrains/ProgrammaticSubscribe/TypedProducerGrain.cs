@@ -18,7 +18,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private int numProducedItems;
         private IDisposable producerTimer;
         internal Logger logger;
-
+        private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
         public override Task OnActivateAsync()
         {
             logger = base.GetLogger(this.GetType() + base.IdentityString);
@@ -35,10 +35,11 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             return TaskDone.Done;
         }
 
-        public Task StartPeriodicProducing()
+        public Task StartPeriodicProducing(TimeSpan? firePeriod = null)
         {
             logger.Info("StartPeriodicProducing");
-            producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+            var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
+            producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, period.Value);
             return TaskDone.Done;
         }
 

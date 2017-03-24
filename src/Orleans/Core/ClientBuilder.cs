@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace Orleans
 {
@@ -86,6 +87,8 @@ namespace Orleans
             services.AddSingleton<StreamProviderManager>();
             services.AddSingleton<ClientStatisticsManager>();
             services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
+            services.AddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
+            services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.AddSingleton<CodeGeneratorManager>();
             services.AddSingleton<IInternalClusterClient, ClusterClient>();
             services.AddFromExisting<IClusterClient, IInternalClusterClient>();
