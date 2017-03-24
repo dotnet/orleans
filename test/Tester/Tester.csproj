@@ -83,6 +83,7 @@
     <Compile Include="StreamingTests\GeneratedStreamRecoveryTests.cs" />
     <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubcribeTests.cs" />
     <Compile Include="StreamingTests\MemoryStreamProviderClientTests.cs" />
+    <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubscribeTestsWithDynamicProviderConfiguration.cs" />
     <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubscribeTestsWithImplicitSubscrbingGrains.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />

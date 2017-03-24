@@ -41,6 +41,13 @@ namespace Tester.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_CanGetSubscriptionManager()
+        {
+            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+            Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);

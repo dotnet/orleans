@@ -289,7 +289,7 @@ namespace Orleans.Runtime
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
             services.AddSingleton<GrainCreator>();
-            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderManager>()));
+            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
             {
                 services.AddSingleton<IConsistentRingProvider>(

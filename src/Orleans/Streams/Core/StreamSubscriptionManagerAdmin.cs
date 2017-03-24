@@ -8,22 +8,27 @@ namespace Orleans.Streams.Core
 {
     internal class StreamSubscriptionManagerAdmin : IStreamSubscriptionManagerAdmin
     {
-        private IStreamProviderManager providerManager;
-        public StreamSubscriptionManagerAdmin(IStreamProviderManager providerManager)
+        private IStreamSubscriptionManager explicitStreamSubscriptionManager;
+        public StreamSubscriptionManagerAdmin(IStreamProviderRuntime providerRuntime)
         {
-            this.providerManager = providerManager;
+            // using ExplicitGrainBasedAndImplicit pubsub here, so if StreamSubscriptionManager.Add(Remove)Subscription called on a implicit subscribed
+            // consumer grain, its subscription will be handled by ImplicitPubsub, and will not be messed into GrainBasedPubsub 
+            this.explicitStreamSubscriptionManager = new StreamSubscriptionManager(providerRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit), 
+                StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         }
 
-        public IStreamSubscriptionManager GetStreamSubscriptionManager(string name)
+        public IStreamSubscriptionManager GetStreamSubscriptionManager(StreamSubscriptionManagerType managerType)
         {
-            // for now the name is provider name
-            var providerName = name;
-            var provider = this.providerManager.GetStreamProvider(providerName);
-            if (provider is IStreamSubscriptionManagerRetriever)
+            IStreamSubscriptionManager manager = null;
+            switch (managerType)
             {
-                return ((IStreamSubscriptionManagerRetriever)provider).GetStreamSubscriptionManager();
+                case StreamSubscriptionManagerType.ExplicitSubscribeOnly:
+                    manager = this.explicitStreamSubscriptionManager;
+                    break;
+                default: manager = this.explicitStreamSubscriptionManager;
+                    break;
             }
-            throw new Runtime.OrleansException($"StreamSubscriptionManager with name {name} does not exist");
+            return manager;
         }
     }
 }

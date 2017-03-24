@@ -42,10 +42,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
                 ? DEFAULT_STREAM_PUBSUB_TYPE
                 : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
-            if (pubSubType != StreamPubSubType.ImplicitOnly)
+            if (pubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+                || pubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                this.streamSubscriptionManager = new StreamSubscriptionManager(this.providerRuntime.PubSub(pubSubType), this.Name);
+                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
+                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
+
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);

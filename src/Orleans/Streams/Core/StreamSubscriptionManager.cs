@@ -9,18 +9,17 @@ namespace Orleans.Streams.Core
 {
     internal class StreamSubscriptionManager: IStreamSubscriptionManager
     {
-        private readonly string name;
+        private readonly StreamSubscriptionManagerType type;
         private readonly IStreamPubSub streamPubSub;
-        public StreamSubscriptionManager(IStreamPubSub streamPubSub, string name)
+        public StreamSubscriptionManager(IStreamPubSub streamPubSub, StreamSubscriptionManagerType managerType)
         {
             this.streamPubSub = streamPubSub;
-            this.name = name;
+            this.type = managerType;
         }
 
-        public async Task<StreamSubscription> AddSubscription(IStreamIdentity streamIdentity, GrainReference grainRef)
+        public async Task<StreamSubscription> AddSubscription(string streamProviderName, IStreamIdentity streamIdentity, GrainReference grainRef)
         {
             var consumer = grainRef.AsReference<IStreamConsumerExtension>();
-            var streamProviderName = this.name;
             var streamId = StreamId.GetStreamId(streamIdentity.Guid, streamProviderName, streamIdentity.Namespace);
             var subscriptionId = streamPubSub.CreateSubscriptionId(
                 streamId, consumer);
@@ -29,15 +28,13 @@ namespace Orleans.Streams.Core
             return newSub;
         }
 
-        public async Task RemoveSubscription(IStreamIdentity streamId, Guid subscriptionId)
+        public async Task RemoveSubscription(string streamProviderName, IStreamIdentity streamId, Guid subscriptionId)
         {
-            var streamProviderName = this.name;
             await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), (StreamId)streamId, streamProviderName);
         }
 
-        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(IStreamIdentity streamIdentity)
+        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity streamIdentity)
         {
-            var streamProviderName = this.name;
             var streamId = StreamId.GetStreamId(streamIdentity.Guid, streamProviderName, streamIdentity.Namespace);
             return streamPubSub.GetAllSubscriptions(streamId).ContinueWith(subs => subs.Result.AsEnumerable());
         }
