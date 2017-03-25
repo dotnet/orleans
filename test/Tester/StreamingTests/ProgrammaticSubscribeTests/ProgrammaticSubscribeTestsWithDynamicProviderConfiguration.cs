@@ -77,7 +77,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task Programmatic_Subscribe_DynamicAddNewStreamProvider_WhenConsuming()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
