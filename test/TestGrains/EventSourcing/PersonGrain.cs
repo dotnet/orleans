@@ -146,7 +146,11 @@ namespace TestGrains
 
             // this time, we wait for (what should be) enough time to commit to MemoryStorage.
             // we would never use such timing assumptions in real code. But this is a unit test.
-            await Task.Delay(20);
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(20);
+                if (Version == 2) break;
+            }
 
             // now the two versions should be the same again
             AssertEqual(2, Version);

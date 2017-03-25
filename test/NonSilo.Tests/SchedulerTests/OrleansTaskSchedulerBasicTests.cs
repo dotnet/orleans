@@ -11,6 +11,7 @@ using TestExtensions;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -43,6 +44,8 @@ namespace UnitTests.SchedulerTests
         private static readonly object lockable = new object();
         private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
         private readonly SiloPerformanceMetrics performanceMetrics;
+        private readonly UnitTestSchedulingContext rootContext;
+        private readonly OrleansTaskScheduler scheduler;
 
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)
         {
@@ -51,6 +54,8 @@ namespace UnitTests.SchedulerTests
             this.runtimeStatisticsGroup = new RuntimeStatisticsGroup();
             this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup);
             InitSchedulerLogging();
+            this.rootContext = new UnitTestSchedulingContext();
+            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
         }
         
         public void Dispose()
@@ -58,6 +63,7 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext.SetSynchronizationContext(null);
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
+            this.scheduler.Stop();
             LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
             //LogManager.UnInitialize();
         }
@@ -65,10 +71,6 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_OrleansTaskScheduler()
         {
-            InitSchedulerLogging();
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             int expected = 2;
             bool done = false;
             Task<int> t = new Task<int>(() => { done = true; return expected; });
@@ -84,10 +86,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_ActivationTaskScheduler()
         {
-            InitSchedulerLogging();
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-            ActivationTaskScheduler activationScheduler = masterScheduler.GetWorkItemGroup(cntx).TaskRunner;
+            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(rootContext).TaskRunner;
 
             int expected = 2;
             bool done = false;
@@ -106,17 +105,15 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
-            ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(rootContext).TaskRunner;
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
             IWorkItem item1 = new ClosureWorkItem(() => { n = n + 5; });
             IWorkItem item2 = new ClosureWorkItem(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
-            orleansTaskScheduler.QueueWorkItem(item1, context);
-            orleansTaskScheduler.QueueWorkItem(item2, context);
+            scheduler.QueueWorkItem(item1, rootContext);
+            scheduler.QueueWorkItem(item2, rootContext);
 
             // Pause to let things run
             Thread.Sleep(1000);
@@ -125,17 +122,14 @@ namespace UnitTests.SchedulerTests
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(15, n);
             output.WriteLine("Test executed OK.");
-            orleansTaskScheduler.Stop();
         }
 
         [Fact]
-        public void Sched_Task_TplFifoTest()
+        public async Task Sched_Task_TplFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
-            ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(rootContext).TaskRunner;
 
             int n = 0;
 
@@ -144,40 +138,10 @@ namespace UnitTests.SchedulerTests
             Task task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
-            task1.Start(scheduler);
-            task2.Start(scheduler);
-
-            // Pause to let things run
-            Thread.Sleep(2000);
-
-            // N should be 15, because the two tasks should execute in order
-            Assert.True(n != 0, "Work items did not get executed");
-            Assert.Equal(15, n);
-            output.WriteLine("Test executed OK.");
-            orleansTaskScheduler.Stop();
-        }
-
-        [Fact]
-        public void Sched_Task_TplFifoTest_TaskScheduler()
-        {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(cntx).TaskRunner;
-
-            int n = 0;
-
-            // ReSharper disable AccessToModifiedClosure
-            Task task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
-            Task task2 = new Task(() => { n = n * 3; });
-            // ReSharper restore AccessToModifiedClosure
-
-            // By queuuing to ActivationTaskScheduler we guarantee single threaded ordered execution.
-            // If we queued to OrleansTaskScheduler we would not guarantee that.
             task1.Start(activationScheduler);
             task2.Start(activationScheduler);
 
-            // Pause to let things run
-            Thread.Sleep(TimeSpan.FromSeconds(2));
+            await Task.WhenAll(task1, task2).WithTimeout(TimeSpan.FromSeconds(5));
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
@@ -185,11 +149,8 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
-        public void Sched_Task_StartTask_1()
+        public async Task Sched_Task_StartTask_1()
         {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();;
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             Task task1 = new Task(() => { pause1.WaitOne(); output.WriteLine("Task-1"); });
@@ -199,24 +160,19 @@ namespace UnitTests.SchedulerTests
             task2.Start(scheduler);
 
             pause1.Set();
-            bool ok = task1.Wait(TimeSpan.FromMilliseconds(100));
-            if (!ok) throw new TimeoutException();
+            await task1.WithTimeout(TimeSpan.FromMilliseconds(100));
             Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
             Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             pause2.Set();
-            ok = task2.Wait(TimeSpan.FromMilliseconds(100));
-            if (!ok) throw new TimeoutException();
+            await task2.WithTimeout(TimeSpan.FromMilliseconds(100));
             Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
             Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
         [Fact]
-        public void Sched_Task_StartTask_2()
+        public async Task Sched_Task_StartTask_2()
         {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             Task task1 = new Task(() => { pause1.WaitOne(); output.WriteLine("Task-1"); });
@@ -225,27 +181,22 @@ namespace UnitTests.SchedulerTests
             pause1.Set();
             task1.Start(scheduler);
 
-            bool ok = task1.Wait(TimeSpan.FromMilliseconds(100));
-            if (!ok) throw new TimeoutException();
+            await task1.WithTimeout(TimeSpan.FromMilliseconds(100));
 
             Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
             Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             task2.Start(scheduler);
             pause2.Set();
-            ok = task2.Wait(TimeSpan.FromMilliseconds(100));
-            if (!ok) throw new TimeoutException();
+            await task2.WithTimeout(TimeSpan.FromMilliseconds(100));
 
             Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
             Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
         [Fact]
-        public void Sched_Task_StartTask_Wrapped()
+        public async Task Sched_Task_StartTask_Wrapped()
         {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             Task task1 = new Task(() => { pause1.WaitOne(); output.WriteLine("Task-1"); });
@@ -254,28 +205,24 @@ namespace UnitTests.SchedulerTests
             Task wrapper1 = new Task(() =>
             {
                 task1.Start(scheduler);
-                bool ok = task1.Wait(TimeSpan.FromSeconds(10));
-                if (!ok) throw new TimeoutException();
+                task1.WaitWithThrow(TimeSpan.FromSeconds(10));
             });
             Task wrapper2 = new Task(() =>
             {
                 task2.Start(scheduler);
-                bool ok = task2.Wait(TimeSpan.FromSeconds(10));
-                if (!ok) throw new TimeoutException();
+                task2.WaitWithThrow(TimeSpan.FromSeconds(10));
             });
 
             pause1.Set();
             wrapper1.Start(scheduler);
-            bool ok1 = wrapper1.Wait(TimeSpan.FromSeconds(10));
-            if (!ok1) throw new TimeoutException();
+            await wrapper1.WithTimeout(TimeSpan.FromSeconds(10));
 
             Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
             Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             wrapper2.Start(scheduler);
             pause2.Set();
-            bool finished = wrapper2.Wait(TimeSpan.FromSeconds(10));
-            if (!finished) throw new TimeoutException();
+            await wrapper2.WithTimeout(TimeSpan.FromSeconds(10));
 
             Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
             Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
@@ -284,9 +231,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public void Sched_Task_StartTask_Wait_Wrapped()
         {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             const int NumTasks = 100;
 
             ManualResetEvent[] flags = new ManualResetEvent[NumTasks];
@@ -340,9 +284,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public void Sched_Task_ClosureWorkItem_Wait()
         {
-            UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx, this.performanceMetrics);
-
             const int NumTasks = 10;
 
             ManualResetEvent[] flags = new ManualResetEvent[NumTasks];
@@ -371,7 +312,7 @@ namespace UnitTests.SchedulerTests
                 });
             }
 
-            foreach (var workItem in workItems) scheduler.QueueWorkItem(workItem, cntx);
+            foreach (var workItem in workItems) scheduler.QueueWorkItem(workItem, rootContext);
             foreach (var flag in flags) flag.Set();
             for (int i = 0; i < tasks.Length; i++)
             {
@@ -388,11 +329,9 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
-        public void Sched_Task_TaskWorkItem_CurrentScheduler()
+        public async Task Sched_Task_TaskWorkItem_CurrentScheduler()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
-            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(rootContext).TaskRunner;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
@@ -421,25 +360,26 @@ namespace UnitTests.SchedulerTests
                 {
                     result0.SetException(exc);
                 }
-            }), context);
+            }), rootContext);
 
-            result0.Task.Wait(TimeSpan.FromMinutes(1));
+            await result0.Task.WithTimeout(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(result0.Task.Result, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            result1.Task.Wait(TimeSpan.FromMinutes(1));
+            await result1.Task.WithTimeout(TimeSpan.FromMinutes(1));
+            // give a minimum extra chance to yield after result0 has been set, as it might not have finished the t1 task
+            await t1.WithTimeout(TimeSpan.FromMilliseconds(1));
+
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(result1.Task.Result, "Task-1 completed");
         }
 
         [Fact]
-        public void Sched_Task_ClosureWorkItem_SpecificScheduler()
+        public async Task Sched_Task_ClosureWorkItem_SpecificScheduler()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
-            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(rootContext).TaskRunner;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
@@ -468,14 +408,17 @@ namespace UnitTests.SchedulerTests
                 {
                     result0.SetException(exc);
                 }
-            }), context);
+            }), rootContext);
 
-            result0.Task.Wait(TimeSpan.FromMinutes(1));
+            await result0.Task.WithTimeout(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(result0.Task.Result, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            result1.Task.Wait(TimeSpan.FromMinutes(1));
+            await result1.Task.WithTimeout(TimeSpan.FromMinutes(1));
+            // give a minimum extra chance to yield after result0 has been set, as it might not have finished the t1 task
+            await t1.WithTimeout(TimeSpan.FromMilliseconds(1));
+
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(result1.Task.Result, "Task-1 completed");
@@ -484,9 +427,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public void Sched_Task_NewTask_ContinueWith_Wrapped_OrleansTaskScheduler()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             Task wrapped = new Task(() =>
             {
                 output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
@@ -518,9 +458,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public void Sched_Task_NewTask_ContinueWith_TaskScheduler()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
 
@@ -539,16 +476,12 @@ namespace UnitTests.SchedulerTests
                 Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
             }, scheduler);
             t0.Start(scheduler);
-            bool ok = t1.Wait(TimeSpan.FromSeconds(30));
-            if (!ok) throw new TimeoutException();
+            t1.WaitWithThrow(TimeSpan.FromSeconds(30));
         }
 
         [Fact]
         public void Sched_Task_StartNew_ContinueWith_TaskScheduler()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             output.WriteLine("#0 - StartNew - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
 
@@ -566,16 +499,12 @@ namespace UnitTests.SchedulerTests
                     SynchronizationContext.Current, TaskScheduler.Current);
                 Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
             }, scheduler);
-            bool ok = t1.Wait(TimeSpan.FromSeconds(30));
-            if (!ok) throw new TimeoutException();
+            t1.WaitWithThrow(TimeSpan.FromSeconds(30));
         }
 
         [Fact]
         public void Sched_Task_SubTaskExecutionSequencing()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             scheduler.RegisterWorkContext(context);
 
@@ -632,9 +561,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public void Sched_Task_RequestContext_NewTask_ContinueWith()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             const string key = "K";
             int val = TestConstants.random.Next();
             RequestContext.Set(key, val);
@@ -666,21 +592,16 @@ namespace UnitTests.SchedulerTests
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
                 t1.Start(scheduler);
-                bool ok = t2.Wait(TimeSpan.FromSeconds(5));
-                if (!ok) throw new TimeoutException();
+                t2.WaitWithThrow(TimeSpan.FromSeconds(5));
             });
             t0.Start(scheduler);
-            bool finished = t0.Wait(TimeSpan.FromSeconds(10));
-            if (!finished) throw new TimeoutException();
+            t0.WaitWithThrow(TimeSpan.FromSeconds(10));
             Assert.False(t0.IsFaulted, "Task #0 FAULTED=" + t0.Exception);
         }
 
         [Fact]
         public void Sched_AC_RequestContext_StartNew_ContinueWith()
         {
-            UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
-
             const string key = "A";
             int val = TestConstants.random.Next();
             RequestContext.Set(key, val);

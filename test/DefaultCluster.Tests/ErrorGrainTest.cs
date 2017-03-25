@@ -84,7 +84,6 @@ namespace DefaultCluster.Tests
             Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
-
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time with false.
         public void ErrorHandlingTimedMethod()
@@ -95,15 +94,13 @@ namespace DefaultCluster.Tests
             Task promise = grain.LongMethod(2000);
 
             // there is a race in the test here. If run in debugger, the invocation can actually finish OK
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
-            bool finished = promise.Wait(TimeSpan.FromMilliseconds(1000));
-            stopwatch.Stop();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            Assert.False(promise.Wait(1000), "The task shouldn't have completed yet.");
 
             // these asserts depend on timing issues and will be wrong for the sync version of OrleansTask
-            Assert.True(!finished);
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+            Assert.True(stopwatch.ElapsedMilliseconds >= 900, $"Waited less than 900ms: ({stopwatch.ElapsedMilliseconds}ms)"); // check that we waited at least 0.9 second
+            Assert.True(stopwatch.ElapsedMilliseconds <= 1300, $"Waited longer than 1300ms: ({stopwatch.ElapsedMilliseconds}ms)");
 
             promise.Wait(); // just wait for the server side grain invocation to finish
             
@@ -120,23 +117,15 @@ namespace DefaultCluster.Tests
             Task promise = grain.LongMethodWithError(2000);
 
             // there is a race in the test here. If run in debugger, the invocation can actually finish OK
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
+            Stopwatch stopwatch = Stopwatch.StartNew();
 
             Assert.False(promise.Wait(1000), "The task shouldn't have completed yet.");
 
             stopwatch.Stop();
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+            Assert.True(stopwatch.ElapsedMilliseconds >= 900, $"Waited less than 900ms: ({stopwatch.ElapsedMilliseconds}ms)"); // check that we waited at least 0.9 second
+            Assert.True(stopwatch.ElapsedMilliseconds <= 1300, $"Waited longer than 1300ms: ({stopwatch.ElapsedMilliseconds}ms)");
 
-            try
-            {
-                promise.Wait();
-                Assert.True(false, "Should have thrown");
-            }
-            catch (Exception)
-            {
-            }
+            Assert.ThrowsAsync<Exception>(() => promise).Wait();
 
             Assert.True(promise.Status == TaskStatus.Faulted);
         }
