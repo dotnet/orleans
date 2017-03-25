@@ -3,17 +3,9 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
-using System.Collections.Concurrent;
-using Microsoft.FSharp.Collections;
-using Orleans.Providers;
-using Orleans.Streams.Core;
-using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace UnitTests.Grains
 {
@@ -48,7 +40,7 @@ namespace UnitTests.Grains
                 await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
                 await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
             }
-            catch (KeyNotFoundException e)
+            catch (KeyNotFoundException)
             {
                 logger.Info("StreamProvider SMSProvider2 is not configured, skip its OnSubscriptionChangeAction configuration");
             }
