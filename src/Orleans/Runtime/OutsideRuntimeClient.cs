@@ -44,6 +44,8 @@ namespace Orleans
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
+	 //   private readonly ActionBlock<Message> messageHandler;
+	    private readonly WaitCallback msgHandler;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
@@ -97,6 +99,15 @@ namespace Orleans
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
+	        msgHandler = state => HandleMessage(((Message) state));
+			//messageHandler = new ActionBlock<Message>(message =>
+			//{
+			//	HandleMessage(message);
+			//},
+			//new ExecutionDataflowBlockOptions
+			//{
+			//	MaxDegreeOfParallelism = 1
+			//});
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -260,21 +271,23 @@ namespace Orleans
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;
             listenForMessages = true;
+            transport.AddShortCicruitTargetBlock(Message.Categories.Application, message => ThreadPool.QueueUserWorkItem(msgHandler, message)); // tdo: dispatch to somewhere
 
-            // Keeping this thread handling it very simple for now. Just queue task on thread pool.
-            Task.Run(
-                () =>
-                {
-                    try
-                    {
-                        RunClientMessagePump(ct);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
-                    }
-                },
-                ct).Ignore();
+            transport.AddTargetBlock(Message.Categories.Application, message => ThreadPool.QueueUserWorkItem(msgHandler, message)); // tdo: dispatch to somewhere
+			//// Keeping this thread handling it very simple for now. Just queue task on thread pool.
+			//Task.Run(
+   //             () =>
+   //             {
+   //                 try
+   //                 {
+   //                     RunClientMessagePump(ct);
+   //                 }
+   //                 catch (Exception exc)
+   //                 {
+   //                     logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+   //                 }
+   //             },
+   //             ct).Ignore();
             grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
             
             await ClientStatistics.Start(statisticsProviderManager, transport, clientId)
@@ -290,59 +303,8 @@ namespace Orleans
             }
             while (listenForMessages)
             {
-                var message = transport.WaitMessage(Message.Categories.Application, ct);
-
-                if (message == null) // if wait was cancelled
-                    break;
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStartProcessing();
-                        }
-#endif
-
-                // when we receive the first message, we update the
-                // clientId for this client because it may have been modified to
-                // include the cluster name
-                if (!firstMessageReceived)
-                {
-                    firstMessageReceived = true;
-                    if (!handshakeClientId.Equals(message.TargetGrain))
-                    {
-                        clientId = message.TargetGrain;
-                        transport.UpdateClientId(clientId);
-                        CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
-                    }
-                    else
-                    {
-                        clientId = handshakeClientId;
-                    }
-                }
-
-                switch (message.Direction)
-                {
-                    case Message.Directions.Response:
-                        {
-                            ReceiveResponse(message);
-                            break;
-                        }
-                    case Message.Directions.OneWay:
-                    case Message.Directions.Request:
-                        {
-                            this.DispatchToLocalObject(message);
-                            break;
-                        }
-                    default:
-                        logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
-                        break;
-                }
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStopProcessing();
-                            incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
-                        }
-#endif
+				Thread.Sleep(int.MaxValue);
+                //if (HandleMessage(ct)) break;
             }
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
@@ -350,7 +312,65 @@ namespace Orleans
             }
         }
 
-        private void DispatchToLocalObject(Message message)
+	    private bool HandleMessage(Message m)
+	    {
+		    var message = m;
+
+		    if (message == null) // if wait was cancelled
+			    return true;
+#if TRACK_DETAILED_STATS
+                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                        {
+                            incomingMessagesThreadTimeTracking.OnStartProcessing();
+                        }
+#endif
+
+		    // when we receive the first message, we update the
+		    // clientId for this client because it may have been modified to
+		    // include the cluster name
+		    if (!firstMessageReceived)
+		    {
+			    firstMessageReceived = true;
+			    if (!handshakeClientId.Equals(message.TargetGrain))
+			    {
+				    clientId = message.TargetGrain;
+				    transport.UpdateClientId(clientId);
+                        CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
+			    }
+			    else
+			    {
+				    clientId = handshakeClientId;
+			    }
+		    }
+
+		    switch (message.Direction)
+		    {
+			    case Message.Directions.Response:
+			    {
+				    ReceiveResponse(message);
+				    break;
+			    }
+			    case Message.Directions.OneWay:
+			    case Message.Directions.Request:
+			    {
+				    this.DispatchToLocalObject(message);
+				    break;
+			    }
+			    default:
+				    logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
+				    break;
+		    }
+#if TRACK_DETAILED_STATS
+                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                        {
+                            incomingMessagesThreadTimeTracking.OnStopProcessing();
+                            incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
+                        }
+#endif
+		    return false;
+	    }
+
+	    private void DispatchToLocalObject(Message message)
         {
             LocalObjectData objectData;
             GuidId observerId = message.TargetObserverId;
@@ -586,13 +606,13 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
-        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        public void SendRequest<T>(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<T> context, Action<Message, TaskCompletionSource<T>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
+            SendRequestMessage<T>(target, message, context, callback, debugContext, options, genericArguments);
         }
 
-        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        private void SendRequestMessage<T>(GrainReference target, Message message, TaskCompletionSource<T> context, Action<Message, TaskCompletionSource<T>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -629,7 +649,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(
+                var callbackData = new CallbackData<T>(
                     callback,
                     tryResendMessage,
                     context,
@@ -637,7 +657,7 @@ namespace Orleans
                     unregisterCallback,
                     config);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(responseTimeout);
+                callbackData.RegisterTimeout(responseTimeout);
             }
 
             if (logger.IsVerbose2) logger.Verbose2("Send {0}", message);

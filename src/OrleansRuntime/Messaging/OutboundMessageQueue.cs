@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (logger.IsVerbose3) logger.Verbose3("Message has been looped back to this silo: {0}", msg);
                 MessagingStatisticsGroup.LocalMessagesSent.Increment();
-                messageCenter.InboundQueue.PostMessage(msg);
+                messageCenter.InboundQueue.PostShortCircuitMessage(msg);
             }
             else
             {

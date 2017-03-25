@@ -2,28 +2,30 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
 {
     internal class WorkQueue
     {
-        private BlockingCollection<IWorkItem> mainQueue;
-        private BlockingCollection<IWorkItem> systemQueue;
-        private BlockingCollection<IWorkItem>[] queueArray;
         private readonly QueueTrackingStatistic mainQueueTracking;
         private readonly QueueTrackingStatistic systemQueueTracking;
         private readonly QueueTrackingStatistic tasksQueueTracking;
-
-        public int Length { get { return mainQueue.Count + systemQueue.Count; } }
-
-        internal WorkQueue()
+        public int Length =>1; // todo
+        private OrleansTaskScheduler _scheduler;
+        internal WorkQueue(OrleansTaskScheduler scheduler, int maxActiveThreads)
         {
-            mainQueue = new BlockingCollection<IWorkItem>(new ConcurrentBag<IWorkItem>());
-            systemQueue = new BlockingCollection<IWorkItem>(new ConcurrentBag<IWorkItem>());
-            queueArray = new BlockingCollection<IWorkItem>[] { systemQueue, mainQueue };
-
+            _scheduler = scheduler;
+            processAction = item =>
+            {
+                ProcessWorkItem((IWorkItem) item);
+            };
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue");
@@ -43,26 +45,26 @@ namespace Orleans.Runtime.Scheduler
 #if PRIORITIZE_SYSTEM_TASKS
                 if (workItem.IsSystemPriority)
                 {
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         systemQueueTracking.OnEnQueueRequest(1, systemQueue.Count);
-    #endif
-                    systemQueue.Add(workItem);
+#endif
+                    OrleansThreadPool.QueueSystemWorkItem(processAction, workItem);
                 }
                 else
                 {
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
-    #endif
-                    mainQueue.Add(workItem);                    
+#endif
+                    OrleansThreadPool.QueueUserWorkItem(processAction, workItem);
                 }
 #else
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectQueueStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
-    #endif
-                mainQueue.Add(task);
+#endif
+                    mainQueueExecutor.Post(workItem);
 #endif
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectGlobalShedulerStats)
@@ -75,92 +77,14 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        public IWorkItem Get(CancellationToken ct, TimeSpan timeout)
-        {
-            try
-            {
-                IWorkItem todo;
-#if PRIORITIZE_SYSTEM_TASKS
-                // TryTakeFromAny is a static method with no state held from one call to another, so each request is independent, 
-                // and it doesn’t attempt to randomize where it next takes from, and does not provide any level of fairness across collections.
-                // It has a “fast path” that just iterates over the collections from 0 to N to see if any of the collections already have data, 
-                // and if it finds one, it takes from that collection without considering the others, so it will bias towards the earlier collections.  
-                // If none of the collections has data, then it will fall through to the “slow path” of waiting on a collection of wait handles, 
-                // one for each collection, at which point it’s subject to the fairness provided by the OS with regards to waiting on events. 
-                if (BlockingCollection<IWorkItem>.TryTakeFromAny(queueArray, out todo, timeout) >= 0)
-#else
-                if (mainQueue.TryTake(out todo, timeout))
-#endif
-                {
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectGlobalShedulerStats)
-                    {
-                        SchedulerStatisticsGroup.OnWorkItemDequeue();
-                    }
-#endif
-                    return todo;
-                }
-                
-                return null;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
-
-        public IWorkItem GetSystem(CancellationToken ct, TimeSpan timeout)
-        {
-            try
-            {
-                IWorkItem todo;
-#if PRIORITIZE_SYSTEM_TASKS
-                if (systemQueue.TryTake(out todo, timeout))
-#else
-                if (mainQueue.TryTake(out todo, timeout))
-#endif
-                {
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectGlobalShedulerStats)
-                    {
-                        SchedulerStatisticsGroup.OnWorkItemDequeue();
-                    }
-#endif
-                    return todo;
-                }
-                
-                return null;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
 
 
         public void DumpStatus(StringBuilder sb)
         {
-            if (systemQueue.Count > 0)
-            {
-                sb.AppendLine("System Queue:");
-                foreach (var workItem in systemQueue)
-                {
-                    sb.AppendFormat("  {0}", workItem).AppendLine();
-                }
-            }
-            
-            if (mainQueue.Count <= 0) return;
-
-            sb.AppendLine("Main Queue:");
-            foreach (var workItem in mainQueue)
-                sb.AppendFormat("  {0}", workItem).AppendLine();
         }
 
         public void RunDown()
         {
-            mainQueue.CompleteAdding();
-            systemQueue.CompleteAdding();
-
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking.OnStopExecution();
@@ -168,23 +92,50 @@ namespace Orleans.Runtime.Scheduler
             tasksQueueTracking.OnStopExecution();
         }
 
-        public void Dispose()
+        private readonly WaitCallback processAction;
+        private void ProcessWorkItem(IWorkItem item)
         {
-            queueArray = null;
-
-            if (mainQueue != null)
+            if (RuntimeContext.Current == null)
             {
-                mainQueue.Dispose();
-                mainQueue = null;
+                RuntimeContext.Current = new RuntimeContext
+                {
+                    Scheduler = _scheduler
+                };
             }
-
-            if (systemQueue != null)
+            try
             {
-                systemQueue.Dispose();
-                systemQueue = null;
+                TaskSchedulerUtils.RunWorkItemTask(item, _scheduler);
             }
+            catch (Exception ex)
+            {
+                var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", item);
 
-            GC.SuppressFinalize(this);
+                // todo
+                LogManager.GetLogger(nameof(WorkQueue), LoggerType.Runtime)
+                    .Error(ErrorCode.Runtime_Error_100030, errorStr, ex);
+            }
+            finally
+            {
+#if TRACK_DETAILED_STATS
+                                if (todo.ItemType != WorkItemType.WorkItemGroup)
+                                {
+                                    if (StatisticsCollector.CollectTurnsStats)
+                                    {
+                                        //SchedulerStatisticsGroup.OnTurnExecutionEnd(CurrentStateTime.Elapsed);
+                                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(CurrentStateStarted));
+                                    }
+                                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                    {
+                                        threadTracking.IncrementNumberOfProcessed();
+                                    }
+                                    CurrentWorkItem = null;
+                                }
+                                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                {
+                                    threadTracking.OnStopProcessing();
+                                }
+#endif
+            }
         }
     }
 }

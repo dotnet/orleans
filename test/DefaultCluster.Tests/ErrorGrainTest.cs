@@ -102,8 +102,11 @@ namespace DefaultCluster.Tests
 
             // these asserts depend on timing issues and will be wrong for the sync version of OrleansTask
             Assert.True(!finished);
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+                Assert.True(stopwatch.ElapsedMilliseconds >= 900,
+                        "Waited less than 900ms :" + stopwatch.ElapsedMilliseconds);
+                // check that we waited at least 0.9 second
+                Assert.True(stopwatch.ElapsedMilliseconds <= 1100,
+                    "Waited longer than 1100ms :" + stopwatch.ElapsedMilliseconds);
 
             promise.Wait(); // just wait for the server side grain invocation to finish
             
@@ -126,8 +129,11 @@ namespace DefaultCluster.Tests
             Assert.False(promise.Wait(1000), "The task shouldn't have completed yet.");
 
             stopwatch.Stop();
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+                Assert.True(stopwatch.ElapsedMilliseconds >= 900,
+                    "Waited less than 900ms :" + stopwatch.ElapsedMilliseconds);
+                // check that we waited at least 0.9 second
+                Assert.True(stopwatch.ElapsedMilliseconds <= 1100,
+                    "Waited longer than 1100ms :" + stopwatch.ElapsedMilliseconds);
 
             try
             {

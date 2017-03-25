@@ -1,18 +1,22 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
     internal class RuntimeContext
     {
-        public TaskScheduler Scheduler { get; private set; }
+        public TaskScheduler Scheduler { get;  set; }
         public ISchedulingContext ActivationContext { get; private set; }
+        private int ExecutionDepth;
 
         [ThreadStatic]
         private static RuntimeContext context;
         public static RuntimeContext Current 
         { 
             get { return context; } 
+            set { context = value; }
         }
 
         internal static ISchedulingContext CurrentActivationContext
@@ -37,13 +41,13 @@ namespace Orleans.Runtime
             context = new RuntimeContext {Scheduler = null};
         }
 
-        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
+        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler, bool advanceExecutionDeep) // todo: remove advanceExecutionDeep
         {
             if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
             context.ActivationContext = shedContext;
             context.Scheduler = scheduler;
         }
-
+        
         internal static void ResetExecutionContext()
         {
             context.ActivationContext = null;

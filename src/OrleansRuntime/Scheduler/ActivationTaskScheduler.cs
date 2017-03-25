@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime.Scheduler
 {
     /// <summary>
-    /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
-    /// </summary>
-    [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
+        /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
+        /// </summary>
+        [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
     internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
     {
         private static readonly Logger logger = LogManager.GetLogger("Scheduler.ActivationTaskScheduler", LoggerType.Runtime);
@@ -22,6 +22,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal ActivationTaskScheduler(WorkItemGroup workGroup)
         {
+           
             myId = Interlocked.Increment(ref idCounter);
             workerGroup = workGroup;
 #if EXTRA_STATS
@@ -41,7 +42,7 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.SchedulingContext, this);
+            RuntimeContext.SetExecutionContext(workerGroup.SchedulingContext, this, false);
             bool done = TryExecuteTask(task);
             if (!done)
                 logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
@@ -66,7 +67,14 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsVerbose2) logger.Verbose2(myId + " QueueTask Task Id={0}", task.Id);
 #endif
-            workerGroup.EnqueueTask(task);
+            var todo = new TaskWorkItem(this, task, workerGroup.SchedulingContext);
+            if (task is WorkItemGroupExecuteTask)
+            {
+                workerGroup.masterScheduler.RunQueue.Add(todo);
+                return;
+            }
+
+            workerGroup.EnqueueTask(todo);
         }
 
         /// <summary>
@@ -79,11 +87,9 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="taskWasPreviouslyQueued">A Boolean denoting whether or not task has previously been queued. If this parameter is True, then the task may have been previously queued (scheduled); if False, then the task is known not to have been queued, and this call is being made in order to execute the task inline without queuing it.</param>
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
-            bool canExecuteInline = WorkerPoolThread.CurrentWorkerThread != null;
 
             RuntimeContext ctx = RuntimeContext.Current;
-            bool canExecuteInline2 = canExecuteInline && ctx != null && object.Equals(ctx.ActivationContext, workerGroup.SchedulingContext);
-            canExecuteInline = canExecuteInline2;
+            bool canExecuteInline = ctx != null && object.Equals(ctx.ActivationContext, workerGroup.SchedulingContext);
 
 #if DEBUG
             if (logger.IsVerbose2)

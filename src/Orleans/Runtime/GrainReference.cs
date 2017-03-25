@@ -330,7 +330,7 @@ namespace Orleans.Runtime
             if (IsUnordered)
                 options |= InvokeMethodOptions.Unordered;
 
-            Task<object> resultTask = InvokeMethod_Impl(request, null, options);
+            Task<T> resultTask = InvokeMethod_Impl<T>(request, null, options);
 
             if (resultTask == null)
             {
@@ -343,15 +343,15 @@ namespace Orleans.Runtime
                 return Task.FromResult(default(T));
             }
 
-            resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return resultTask.Unbox<T>();
+			if (resultTask.Status == TaskStatus.Created) resultTask.Start();
+	        return resultTask;
         }
 
         #endregion
 
         #region Private members
 
-        private Task<object> InvokeMethod_Impl(InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<T> InvokeMethod_Impl<T>(InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
@@ -378,8 +378,10 @@ namespace Orleans.Runtime
 
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            this.RuntimeClient.SendRequest(this, request, resolver, this.responseCallbackDelegate, debugContext, options, genericArguments);
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<T>();
+	        this.RuntimeClient.SendRequest<T>(this, request, resolver,
+		        (message, source) => ResponseCallback(message, source), // todo: new alloc
+				debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -408,7 +410,7 @@ namespace Orleans.Runtime
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void ResponseCallback(Message message, TaskCompletionSource<object> context)
+        private void ResponseCallback<T>(Message message, TaskCompletionSource<T> context)
         {
             Response response;
             if (message.Result != Message.ResponseTypes.Rejection)
@@ -451,7 +453,7 @@ namespace Orleans.Runtime
 
             if (!response.ExceptionFlag)
             {
-                context.TrySetResult(response.Data);
+                context.TrySetResult((T)response.Data);
             }
             else
             {

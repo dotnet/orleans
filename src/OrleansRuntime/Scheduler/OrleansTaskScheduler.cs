@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
@@ -54,7 +55,7 @@ namespace Orleans.Runtime.Scheduler
             applicationTurnsStopped = false;
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
-            RunQueue = new WorkQueue();
+            RunQueue = new WorkQueue(this, maxActiveThreads);
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
             Pool = new WorkerPool(this, performanceMetrics, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
@@ -225,9 +226,9 @@ namespace Orleans.Runtime.Scheduler
             }
             else
             {
-                // Create Task wrapper for this work item
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
-                t.Start(workItemGroup.TaskRunner);
+                // no need to wrap work item in Task as it will be executed 
+                // under task with correct (activation) task scheduler
+                workItemGroup.EnqueueTask(workItem);
             }
         }
 
@@ -334,7 +335,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                RuntimeContext.SetExecutionContext(null, this);
+                RuntimeContext.SetExecutionContext(null, this, false);
                 bool done = TryExecuteTask(task);
                 if (!done)
                     logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete2, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",

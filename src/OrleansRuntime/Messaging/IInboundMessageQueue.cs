@@ -1,4 +1,6 @@
-﻿namespace Orleans.Runtime.Messaging
+﻿using System;
+
+namespace Orleans.Runtime.Messaging
 {
     internal interface IInboundMessageQueue
     {
@@ -7,7 +9,9 @@
         void Stop();
 
         void PostMessage(Message message);
+        void PostShortCircuitMessage(Message msg);
 
-        Message WaitMessage(Message.Categories type);
+        void AddTargetBlock(Message.Categories type, Action<Message> actionBlock);
+        void AddShortCicruitTargetBlock(Message.Categories type, Action<Message> actionBlock);
     }
 }

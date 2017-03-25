@@ -467,6 +467,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+
             Socket sock = rcc.Socket;
             try
             {

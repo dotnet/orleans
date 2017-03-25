@@ -12,6 +12,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Dispatcher dispatcher;
         private readonly MessageFactory messageFactory;
         private readonly Message.Categories category;
+        private readonly WaitCallback processAction;
 
         internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher, MessageFactory messageFactory) :
             base(cat.ToString())
@@ -23,6 +24,10 @@ namespace Orleans.Runtime.Messaging
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
             OnFault = FaultBehavior.RestartOnFault;
+            processAction = message =>
+            {
+                ReceiveMessage((Message)message);
+            };
         }
 
         public override void Start()
@@ -41,32 +46,27 @@ namespace Orleans.Runtime.Messaging
                     threadTracking.OnStartExecution();
                 }
 #endif
-                CancellationToken ct = Cts.Token;
-                while (true)
-                {
-                    // Get an application message
-                    var msg = messageCenter.WaitMessage(category, ct);
-                    if (msg == null)
-                    {
-                        if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
-                        // Null return means cancelled
-                        break;
-                    }
 
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStartProcessing();
-                    }
-#endif
-                    ReceiveMessage(msg);
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStopProcessing();
-                        threadTracking.IncrementNumberOfProcessed();
-                    }
-#endif
+                messageCenter.AddTargetBlock(category, message =>
+                {
+                    OrleansThreadPool.QueueSystemWorkItem(processAction, message);
+                });
+
+                messageCenter.AddShortCicruitTargetBlock(category, message =>
+                {
+                    ReceiveMessage((Message)message);
+                });
+
+                try
+                {
+                    messageCenter.Completion.WaitOne();
+                }
+                catch (AggregateException)
+                {
+                    // run was cancelled
+                }
+                catch (ObjectDisposedException)
+                {
                 }
             }
             finally
@@ -82,6 +82,20 @@ namespace Orleans.Runtime.Messaging
 
         private void ReceiveMessage(Message msg)
         {
+            if (msg == null)
+            {
+                if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
+                // Null message means cancelled
+                return;
+            }
+
+#if TRACK_DETAILED_STATS
+                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                    {
+                        threadTracking.OnStartProcessing();
+                    }
+#endif
+
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
 
             ISchedulingContext context;
@@ -154,6 +168,14 @@ namespace Orleans.Runtime.Messaging
                     EnqueueReceiveMessage(msg, null, null);
                 }
             }
+
+#if TRACK_DETAILED_STATS
+                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                    {
+                        threadTracking.OnStopProcessing();
+                        threadTracking.IncrementNumberOfProcessed();
+                    }
+#endif
         }
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)

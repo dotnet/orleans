@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -15,27 +16,48 @@ namespace Orleans.Runtime
         void OnTimeout();
         TimeSpan RequestedTimeout();
     }
+   
 
-    internal class CallbackData : ITimebound, IDisposable
+    internal interface CallbackData : ITimebound, IDisposable
     {
-        private readonly Action<Message, TaskCompletionSource<object>> callback;
+        void DoCallback(Message response);
+        Message Message { get; set; }
+        DateTime DueTime { get; set; }
+        void OnTargetSiloFail();
+        bool alreadyFired { get; }
+        void OnTimeout();
+    }
+
+    internal static class CallbackDataTimerWheelInstance
+    {
+        private static readonly TimeSpan _callbacksWheelCheckPeriod =
+          System.Diagnostics.Debugger.IsAttached ? TimeSpan.FromSeconds(60) : TimeSpan.FromMilliseconds(3077);
+        public static TimerWheel<CallbackData> CallbacksWheel = new TimerWheel<CallbackData>(_callbacksWheelCheckPeriod);
+    }
+
+    internal class CallbackData<T> : CallbackData
+    {
+        private readonly Action<Message, TaskCompletionSource<T>> callback;
         private readonly Func<Message, bool> resendFunc;
         private readonly Action<Message> unregister;
-        private readonly TaskCompletionSource<object> context;
+        private readonly TaskCompletionSource<T> context;
         private readonly IMessagingConfiguration config;
-
-        private bool alreadyFired;
-        private TimeSpan timeout;
+          private TimeSpan timeout;
+        private TimeSpan? resendPeriod;
         private SafeTimer timer;
+        private CallbackEntityHolder _callbackHolder;
         private ITimeInterval timeSinceIssued;
         private static readonly Logger logger = LogManager.GetLogger("CallbackData");
 
-        public Message Message { get; set; } // might hold metadata used by response pipeline
+        public bool alreadyFired { get; private set; }
+        public Message Message { get; set; }
+        public DateTime DueTime { get; set; }
+// might hold metadata used by response pipeline
 
         public CallbackData(
-            Action<Message, TaskCompletionSource<object>> callback, 
+            Action<Message, TaskCompletionSource<T>> callback, 
             Func<Message, bool> resendFunc, 
-            TaskCompletionSource<object> ctx, 
+            TaskCompletionSource<T> ctx, 
             Message msg, 
             Action<Message> unregisterDelegate,
             IMessagingConfiguration config)
@@ -58,7 +80,7 @@ namespace Orleans.Runtime
         /// Start this callback timer
         /// </summary>
         /// <param name="time">Timeout time</param>
-        public void StartTimer(TimeSpan time)
+        public void RegisterTimeout(TimeSpan time)
         {
             if (time < TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(time), "The timeout parameter is negative.");
@@ -70,21 +92,20 @@ namespace Orleans.Runtime
             }
 
             TimeSpan firstPeriod = timeout;
-            TimeSpan repeatPeriod = Constants.INFINITE_TIMESPAN; // Single timeout period --> No repeat
             if (config.ResendOnTimeout && config.MaxResendCount > 0)
             {
-                firstPeriod = repeatPeriod = timeout.Divide(config.MaxResendCount + 1);
+                resendPeriod = firstPeriod = timeout.Divide(config.MaxResendCount + 1);
+                DueTime = DateTime.UtcNow.Add(firstPeriod);
+                _callbackHolder = new ResendableMessageCallbackEntityHolder(this, DueTime);
+                CallbackDataTimerWheelInstance.CallbacksWheel.CheckQueueAndRegister(_callbackHolder);
+                return;
             }
-            // Start time running
-            DisposeTimer();
-            timer = new SafeTimer(TimeoutCallback, null, firstPeriod, repeatPeriod);
 
+            DueTime = DateTime.UtcNow.Add(firstPeriod);
+            _callbackHolder = new CallbackEntityHolder(this, DueTime);
+            CallbackDataTimerWheelInstance.CallbacksWheel.CheckQueueAndRegister(_callbackHolder);
         }
-
-        private void TimeoutCallback(object obj)
-        {
-            OnTimeout();
-        }
+        
 
         public void OnTimeout()
         {
@@ -154,16 +175,12 @@ namespace Orleans.Runtime
             GC.SuppressFinalize(this);
         }
 
-        private void DisposeTimer()
+        private void DisposeTimer() // todo: rename
         {
             try
             {
-                var tmp = timer;
-                if (tmp != null)
-                {
-                    timer = null;
-                    tmp.Dispose();
-                }
+             _callbackHolder?.RemoveCallbackReference();
+              _callbackHolder = null;
             }
             catch (Exception) { } // Ignore any problems with Dispose
         }
@@ -206,6 +223,100 @@ namespace Orleans.Runtime
         public TimeSpan RequestedTimeout()
         {
             return timeout;
+        }
+
+        internal class CallbackEntityHolder : TimeboundEntityHolder<CallbackData>
+        {
+            public CallbackEntityHolder(CallbackData data, DateTime dueTime) : base(data, dueTime)
+            {
+            }
+
+            public override bool AvailableForDequeue
+            {
+                get { return Entity.alreadyFired; }
+            }
+            
+            public override void OnTimeout(Queue<TimeboundEntityHolder<CallbackData>> queue)
+            {
+                Entity.OnTimeout();
+            }
+
+            public void RemoveCallbackReference()
+            {
+                Entity = DummyCallback.Instance;
+            }
+
+            private class DummyCallback : CallbackData
+            {
+                public static DummyCallback Instance = new DummyCallback();
+                public bool alreadyFired
+                {
+                    get
+                    {
+                        return true;
+                    }
+                }
+
+                public DateTime DueTime
+                {
+                    get
+                    {
+                        throw new NotImplementedException();
+                    }
+
+                    set
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                public Message Message
+                {
+                    get
+                    {
+                        throw new NotImplementedException();
+                    }
+
+                    set
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                public void Dispose()
+                {
+                }
+
+                public void DoCallback(Message response)
+                {
+                }
+
+                public void OnTargetSiloFail()
+                {
+                    throw new NotImplementedException();
+                }
+
+                public void OnTimeout()
+                {
+                }
+
+                public TimeSpan RequestedTimeout()
+                {
+                    throw new NotImplementedException();
+                }
+            }
+        }
+        internal class ResendableMessageCallbackEntityHolder : CallbackEntityHolder
+        {
+            public ResendableMessageCallbackEntityHolder(CallbackData data, DateTime dueTime) : base(data, dueTime)
+            {
+            }
+            public override void OnTimeout(Queue<TimeboundEntityHolder<CallbackData>> queue)
+            {
+                // todo
+                // resendPeriod = firstPeriod = timeout.Divide(config.MaxResendCount + 1); 
+                base.OnTimeout(queue);
+            }
         }
     }
 }
