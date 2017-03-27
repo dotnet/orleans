@@ -48,6 +48,7 @@
     <Compile Include="ClientConnectionTests\ClientDisconnectionEventTests.cs" />
     <Compile Include="ClientConnectionTests\GatewayConnectionTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="DependencyInjectionDisambiguationTests.cs" />
     <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
     <Compile Include="EventSourcingTests\ChatGrainTests.cs" />
     <Compile Include="EventSourcingTests\CountersGrainPerfTests.cs" />
