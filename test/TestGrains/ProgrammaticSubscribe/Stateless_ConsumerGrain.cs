@@ -9,10 +9,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [StatelessWorker(MaxLocalWorkers)]
     public class Stateless_ConsumerGrain : Grain, IStateless_ConsumerGrain
     {
-        public const int MaxLocalWorkers = 2;
         internal Logger logger;
         private List<ConsumerObserver<int>> consumerObservers;
         private List<StreamSubscriptionHandle<int>> consumerHandles;
@@ -44,6 +42,13 @@ namespace UnitTests.Grains
             {
                 logger.Info("StreamProvider SMSProvider2 is not configured, skip its OnSubscriptionChangeAction configuration");
             }
+        }
+
+        public async Task SetupOnSubscriptionChangActionForProvider(string providerName)
+        {
+            var streamProvider = base.GetStreamProvider(providerName);
+            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
@@ -84,6 +89,12 @@ namespace UnitTests.Grains
             }
             consumerHandles2.Clear();
             consumerObservers2.Clear();
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
+            return TaskDone.Done;
         }
 
         private async Task OnAdd(StreamSubscriptionHandle<int> handle)

@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
         Task StopConsuming();
         Task<int> GetCountOfOnAddFuncCalled();
         Task<int> GetNumberConsumed();
+        Task SetupOnSubscriptionChangActionForProvider(string providerName);
     }
 
     //the consumer grain marker interface which would unsubscribe on any subscription added by StreamSubscriptionManager

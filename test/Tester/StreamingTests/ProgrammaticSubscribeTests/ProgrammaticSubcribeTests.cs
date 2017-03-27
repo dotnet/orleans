@@ -24,7 +24,7 @@ namespace Tester.StreamingTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(1);
+                var options = new TestClusterOptions(2);
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
