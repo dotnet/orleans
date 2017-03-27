@@ -444,18 +444,19 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.Equal(activationScheduler, TaskScheduler.Current);  // "TaskScheduler.Current #0"
 
-                    t1 = new Task(() =>
-                    {
-                        output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                            SynchronizationContext.Current, TaskScheduler.Current);
-                        Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
-                        result1.SetResult(true);
-                    });
-                    t1.Start(scheduler);
+					t1 = new Task(() =>
+					{
+						output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+							SynchronizationContext.Current, TaskScheduler.Current);
+						 // "TaskScheduler.Current #1"
+						result1.SetResult(scheduler.Equals(TaskScheduler.Current));
+					});
 
-                    result0.SetResult(true);
+					t1.Start(scheduler);
+
+					// "TaskScheduler.Current #0"
+					result0.SetResult(TaskScheduler.Current.Equals(activationScheduler));
                 }
                 catch (Exception exc)
                 {
