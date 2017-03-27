@@ -12,9 +12,9 @@ The idea is to track end-user facing changes as they occur.*
 ### [v1.4.1]
 - Improvements
   - Fix a cleanup issue in TestCluster after a failure #2734
-  - Remove unnecessary service registration of IServiceProvider to itself #2749
+  - Remove unnecessary service registration of IServiceProvider to itself, which improves support for 3rd party containers #2749
   - Add a timeout for socket connection #2791
-  - Support for string grain id #2815
+  - Support for string grain id in OrleansManager.exe #2815
   - Avoid reconnection to gateway no longer in the list returned by IGatewayListProvider #2824
   - Handle absolute path in IntermediateOutputPath to address issue 2864 #2865, #2871
   - Rename codegen file to be excluded from analyzers #2872
@@ -28,7 +28,7 @@ The idea is to track end-user facing changes as they occur.*
   - Fix to make OrleansPerfCounterTelemetryConsumer still work for grain-specific counters. (part of #2807)
   - Fix typos in format strings #2853
   - Fix null reference exception in simple queue cache. #2829 
-  
+
 ### [v1.4.0]
 - Breaking changes
   - All grain instances and providers are constructed using the configured Dependency Injection container. The result is that all grains must have a single parameterless public constructor or single constructor with arguments which can all be injected. If no container is configured, the default container will be used. [#2485](https://github.com/dotnet/orleans/pull/2485)
