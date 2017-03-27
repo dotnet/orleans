@@ -11,6 +11,7 @@ using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
 
 // ReSharper disable InconsistentNaming
 
@@ -18,18 +19,19 @@ namespace Tests.GeoClusterTests
 {
     // We need use ClientWrapper to load a client object in a new app domain. 
     // This allows us to create multiple clients that are connected to different silos.
-
+    [TestCategory("GeoCluster")]
     public class GlobalSingleInstanceClusterTests : TestingClusterHost
     {
 
         public GlobalSingleInstanceClusterTests(ITestOutputHelper output) : base(output)
-        { }
+        {
+        }
 
         /// <summary>
         /// Run all tests on a small configuration (two clusters, one silo each, one client each)
         /// </summary>
         /// <returns></returns>
-        [Fact, TestCategory("Functional"), TestCategory("GeoCluster")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task All_Small()
         {
             await Setup_Clusters(false);
@@ -43,7 +45,7 @@ namespace Tests.GeoClusterTests
         /// Run all tests on a larger configuration (two clusters with 3 or 4 silos, respectively, and two clients each)
         /// </summary>
         /// <returns></returns>
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task All_Large()
         {
             await Setup_Clusters(true);

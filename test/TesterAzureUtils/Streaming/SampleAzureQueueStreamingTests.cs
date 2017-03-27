@@ -30,11 +30,14 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var deploymentId = HostedCluster.DeploymentId;
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            var deploymentId = HostedCluster?.DeploymentId;
+            if (deploymentId != null)
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SampleStreamingTests_4()
         {
             logger.Info("************************ SampleStreamingTests_4 *********************************");
@@ -42,7 +45,7 @@ namespace Tester.AzureUtils.Streaming
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SampleStreamingTests_5()
         {
             logger.Info("************************ SampleStreamingTests_5 *********************************");

@@ -5,9 +5,11 @@ using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Configuration;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
+    [TestCategory("GeoCluster")]
     public class BasicMultiClusterTest 
     {
 
@@ -37,9 +39,10 @@ namespace Tests.GeoClusterTests
         {
             this.output = output;
         }
+
         private ITestOutputHelper output;
 
-        [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public void CreateTwoIndependentClusters()
         {
             using (var host = new TestingClusterHost(output))
