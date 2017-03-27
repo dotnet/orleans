@@ -35,9 +35,9 @@ namespace TestExtensions
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },
                 { nameof(TestClusterOptions.FallbackOptions.TraceToConsole), "false" },
             });
-            builder.AddEnvironmentVariables("Orleans");
 
             AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
+            builder.AddEnvironmentVariables("Orleans");
 
             var config = builder.Build();
             return config;
