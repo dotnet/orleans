@@ -47,6 +47,10 @@
     </Compile>
     <Compile Include="ErrorCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\AggregatedCachePressureMonitor.cs" />
+    <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\AveragingCachePressureMonitor.cs" />
+    <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\ICachePressureMonitor.cs" />
+    <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\SlowConsumingPressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\DefaultEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\EventDataExtensions.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterFactory.cs" />
@@ -63,7 +67,6 @@
     <Compile Include="Providers\Streams\EventHub\EventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderSettings.cs" />
-    <Compile Include="Providers\Streams\EventHub\ICachePressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\ICheckpointerSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubReceiverMonitor.cs" />

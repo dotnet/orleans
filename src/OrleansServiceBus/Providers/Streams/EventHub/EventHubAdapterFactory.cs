@@ -143,20 +143,27 @@ namespace Orleans.ServiceBus.Providers
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
-                if (adapterSettings.SlowConsumingMonitorThreshold > 0)
+                CacheFactory = (partition, checkpointer, cacheLogger) =>
                 {
-                    CacheFactory = (partition, checkpointer, cacheLogger) =>
-                    {   var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
-                        var monitor = new SlowConsumingPressureMonitor(adapterSettings.SlowConsumingMonitorThreshold, log);
-                        cache.AddCachePressureMonitor(monitor);
-                        return cache;
-                    };
-                }
-                else
-                {
-                    CacheFactory = (partition, checkpointer, cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
-                }
-                
+                    var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+                    if (adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
+                    {
+                        var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, log);
+                        cache.AddCachePressureMonitor(avgMonitor);
+                    }
+                    if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue
+                    || adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+                    {
+
+                        var slowConsumeMonitor = new SlowConsumingPressureMonitor(log);
+                        if (adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+                            slowConsumeMonitor.FlowControlThreshold = adapterSettings.SlowConsumingMonitorFlowControlThreshold.Value;
+                        if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue)
+                            slowConsumeMonitor.CheckPeriod = adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.Value;
+                        cache.AddCachePressureMonitor(slowConsumeMonitor);
+                    }
+                    return cache;
+                };
             }
 
             if (StreamFailureHandlerFactory == null)

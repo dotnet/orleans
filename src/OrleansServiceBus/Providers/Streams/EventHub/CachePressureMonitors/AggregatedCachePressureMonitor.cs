@@ -4,17 +4,17 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OrleansServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
-    public interface ICachePressureMonitor
+    /// <summary>
+    /// Aggregated cache pressure monitor
+    /// </summary>
+    public class AggregatedCachePressureMonitor : List<ICachePressureMonitor>, ICachePressureMonitor
     {
-        void RecordCachePressureContribution(double cachePressureContribution);
-
-        bool IsUnderPressure(DateTime utcNow);
-    }
-
-    internal class AggregatedCachePressureMonitor : List<ICachePressureMonitor>, ICachePressureMonitor
-    {
+        /// <summary>
+        /// Record cache pressure to every monitor in this aggregated cache monitor group
+        /// </summary>
+        /// <param name="cachePressureContribution"></param>
         public void RecordCachePressureContribution(double cachePressureContribution)
         {
             this.ForEach(monitor =>
@@ -23,15 +23,24 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
             });
         }
 
+        /// <summary>
+        /// Add one monitor to this aggregated cache monitor group
+        /// </summary>
+        /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
             this.Add(monitor);
         }
 
+        /// <summary>
+        /// If any mornitor in this aggregated cache monitor group is under pressure, then return true
+        /// </summary>
+        /// <param name="utcNow"></param>
+        /// <returns></returns>
         public bool IsUnderPressure(DateTime utcNow)
         {
             bool isUnderPressure = false;
-            //if any mornitor in this monitor list is under pressure, then return true
+            
             this.ForEach(monitor =>
             {
                 if (monitor.IsUnderPressure(utcNow))
