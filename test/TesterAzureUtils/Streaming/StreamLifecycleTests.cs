@@ -10,6 +10,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
 
 namespace UnitTests.StreamingTests
 {
@@ -28,6 +29,8 @@ namespace UnitTests.StreamingTests
 
         public override TestCluster CreateTestCluster()
         {
+            TestUtils.CheckForAzureStorage();
+
             var options = new TestClusterOptions();
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
@@ -62,31 +65,31 @@ namespace UnitTests.StreamingTests
             base.Dispose();
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task StreamCleanup_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, false);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task StreamCleanup_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, false);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, true);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, true);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
             string testName = "Stream_Lifecycle_AddRemoveProducers";

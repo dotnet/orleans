@@ -5,8 +5,6 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Tester;
 using TestExtensions;
@@ -17,6 +15,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.GeoClusterTests
 {
+    [TestCategory("GeoCluster")]
     public class MultiClusterRegistrationTests : TestingClusterHost
     {
         private string[] ClusterNames;
@@ -33,7 +32,7 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GeoCluster")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task TwoClusterBattery()
         {
 
@@ -52,7 +51,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task ThreeClusterBattery()
         {
 
@@ -71,7 +70,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task FourClusterBattery()
         {
 
@@ -454,9 +453,7 @@ namespace UnitTests.GeoClusterTests
                 AssertEqual(1, p.Result, gref);
         }
 
-
-
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task BlockedDeact()
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>

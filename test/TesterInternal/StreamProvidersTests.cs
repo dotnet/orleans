@@ -107,14 +107,8 @@ namespace UnitTests.Streaming
 
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
-
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
-
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
-                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
                 return new TestCluster(options);
             }

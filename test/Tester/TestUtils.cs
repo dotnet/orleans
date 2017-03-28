@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
@@ -23,6 +22,11 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new SkipException("No connection string found. Skipping");
+            }
+
             bool usingLocalWAS = string.Equals(TestDefaultConfiguration.DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
 
             if (!usingLocalWAS)

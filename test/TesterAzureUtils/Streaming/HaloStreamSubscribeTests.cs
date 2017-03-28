@@ -11,6 +11,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
+using Tester.AzureUtils;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -19,7 +20,7 @@ namespace UnitTests.HaloTests.Streaming
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
@@ -44,9 +45,12 @@ namespace UnitTests.HaloTests.Streaming
 
             public override void Dispose()
             {
-                var deploymentId = this.HostedCluster.DeploymentId;
+                var deploymentId = this.HostedCluster?.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                if (deploymentId != null)
+                {
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                }
             }
         }
 
@@ -63,18 +67,19 @@ namespace UnitTests.HaloTests.Streaming
         {
             this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
+            fixture.EnsurePreconditionsMet();
         }
-        
+
         public void Dispose()
         {
-            var deploymentId = this.HostedCluster.DeploymentId;
-            if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
+            var deploymentId = this.HostedCluster?.DeploymentId;
+            if (deploymentId != null && _streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
                 AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ConsumerProducer()
         {
             this.fixture.Logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -86,7 +91,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ProducerConsumer()
         {
             this.fixture.Logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
@@ -98,7 +103,7 @@ namespace UnitTests.HaloTests.Streaming
             await ProducerConsumerTest(producerGuid, consumerGuid);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
             this.fixture.Logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -110,7 +115,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
             this.fixture.Logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");

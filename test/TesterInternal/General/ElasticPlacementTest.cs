@@ -1,21 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.General
 {
+    [TestCategory("Elasticity"), TestCategory("Placement")]
     public class ElasticPlacementTests : TestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
@@ -24,16 +22,10 @@ namespace UnitTests.General
 
         public override TestCluster CreateTestCluster()
         {
-            TestUtils.CheckForAzureStorage();
             var options = new TestClusterOptions();
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
             options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
-            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
-            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
-
             return new TestCluster(options);
         }
 
@@ -41,7 +33,7 @@ namespace UnitTests.General
         /// Test placement behaviour for newly added silos. The grain placement strategy should favor them
         /// until they reach a similar load as the other silos.
         /// </summary>
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_CatchingUp()
         {
 
@@ -95,7 +87,7 @@ namespace UnitTests.General
         /// This evaluates the how the placement strategy behaves once silos are stopped: The strategy should
         /// balance the activations from the stopped silo evenly among the remaining silos.
         /// </summary>
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
             List<SiloHandle> runtimes = this.HostedCluster.StartAdditionalSilos(2);
@@ -136,7 +128,7 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are above 110 CPU utilization.
         /// </summary>
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
@@ -152,7 +144,7 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are above 110 CPU utilization or have overloaded flag set.
         /// </summary>
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
@@ -169,7 +161,7 @@ namespace UnitTests.General
         }
 
 
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task LoadAwareGrainShouldNotAttemptToCreateActivationsOnOverloadedSilo()
         {
             await ElasticityGrainPlacementTest(
@@ -181,7 +173,7 @@ namespace UnitTests.General
                 "A grain instantiated with the load-aware placement strategy should not attempt to create activations on an overloaded silo.");
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
+        [Fact, TestCategory("Functional")]
         public async Task LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos()
         {
             // a CPU usage of 110% will disqualify a silo from getting new grains.
