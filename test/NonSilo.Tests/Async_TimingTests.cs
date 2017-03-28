@@ -60,9 +60,8 @@ namespace UnitTests
         {
             TimeSpan timeout = TimeSpan.FromMilliseconds(2000);
             TimeSpan sleepTime = TimeSpan.FromMilliseconds(4000);
-            TimeSpan delta = TimeSpan.FromMilliseconds(200);
-            Stopwatch watch = new Stopwatch();
-            watch.Start();
+            TimeSpan delta = TimeSpan.FromMilliseconds(300);
+            Stopwatch watch = Stopwatch.StartNew();
 
             Task<int> promise = Task<int>.Factory.StartNew(() =>
             {
@@ -70,19 +69,9 @@ namespace UnitTests
                 return 5;
             }).WithTimeout(timeout);
 
-            bool hasThrown = false;
-            try
-            {
-                await promise;
-            }
-            catch (Exception exc)
-            {
-                hasThrown = true;
-                Assert.True(exc.GetBaseException().GetType().Equals(typeof(TimeoutException)), exc.ToString());
-            }
+            await Assert.ThrowsAsync<TimeoutException>(() => promise);
             watch.Stop();
 
-            Assert.True(hasThrown);
             Assert.True(watch.Elapsed >= timeout - delta, watch.Elapsed.ToString());
             Assert.True(watch.Elapsed <= timeout + delta, watch.Elapsed.ToString());
             Assert.True(watch.Elapsed < sleepTime, watch.Elapsed.ToString());
