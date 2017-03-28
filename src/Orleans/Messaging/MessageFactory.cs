@@ -27,7 +27,7 @@ namespace Orleans.Runtime
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 BodyObject = request,
-                IsUsingIfaceVersion = request.InterfaceVersion > 0,
+                IsUsingInterfaceVersions = request.InterfaceVersion > 0,
             };
 
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)

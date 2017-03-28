@@ -263,7 +263,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsUsingIfaceVersion
+        public bool IsUsingInterfaceVersions
         {
             get { return Headers.IsUsingIfaceVersion; }
             set

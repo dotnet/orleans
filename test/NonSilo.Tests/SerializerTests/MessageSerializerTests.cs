@@ -42,7 +42,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
             resp.IsAlwaysInterleave = true;
-            Assert.True(resp.IsUsingIfaceVersion);
+            Assert.True(resp.IsUsingInterfaceVersions);
 
             List<object> requestBody = new List<object>();
             for (int k = 0; k < numItems; k++)
@@ -99,7 +99,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
-            Assert.True(resp1.IsUsingIfaceVersion);
+            Assert.True(resp1.IsUsingInterfaceVersions);
             List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)

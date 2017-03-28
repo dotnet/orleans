@@ -375,7 +375,7 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.Grain.IsGrain && message.IsUsingIfaceVersion)
+                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
                     var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
                     var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
@@ -650,7 +650,7 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-            var request = message.IsUsingIfaceVersion
+            var request = message.IsUsingInterfaceVersions
                 ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
                 : null;
             var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
