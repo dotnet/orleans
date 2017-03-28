@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -617,7 +619,40 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
+            if (TrySendMessageToLocalActivation(message))
+            {
+                return;
+            }
+
             AsyncSendMessage(message, sendingActivation).Ignore();
+        }
+
+        private bool TrySendMessageToLocalActivation(Message message)
+        {
+            List<ActivationData> localActivation;
+
+            if (catalog.LocalLookup(message.TargetGrain, out localActivation))
+            {
+                // todo: consolidate with placement directors (e.g. use FastLookup) and incoming message queue
+                for (var i = 0; i < localActivation.Count; i++)
+                {
+                    var targetActivation = localActivation[i];
+                    if (targetActivation.IsStatelessWorker && localActivation.Count > 1)
+                    {
+                        var rand = new FastRandom(message.TargetGrain.GetHashCode());
+                        // should use placement director, for now using dirty 
+                        targetActivation = localActivation[rand.Next(localActivation.Count - 1)];
+                    }
+
+                    if (targetActivation.GrainInstance != null && targetActivation.State == ActivationState.Valid)
+                    {
+                        message.TargetAddress = targetActivation.Address;
+                        HandleIncomingRequest(message, targetActivation);
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /// <summary>
