@@ -9,7 +9,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class Stateless_ConsumerGrain : Grain, IStateless_ConsumerGrain
+    public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain
     {
         internal Logger logger;
         private List<ConsumerObserver<int>> consumerObservers;
@@ -44,7 +44,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public async Task SetupOnSubscriptionChangActionForProvider(string providerName)
+        public async Task SetupOnSubscriptionChangeActionForProvider(string providerName)
         {
             var streamProvider = base.GetStreamProvider(providerName);
             await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);

@@ -47,8 +47,8 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
                 .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             //set up stream subscriptions for grains
-            var subscriptions = await SetupStreamingSubscriptionForStream<IStateless_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
-            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IStateless_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
+            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             // configure stream provider after subscriptions set up
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
@@ -84,8 +84,8 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
                 .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             //set up stream subscriptions for grains
-            var subscriptions = await SetupStreamingSubscriptionForStream<IStateless_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
-            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IStateless_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
+            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             // configure stream provider1 
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
@@ -102,13 +102,13 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             //set up stream2 and StreamProvider2
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName2 });
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
-            await SetupStreamingSubscriptionForGrains<IStateless_ConsumerGrain>(subManager, streamId2, consumers);
+            await SetupStreamingSubscriptionForGrains<IPassive_ConsumerGrain>(subManager, streamId2, consumers);
 
             //set up on subscription change actions for new provider StreamProviderName2
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks.Add(consumer.SetupOnSubscriptionChangActionForProvider(StreamProviderName2));
+                tasks.Add(consumer.SetupOnSubscriptionChangeActionForProvider(StreamProviderName2));
             }
             await Task.WhenAll(tasks);
             tasks.Clear();
