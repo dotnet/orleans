@@ -47,8 +47,8 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
                 .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             //set up stream subscriptions for grains
-            var subscriptions = await SetupStreamingSubscriptionForStream<IStateless_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
-            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IStateless_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
+            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             // configure stream provider after subscriptions set up
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
@@ -77,15 +77,15 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task Programmatic_Subscribe_DynamicAddNewStreamProvider_WhenConsuming()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
                 .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             //set up stream subscriptions for grains
-            var subscriptions = await SetupStreamingSubscriptionForStream<IStateless_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
-            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IStateless_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
+            var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             // configure stream provider1 
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
@@ -94,7 +94,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-            await producer.StartPeriodicProducing(TimeSpan.FromSeconds(1));
+            await producer.StartPeriodicProducing();
 
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
@@ -102,13 +102,21 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             //set up stream2 and StreamProvider2
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName2 });
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
-            await SetupStreamingSubscriptionForGrains<IStateless_ConsumerGrain>(subManager, streamId2, consumers);
+            await SetupStreamingSubscriptionForGrains<IPassive_ConsumerGrain>(subManager, streamId2, consumers);
 
+            //set up on subscription change actions for new provider StreamProviderName2
+            var tasks = new List<Task>();
+            foreach (var consumer in consumers)
+            {
+                tasks.Add(consumer.SetupOnSubscriptionChangeActionForProvider(StreamProviderName2));
+            }
+            await Task.WhenAll(tasks);
+            tasks.Clear();
             //set up producer2 to produce to stream2
             var producer2 = this.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
-            await producer2.StartPeriodicProducing(TimeSpan.FromSeconds(1));
+            await producer2.StartPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
 
@@ -116,7 +124,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer2.StopPeriodicProducing();
             await producer.StopPeriodicProducing();
 
-            var tasks = new List<Task>();
+            
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },

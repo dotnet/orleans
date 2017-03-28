@@ -15,7 +15,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     public class TypedProducerGrain<T> : Grain, ITypedProducerGrain
     {
         private IAsyncStream<T> producer;
-        private int numProducedItems;
+        protected int numProducedItems;
         private IDisposable producerTimer;
         internal Logger logger;
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
@@ -80,8 +80,8 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         private async Task Fire([CallerMemberName] string caller = null)
         {
-            await ProducerOnNextAsync(this.producer);
             numProducedItems++;
+            await ProducerOnNextAsync(this.producer);
             logger.Info("{0} (item={1})", caller, numProducedItems);
         }
 
@@ -95,7 +95,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         protected override Task ProducerOnNextAsync(IAsyncStream<int> theProducer)
         {
-            return theProducer.OnNextAsync(0);
+            return theProducer.OnNextAsync(this.numProducedItems);
         }
     }
 
@@ -103,7 +103,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         protected override Task ProducerOnNextAsync(IAsyncStream<string> theProducer)
         {
-            return theProducer.OnNextAsync("o");
+            return theProducer.OnNextAsync(this.numProducedItems.ToString());
         }
     }
 }
