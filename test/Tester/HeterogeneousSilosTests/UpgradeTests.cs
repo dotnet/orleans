@@ -87,17 +87,18 @@ namespace Tester.HeterogeneousSilosTests
             await StartSiloV2();
 
             // New activation should be V2
-            for (var i = numberOfGrains; i < numberOfGrains * 2; i++)
+            for (var i = 0; i < numberOfGrains * 2; i++)
             {
                 var grain = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
-                Assert.Equal(2, await grain.GetVersion());
+                var expectedVersion = i < numberOfGrains ? 1 : 2;
+                Assert.Equal(expectedVersion, await grain.GetVersion());
             }
 
             // Stop the V2 silo
             await StopSiloV2();
 
             // Now all activation should be V1
-            for (var i = numberOfGrains * 2; i < numberOfGrains * 3; i++)
+            for (var i = 0; i < numberOfGrains * 3; i++)
             {
                 var grain = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());

@@ -266,15 +266,6 @@ namespace Orleans.TestingHost
         /// <returns>SiloHandle for the newly started silo.</returns>
         public SiloHandle StartAdditionalSilo()
         {
-            return StartAdditionalSilo(null);
-        }
-
-        /// <summary>
-        /// Start an additional silo, so that it joins the existing cluster.
-        /// </summary>
-        /// <returns>SiloHandle for the newly started silo.</returns>
-        public SiloHandle StartAdditionalSilo(Action<NodeConfiguration> configurationModification)
-        {
             var clusterConfig = this.ClusterConfiguration;
             short instanceNumber = (short)clusterConfig.Overrides.Count;
             var defaultNode = clusterConfig.Defaults;
@@ -286,8 +277,6 @@ namespace Orleans.TestingHost
                 instanceNumber, 
                 baseSiloPort, 
                 baseGatewayPort);
-
-            configurationModification?.Invoke(nodeConfig);
 
             SiloHandle instance = StartOrleansSilo(
                 Silo.SiloType.Secondary,
