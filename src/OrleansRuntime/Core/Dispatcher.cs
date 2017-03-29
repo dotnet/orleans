@@ -619,9 +619,9 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
-            if (TrySendMessageToLocalActivation(message))
+			if (TrySendMessageToLocalActivation(message))
             {
-                return;
+               return;
             }
 
             AsyncSendMessage(message, sendingActivation).Ignore();
@@ -630,6 +630,11 @@ namespace Orleans.Runtime
         private bool TrySendMessageToLocalActivation(Message message)
         {
             List<ActivationData> localActivation;
+
+	        if (message.TargetGrain.IsClient || message.SendingGrain.IsClient)
+			{
+		        return false;
+	        }
 
             if (catalog.LocalLookup(message.TargetGrain, out localActivation))
             {
