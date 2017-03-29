@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace UnitTests.StorageTests
 {
@@ -111,7 +112,7 @@ namespace UnitTests.StorageTests
             Log.Info(0, "WriteStateAsync for {0} {1} ErrorInjection={0}", grainType, grainReference, ErrorInjection);
             try
             {
-                if (ErrorInjection == ErrorInjectionPoint.BeforeWrite && DoInjectErrors) throw new StorageProviderInjectedError(ErrorInjection);
+                if (ErrorInjection == ErrorInjectionPoint.BeforeWrite && DoInjectErrors) throw new InconsistentStateException();
                 await base.WriteStateAsync(grainType, grainReference, grainState);
                 if (ErrorInjection == ErrorInjectionPoint.AfterWrite && DoInjectErrors) throw new StorageProviderInjectedError(ErrorInjection);
             }

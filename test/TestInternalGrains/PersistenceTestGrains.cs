@@ -147,6 +147,8 @@ namespace UnitTests.Grains
             await ReadStateAsync();
             return State.Field1;
         }
+
+        public Task<string> GetActivationId() => Task.FromResult(this.Data.ActivationId.ToString());
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
@@ -402,6 +404,8 @@ namespace UnitTests.Grains
             await ReadStateAsync(); // Re-read state from store
             return State.Field1;
         }
+
+        public Task<string> GetActivationId() => Task.FromResult(this.Data.ActivationId.ToString());
 
         public Task DoDelete()
         {
