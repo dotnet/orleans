@@ -310,7 +310,7 @@ namespace UnitTests.SchedulerTests
             Assert.NotNull(wrapper); // Wrapper Task was not created
 
             Log(18, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
-            bool finished = wrapper.Wait(TimeSpan.FromSeconds(2 * waitFactor));
+            bool finished = wrapper.Wait(TimeSpan.FromSeconds(4 * waitFactor));
             Log(19, "Done waiting for wrapper Task Id=" + wrapper.Id + " Finished=" + finished);
             if (!finished) throw new TimeoutException();
             Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
@@ -419,7 +419,7 @@ namespace UnitTests.SchedulerTests
             Assert.NotNull(wrapper); // Wrapper Task was not created
 
             Log(14, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
-            bool finished = wrapper.Wait(TimeSpan.FromSeconds(2 * waitFactor));
+            bool finished = wrapper.Wait(TimeSpan.FromSeconds(4 * waitFactor));
             Log(15, "Done waiting for wrapper Task Id=" + wrapper.Id + " Finished=" + finished);
             if (!finished) throw new TimeoutException();
             Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
