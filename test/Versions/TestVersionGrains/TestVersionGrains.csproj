@@ -45,6 +45,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IVersionTestGrain.cs" />
     <Compile Include="VersionTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -68,10 +69,6 @@
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestVersionGrainInterfaces\TestVersionGrainInterfaces.csproj">
-      <Project>{566309fe-6851-445a-9491-4612a2a52c31}</Project>
-      <Name>TestVersionGrainInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

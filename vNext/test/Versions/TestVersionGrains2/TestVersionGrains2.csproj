@@ -27,6 +27,5 @@
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\TestVersionGrainInterfaces2\TestVersionGrainInterfaces2.csproj" />
   </ItemGroup>
 </Project>
