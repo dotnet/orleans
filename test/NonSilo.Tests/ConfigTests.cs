@@ -925,7 +925,7 @@ namespace UnitTests
             const string filename = "Config_Azure_Default.xml";
 
             string deploymentId = "SiloConfig_Azure_Default" + TestConstants.random.Next();
-            string connectionString = TestDefaultConfiguration.DataConnectionString;
+            string connectionString = "UseDevelopmentStorage=true";
 
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
@@ -979,7 +979,7 @@ namespace UnitTests
             var config = new ClientConfiguration();
 
             config.DeploymentId = deploymentId;
-            config.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+            config.DataConnectionString = "UseDevelopmentStorage=true";
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
             config.PreferedGatewayIndex = 11;

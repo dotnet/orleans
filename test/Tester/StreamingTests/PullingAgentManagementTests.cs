@@ -32,6 +32,12 @@ namespace UnitTests.StreamingTests
                 options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
                 return new TestCluster(options);
             }
+
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                TestUtils.CheckForAzureStorage();
+            }
         }
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -42,9 +48,10 @@ namespace UnitTests.StreamingTests
         public PullingAgentManagementTests(Fixture fixture)
         {
             this.fixture = fixture;
+            this.fixture.EnsurePreconditionsMet();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;

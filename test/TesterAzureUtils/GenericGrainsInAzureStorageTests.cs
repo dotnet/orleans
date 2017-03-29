@@ -13,7 +13,7 @@ namespace Tester.AzureUtils.General
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -58,7 +58,7 @@ namespace Tester.AzureUtils.General
     {
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
