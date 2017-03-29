@@ -18,8 +18,11 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Placement;
 
 namespace Orleans.Runtime
 {
@@ -151,6 +154,7 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
 
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
+        private readonly CachedVersionDirectorManager versionDirectorManager;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -165,7 +169,8 @@ namespace Orleans.Runtime
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
+            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
+			CachedVersionDirectorManager versionDirectorManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = localSiloDetails.SiloAddress;
@@ -180,11 +185,12 @@ namespace Orleans.Runtime
             this.nodeConfig = nodeConfig;
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
+            this.versionDirectorManager = versionDirectorManager;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config);
-            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager);
+            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager, versionDirectorManager.CompatibilityDirectorManager);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
             config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
@@ -226,7 +232,7 @@ namespace Orleans.Runtime
             IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
-                var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();
+                var version = versionDirectorManager.GetSuitableVersion(target.InterfaceId, target.InterfaceVersion);
                 silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, version);
             }
             else

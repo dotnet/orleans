@@ -168,7 +168,7 @@ namespace Orleans.Runtime
             return supportedSilosByInterface[ifaceId].Keys.ToList();
         }
 
-        internal int GetLocalSupportedVersion(int ifaceId)
+        internal ushort GetLocalSupportedVersion(int ifaceId)
         {
             return grainInterfaceMap.GetInterfaceVersion(ifaceId);
         }

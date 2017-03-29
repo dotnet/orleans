@@ -183,6 +183,12 @@
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
     <Compile Include="Utils\Factory.cs" />
     <Compile Include="Utils\IKeyedServiceCollection.cs" />
+    <Compile Include="Versions\Compatibility\AllVersionsCompatible.cs" />
+    <Compile Include="Versions\Compatibility\BackwardCompatible.cs" />
+    <Compile Include="Versions\Compatibility\ICompatibilityDirector.cs" />
+    <Compile Include="Versions\Placement\LatestVersion.cs" />
+    <Compile Include="Versions\Placement\MinimumVersion.cs" />
+    <Compile Include="Versions\Placement\IPlacementVersionDirector.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
@@ -438,6 +444,7 @@
   <ItemGroup>
     <None Include="project.json" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
     <PropertyGroup Condition="'$(BuildNumber)' == ''">
