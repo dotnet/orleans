@@ -137,7 +137,7 @@ namespace UnitTests.SchedulerTests
 
             // Pause to let things run
             output.WriteLine("Main-task sleeping");
-            Thread.Sleep(TimeSpan.FromSeconds(2));
+            Thread.Sleep(TimeSpan.FromSeconds(200));
             output.WriteLine("Main-task awake");
 
             // N should be 10, because all tasks should execute serially

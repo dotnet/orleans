@@ -629,6 +629,7 @@ namespace Orleans.Runtime
 
         private bool TrySendMessageToLocalActivation(Message message)
         {
+	        return false;
             List<ActivationData> localActivation;
 
 	        if (message.TargetGrain.IsClient || message.SendingGrain.IsClient)
