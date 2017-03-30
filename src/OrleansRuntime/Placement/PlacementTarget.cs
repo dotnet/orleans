@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Orleans.Runtime.Placement
+﻿namespace Orleans.Runtime.Placement
 {
-    internal class PlacementTarget
+    internal struct PlacementTarget
     {
         public GrainId GrainId { get; }
 
