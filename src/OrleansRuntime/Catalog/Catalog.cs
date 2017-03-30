@@ -226,8 +226,8 @@ namespace Orleans.Runtime
             IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
-                var versions = new[] { GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max() };
-                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, versions);
+                var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();
+                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, version);
             }
             else
             {
