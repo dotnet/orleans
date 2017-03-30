@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
-        private Dictionary<Tuple<int, int, ushort>, List<SiloAddress>> supportedSilosCache;
+        private ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>> supportedSilosCache;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
         {
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
-            supportedSilosCache = new Dictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
+            supportedSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
         }
 
         public void Start(bool strict = true)
@@ -153,16 +153,14 @@ namespace Orleans.Runtime
 
         internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, ushort version)
         {
-            List<SiloAddress> result;
             var key = Tuple.Create(typeCode, ifaceId, version);
-            if (supportedSilosCache.TryGetValue(key, out result))
-                return result;
-
-            var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
-            result = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
-            supportedSilosCache.Add(key, result);
-
-            return result;
+            return supportedSilosCache.GetOrAdd(
+                key,
+                tuple =>
+                {
+                    var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
+                    return supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
+                });
         }
 
         internal IReadOnlyList<ushort> GetAvailableVersions(int ifaceId)
@@ -306,7 +304,7 @@ namespace Orleans.Runtime
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
             supportedSilosByInterface = newSupportedSilosByInterface;
-            supportedSilosCache = new Dictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
+            supportedSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
         }
 
         private class InvokerData
