@@ -28,7 +28,7 @@ namespace UnitTests.StorageTests.SQLAdapter
         
         //This timeout limit should be clearly less than that defined in RelationalStorageForTesting.CancellationTestQuery. 
         private readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(1);
-        private readonly TimeSpan StreamCancellationTimeoutLimit = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan StreamCancellationTimeoutLimit = TimeSpan.FromSeconds(15);
         private const int MiB = 1048576;
         private const int StreamSizeToBeInsertedInBytes = MiB * 2;
         private const int NumberOfParallelStreams = 5;
@@ -84,7 +84,6 @@ namespace UnitTests.StorageTests.SQLAdapter
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
             {             
-                tokenSource.CancelAfter(StreamCancellationTimeoutLimit);
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(mySqlStorage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
                 Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }
