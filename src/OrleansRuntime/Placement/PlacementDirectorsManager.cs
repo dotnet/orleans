@@ -41,22 +41,22 @@ namespace Orleans.Runtime.Placement
 
         public async Task<PlacementResult> SelectOrAddActivation(
                 ActivationAddress sendingAddress,
-                GrainId targetGrain,
+                PlacementTarget targetGrain,
                 IPlacementContext context,
                 PlacementStrategy strategy)
         {
             if (targetGrain.IsClient)
             {
-                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain, context);
+                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain.GrainId, context);
                 if (res == null)
                 {
-                    throw new ClientNotAvailableException(targetGrain);
+                    throw new ClientNotAvailableException(targetGrain.GrainId);
                 }
                 return res;
             }
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;
-            var result = await SelectActivation(targetGrain, context, actualStrategy);
+            var result = await SelectActivation(targetGrain.GrainId, context, actualStrategy);
             if (result != null) return result;
 
             return await AddActivation(targetGrain, context, actualStrategy);
@@ -72,15 +72,15 @@ namespace Orleans.Runtime.Placement
         }
 
         private Task<PlacementResult> AddActivation(
-                GrainId grain,
+                PlacementTarget target,
                 IPlacementContext context,
                 PlacementStrategy strategy)
         {
-            if (grain.IsClient)
+            if (target.IsClient)
                 throw new InvalidOperationException("Client grains are not activated using the placement subsystem.");
 
             var director = ResolveDirector(strategy);
-            return director.OnAddActivation(strategy, grain, context);
+            return director.OnAddActivation(strategy, target, context);
         }
 
         private void ResolveBuiltInStrategies()

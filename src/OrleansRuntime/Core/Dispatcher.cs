@@ -3,11 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
@@ -23,6 +25,7 @@ namespace Orleans.Runtime
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MessageFactory messagefactory;
+        private readonly SerializationManager serializationManager;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -35,7 +38,8 @@ namespace Orleans.Runtime
             ClusterConfiguration config,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
-            MessageFactory messagefactory)
+            MessageFactory messagefactory,
+            SerializationManager serializationManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -44,6 +48,7 @@ namespace Orleans.Runtime
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
+            this.serializationManager = serializationManager;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -370,7 +375,15 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.State == ActivationState.Invalid)
+                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
+                {
+                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (supportedVersion < request.InterfaceVersion)
+                        catalog.DeactivateActivationOnIdle(targetActivation);
+                }
+
+                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
                 {
                     ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
                     return;
@@ -637,8 +650,12 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
+            var request = message.IsUsingInterfaceVersions
+                ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
+                : null;
+            var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, message.TargetGrain, this.catalog, strategy);
+                message.SendingAddress, target, this.catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {

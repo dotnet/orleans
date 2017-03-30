@@ -34,7 +34,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
 
         private void RunTest(int numItems)
         {
-            InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
+            InvokeMethodRequest request = new InvokeMethodRequest(0, 2, 0, null);
             Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
@@ -42,6 +42,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
             resp.IsAlwaysInterleave = true;
+            Assert.True(resp.IsUsingInterfaceVersions);
 
             List<object> requestBody = new List<object>();
             for (int k = 0; k < numItems; k++)
@@ -98,6 +99,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
+            Assert.True(resp1.IsUsingInterfaceVersions);
             List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)

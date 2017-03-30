@@ -1,6 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -9,6 +10,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.HeterogeneousSilosTests
 {
@@ -23,6 +25,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var options = new TestClusterOptions(1);
+
             options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;

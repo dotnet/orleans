@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutputPath)' != ''">
+    <OutDir>$(OutputPath)\$(TargetFramework)\TestVersionGrainInterfacesV2</OutDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\..\test\Versions\TestVersionGrainInterfaces2\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrainInterfaces2\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrainInterfaces2\obj\**\*.cs;..\..\..\..\test\Versions\TestVersionGrainInterfaces2\Properties\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

@@ -60,6 +60,7 @@
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
     <Compile Include="GrainServiceTests\CustomGrainService.cs" />
     <Compile Include="GrainServiceTests\GrainServiceTests.cs" />
+    <Compile Include="HeterogeneousSilosTests\UpgradeTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
@@ -187,17 +188,19 @@
       <Project>{aeff3b6c-7986-4bf9-85f5-2571decf8959}</Project>
       <Name>TestInterfaces</Name>
     </ProjectReference>
-    <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
-      <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
-      <Name>TestInternalGrainInterfaces</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
-      <Project>{4682abc1-1a51-4794-8012-da8e59ebc72e}</Project>
-      <Name>TestInternalGrains</Name>
-    </ProjectReference>
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
       <Project>{8fd242b4-eda9-42cd-ba39-e410b98add26}</Project>
       <Name>TestExtensions</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
+      <Project>{4682ABC1-1A51-4794-8012-DA8E59EBC72E}</Project>
+      <Name>TestInternalGrains</Name>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.csproj">
+      <Project>{668ac915-7c11-4ec7-a899-bb49011e529a}</Project>
+      <Name>TestVersionGrains</Name>
+      <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

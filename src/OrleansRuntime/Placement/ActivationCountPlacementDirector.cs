@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Placement
 
 
         // internal for unit tests
-        internal Func<PlacementStrategy, GrainId, IPlacementContext, Task<PlacementResult>> SelectSilo;
+        internal Func<PlacementStrategy, PlacementTarget, IPlacementContext, Task<PlacementResult>> SelectSilo;
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
@@ -87,9 +87,9 @@ namespace Orleans.Runtime.Placement
                 context.GetGrainTypeName(grain)));
         }
 
-        public Task<PlacementResult> SelectSiloPowerOfK(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+        public Task<PlacementResult> SelectSiloPowerOfK(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var compatibleSilos = context.GetCompatibleSiloList(grain);
+            var compatibleSilos = context.GetCompatibleSiloList(target);
             // Exclude overloaded and non-compatible silos
             var relevantSilos = new List<CachedLocalStat>();
             foreach (CachedLocalStat current in localCache.Values)
@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Placement
                         minLoadedSilo = s;
                 }
 
-                return MakePlacement(strategy, grain, context, minLoadedSilo);
+                return MakePlacement(strategy, target.GrainId, context, minLoadedSilo);
             }
             
             var debugLog = string.Format("Unable to select a candidate from {0} silos: {1}", localCache.Count,
@@ -163,9 +163,9 @@ namespace Orleans.Runtime.Placement
         }
 
         public override Task<PlacementResult> OnAddActivation(
-            PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+            PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            return SelectSilo(strategy, grain, context);
+            return SelectSilo(strategy, target, context);
         }
 
         public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats)
