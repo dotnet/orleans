@@ -14,12 +14,6 @@ namespace Orleans.Streams
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);
         Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId);
-        /// <summary>
-        /// Set onSubscriptionChange action for susbcriptions on different streams
-        /// </summary>
-        /// <typeparam name="T">Type the stream subscription handle is handling</typeparam>
-        /// <param name="onAdd">delegate which will be executed when subscription added</param>
-        Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd);
     }
 
     // This is the extension interface for stream producers

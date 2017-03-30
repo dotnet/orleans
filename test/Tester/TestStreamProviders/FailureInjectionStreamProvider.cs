@@ -39,11 +39,6 @@ namespace Tester.TestStreamProviders
             return TaskDone.Done;
         }
 
-        public Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration providerConfig)
         {
             Name = name;

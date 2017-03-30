@@ -682,7 +682,7 @@ namespace Orleans.Runtime
         public bool TryAddExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(handler.GetType());
+            var invoker = TryGetExtensionInvoker(this.typeManager, handler.GetType());
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
 
@@ -717,7 +717,7 @@ namespace Orleans.Runtime
             return (ActivationData)activationData;
         }
 
-        private IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
+        internal static IGrainExtensionMethodInvoker TryGetExtensionInvoker(GrainTypeManager typeManager, Type handlerType)
         {
             var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if (interfaces.Count != 1)

@@ -20,6 +20,8 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams.Core;
+using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
@@ -133,6 +135,7 @@ namespace Orleans.Runtime
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
+        private IStreamProviderRuntime providerRuntime;
         private readonly Logger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
@@ -238,7 +241,12 @@ namespace Orleans.Runtime
         internal void SetLogConsistencyManager(ILogConsistencyProviderManager logConsistencyManager)
         {
             logConsistencyProviderManager = logConsistencyManager;
-        } 
+        }
+
+        internal void SetStreamProviderRuntime(IStreamProviderRuntime streamProviderRuntime)
+        {
+            this.providerRuntime = streamProviderRuntime;
+        }
 
         internal void Start()
         {
@@ -728,10 +736,10 @@ namespace Orleans.Runtime
                     storage.SetGrain(grain);
                 }
                 else
-                { 
+                {
                     // Create a new instance of the given grain type
                     grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-                    
+
                     // for log-view grains, install log-view adaptor
                     if (grain is ILogConsistentGrain)
                     {
@@ -741,7 +749,14 @@ namespace Orleans.Runtime
                             consistencyProvider, data.StorageProvider);
                     }
                 }
-             
+
+                if (typeof(IOnSubscriptionActioner).IsAssignableFrom(grainType))
+                {
+                    var actioner = grain as IOnSubscriptionActioner;
+                    InstallStreamConsumerExtension(data, actioner);
+                }
+                   
+
                 grain.Data = data;
                 data.SetGrainInstance(grain);
             }
@@ -861,7 +876,15 @@ namespace Orleans.Runtime
 
             return defaultFactory;
         }
-       
+
+        private void InstallStreamConsumerExtension(ActivationData result, IOnSubscriptionActioner actioner)
+        {
+            var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
+            if (invoker == null)
+                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
+            var handler = new StreamConsumerExtension(this.providerRuntime, actioner);
+            result.TryAddExtension(invoker, handler);
+        }
 
         private async Task SetupActivationState(ActivationData result, string grainType)
         {

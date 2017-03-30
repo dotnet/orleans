@@ -238,7 +238,7 @@ namespace UnitTests.Grains
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
             var tup = await runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(streamProviderRuntime, _streamProvider.IsRewindable));
+                        () => new StreamConsumerExtension(streamProviderRuntime));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
@@ -534,6 +534,6 @@ namespace UnitTests.Grains
 
     internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
     {
-        public ClosedTypeStreamSubscriptionHandle() : base(null, null, false) { /* not a subject to the creation */ }
+        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
     }
 }

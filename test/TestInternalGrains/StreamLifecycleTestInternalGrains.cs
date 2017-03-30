@@ -72,7 +72,7 @@ namespace UnitTests.Grains
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
             var tup = await this.runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(this.streamProviderRuntime, _streamProvider.IsRewindable));
+                        () => new StreamConsumerExtension(this.streamProviderRuntime));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
