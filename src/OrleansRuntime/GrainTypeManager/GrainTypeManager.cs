@@ -24,7 +24,6 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
-        private Dictionary<int, HashSet<ushort>> interfaceVersions;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
@@ -306,7 +305,6 @@ namespace Orleans.Runtime
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
             supportedSilosByInterface = newSupportedSilosByInterface;
-            interfaceVersions = newInterfaceVersions;
         }
 
         private class InvokerData
