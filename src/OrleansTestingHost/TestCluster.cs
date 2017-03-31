@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
+using System.Collections.Concurrent;
 
 namespace Orleans.TestingHost
 {
@@ -39,7 +40,7 @@ namespace Orleans.TestingHost
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
-        private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
+        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
 
         /// <summary>
         /// Client configuration to use when initializing the client
