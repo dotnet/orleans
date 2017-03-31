@@ -15,10 +15,11 @@ namespace Tester.HeterogeneousSilosTests
 {
     public class UpgradeTests : IDisposable
     {
-        internal IGrainFactory GrainFactory => GrainClient.GrainFactory;
 
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
         private readonly TimeSpan waitDelay;
+        private readonly IClusterClient client;
+        private IGrainFactory grainFactory => client;
 
 #if DEBUG
         private const string BuildConfiguration = "Debug";
@@ -71,7 +72,8 @@ namespace Tester.HeterogeneousSilosTests
             waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
 
             StartSiloV1().Wait(waitDelay);
-            GrainClient.Initialize(options.ClientConfiguration);
+            client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
+            client.Connect().Wait();
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
@@ -82,7 +84,7 @@ namespace Tester.HeterogeneousSilosTests
             // Only V1 exist for now
             for (var i = 0; i < numberOfGrains; i++)
             {
-                var grain = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
+                var grain = grainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion()); 
             }
 
@@ -92,7 +94,7 @@ namespace Tester.HeterogeneousSilosTests
             // New activation should be V2
             for (var i = 0; i < numberOfGrains * 2; i++)
             {
-                var grain = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
+                var grain = grainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
                 var expectedVersion = i < numberOfGrains ? 1 : 2;
                 Assert.Equal(expectedVersion, await grain.GetVersion());
             }
@@ -103,7 +105,7 @@ namespace Tester.HeterogeneousSilosTests
             // Now all activation should be V1
             for (var i = 0; i < numberOfGrains * 3; i++)
             {
-                var grain = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
+                var grain = grainFactory.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
             }
         }
@@ -112,14 +114,14 @@ namespace Tester.HeterogeneousSilosTests
         public async Task UpgradeNoPendingRequestTest()
         {
             // Only V1 exist for now
-            var grain0 = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
+            var grain0 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grain0.GetVersion());
 
             // Start a new silo with V2
             await StartSiloV2();
 
             // New activation should be V2
-            var grain1 = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(1);
+            var grain1 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(1);
             Assert.Equal(2, await grain1.GetVersion());
 
             // First call should provoke "upgrade" of grain0
@@ -138,14 +140,14 @@ namespace Tester.HeterogeneousSilosTests
         public async Task UpgradeSeveralQueuedRequestsTest()
         {
             // Only V1 exist for now
-            var grain0 = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
+            var grain0 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grain0.GetVersion());
 
             // Start a new silo with V2
             await StartSiloV2();
 
             // New activation should be V2
-            var grain1 = GrainFactory.GetGrain<IVersionUpgradeTestGrain>(1);
+            var grain1 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(1);
             Assert.Equal(2, await grain1.GetVersion());
 
             var waitingTask = grain0.LongRunningTask(TimeSpan.FromSeconds(5));
