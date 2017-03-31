@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
+using System.Collections.Concurrent;
 
 namespace Orleans.TestingHost
 {
@@ -46,7 +47,7 @@ namespace Orleans.TestingHost
         public SiloHandle Secondary { get; private set; }
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
+        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
 
         private TestingSiloOptions siloInitOptions { get; set; }
 
