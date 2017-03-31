@@ -18,6 +18,7 @@ namespace Tester.HeterogeneousSilosTests
         internal IGrainFactory GrainFactory => GrainClient.GrainFactory;
 
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
+        private readonly TimeSpan waitDelay;
 
 #if DEBUG
         private const string BuildConfiguration = "Debug";
@@ -67,11 +68,13 @@ namespace Tester.HeterogeneousSilosTests
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
             options.ClientConfiguration.Gateways.RemoveAt(1); // Only use primary gw
 
-            StartSiloV1().Wait(TimeSpan.FromSeconds(10));
+            waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
+
+            StartSiloV1().Wait(waitDelay);
             GrainClient.Initialize(options.ClientConfiguration);
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task AlwaysCreateNewActivationWithLatestVersionTest()
         {
             const int numberOfGrains = 100;
@@ -105,7 +108,7 @@ namespace Tester.HeterogeneousSilosTests
             }
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task UpgradeNoPendingRequestTest()
         {
             // Only V1 exist for now
@@ -131,7 +134,7 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Equal(1, await grain1.GetVersion());
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task UpgradeSeveralQueuedRequestsTest()
         {
             // Only V1 exist for now
@@ -163,7 +166,7 @@ namespace Tester.HeterogeneousSilosTests
         private async Task StartSiloV2()
         {
             this.siloV2 = StartSilo("Secondary_1", assemblyGrainsV2Dir);
-            await Task.Delay(1000);
+            await Task.Delay(waitDelay);
         }
 
         private SiloHandle StartSilo(string name, DirectoryInfo rootDir)
@@ -182,7 +185,7 @@ namespace Tester.HeterogeneousSilosTests
         private async Task StopSiloV2()
         {
             StopSilo(siloV2);
-            await Task.Delay(1000);
+            await Task.Delay(waitDelay);
         }
 
         private void StopSilo(SiloHandle handle)

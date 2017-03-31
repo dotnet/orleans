@@ -241,7 +241,11 @@ namespace Orleans.TestingHost
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
-        private static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
+        /// <summary>
+        /// Get the timeout value to use to wit for the silo liveness sub-system to detect and act on any recent cluster membership changes.
+        /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
+        /// </summary>
+        public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
         {
             TimeSpan stabilizationTime = TimeSpan.Zero;
             if (didKill)
