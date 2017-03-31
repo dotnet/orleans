@@ -7,18 +7,18 @@ $maxDegreeOfParallelism = 3
 $failed = $false
 
 function Receive-CompletedJobs {
-    $anyFailures = $false
+    $succeeded = $true
     foreach($job in (Get-Job | Where-Object { $_.State -ne 'Running' }))
     {
         Receive-Job $job -AutoRemoveJob -Wait | Write-Host
 
         if ($job.State -eq 'Failed') { 
-            $anyFailures = $true
+            $succeeded = $false
             Write-Host -ForegroundColor Red 'Failed: ' $job.Name '('$job.State')'
         }
         Write-Host ''  
     }
-    return $anyFailures
+    return $succeeded
 }
 
 # If there is multiple xunit packages installed, take the latest one
@@ -44,7 +44,7 @@ foreach ($a in $assemblies)
         $running | Wait-Job -Any | Out-Null
     }
 
-    if (Receive-CompletedJobs) { $failed = $true }
+    if (-not (Receive-CompletedJobs)) { $failed = $true }
 	
     $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileNameWithoutExtension($a) + '.xml'
     $outXml = $(Join-Path $outDir $xmlName)
@@ -57,7 +57,7 @@ foreach ($a in $assemblies)
 # Wait for all jobs to complete and results ready to be received
 Wait-Job * | Out-Null
 
-if (Receive-CompletedJobs) { $failed = $true }
+if (-not (Receive-CompletedJobs)) { $failed = $true }
 
 if ($failed)
 {
