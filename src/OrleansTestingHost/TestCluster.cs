@@ -242,7 +242,7 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Get the timeout value to use to wit for the silo liveness sub-system to detect and act on any recent cluster membership changes.
+        /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
         /// </summary>
         public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)

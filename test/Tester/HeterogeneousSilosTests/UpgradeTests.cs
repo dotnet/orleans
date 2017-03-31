@@ -13,6 +13,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests
 {
+    [TestCategory("ExcludeXAML")]
     public class UpgradeTests : IDisposable
     {
 
@@ -199,7 +200,7 @@ namespace Tester.HeterogeneousSilosTests
         {
             siloV2?.Dispose();
             siloV1?.Dispose();
-            GrainClient.Uninitialize();
+            client?.Dispose();
         }
     }
 }
