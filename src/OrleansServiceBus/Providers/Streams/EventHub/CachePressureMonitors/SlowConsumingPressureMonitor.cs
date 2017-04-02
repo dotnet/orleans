@@ -12,13 +12,13 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class SlowConsumingPressureMonitor : ICachePressureMonitor
     {
-        private static TimeSpan DefaultCheckPeriod = TimeSpan.FromMinutes(1);
+        private static TimeSpan DefaultPressureWindowSize = TimeSpan.FromMinutes(1);
         private const double DefaultFlowControlThreshold = 0.5;
 
         /// <summary>
-        /// CheckPeriod
+        /// PressureWindowSize
         /// </summary>
-        public TimeSpan CheckPeriod { get; set; }
+        public TimeSpan PressureWindowSize { get; set; }
         /// <summary>
         /// FlowControlThreshold
         /// </summary>
@@ -34,16 +34,16 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="logger"></param>
         public SlowConsumingPressureMonitor(Logger logger)
-            : this(DefaultFlowControlThreshold, DefaultCheckPeriod, logger)
+            : this(DefaultFlowControlThreshold, DefaultPressureWindowSize, logger)
         { }
 
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="checkPeriod"></param>
+        /// <param name="pressureWindowSize"></param>
         /// <param name="logger"></param>
-        public SlowConsumingPressureMonitor(TimeSpan checkPeriod, Logger logger)
-            : this(DefaultFlowControlThreshold, checkPeriod, logger)
+        public SlowConsumingPressureMonitor(TimeSpan pressureWindowSize, Logger logger)
+            : this(DefaultFlowControlThreshold, pressureWindowSize, logger)
         {
         }
 
@@ -53,7 +53,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         public SlowConsumingPressureMonitor(double flowControlThreshold, Logger logger)
-            : this(flowControlThreshold, DefaultCheckPeriod, logger)
+            : this(flowControlThreshold, DefaultPressureWindowSize, logger)
         {
         }
 
@@ -61,16 +61,16 @@ namespace Orleans.ServiceBus.Providers
         /// Constructor
         /// </summary>
         /// <param name="flowControlThreshold"></param>
-        /// <param name="checkPeriod"></param>
+        /// <param name="pressureWindowSzie"></param>
         /// <param name="logger"></param>
-        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan checkPeriod, Logger logger)
+        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan pressureWindowSzie, Logger logger)
         {
             this.FlowControlThreshold = flowControlThreshold;
             this.logger = logger.GetSubLogger(this.GetType().Name);
             this.nextCheckedTime = DateTime.MinValue;
             this.biggestPressureInCurrentPeriod = 0;
             this.isUnderPressure = false;
-            this.CheckPeriod = checkPeriod;
+            this.PressureWindowSize = pressureWindowSzie;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)
@@ -95,7 +95,7 @@ namespace Orleans.ServiceBus.Providers
             if (nextCheckedTime < utcNow)
             {
                 //at the end of each check period, reset biggestPressureInCurrentPeriod
-                this.nextCheckedTime = utcNow + this.CheckPeriod;
+                this.nextCheckedTime = utcNow + this.PressureWindowSize;
                 this.biggestPressureInCurrentPeriod = 0;
             }
             return underPressure;

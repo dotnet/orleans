@@ -19,7 +19,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// SlowConsumingMonitorFlowControlThresholdName
         /// </summary>
-        public const string SlowConsumingMonitorFlowControlThresholdName = "SlowConsumingMonitorFlowControlThreshold";
+        public const string SlowConsumingMonitorFlowControlThresholdName = nameof(SlowConsumingMonitorFlowControlThreshold);
 
         /// <summary>
         /// SlowConsumingPressureMonitorConfig
@@ -27,25 +27,25 @@ namespace Orleans.ServiceBus.Providers
         public double? SlowConsumingMonitorFlowControlThreshold { get; set; }
 
         /// <summary>
-        /// SlowConsumingMonitorFlowControlCheckperiodName
+        /// SlowConsumingMonitorPressureWindowSizeName
         /// </summary>
-        public const string SlowConsumingMonitorFlowControlCheckperiodName = "SlowConsumingMonitorFlowControlCheckperiod";
+        public const string SlowConsumingMonitorPressureWindowSizeName = nameof(SlowConsumingMonitorPressureWindowSize);
 
         /// <summary>
-        /// SlowConsumingMonitorFlowControlCheckperiod
+        /// SlowConsumingMonitorPressureWindowSize
         /// </summary>
-        public TimeSpan? SlowConsumingMonitorFlowControlCheckperiod { get; set; }
+        public TimeSpan? SlowConsumingMonitorPressureWindowSize { get; set; }
 
         /// <summary>
         /// AveragingCachePressureMonitorFlowControlThresholdName
         /// </summary>
-        public const string AveragingCachePressureMonitorFlowControlThresholdName = "AveragingCachePressureMonitorFlowControlThreshold";
+        public const string AveragingCachePressureMonitorFlowControlThresholdName = nameof(AveragingCachePressureMonitorFlowControlThreshold);
 
         /// <summary>
         /// AveragingCachePressureMonitorFlowControlThreshold, AveragingCachePressureMonitor is turn on by default. 
         /// User can turn it off by setting this value to null
         /// </summary>
-        public double? AveragingCachePressureMonitorFlowControlThreshold = AveragingCachePressureMonitor.DefaultThreashold;
+        public double? AveragingCachePressureMonitorFlowControlThreshold = AveragingCachePressureMonitor.DefaultThreshold;
 
         /// <summary>
         /// EventHubSettingsType setting name.
@@ -145,9 +145,9 @@ namespace Orleans.ServiceBus.Providers
             {
                 properties.Add(AveragingCachePressureMonitorFlowControlThresholdName, AveragingCachePressureMonitorFlowControlThreshold.ToString());
             }
-            if (SlowConsumingMonitorFlowControlCheckperiod.HasValue)
+            if (SlowConsumingMonitorPressureWindowSize.HasValue)
             {
-                properties.Add(SlowConsumingMonitorFlowControlCheckperiodName, SlowConsumingMonitorFlowControlCheckperiod.ToString());
+                properties.Add(SlowConsumingMonitorPressureWindowSizeName, SlowConsumingMonitorPressureWindowSize.ToString());
             }
             if (SlowConsumingMonitorFlowControlThreshold.HasValue)
             {
@@ -175,10 +175,10 @@ namespace Orleans.ServiceBus.Providers
             {
                 this.SlowConsumingMonitorFlowControlThreshold = flowControlThreshold;
             }
-            TimeSpan checkPeriod = TimeSpan.Zero;
-            if (providerConfiguration.TryGetTimeSpanProperty(SlowConsumingMonitorFlowControlCheckperiodName, out checkPeriod))
+            TimeSpan pressureWindowSize = TimeSpan.Zero;
+            if (providerConfiguration.TryGetTimeSpanProperty(SlowConsumingMonitorPressureWindowSizeName, out pressureWindowSize))
             {
-                this.SlowConsumingMonitorFlowControlCheckperiod = checkPeriod;
+                this.SlowConsumingMonitorPressureWindowSize = pressureWindowSize;
             }
             if (providerConfiguration.TryGetDoubleProperty(AveragingCachePressureMonitorFlowControlThresholdName, out flowControlThreshold))
             {

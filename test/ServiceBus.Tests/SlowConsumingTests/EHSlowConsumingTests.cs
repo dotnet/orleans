@@ -31,7 +31,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private const string EHConsumerGroup = "orleansnightly";
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-        private static readonly TimeSpan monitorCheckperiod = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private const double flowControlThredhold = 0.6;
         public static readonly EventHubStreamProviderSettings ProviderSettings =
@@ -54,19 +54,34 @@ namespace ServiceBus.Tests.SlowConsumingTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(2);
-                ProviderSettings.SlowConsumingMonitorFlowControlCheckperiod = monitorCheckperiod;
+                ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
                 ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                 ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }
 
+            private bool isSkippable;
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.EventHubConnectionString) ||
+                    string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                {
+                    this.isSkippable = true;
+                    throw new SkipException("EventHubConnectionString or DataConnectionString is not set up");
+                }
+            }
+
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
+                if (!isSkippable)
+                {
+                    var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
+                    dataManager.InitTableAsync().Wait();
+                    dataManager.ClearTableAsync().Wait();
+                }
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -89,9 +104,10 @@ namespace ServiceBus.Tests.SlowConsumingTests
         public EHSlowConsumingTests(Fixture fixture)
         {
             this.fixture = fixture;
+            fixture.EnsurePreconditionsMet();
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
         public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
@@ -115,7 +131,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await slowConsumer.StopConsuming();
 
             //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
-            await Task.Delay(monitorCheckperiod);
+            await Task.Delay(monitorPressureWindowSize);
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(false, lastTry), timeout);
 
             //clean up test

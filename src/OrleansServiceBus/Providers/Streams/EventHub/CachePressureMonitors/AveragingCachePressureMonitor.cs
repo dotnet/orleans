@@ -16,7 +16,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Default flow control threshold
         /// </summary>
-        public static readonly double DefaultThreashold = 1 / 3;
+        public static readonly double DefaultThreshold = 1 / 3;
         private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
         private readonly Logger logger;
 
@@ -31,7 +31,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="logger"></param>
         public AveragingCachePressureMonitor(Logger logger)
-            :this(DefaultThreashold, logger)
+            :this(DefaultThreshold, logger)
         { }
 
         /// <summary>

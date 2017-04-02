@@ -39,16 +39,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool IsUnderPressure(DateTime utcNow)
         {
-            bool isUnderPressure = false;
-            
-            this.ForEach(monitor =>
-            {
-                if (monitor.IsUnderPressure(utcNow))
-                {
-                    isUnderPressure = true;
-                }
-            });
-            return isUnderPressure;
+            return this.Any(monitor => monitor.IsUnderPressure(utcNow));
         }
     }
 }

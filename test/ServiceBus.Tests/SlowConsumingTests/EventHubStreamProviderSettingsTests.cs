@@ -30,7 +30,7 @@ namespace NonSilo.Tests.StreamingTests
         public void SettingWithSlowConsumingMonitorSetUp_Write_Into_ProviderConfiguration_PopulateBack()
         {
             var expectedSetting = new EventHubStreamProviderSettings(StreamProviderName);
-            expectedSetting.SlowConsumingMonitorFlowControlCheckperiod = TimeSpan.FromMinutes(2);
+            expectedSetting.SlowConsumingMonitorPressureWindowSize = TimeSpan.FromMinutes(2);
             expectedSetting.SlowConsumingMonitorFlowControlThreshold = 1 / 3;
             AssertSettingEqual_After_WriteInto_ProviderConfiguration_AndPopulateBack(expectedSetting);
         }
@@ -57,7 +57,7 @@ namespace NonSilo.Tests.StreamingTests
         {
             Assert.Equal(expectedSettings.StreamProviderName, actualSettings.StreamProviderName);
             Assert.Equal(expectedSettings.SlowConsumingMonitorFlowControlThreshold, actualSettings.SlowConsumingMonitorFlowControlThreshold);
-            Assert.Equal(expectedSettings.SlowConsumingMonitorFlowControlCheckperiod, actualSettings.SlowConsumingMonitorFlowControlCheckperiod);
+            Assert.Equal(expectedSettings.SlowConsumingMonitorPressureWindowSize, actualSettings.SlowConsumingMonitorPressureWindowSize);
             Assert.Equal(expectedSettings.AveragingCachePressureMonitorFlowControlThreshold, actualSettings.AveragingCachePressureMonitorFlowControlThreshold);
             Assert.Equal(expectedSettings.EventHubSettingsType, actualSettings.EventHubSettingsType);
             Assert.Equal(expectedSettings.CheckpointerSettingsType, actualSettings.CheckpointerSettingsType);

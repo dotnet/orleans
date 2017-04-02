@@ -145,24 +145,7 @@ namespace Orleans.ServiceBus.Providers
                 var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 CacheFactory = (partition, checkpointer, cacheLogger) =>
                 {
-                    var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
-                    if (adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
-                    {
-                        var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, log);
-                        cache.AddCachePressureMonitor(avgMonitor);
-                    }
-                    if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue
-                    || adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
-                    {
-
-                        var slowConsumeMonitor = new SlowConsumingPressureMonitor(log);
-                        if (adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
-                            slowConsumeMonitor.FlowControlThreshold = adapterSettings.SlowConsumingMonitorFlowControlThreshold.Value;
-                        if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue)
-                            slowConsumeMonitor.CheckPeriod = adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.Value;
-                        cache.AddCachePressureMonitor(slowConsumeMonitor);
-                    }
-                    return cache;
+                    return CreateCacheFactory(partition, checkpointer, cacheLogger, bufferPool, timePurge);
                 };
             }
 
@@ -275,6 +258,29 @@ namespace Orleans.ServiceBus.Providers
         private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
             return receivers.GetOrAdd(queueId, q => MakeReceiver(queueId));
+        }
+
+        private IEventHubQueueCache CreateCacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
+            FixedSizeObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
+        {
+            var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+            if (adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
+            {
+                var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
+cache.AddCachePressureMonitor(avgMonitor);
+            }
+            if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue
+            || adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+            {
+
+                var slowConsumeMonitor = new SlowConsumingPressureMonitor(cacheLogger);
+                if (adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+                    slowConsumeMonitor.FlowControlThreshold = adapterSettings.SlowConsumingMonitorFlowControlThreshold.Value;
+                if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue)
+                    slowConsumeMonitor.PressureWindowSize = adapterSettings.SlowConsumingMonitorPressureWindowSize.Value;
+cache.AddCachePressureMonitor(slowConsumeMonitor);
+            }
+            return cache;
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)

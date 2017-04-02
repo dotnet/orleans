@@ -41,15 +41,15 @@ namespace ServiceBus.Tests.TestStreamProviders
                     var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
                     cache.AddCachePressureMonitor(avgMonitor);
                 }
-                if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue
+                if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue
                 || adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
                 {
 
                     var slowConsumeMonitor = new SlowConsumingPressureMonitor(cacheLogger);
                     if (adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
                         slowConsumeMonitor.FlowControlThreshold = adapterSettings.SlowConsumingMonitorFlowControlThreshold.Value;
-                    if (adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.HasValue)
-                        slowConsumeMonitor.CheckPeriod = adapterSettings.SlowConsumingMonitorFlowControlCheckperiod.Value;
+                    if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue)
+                        slowConsumeMonitor.PressureWindowSize = adapterSettings.SlowConsumingMonitorPressureWindowSize.Value;
                     cache.AddCachePressureMonitor(slowConsumeMonitor);
                 }
                 this.createdCaches.Add(cache);
