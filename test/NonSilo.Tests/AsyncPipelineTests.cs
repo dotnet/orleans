@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
+    [TestCategory("AsynchronyPrimitives")]
     public class AsyncPipelineTests
     {
         private readonly ITestOutputHelper output;
@@ -21,31 +22,31 @@ namespace UnitTests.AsyncPrimitivesTests
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional")]
         public void AsyncPipelineSimpleTest()
         {
-            int step = 1000;
-            var done = TimedCompletions(step, step, step);
+            int step = 2000;
+            int epsilon = 200;
             var pipeline = new AsyncPipeline(2);
-            Stopwatch watch = new Stopwatch();
-            watch.Start();
+            var done = TimedCompletions(step, step, step);
+            Stopwatch watch = Stopwatch.StartNew();
             pipeline.Add(done[0]);
-            const int epsilon = 130;
             var elapsed0 = watch.ElapsedMilliseconds;
-            Assert.True(elapsed0 < epsilon, elapsed0.ToString());
+            Assert.True(elapsed0 < epsilon, $"{elapsed0}ms");
             pipeline.Add(done[2]);
             var elapsed1 = watch.ElapsedMilliseconds;
-            Assert.True(elapsed1 < epsilon, elapsed1.ToString());
+            Assert.True(elapsed1 < epsilon, $"{elapsed1}ms");
             pipeline.Add(done[1]);
             var elapsed2 = watch.ElapsedMilliseconds;
-            Assert.True(step - epsilon <= elapsed2 && elapsed2 <= step + epsilon);
+            Assert.True(step - epsilon <= elapsed2, $"{elapsed2}ms");
+            Assert.True(elapsed2 <= step + epsilon, $"{elapsed2}ms");
             pipeline.Wait();
             watch.Stop();
             Assert.True(3 * step - epsilon <= watch.ElapsedMilliseconds, $"{watch.ElapsedMilliseconds}ms");
             Assert.True(watch.ElapsedMilliseconds <= 3 * step + epsilon, $"{watch.ElapsedMilliseconds}ms");
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional")]
         public void AsyncPipelineWaitTest()
         {
             Random rand = new Random(222);
@@ -91,7 +92,7 @@ namespace UnitTests.AsyncPrimitivesTests
             return result;
         }
         
-        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional")]
         public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest()
         {
             await AsyncPipelineBlackBoxConsistencyTest(1);
