@@ -171,7 +171,7 @@
     <Compile Include="Services\IGrainService.cs" />
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
-    <Compile Include="Streams\Core\IOnSubscriptionActioner.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionObserver.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManagerAdmin.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManagerRetriever.cs" />

@@ -750,11 +750,11 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if (typeof(IOnSubscriptionActioner).IsAssignableFrom(grainType))
-                {
-                    var actioner = grain as IOnSubscriptionActioner;
-                    InstallStreamConsumerExtension(data, actioner);
-                }
+
+                List<Type> supportedTypes;
+                if(IsStreamSubscriptionObserver(grainType, out supportedTypes))
+                    InstallStreamConsumerExtension(data, grain, supportedTypes);
+                
                    
 
                 grain.Data = data;
@@ -765,6 +765,31 @@ namespace Orleans.Runtime
             activations.IncrementGrainCounter(grainClassName);
 
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
+        }
+
+        private void InstallStreamConsumerExtension(ActivationData result, IAddressable grainRef, List<Type> supportedTypes)
+        {
+            var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
+            if (invoker == null)
+                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
+            var handler = new StreamConsumerExtension(this.providerRuntime, grainRef, supportedTypes);
+            result.TryAddExtension(invoker, handler);
+        }
+
+        private bool IsStreamSubscriptionObserver(Type grainType, out List<Type> supportedTypes)
+        {
+            var interfaces = grainType.GetInterfaces();
+            List<Type> observerSuppportedTypes = new List<Type>();
+            foreach (var interf in interfaces)
+            {
+                if (interf.IsGenericType && (interf.GetGenericTypeDefinition().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
+                {
+                    var typeParam = interf.GetGenericArguments()[0];
+                    observerSuppportedTypes.Add(typeParam);
+                }
+            }
+            supportedTypes = observerSuppportedTypes;
+            return observerSuppportedTypes.Count > 0;
         }
 
         private void SetupStorageProvider(Type grainType, ActivationData data)
@@ -875,15 +900,6 @@ namespace Orleans.Runtime
                 SetupStorageProvider(grainType, data);
 
             return defaultFactory;
-        }
-
-        private void InstallStreamConsumerExtension(ActivationData result, IOnSubscriptionActioner actioner)
-        {
-            var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
-            if (invoker == null)
-                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var handler = new StreamConsumerExtension(this.providerRuntime, actioner);
-            result.TryAddExtension(invoker, handler);
         }
 
         private async Task SetupActivationState(ActivationData result, string grainType)

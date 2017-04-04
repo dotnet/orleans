@@ -54,7 +54,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
 
             //set up producer
-            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -105,7 +105,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await SetupStreamingSubscriptionForGrains<IPassive_ConsumerGrain>(subManager, streamId2, consumers);
 
             //set up producer2 to produce to stream2
-            var producer2 = this.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer2 = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             await producer2.StartPeriodicProducing();

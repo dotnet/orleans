@@ -59,12 +59,22 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
-        public async Task OnAdd<T>(StreamSubscriptionHandle<T> handle)
+        public async Task OnNewSubscription(StreamSubscriptionHandle<int> handle)
         {
             logger.Info("OnAdd");
             this.onAddCalledCount++;
-            var observer = new CounterObserver<T>(this.logger);
-            var newhandle = new ExternalStreamSubscriptionHandle<T>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
+            var observer = new CounterObserver<int>(this.logger);
+            var newhandle = new ExternalStreamSubscriptionHandle<int>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
+            this.consumerHandles.Add(newhandle);
+            this.consumerObservers.Add(observer);
+        }
+
+        public async Task OnNewSubscription(StreamSubscriptionHandle<IFruit> handle)
+        {
+            logger.Info("OnAdd");
+            this.onAddCalledCount++;
+            var observer = new CounterObserver<IFruit>(this.logger);
+            var newhandle = new ExternalStreamSubscriptionHandle<IFruit>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
             this.consumerHandles.Add(newhandle);
             this.consumerObservers.Add(observer);
         }
@@ -82,7 +92,7 @@ namespace UnitTests.Grains
         }
 
         //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
-        public async Task OnAdd<T>(StreamSubscriptionHandle<T> handle)
+        public async Task OnNewSubscription(StreamSubscriptionHandle<int> handle)
         {
             await handle.UnsubscribeAsync();
         }

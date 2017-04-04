@@ -36,10 +36,12 @@ namespace Orleans.Streams
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
-        private readonly IOnSubscriptionActioner onSubscriptionActioner;
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IOnSubscriptionActioner actioner = null)
+        private readonly IAddressable streamSubscriptionObserver;
+        private readonly List<Type> supportedTypes;
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IAddressable observer = null, List<Type> supportedTypes = null)
         {
-            this.onSubscriptionActioner = actioner;
+            this.streamSubscriptionObserver = observer;
+            this.supportedTypes = supportedTypes;
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             logger = providerRuntime.GetLogger(GetType().Name);
@@ -77,6 +79,19 @@ namespace Orleans.Streams
             return DeliverMutable(subscriptionId, streamId, item.Value, currentToken, handshakeToken);
         }
 
+        private Type findSupportedBaseType(Type concretType)
+        {
+            Type supportedType = null;
+            foreach (var type in this.supportedTypes)
+            {
+                if (type.IsAssignableFrom(concretType))
+                {
+                    supportedType = type;
+                    break;
+                }
+            }
+            return supportedType;
+        }
         public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, StreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsVerbose3)
@@ -93,21 +108,25 @@ namespace Orleans.Streams
             else
             {
                 // if no observer attached to the subscription, check if the grain is a IOnSubscriptionActioner
-                if (this.onSubscriptionActioner != null)
+                if (this.streamSubscriptionObserver != null)
                 {
-
-                    //if the onAddAction attached an observer to the subscription
-                    var streamProvider = this.providerRuntime.ServiceProvider
-                                .GetService<IStreamProviderManager>()
-                                .GetStreamProvider(streamId.ProviderName);
-                    
-                    Type constructedType = typeof(OnSubscriptionActionInvoker<>).MakeGenericType(item.GetType());
-                    var actionInvoker = (IOnSubscriptionActionInvoker)Activator.CreateInstance(constructedType, this.onSubscriptionActioner);
-                    await actionInvoker.InvokeOnAdd(streamId, subscriptionId, streamProvider);
-                    if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                    var supportedType = findSupportedBaseType(item.GetType());
+                    if (supportedType != null)
                     {
-                        return await observer.DeliverItem(item, currentToken, handshakeToken);
+                        //if the onAddAction attached an observer to the subscription
+                        var streamProvider = this.providerRuntime.ServiceProvider
+                                    .GetService<IStreamProviderManager>()
+                                    .GetStreamProvider(streamId.ProviderName);
+
+                        Type constructedType = typeof(OnSubscriptionActionInvoker<>).MakeGenericType(supportedType);
+                        var actionInvoker = (IOnSubscriptionActionInvoker)Activator.CreateInstance(constructedType, this.streamSubscriptionObserver);
+                        await actionInvoker.InvokeOnNewSubscription(streamId, subscriptionId, streamProvider);
+                        if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                        {
+                            return await observer.DeliverItem(item, currentToken, handshakeToken);
+                        }
                     }
+                   
                 }
             }
 
@@ -130,22 +149,25 @@ namespace Orleans.Streams
             else
             {
                 // if no observer attached to the subscription, checkif the grain reference is IOnSubscriptionChangeActioner
-                if (this.onSubscriptionActioner != null)
+                if (this.streamSubscriptionObserver != null)
                 {
-                    //if the onAddAction attached an observer to the subscription
-                    var streamProvider = this.providerRuntime.ServiceProvider
+                    var supportedType = findSupportedBaseType(batch.Value.GetType());
+                    if (supportedType != null)
+                    {
+                        //if the onAddAction attached an observer to the subscription
+                        var streamProvider = this.providerRuntime.ServiceProvider
                                 .GetService<IStreamProviderManager>()
                                 .GetStreamProvider(streamId.ProviderName);
-                   
-                    Type constructedType = typeof(OnSubscriptionActionInvoker<>).MakeGenericType(batch.Value.GetType());
-                    var actionInvoker = (IOnSubscriptionActionInvoker)Activator.CreateInstance(constructedType, this.onSubscriptionActioner);
-                    await actionInvoker.InvokeOnAdd(streamId, subscriptionId, streamProvider);
-                    //if the onAddAction attached an observer to the subscription
-                    if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                    {
-                        return await observer.DeliverBatch(batch.Value, handshakeToken);
+
+                        Type constructedType = typeof(OnSubscriptionActionInvoker<>).MakeGenericType(supportedType);
+                        var actionInvoker = (IOnSubscriptionActionInvoker)Activator.CreateInstance(constructedType, this.streamSubscriptionObserver);
+                        await actionInvoker.InvokeOnNewSubscription(streamId, subscriptionId, streamProvider);
+                        //if the onAddAction attached an observer to the subscription
+                        if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                        {
+                            return await observer.DeliverBatch(batch.Value, handshakeToken);
+                        }
                     }
-                    
                 }
             }
 
