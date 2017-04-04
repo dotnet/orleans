@@ -108,8 +108,8 @@
 <p>Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide the autocode generation for us our Grains and Interfaces, and the Runtime which is used for hosting.</p>
 <h4 id="with-nuget">With Nuget</h4>
 <ol>
-<li>Add Microsoft.Orleans.Templates.Interfaces to GrainInterfaces</li>
-<li>Add Microsoft.Orleans.Templates.Grains to GrainCollection</li>
+<li>Add Microsoft.Orleans.OrleansCodeGenerator.Build  to GrainInterfaces</li>
+<li>Add Microsoft.Orleans.OrleansCodeGenerator.Build  to GrainCollection</li>
 <li>Add Microsoft.Orleans.OrleansRuntime to Host</li>
 </ol>
 <h2 id="creating-our-grain-interface">Creating our Grain Interface</h2>
@@ -167,6 +167,7 @@ class HelloGrain : Orleans.Grain, IHello
 <pre><code class="lang-csharp">using Orleans.Runtime.Host;
 using Orleans;
 using System.Net;
+using System;
 
 
 class Program
@@ -234,6 +235,15 @@ class Program
 <p>At this point we should be able to run Host. A console should appear with a large amount of logging text, at the end it should look like this</p>
 <p><img src="../Images/MinimalOrleansApplication2.png" alt=""></p>
 <p>Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<ul>
+<li>System.SystemException: &#39;Failed to start Orleans silo &#39;YOUR-HOST-NAME&#39; as a Secondary node&#39;:<ul>
+<li>Problem: The silo is trying to start but does not find a the specified file to get the configuration.</li>
+<li>Solution: Set the property &quot;Copy to Output Directory&quot; to &quot;Copy if newer&quot;, to set it, right click on the configuration file, then click on properites.
+```</li>
+</ul>
+</li>
+</ul>
 <h2 id="further-reading">Further Reading</h2>
 <ul>
 <li><a href="http://dotnet.github.io/orleans/NuGets">List of Orleans Packages</a></li>

@@ -5,6 +5,70 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v1.4.1](https://github.com/dotnet/orleans/releases/tag/v1.4.1) March 27th 2017
+
+### Release notes
+
+Improvements and bug fixes since 1.4.0.
+Addressed the known issue in 1.4.0: *"When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac."*
+
+- Improvements
+  - Fix a cleanup issue in TestCluster after a failure [#2734](https://github.com/dotnet/orleans/pull/2734/)
+  - Remove unnecessary service registration of IServiceProvider to itself, which improves support for 3rd party containers [#2749](https://github.com/dotnet/orleans/pull/2749/)
+  - Add a timeout for socket connection [#2791](https://github.com/dotnet/orleans/pull/2791/)
+  - Support for string grain id in OrleansManager.exe [#2815](https://github.com/dotnet/orleans/pull/2815/)
+  - Avoid reconnection to gateway no longer in the list returned by IGatewayListProvider [#2824](https://github.com/dotnet/orleans/pull/2824/)
+  - Handle absolute path in IntermediateOutputPath to address issue 2864 [#2865](https://github.com/dotnet/orleans/pull/2865/), [#2871](https://github.com/dotnet/orleans/pull/2871/)
+  - Rename codegen file to be excluded from analyzers [#2872](https://github.com/dotnet/orleans/pull/2872/)
+  - ProviderTypeLoader: do not enumerate types in ReflectionOnly assembly. [#2869](https://github.com/dotnet/orleans/pull/2869/)
+  - Do not throw when calling Stop on AsynchQueueAgent after it was disposed.
+- Bug fixes
+  - NodeConfiguration.AdditionalAssemblyDirectories was not 'deeply' copied in the copy constructor [#2758](https://github.com/dotnet/orleans/pull/2758/)
+  - Fix AsReference() in generated code for null values [#2756](https://github.com/dotnet/orleans/pull/2756/)
+  - Avoid a NullReferenceException in SerializationManager.Register(...) [#2768](https://github.com/dotnet/orleans/pull/2768/)
+  - Fix missing check for empty deployment id [#2786](https://github.com/dotnet/orleans/pull/2786/)
+  - Fix to make OrleansPerfCounterTelemetryConsumer still work for grain-specific counters. (part of [#2807](https://github.com/dotnet/orleans/pull/2807/))
+  - Fix typos in format strings [#2853](https://github.com/dotnet/orleans/pull/2853/)
+  - Fix null reference exception in simple queue cache. [#2829](https://github.com/dotnet/orleans/pull/2829/) 
+
+
+## Community Virtual Meetup #14
+
+[Orleans FSM](https://youtu.be/XmsVYLfNHjI) with [John Azariah](https://github.com/johnazariah)
+March 22nd 2017
+
+
+## [v1.4.0](https://github.com/dotnet/orleans/releases/tag/v1.4.0) February 21st 2017
+
+### Release notes
+
+- Major new features
+  - Revamped JournaledGrain for event sourcing with support for geo-distributed log-based consistency providers.
+  - Abstraction of Grain Services with fixed-placed per-silo application components with their workload partitioned via cluster consistency ring.
+  - Support for heterogeneous silos with non-uniform distribution of available grain classes.
+  - Cluster membership provider for Service Fabric.
+
+####New in v1.4.0 since beta
+
+- Known issues 
+  - When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac. This is bein addressed for 1.4.1, but there is a simple workaround for it at #2747
+  - The build-time code generator required (and automatically added) a file named Properties\orleans.codegen.cs to the project where codegen was being ran. The new MSBuild targets no longer do that, so when upgrading a solution with a previous version of Orleans, you should delete this orleans.codegen.cs file from your grain projects.
+
+- Improvements 
+  - Support for grains with generic methods [#2670](https://github.com/dotnet/orleans/pull/2670/)
+  - Do native PE files check before assembly loading to avoid misleading warnings on startup [#2714](https://github.com/dotnet/orleans/pull/2714/)
+  - Throw explicit exception when using streams not in Orleans Context [#2683](https://github.com/dotnet/orleans/pull/2683/)
+  - Several improvements to JournaledGrain API [#2651](https://github.com/dotnet/orleans/pull/2651/) [#2720](https://github.com/dotnet/orleans/pull/2720/)
+  - Allow overriding MethodId using [MethodId(id)] on interface methods [#2660](https://github.com/dotnet/orleans/pull/2660/)
+- Bug fixes 
+  - EventHubSequenceToken not used consistently [#2724](https://github.com/dotnet/orleans/pull/2724/)
+  - Support grains with generic state where the state param do not match the grain type params [#2715](https://github.com/dotnet/orleans/pull/2715/)
+  - Fix ServiceFabric IFabricServiceSiloResolver registration in DI container [#2712](https://github.com/dotnet/orleans/pull/2712/)
+  - Fix ConditionalCheckFailedException when updating silo 'IAmAlive' field in DynamoDB [#2678](https://github.com/dotnet/orleans/pull/2678/)
+  - Ensure DynamoDB Gateway Provider only returns silos with a proxy port configured [#2679](https://github.com/dotnet/orleans/pull/2679/)
+  - Fix e-Tag issue in AzureBlobStorage when calling ClearStateAsync ([#2669](https://github.com/dotnet/orleans/pull/2669/))
+  - Other minor fixes: [#2729](https://github.com/dotnet/orleans/pull/2729/) [#2691](https://github.com/dotnet/orleans/pull/2691/)
+
 ## Community Virtual Meetup #13
 
 [Upgrading Orleans Applications](https://youtu.be/_5hWNVccKeQ) with [Sergey Bykov](https://github.com/sergeybykov) and team
