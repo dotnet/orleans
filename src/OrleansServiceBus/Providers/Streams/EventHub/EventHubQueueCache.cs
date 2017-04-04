@@ -49,7 +49,7 @@ namespace Orleans.ServiceBus.Providers
             cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer, logger);
             cacheDataAdapter.PurgeAction = cache.Purge;
             cache.OnPurged = OnPurge;
-            this.cachePressureMonitor = new AggregatedCachePressureMonitor();
+            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger);
         }
 
         /// <summary>

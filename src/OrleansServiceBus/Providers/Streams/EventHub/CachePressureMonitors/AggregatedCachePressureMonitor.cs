@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Orleans.Runtime;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +12,19 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class AggregatedCachePressureMonitor : List<ICachePressureMonitor>, ICachePressureMonitor
     {
+        private bool isUnderPressure;
+        private Logger logger;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="logger"></param>
+        public AggregatedCachePressureMonitor(Logger logger)
+        {
+            this.isUnderPressure = false;
+            this.logger = logger.GetSubLogger(this.GetType().Name);
+        }
+
         /// <summary>
         /// Record cache pressure to every monitor in this aggregated cache monitor group
         /// </summary>
@@ -39,7 +53,15 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool IsUnderPressure(DateTime utcNow)
         {
-            return this.Any(monitor => monitor.IsUnderPressure(utcNow));
+            bool underPressure = this.Any(monitor => monitor.IsUnderPressure(utcNow));
+            if (this.isUnderPressure != underPressure)
+            {
+                this.isUnderPressure = underPressure;
+                logger.Info(this.isUnderPressure
+                    ? $"Ingesting messages too fast. Throttling message reading."
+                    : $"Message ingestion is healthy.");
+            }
+            return underPressure;
         }
     }
 }

@@ -87,7 +87,7 @@ namespace Orleans.ServiceBus.Providers
             if (this.isUnderPressure != underPressure)
             {
                 this.isUnderPressure = underPressure;
-                logger.Info(this.isUnderPressure
+                logger.Verbose(this.isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentPeriod}, Threshold: {FlowControlThreshold}"
                     : $"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentPeriod}, Threshold: {FlowControlThreshold}");
             }
