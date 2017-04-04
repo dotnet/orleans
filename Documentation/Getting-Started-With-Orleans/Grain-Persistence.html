@@ -167,6 +167,8 @@ config.Globals.RegisterStorageProvider&lt;Orleans.Storage.AdoNetStorageProvider&
 </ol>
 <p>The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
 there is no method to expose them to application code. More information in <a href="#ADONETPersistenceRationale">ADO.NET Persistence Rationale</a>.</p>
+<p><strong>NB for Microsoft SQL Server users:</strong>
+For the ADO.NET Storage Provider to work with SQL Server, you need to add <a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a> NuGet package to your project.</p>
 <h3 id="memorystorage">MemoryStorage</h3>
 <pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;MemoryStorage&quot;  /&gt;
 </code></pre><blockquote><p><strong>Note:</strong> This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.</p>
