@@ -8,6 +8,8 @@ using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Placement;
 using TestVersionGrainInterfaces;
 using Xunit;
 
@@ -18,8 +20,8 @@ namespace Tester.HeterogeneousSilosTests
     {
 
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
-        private readonly TimeSpan waitDelay;
-        private readonly IClusterClient client;
+        private TimeSpan waitDelay;
+        private IClusterClient client;
         private IGrainFactory grainFactory => client;
 
 #if DEBUG
@@ -36,7 +38,7 @@ namespace Tester.HeterogeneousSilosTests
 
         private SiloHandle siloV1;
         private SiloHandle siloV2;
-        private readonly TestClusterOptions options;
+        private TestClusterOptions options;
 
         public UpgradeTests()
         {
@@ -64,23 +66,31 @@ namespace Tester.HeterogeneousSilosTests
                     assemblyGrainsV2Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV2Vs + target);
                 }
             }
+        }
 
+        private async Task DeployCluster(
+            VersionPlacementStrategy versionPlacementStrategy,
+            VersionCompatibilityStrategy versionCompatibilityStrategy)
+        {
             this.options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
-            options.ClusterConfiguration.Globals.DefaultPlacementVersionStrategy = Orleans.Versions.Placement.LatestPlacementVersion.Singleton;
+            options.ClusterConfiguration.Globals.DefaultVersionPlacementStrategy = versionPlacementStrategy;
+            options.ClusterConfiguration.Globals.DefaultVersionCompatibilityStrategy = versionCompatibilityStrategy;
             options.ClientConfiguration.Gateways.RemoveAt(1); // Only use primary gw
 
             waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
 
-            StartSiloV1().Wait(waitDelay);
+            await StartSiloV1();
             client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
-            client.Connect().Wait();
+            await client.Connect();
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task AlwaysCreateNewActivationWithLatestVersionTest()
         {
+            await DeployCluster(LatestVersionPlacement.Singleton, BackwardCompatible.Singleton);
+
             const int numberOfGrains = 100;
 
             // Only V1 exist for now
@@ -115,6 +125,8 @@ namespace Tester.HeterogeneousSilosTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task UpgradeNoPendingRequestTest()
         {
+            await DeployCluster(LatestVersionPlacement.Singleton, BackwardCompatible.Singleton);
+
             // Only V1 exist for now
             var grain0 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grain0.GetVersion());
@@ -141,6 +153,8 @@ namespace Tester.HeterogeneousSilosTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task UpgradeSeveralQueuedRequestsTest()
         {
+            await DeployCluster(LatestVersionPlacement.Singleton, BackwardCompatible.Singleton);
+
             // Only V1 exist for now
             var grain0 = grainFactory.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grain0.GetVersion());
@@ -164,7 +178,7 @@ namespace Tester.HeterogeneousSilosTests
         private async Task StartSiloV1()
         {
             this.siloV1 = StartSilo(Silo.PrimarySiloName, assemblyGrainsV1Dir);
-            await Task.Delay(1000);
+            await Task.Delay(waitDelay);
         }
 
         private async Task StartSiloV2()

@@ -1,5 +1,8 @@
-﻿namespace Orleans.Versions.Placement
+﻿using System;
+
+namespace Orleans.Versions.Placement
 {
+    [Serializable]
     public class MinimumVersionPlacement : VersionPlacementStrategy
     {
         internal static MinimumVersionPlacement Singleton { get; } = new MinimumVersionPlacement();
