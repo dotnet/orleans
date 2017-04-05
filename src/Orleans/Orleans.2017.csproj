@@ -40,6 +40,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="1.0.0" />
     <PackageReference Include="Newtonsoft.Json" version="9.0.1" />
     <PackageReference Include="System.Collections.Immutable" Version="1.1.37" />
+    <PackageReference Include="System.Reflection.Metadata" Version="1.2.0" />
   </ItemGroup>
   <PropertyGroup>
     <OrleansBootstrapSteps>
