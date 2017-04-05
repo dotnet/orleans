@@ -4,7 +4,7 @@ namespace Orleans.Runtime.Versions.Compatibility
 {
     internal class AllVersionsCompatibilityDirector : IVersionCompatibilityDirector<AllVersionsCompatible>
     {
-        public bool IsCompatible(ushort requestedVersion, ushort actualVersion)
+        public bool IsCompatible(ushort requestedVersion, ushort currentVersion)
         {
             return true;
         }
