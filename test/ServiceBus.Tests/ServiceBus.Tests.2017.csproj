@@ -7,9 +7,6 @@
     <RootNamespace>ServiceBus.Tests</RootNamespace>
     <AssemblyName>ServiceBus.Tests</AssemblyName>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="Streaming\StreamTypeSerializationTests.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
