@@ -452,8 +452,8 @@ namespace Orleans.Runtime.Configuration
         public string DefaultPlacementStrategy { get; set; }
 
         public VersionCompatibilityStrategy DefaultVersionCompatibilityStrategy { get; set; }
-		
-		public VersionPlacementStrategy DefaultVersionPlacementStrategy { get; set; }
+
+        public VersionPlacementStrategy DefaultVersionPlacementStrategy { get; set; }
 
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; }
 
@@ -600,7 +600,7 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
             GrainServiceConfigurations = new GrainServiceConfigurations();
             DefaultVersionCompatibilityStrategy = BackwardCompatible.Singleton;
-			DefaultVersionPlacementStrategy = MinimumVersionPlacement.Singleton;
+            DefaultVersionPlacementStrategy = MinimumVersionPlacement.Singleton;
         }
 
         public override string ToString()

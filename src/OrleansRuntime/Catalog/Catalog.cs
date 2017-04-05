@@ -170,7 +170,7 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
-			CachedVersionDirectorManager versionDirectorManager)
+            CachedVersionDirectorManager versionDirectorManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = localSiloDetails.SiloAddress;

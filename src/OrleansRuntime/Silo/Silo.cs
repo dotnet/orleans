@@ -286,8 +286,8 @@ namespace Orleans.Runtime
             services.AddSingleton<VersionPlacementDirectorManager>();
             services.AddSingleton<IVersionPlacementDirector<MinimumVersionPlacement>, MinimumVersionPlacementDirector>();
             services.AddSingleton<IVersionPlacementDirector<LatestVersionPlacement>, LatestVersionPlacementDirector>();
-			services.AddSingleton<CompatibilityDirectorManager>();
-			services.AddSingleton<IVersionCompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
+            services.AddSingleton<CompatibilityDirectorManager>();
+            services.AddSingleton<IVersionCompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
             services.AddSingleton<IVersionCompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
             services.AddSingleton<CachedVersionDirectorManager>();
 
