@@ -384,8 +384,8 @@ namespace Orleans.Runtime
                 {
                     var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
-                    var actualVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
-                    if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, actualVersion))
+                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
                         catalog.DeactivateActivationOnIdle(targetActivation);
                 }
 
