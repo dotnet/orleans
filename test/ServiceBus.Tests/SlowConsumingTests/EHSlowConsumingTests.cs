@@ -31,7 +31,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private const string EHConsumerGroup = "orleansnightly";
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-        private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private const double flowControlThredhold = 0.6;
         public static readonly EventHubStreamProviderSettings ProviderSettings =
