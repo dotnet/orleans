@@ -4,9 +4,9 @@ namespace Orleans.Runtime.Versions.Compatibility
 {
     internal class BackwardCompatilityDirector : IVersionCompatibilityDirector<BackwardCompatible>
     {
-        public bool IsCompatible(ushort requestedVersion, ushort actualVersion)
+        public bool IsCompatible(ushort requestedVersion, ushort currentVersion)
         {
-            return requestedVersion <= actualVersion;
+            return requestedVersion <= currentVersion;
         }
     }
 }
