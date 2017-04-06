@@ -624,7 +624,7 @@ namespace Orleans
             if (message.IsExpirableMessage(config))
             {
                 // don't set expiration for system target messages.
-                message.Expiration = DateTime.UtcNow + responseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
+                message.Expiration = responseTimeout;
             }
 
             if (!oneWay)

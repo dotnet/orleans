@@ -62,6 +62,8 @@ namespace Orleans.Runtime
 
         private object bodyObject;
 
+        private DateTime localCreationTime;
+
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
@@ -278,13 +280,24 @@ namespace Orleans.Runtime
             set {  Headers.Result = value; }
         }
 
-        public DateTime? Expiration
+        public TimeSpan? Expiration
         {
             get { return Headers.Expiration; }
             set { Headers.Expiration = value; }
         }
 
-        public bool IsExpired => Expiration.HasValue && DateTime.UtcNow > Expiration.Value;
+        public bool IsExpired
+        {
+            get
+            {
+                if (!Expiration.HasValue)
+                    return false;
+
+                var elapsed = DateTime.UtcNow - localCreationTime;
+                Expiration = Expiration - elapsed;
+                return Expiration <= TimeSpan.Zero;
+            }
+        }
 
         public bool IsExpirableMessage(IMessagingConfiguration config)
         {
@@ -426,6 +439,7 @@ namespace Orleans.Runtime
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
+            localCreationTime = DateTime.UtcNow;
         }
         
         /// <summary>
@@ -773,7 +787,7 @@ namespace Orleans.Runtime
             private bool _isNewPlacement;
             private bool _isUsingIfaceVersion;
             private ResponseTypes _result;
-            private DateTime? _expiration;
+            private TimeSpan? _expiration;
             private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
             private string _newGrainType;
@@ -953,7 +967,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public DateTime? Expiration
+            public TimeSpan? Expiration
             {
                 get { return _expiration; }
                 set
@@ -1230,7 +1244,7 @@ namespace Orleans.Runtime
                     result.Direction = (Message.Directions)reader.ReadByte();
 
                 if ((headers & Headers.EXPIRATION) != Headers.NONE)
-                    result.Expiration = reader.ReadDateTime();
+                    result.Expiration = reader.ReadTimeSpan();
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
                     result.ForwardCount = reader.ReadInt();
