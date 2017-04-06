@@ -136,6 +136,7 @@ namespace Orleans.Runtime
         private IStorageProviderManager storageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
         private IStreamProviderRuntime providerRuntime;
+        private IServiceProvider serviceProvider;
         private readonly Logger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
@@ -152,7 +153,6 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
-
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 
         public Catalog(
@@ -168,7 +168,9 @@ namespace Orleans.Runtime
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
+            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
+            IStreamProviderRuntime providerRuntime,
+            IServiceProvider serviceProvider)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = localSiloDetails.SiloAddress;
@@ -183,7 +185,8 @@ namespace Orleans.Runtime
             this.nodeConfig = nodeConfig;
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
-
+            this.providerRuntime = providerRuntime;
+            this.serviceProvider = serviceProvider;
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config);
@@ -241,11 +244,6 @@ namespace Orleans.Runtime
         internal void SetLogConsistencyManager(ILogConsistencyProviderManager logConsistencyManager)
         {
             logConsistencyProviderManager = logConsistencyManager;
-        }
-
-        internal void SetStreamProviderRuntime(IStreamProviderRuntime streamProviderRuntime)
-        {
-            this.providerRuntime = streamProviderRuntime;
         }
 
         internal void Start()
@@ -749,13 +747,11 @@ namespace Orleans.Runtime
                             consistencyProvider, data.StorageProvider);
                     }
                 }
-
-
-                List<Type> supportedTypes;
-                if(IsStreamSubscriptionObserver(grainType, out supportedTypes))
-                    InstallStreamConsumerExtension(data, grain, supportedTypes);
                 
-                   
+                Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap;
+                //if grain implements IStreamSubscriptionObserver<T>, then can get a set of subscriptionObserver from it
+                if(TryGetStreamSubscriptionObservers(grainType, grain, out observerProxyMap))
+                    InstallStreamConsumerExtension(data, observerProxyMap);
 
                 grain.Data = data;
                 data.SetGrainInstance(grain);
@@ -767,29 +763,32 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
 
-        private void InstallStreamConsumerExtension(ActivationData result, IAddressable grainRef, List<Type> supportedTypes)
+        private void InstallStreamConsumerExtension(ActivationData result, Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
         {
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var handler = new StreamConsumerExtension(this.providerRuntime, grainRef, supportedTypes);
+            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.providerRuntime, observerProxyMap);
+            var handler = new StreamConsumerExtension(this.providerRuntime, subscriptionChangeHandler);
             result.TryAddExtension(invoker, handler);
         }
 
-        private bool IsStreamSubscriptionObserver(Type grainType, out List<Type> supportedTypes)
+        private bool TryGetStreamSubscriptionObservers(Type grainType, IAddressable grain, out Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
         {
             var interfaces = grainType.GetInterfaces();
-            List<Type> observerSuppportedTypes = new List<Type>();
+            var subObserverProxyMap = new Dictionary<Type, IStreamSubscriptionObserverProxy>();
             foreach (var interf in interfaces)
             {
                 if (interf.IsGenericType && (interf.GetGenericTypeDefinition().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
                 {
                     var typeParam = interf.GetGenericArguments()[0];
-                    observerSuppportedTypes.Add(typeParam);
+                    var observerProxy = (IStreamSubscriptionObserverProxy)this.serviceProvider.GetService(interf);
+                    observerProxy.SubscriptionObserver = grain;
+                    subObserverProxyMap.Add(typeParam, observerProxy);
                 }
             }
-            supportedTypes = observerSuppportedTypes;
-            return observerSuppportedTypes.Count > 0;
+            observerProxyMap = subObserverProxyMap;
+            return subObserverProxyMap.Count > 0;
         }
 
         private void SetupStorageProvider(Type grainType, ActivationData data)
