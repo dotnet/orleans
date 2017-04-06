@@ -12,7 +12,10 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class SlowConsumingPressureMonitor : ICachePressureMonitor
     {
-        private static TimeSpan DefaultPressureWindowSize = TimeSpan.FromMinutes(1);
+        /// <summary>
+        /// DefaultPressureWindowSize
+        /// </summary>
+        public static TimeSpan DefaultPressureWindowSize = TimeSpan.FromMinutes(1);
         private const double DefaultFlowControlThreshold = 0.5;
 
         /// <summary>
