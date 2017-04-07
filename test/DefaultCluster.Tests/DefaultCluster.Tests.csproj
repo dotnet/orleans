@@ -54,6 +54,7 @@
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="DeactivationTests.cs" />
+    <Compile Include="DropMessageTests.cs" />
     <Compile Include="EchoTaskGrainTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ExternalTypesTests.cs" />

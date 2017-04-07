@@ -282,7 +282,12 @@ namespace Orleans.Runtime
 
         public TimeSpan? Expiration
         {
-            get { return Headers.Expiration; }
+            get
+            {
+                var elapsed = DateTime.UtcNow - localCreationTime;
+                Headers.Expiration = Headers.Expiration - elapsed;
+                return Headers.Expiration;
+            }
             set { Headers.Expiration = value; }
         }
 
@@ -292,9 +297,7 @@ namespace Orleans.Runtime
             {
                 if (!Expiration.HasValue)
                     return false;
-
-                var elapsed = DateTime.UtcNow - localCreationTime;
-                Expiration = Expiration - elapsed;
+                
                 return Expiration <= TimeSpan.Zero;
             }
         }
