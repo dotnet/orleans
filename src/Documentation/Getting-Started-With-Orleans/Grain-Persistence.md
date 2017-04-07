@@ -101,7 +101,20 @@ The following attributes can be added to the `<Provider />` element to configure
 
 ### ADO.NET Storage Provider (SQL Storage Provider)
 
-Note that to use this it is necessary to deploy the database script to the database. The scripts are located in the NuGet library, similar to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version and database vendor.
+Note that to use this it is necessary to deploy the database script to the database.
+The scripts are located in the NuGet library, similar to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version and database vendor.
+They can also be found in the [repository](https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils).
+Currently, the NuGet package includes scripts for SQL Server, MySQL, and PostgreSQL.
+
+__Important:__
+You need to add an ADO.NET provider corrsponding to the database vendor you use.
+Currently, you can use the following NuGet packages, but the list may change in the future.
+- SQL Server [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/)
+- MySQL [MySql.Data](https://www.nuget.org/packages/MySql.Data/)
+- PostgreSQL [Npgsql](https://www.nuget.org/packages/Npgsql)
+
+Check with your database vendor for their latest supported ADO.NET provider.   
+
 
 ```xml
 <Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore" DataConnectionString="Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;" />
