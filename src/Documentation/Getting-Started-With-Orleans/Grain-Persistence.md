@@ -107,7 +107,7 @@ They can also be found in the [repository](https://github.com/dotnet/orleans/tre
 Currently, the NuGet package includes scripts for SQL Server, MySQL, and PostgreSQL.
 
 __Important:__
-You need to add an ADO.NET provider corrsponding to the database vendor you use.
+You need to reference an ADO.NET provider corresponding to the database vendor you use.
 Currently, you can use the following NuGet packages, but the list may change in the future.
 - SQL Server [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/)
 - MySQL [MySql.Data](https://www.nuget.org/packages/MySql.Data/)
