@@ -253,7 +253,8 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
-            gatewayRefreshTimer?.Dispose();
+            if (gatewayRefreshTimer != null)
+                gatewayRefreshTimer.Dispose();
         }
     }
 }
