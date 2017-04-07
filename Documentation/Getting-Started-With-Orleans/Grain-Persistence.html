@@ -143,7 +143,19 @@ public class MyGrain&lt;MyGrainState&gt; ...
 <li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
 </ul>
 <h3 id="adonet-storage-provider-sql-storage-provider">ADO.NET Storage Provider (SQL Storage Provider)</h3>
-<p>Note that to use this it is necessary to deploy the database script to the database. The scripts are located in the NuGet library, similar to <code>\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net&lt;version&gt;\SQLServer\</code> depending on version and database vendor.</p>
+<p>Note that to use this it is necessary to deploy the database script to the database.
+The scripts are located in the NuGet library, similar to <code>\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net&lt;version&gt;\SQLServer\</code> depending on version and database vendor.
+They can also be found in the <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils">repository</a>.
+Currently, the NuGet package includes scripts for SQL Server, MySQL, and PostgreSQL.</p>
+<p><strong>Important:</strong>
+You need to reference an ADO.NET provider corresponding to the database vendor you use.
+Currently, you can use the following NuGet packages, but the list may change in the future.</p>
+<ul>
+<li>SQL Server <a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></li>
+<li>MySQL <a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></li>
+<li>PostgreSQL <a href="https://www.nuget.org/packages/Npgsql">Npgsql</a></li>
+</ul>
+<p>Check with your database vendor for their latest supported ADO.NET provider.   </p>
 <pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.SqlUtils.StorageProvider.SqlStorageProvider&quot; Name=&quot;SqlStore&quot; DataConnectionString=&quot;Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;&quot; /&gt;
 </code></pre><ul>
 <li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The SQL connection string to use.</li>
