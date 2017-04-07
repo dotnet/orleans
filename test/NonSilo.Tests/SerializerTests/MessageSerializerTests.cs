@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -30,6 +31,63 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
         public void MessageTest_BinaryRoundTrip()
         {
             RunTest(1000);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public async Task MessageTest_TtlUpdatedOnAccess()
+        {
+            var request = new InvokeMethodRequest(0, 0, 0, null);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+            message.TimeToLive = TimeSpan.FromSeconds(1);
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(500));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public async Task MessageTest_TtlUpdatedOnSerialization()
+        {
+            var request = new InvokeMethodRequest(0, 0, 0, null);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+            message.TimeToLive = TimeSpan.FromSeconds(1);
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+            int dummy;
+            var serialized = message.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
+            int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
+            byte[] data = new byte[length];
+            int n = 0;
+            foreach (var buffer in serialized)
+            {
+                Array.Copy(buffer.Array, buffer.Offset, data, n, buffer.Count);
+                n += buffer.Count;
+            }
+            message.ReleaseBodyAndHeaderBuffers();
+
+            int headerLength = BitConverter.ToInt32(data, 0);
+            int bodyLength = BitConverter.ToInt32(data, 4);
+            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
+            byte[] header = new byte[headerLength];
+            Array.Copy(data, 8, header, 0, headerLength);
+            byte[] body = new byte[bodyLength];
+            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
+            var headerList = new List<ArraySegment<byte>>();
+            headerList.Add(new ArraySegment<byte>(header));
+            var bodyList = new List<ArraySegment<byte>>();
+            bodyList.Add(new ArraySegment<byte>(body));
+            var context = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(headerList)
+            };
+            var deserializedMessage = new Message
+            {
+                Headers = SerializationManager.DeserializeMessageHeaders(context)
+            };
+            deserializedMessage.SetBodyBytes(bodyList);
+
+            Assert.NotNull(deserializedMessage.TimeToLive);
+            Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(500));
         }
 
         private void RunTest(int numItems)
