@@ -284,8 +284,10 @@ namespace Orleans.Runtime
         {
             get
             {
-                var elapsed = DateTime.UtcNow - localCreationTime;
+                var now = DateTime.UtcNow;
+                var elapsed = now - localCreationTime;
                 Headers.Expiration = Headers.Expiration - elapsed;
+                localCreationTime = now;
                 return Headers.Expiration;
             }
             set { Headers.Expiration = value; }
