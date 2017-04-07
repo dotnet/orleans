@@ -62,8 +62,6 @@ namespace Orleans.Runtime
 
         private object bodyObject;
 
-        private DateTime localCreationTime;
-
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
@@ -282,14 +280,7 @@ namespace Orleans.Runtime
 
         public TimeSpan? Expiration
         {
-            get
-            {
-                var now = DateTime.UtcNow;
-                var elapsed = now - localCreationTime;
-                Headers.Expiration = Headers.Expiration - elapsed;
-                localCreationTime = now;
-                return Headers.Expiration;
-            }
+            get { return Headers.Expiration; }
             set { Headers.Expiration = value; }
         }
 
@@ -444,7 +435,6 @@ namespace Orleans.Runtime
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
-            localCreationTime = DateTime.UtcNow;
         }
         
         /// <summary>
@@ -800,6 +790,12 @@ namespace Orleans.Runtime
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
+            private readonly DateTime _localCreationTime;
+
+            public HeadersContainer()
+            {
+                _localCreationTime = DateTime.UtcNow;
+            }
 
             public Categories Category
             {
@@ -974,7 +970,10 @@ namespace Orleans.Runtime
 
             public TimeSpan? Expiration
             {
-                get { return _expiration; }
+                get
+                {
+                    return _expiration - (DateTime.UtcNow - _localCreationTime);
+                }
                 set
                 {
                     _expiration = value;
