@@ -147,10 +147,6 @@ A quick way to test this is to (see in the aforementioned the few commented line
 The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
 there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
 
-__NB for Microsoft SQL Server users:__
-For the ADO.NET Storage Provider to work with SQL Server, you need to add [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) NuGet package to your project.
-
-
 ### MemoryStorage
 
 ```xml
