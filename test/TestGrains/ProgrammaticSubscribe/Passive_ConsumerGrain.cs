@@ -144,7 +144,7 @@ namespace UnitTests.Grains
         internal ConsumerObserver(Logger logger)
         {
             this.NumConsumed = 0;
-            this.logger = logger;
+            this.logger = logger.GetSubLogger(this.GetType().Name);
         }
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)

@@ -118,6 +118,7 @@
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleDIGrain.cs" />
     <Compile Include="MultipleConstructorsSimpleGrain.cs" />
+    <Compile Include="SlowConsumingGrains\SlowConsumingGrain.cs" />
     <Compile Include="SQLAdapter\CustomerGrain.cs" />
     <Compile Include="SQLAdapter\DeviceGrain.cs" />
     <Compile Include="SQLAdapter\ICustomerState.cs" />
