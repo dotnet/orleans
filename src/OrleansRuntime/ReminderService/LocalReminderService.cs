@@ -175,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
             var rangeSerialNumberCopy = RangeSerialNumber;
             if (Logger.IsVerbose2) Logger.Verbose2($"My range= {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {localReminders.Count}");
             var acks = new List<Task>();
-            foreach (SingleRange range in RangeFactory.GetSubRanges(RingRange))
+            foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
                 acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
@@ -289,7 +289,10 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                var srange = (SingleRange)range;
+                var srange = range as ISingleRange;
+                if (srange == null)
+                    throw new InvalidOperationException("LocalReminderService must be dealing with SingleRange");
+
                 ReminderTableData table = await reminderTable.ReadRows(srange.Begin, srange.End); // get all reminders, even the ones we already have
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)

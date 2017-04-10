@@ -25,8 +25,20 @@ namespace Orleans.Runtime
         string ToFullString();
     }
 
+    public interface ISingleRange : IRingRange
+    {
+        /// <summary>
+        /// Exclusive
+        /// </summary>
+        uint Begin { get; }
+        /// <summary>
+        /// Inclusive
+        /// </summary>
+        uint End { get; }
+    }
+
     [Serializable]
-    internal class SingleRange : IRingRangeInternal, IEquatable<SingleRange>
+    internal class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange
     {
         private readonly uint begin;
         private readonly uint end;
@@ -121,7 +133,7 @@ namespace Orleans.Runtime
         }
     }
 
-    internal static class RangeFactory
+    public static class RangeFactory
     {
         public const long RING_SIZE = ((long)uint.MaxValue) + 1;
 
@@ -140,12 +152,12 @@ namespace Orleans.Runtime
             return new GeneralMultiRange(inRanges);
         }
 
-        public static EquallyDividedMultiRange CreateEquallyDividedMultiRange(IRingRange range, int numSubRanges)
+        internal static EquallyDividedMultiRange CreateEquallyDividedMultiRange(IRingRange range, int numSubRanges)
         {
             return new EquallyDividedMultiRange(range, numSubRanges);
         }
 
-        public static IEnumerable<SingleRange> GetSubRanges(IRingRange range)
+        public static IEnumerable<ISingleRange> GetSubRanges(IRingRange range)
         {
             if (range is SingleRange)
             {
@@ -352,3 +364,4 @@ namespace Orleans.Runtime
         }
     }
 }
+
