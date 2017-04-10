@@ -47,6 +47,7 @@ namespace Orleans.ServiceBus.Providers
             isUnderPressure = false;
         }
 
+        /// <inheritdoc />
         public void RecordCachePressureContribution(double cachePressureContribution)
         {
             // Weight unhealthy contributions thrice as much as healthy ones.
@@ -56,6 +57,7 @@ namespace Orleans.ServiceBus.Providers
             cachePressureContributionCount += weight;
         }
 
+        /// <inheritdoc />
         public bool IsUnderPressure(DateTime utcNow)
         {
             if (nextCheckedTime < utcNow)

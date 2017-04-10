@@ -76,12 +76,14 @@ namespace Orleans.ServiceBus.Providers
             this.PressureWindowSize = pressureWindowSzie;
         }
 
+        /// <inheritdoc />
         public void RecordCachePressureContribution(double cachePressureContribution)
         {
             if (cachePressureContribution > this.biggestPressureInCurrentWindow)
                 biggestPressureInCurrentWindow = cachePressureContribution;
         }
 
+        /// <inheritdoc />
         public bool IsUnderPressure(DateTime utcNow)
         {
             //if any pressure contribution in current period is bigger than flowControlThreshold
