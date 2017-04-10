@@ -96,7 +96,8 @@ namespace UnitTests
             var target = Client.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
 
             // First call should be successful, but client will not receive the response
-            var firstCall = target.LongRunningTask(1, responseTimeout + TimeSpan.FromSeconds(5));
+            var delay = TimeSpan.FromSeconds(5);
+            var firstCall = target.LongRunningTask(1, responseTimeout + delay);
             await Task.Delay(TimeSpan.FromMilliseconds(100));
             // Second call should be dropped by the silo
             var secondCall = target.LongRunningTask(2, TimeSpan.Zero);
@@ -113,7 +114,7 @@ namespace UnitTests
                 throw;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Task.Delay(delay);
 
             Assert.Equal(1, await target.GetLastValue());
         }

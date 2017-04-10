@@ -65,26 +65,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             }
             message.ReleaseBodyAndHeaderBuffers();
 
-            int headerLength = BitConverter.ToInt32(data, 0);
-            int bodyLength = BitConverter.ToInt32(data, 4);
-            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
-            byte[] header = new byte[headerLength];
-            Array.Copy(data, 8, header, 0, headerLength);
-            byte[] body = new byte[bodyLength];
-            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
-            var headerList = new List<ArraySegment<byte>>();
-            headerList.Add(new ArraySegment<byte>(header));
-            var bodyList = new List<ArraySegment<byte>>();
-            bodyList.Add(new ArraySegment<byte>(body));
-            var context = new DeserializationContext(this.fixture.SerializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(headerList)
-            };
-            var deserializedMessage = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(context)
-            };
-            deserializedMessage.SetBodyBytes(bodyList);
+            Message deserializedMessage = DeserializeMessage(length, data);
 
             Assert.NotNull(deserializedMessage.TimeToLive);
             Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(500));
@@ -125,26 +106,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             }
             resp.ReleaseBodyAndHeaderBuffers();
 
-            int headerLength = BitConverter.ToInt32(data, 0);
-            int bodyLength = BitConverter.ToInt32(data, 4);
-            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
-            byte[] header = new byte[headerLength];
-            Array.Copy(data, 8, header, 0, headerLength);
-            byte[] body = new byte[bodyLength];
-            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
-            var headerList = new List<ArraySegment<byte>>();
-            headerList.Add(new ArraySegment<byte>(header));
-            var bodyList = new List<ArraySegment<byte>>();
-            bodyList.Add(new ArraySegment<byte>(body));
-            var context = new DeserializationContext(this.fixture.SerializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(headerList)
-            };
-            var resp1 = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(context)
-            };
-            resp1.SetBodyBytes(bodyList);
+            var resp1 = DeserializeMessage(length, data);
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
@@ -165,6 +127,31 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
                 Assert.IsAssignableFrom<string>(responseList[k]); //Body list item " + k + " has wrong type
                 Assert.Equal<string>((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
             }
+        }
+
+        private Message DeserializeMessage(int length, byte[] data)
+        {
+            int headerLength = BitConverter.ToInt32(data, 0);
+            int bodyLength = BitConverter.ToInt32(data, 4);
+            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
+            byte[] header = new byte[headerLength];
+            Array.Copy(data, 8, header, 0, headerLength);
+            byte[] body = new byte[bodyLength];
+            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
+            var headerList = new List<ArraySegment<byte>>();
+            headerList.Add(new ArraySegment<byte>(header));
+            var bodyList = new List<ArraySegment<byte>>();
+            bodyList.Add(new ArraySegment<byte>(body));
+            var context = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(headerList)
+            };
+            var deserializedMessage = new Message
+            {
+                Headers = SerializationManager.DeserializeMessageHeaders(context)
+            };
+            deserializedMessage.SetBodyBytes(bodyList);
+            return deserializedMessage;
         }
     }
 }
