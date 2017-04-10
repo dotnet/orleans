@@ -9,6 +9,6 @@ namespace Orleans.Streams.Core
 {
     public interface IStreamSubscriptionObserver<T> 
     {
-        Task OnNewSubscription(StreamSubscriptionHandle<T> handle);
+        Task OnSubscribed(StreamSubscriptionHandle<T> handle);
     }
 }

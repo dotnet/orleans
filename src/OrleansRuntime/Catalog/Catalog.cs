@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.GrainDirectory;
@@ -136,6 +135,7 @@ namespace Orleans.Runtime
         private IStorageProviderManager storageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
         private IStreamProviderRuntime providerRuntime;
+        private IStreamProviderManager providerManager;
         private IServiceProvider serviceProvider;
         private readonly Logger logger;
         private int collectionNumber;
@@ -170,6 +170,7 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
             IStreamProviderRuntime providerRuntime,
+            IStreamProviderManager providerManager,
             IServiceProvider serviceProvider)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
@@ -187,6 +188,7 @@ namespace Orleans.Runtime
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
+            this.providerManager = providerManager;
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config);
@@ -768,7 +770,7 @@ namespace Orleans.Runtime
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.providerRuntime, observerProxyMap);
+            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.providerManager, observerProxyMap);
             var handler = new StreamConsumerExtension(this.providerRuntime, subscriptionChangeHandler);
             result.TryAddExtension(invoker, handler);
         }
@@ -779,7 +781,8 @@ namespace Orleans.Runtime
             var subObserverProxyMap = new Dictionary<Type, IStreamSubscriptionObserverProxy>();
             foreach (var interf in interfaces)
             {
-                if (interf.IsGenericType && (interf.GetGenericTypeDefinition().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
+                //use GetTypeInfo for netstandard compatible
+                if (interf.GetTypeInfo().IsGenericType && (interf.GetGenericTypeDefinition().GetTypeInfo().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
                 {
                     var typeParam = interf.GetGenericArguments()[0];
                     var observerProxy = (IStreamSubscriptionObserverProxy)this.serviceProvider.GetService(interf);

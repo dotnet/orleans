@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Orleans.Streams.Core;
 
@@ -36,7 +35,9 @@ namespace Orleans.Streams
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
+        [NonSerialized]
         private readonly StreamSubscriptionChangeHandler subscriptionChangeHandler;
+
         internal StreamConsumerExtension(IStreamProviderRuntime providerRt, StreamSubscriptionChangeHandler streamSubscriptionChangeHandler = null)
         {
             this.subscriptionChangeHandler = streamSubscriptionChangeHandler;

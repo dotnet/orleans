@@ -6,22 +6,23 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Streams.Core;
+using System.Reflection;
 
 namespace Orleans.Streams
 {
     internal class StreamSubscriptionChangeHandler
     {
-        private IStreamProviderRuntime providerRuntime;
+        private IStreamProviderManager providerManager;
         private Dictionary<Type, IStreamSubscriptionObserverProxy> subscriptionObserverMap;
 
-        public StreamSubscriptionChangeHandler(IStreamProviderRuntime providerRT, Dictionary<Type, IStreamSubscriptionObserverProxy> observerMap)
+        public StreamSubscriptionChangeHandler(IStreamProviderManager providerManager, Dictionary<Type, IStreamSubscriptionObserverProxy> observerMap)
         {
-            this.providerRuntime = providerRT;
+            this.providerManager = providerManager;
             this.subscriptionObserverMap = observerMap;
         }
 
         /// <summary>
-        /// This method finds the correct IStreamSubscriptionObserver<T> based on item's type, and invoke its OnNewSubscription method
+        /// This method finds the correct IStreamSubscriptionObserver based on item's type, and invoke its OnNewSubscription method
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamId"></param>
@@ -33,11 +34,9 @@ namespace Orleans.Streams
             IStreamSubscriptionObserverProxy observerProxy;
             if (TryGetStreamSubscriptionObserverProxyForType(messageType, out observerProxy))
             {
-                var streamProvider = this.providerRuntime.ServiceProvider
-                            .GetService<IStreamProviderManager>()
-                            .GetStreamProvider(streamId.ProviderName);
+                var streamProvider = this.providerManager.GetStreamProvider(streamId.ProviderName);
 
-                await observerProxy.InvokeOnNewSubscription(streamId, subscriptionId, streamProvider);
+                await observerProxy.OnSubscribed(streamId, subscriptionId, streamProvider);
             }
         }
 
@@ -46,7 +45,8 @@ namespace Orleans.Streams
             IStreamSubscriptionObserverProxy proxy = null;
             foreach (var observerEntry in this.subscriptionObserverMap)
             {
-                if (observerEntry.Key.IsAssignableFrom(concretType))
+                //use GetTypeInfo for netstandard compatible
+                if (observerEntry.Key.GetTypeInfo().IsAssignableFrom(concretType))
                 {
                     proxy = observerEntry.Value;
                     break;
@@ -59,33 +59,40 @@ namespace Orleans.Streams
 
     internal interface IStreamSubscriptionObserverProxy 
     {
-        Task InvokeOnNewSubscription(StreamId streamId, GuidId subscriptionId, IStreamProvider streamProvider);
+        Task OnSubscribed(StreamId streamId, GuidId subscriptionId, IStreamProvider streamProvider);
         IAddressable SubscriptionObserver { set; }
     }
 
     /// <summary>
-    /// Decorator class for a IStreamSubscriptionObserver<T>. Created mainly to avoid using reflection to invoke
-    /// methods on IStreamSubscriptionObserver<T>.
+    /// Decorator class for a IStreamSubscriptionObserver. Created mainly to avoid using reflection to invoke
+    /// methods on IStreamSubscriptionObserver.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     internal class StreamSubscriptionObserverProxy<T> : IStreamSubscriptionObserver<T>, IStreamSubscriptionObserverProxy
     {
-        private IStreamSubscriptionObserver<T> observer => this.SubscriptionObserver as IStreamSubscriptionObserver<T>;
-        public IAddressable SubscriptionObserver { private get; set; }
+        private IStreamSubscriptionObserver<T> observer;
+        public IAddressable SubscriptionObserver
+        {
+            set
+            {
+                this.observer = (IStreamSubscriptionObserver<T>)value;
+            }
+        }
+
         public StreamSubscriptionObserverProxy()
         {
         }
 
-        public Task OnNewSubscription(StreamSubscriptionHandle<T> handle)
+        public Task OnSubscribed(StreamSubscriptionHandle<T> handle)
         {
-            return this.observer.OnNewSubscription(handle);
+            return this.observer.OnSubscribed(handle);
         }
 
-        public Task InvokeOnNewSubscription(StreamId streamId, GuidId subscriptionId, IStreamProvider streamProvider)
+        public Task OnSubscribed(StreamId streamId, GuidId subscriptionId, IStreamProvider streamProvider)
         {
             var stream = streamProvider.GetStream<T>(streamId.Guid, streamId.Namespace) as StreamImpl<T>;
             var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, stream);
-            return this.observer.OnNewSubscription(handle);
+            return this.OnSubscribed(handle);
         }
     }
 }
