@@ -56,12 +56,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\IMessage.cs">
+      <Link>IMessage.cs</Link>
+    </Compile>
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\IMonsterGrain.cs" />
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\IPlayerGrain.cs" />
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\IRoomGrain.cs" />
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\MonsterInfo.cs" />
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\PlayerInfo.cs" />
-    <Compile Include="IMessage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\AdventureDotNetCli\AdventureGrainInterfaces\Thing.cs" />
   </ItemGroup>
