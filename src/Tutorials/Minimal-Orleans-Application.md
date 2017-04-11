@@ -19,7 +19,7 @@ You can find the final source code in `Samples\Tutorial.Minimal` folder ([see la
 ## Project Setup
 
 
-For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document [Getting Started with Orleans](https://dotnet.github.io/orleans/Tutorials/My-First-Orleans-Application.html).
+For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document [Getting Started with Orleans](My-First-Orleans-Application.md).
 
 The Solution will eventually look like this.  (Missing files will be added in the sections below)
 
@@ -232,5 +232,5 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
  - [List of Orleans Packages](http://dotnet.github.io/orleans/NuGets)
  - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/)
  - [Orleans Best Practices](http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf)
- - [Running in a Stand Alone Silo](https://dotnet.github.io/orleans/Tutorials/Running-in-a-Stand-alone-Silo.html)
+ - [Running in a Stand Alone Silo](Running-in-a-Stand-alone-Silo.md)
  - [Azure Web Sample](http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample)
