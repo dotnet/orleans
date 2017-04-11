@@ -23,7 +23,7 @@ using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementContext, ISiloStatusListener
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, ISiloStatusListener
     {
         /// <summary>
         /// Exception to indicate that the activation would have been a duplicate so messages pending for it should be redirected.

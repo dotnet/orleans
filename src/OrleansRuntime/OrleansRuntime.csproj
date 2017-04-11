@@ -63,7 +63,6 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
-    <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />
     <Compile Include="Services\GrainServiceClient.cs" />
@@ -143,7 +142,7 @@
     <Compile Include="Scheduler\ClosureWorkItem.cs" />
     <Compile Include="Scheduler\IWorkItem.cs" />
     <Compile Include="Scheduler\SchedulingContext.cs" />
-    <Compile Include="Placement\IPlacementContext.cs" />
+    <Compile Include="Placement\IPlacementRuntime.cs" />
     <Compile Include="Counters\CountersStatistics.cs" />
     <Compile Include="Counters\OrleansCounterManager.cs" />
     <Compile Include="GrainDirectory\AdaptiveGrainDirectoryCache.cs" />
