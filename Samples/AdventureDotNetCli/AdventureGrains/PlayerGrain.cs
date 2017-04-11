@@ -33,15 +33,17 @@ namespace AdventureGrains
         }
 
         // Clients call this to subscribe.
-        public async Task Subscribe(IMessage observer)
+        public Task Subscribe(IMessage observer)
         {
              _subsManager.Subscribe(observer);
+            return TaskDone.Done;
         }
 
         //Also clients use this to unsubscribe themselves to no longer receive the messages.
-        public async Task UnSubscribe(IMessage observer)
+        public Task UnSubscribe(IMessage observer)
         {
             _subsManager.Unsubscribe(observer);
+            return TaskDone.Done;
         }
 
         public Task SendUpdateMessage(string message)
@@ -282,10 +284,9 @@ namespace AdventureGrains
             if (this.roomGrain != null)
             {
                 await roomGrain.Leave(myInfo);
-            }
-            return "You left the game";
+            }            
 
-            this.DeactivateOnIdle(); // Force a deactivation of the grain
+            return "You left the game";           
         }
 
         async Task<string> IPlayerGrain.Play(string command)
@@ -306,6 +307,7 @@ namespace AdventureGrains
            
             switch (verb)
             {
+                case "l":
                 case "look":
                     return await this.roomGrain.Description(myInfo);
 
@@ -366,10 +368,10 @@ namespace AdventureGrains
                     verb = "south";
                     break;
                 case "e":
-                    verb = "north";
+                    verb = "east";
                     break;
                 case "w":
-                    verb = "south";
+                    verb = "west";
                     break;
             }
 
