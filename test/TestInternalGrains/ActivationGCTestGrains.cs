@@ -62,8 +62,8 @@ namespace UnitTests.Grains
 
         private void OnCollectActivation(GrainId grainId)
         {
-            int other = grainId.GetTypeCode();
-            int self = Data.Address.Grain.GetTypeCode();
+            int other = grainId.TypeCode;
+            int self = Data.Address.Grain.TypeCode;
             if (other == self)
             {
                 IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId.GetPrimaryKey());

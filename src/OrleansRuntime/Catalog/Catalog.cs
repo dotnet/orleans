@@ -222,7 +222,7 @@ namespace Orleans.Runtime
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = target.GrainId.GetTypeCode();
+            var typeCode = target.GrainId.TypeCode;
             IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
@@ -375,7 +375,7 @@ namespace Orleans.Runtime
                 PlacementStrategy unused;
                 MultiClusterRegistrationStrategy unusedActivationStrategy;
                 string grainClassName;
-                GrainTypeManager.GetTypeInfo(grain.GetTypeCode(), out grainClassName, out unused, out unusedActivationStrategy);
+                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused, out unusedActivationStrategy);
                 report.GrainClassTypeName = grainClassName;
             }
             catch (Exception exc)
@@ -497,7 +497,7 @@ namespace Orleans.Runtime
                     return result;
                 }
                 
-                int typeCode = address.Grain.GetTypeCode();
+                int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
 
@@ -702,7 +702,7 @@ namespace Orleans.Runtime
             if (!GrainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
             {
                 // Lookup from grain type code
-                var typeCode = data.Grain.GetTypeCode();
+                var typeCode = data.Grain.TypeCode;
                 if (typeCode != 0)
                 {
                     PlacementStrategy unused;

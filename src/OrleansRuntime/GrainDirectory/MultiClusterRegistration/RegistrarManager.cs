@@ -27,13 +27,13 @@ namespace Orleans.Runtime.GrainDirectory
         {
             MultiClusterRegistrationStrategy strategy;
 
-            var typeCode = grainId.GetTypeCode();
+            var typeCode = grainId.TypeCode;
 
             if (typeCode != 0)
             {
                 string unusedGrainClass;
                 PlacementStrategy unusedPlacement;
-                this.grainTypeManager.GetTypeInfo(grainId.GetTypeCode(), out unusedGrainClass, out unusedPlacement, out strategy);
+                this.grainTypeManager.GetTypeInfo(grainId.TypeCode, out unusedGrainClass, out unusedPlacement, out strategy);
             }
             else
             {
