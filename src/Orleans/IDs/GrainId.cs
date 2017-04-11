@@ -149,7 +149,7 @@ namespace Orleans.Runtime
             return key;
         }
 
-	    internal int TypeCode => Key.BaseTypeCode;
+	    public int TypeCode => Key.BaseTypeCode;
 
 	    private static GrainId FindOrCreateGrainId(UniqueKey key)
         {
