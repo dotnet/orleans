@@ -215,15 +215,15 @@ namespace Orleans.Runtime
         /// </summary>
         public Dispatcher Dispatcher { get; }
 
-        public IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target)
+        public IList<SiloAddress> GetCompatibleSilos(PlacementTarget target)
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = target.GrainId.TypeCode;
-            IReadOnlyList<SiloAddress> silos;
+			var typeCode = target.GrainIdentity.TypeCode;
+			IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
                 var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();
@@ -1402,7 +1402,7 @@ namespace Orleans.Runtime
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 #endregion
-#region IPlacementContext
+#region IPlacementRuntime
 
         public Logger Logger => logger;
 

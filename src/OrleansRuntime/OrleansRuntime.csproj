@@ -63,6 +63,7 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="Placement\IActivationSelector.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />
     <Compile Include="Services\GrainServiceClient.cs" />
@@ -94,7 +95,6 @@
     <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
-    <Compile Include="Placement\IPlacementDirector.cs" />
     <Compile Include="Placement\RandomPlacementDirector.cs" />
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />

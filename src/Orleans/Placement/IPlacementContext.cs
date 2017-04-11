@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Placement
 {
 	public interface IPlacementContext
 	{
-		IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target);
+		IList<SiloAddress> GetCompatibleSilos(PlacementTarget target);
 
 		SiloAddress LocalSilo { get; }
 

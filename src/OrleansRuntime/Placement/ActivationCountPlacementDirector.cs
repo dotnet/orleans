@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Placement
 
 
         // internal for unit tests
-        internal Func<PlacementStrategy, PlacementTarget, IPlacementContext, Task<PlacementResult>> SelectSilo;
+        internal Func<PlacementStrategy, PlacementTarget, IPlacementContext, Task<SiloAddress>> SelectSilo;
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
@@ -74,22 +74,19 @@ namespace Orleans.Runtime.Placement
                 cachedStats.SiloStats.RecentlyUsedActivationCount;
         }
 
-        private Task<PlacementResult> MakePlacement(PlacementStrategy strategy, GrainId grain, IPlacementContext context, CachedLocalStat minLoadedSilo)
+        private Task<SiloAddress> MakePlacement(CachedLocalStat minLoadedSilo)
         {
             // Increment placement by number of silos instead of by one.
             // This is our trick to get more balanced placement, accounting to the probable
             // case when multiple silos place on the same silo at the same time, before stats are refreshed.
             minLoadedSilo.IncrementActivationCount(localCache.Count);
 
-            return Task.FromResult(PlacementResult.SpecifyCreation(
-                minLoadedSilo.Address,
-                strategy,
-                context.GetGrainTypeName(grain)));
+            return Task.FromResult(minLoadedSilo.Address);
         }
 
-        public Task<PlacementResult> SelectSiloPowerOfK(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        public Task<SiloAddress> SelectSiloPowerOfK(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var compatibleSilos = context.GetCompatibleSiloList(target);
+            var compatibleSilos = context.GetCompatibleSilos(target);
             // Exclude overloaded and non-compatible silos
             var relevantSilos = new List<CachedLocalStat>();
             foreach (CachedLocalStat current in localCache.Values)
@@ -119,7 +116,7 @@ namespace Orleans.Runtime.Placement
                         minLoadedSilo = s;
                 }
 
-                return MakePlacement(strategy, target.GrainId, context, minLoadedSilo);
+                return MakePlacement(minLoadedSilo);
             }
             
             var debugLog = string.Format("Unable to select a candidate from {0} silos: {1}", localCache.Count,
@@ -136,7 +133,7 @@ namespace Orleans.Runtime.Placement
         /// <note>
         /// This is equivalent with SelectSiloPowerOfK() with chooseHowMany = #Silos
         /// </note>
-        private Task<PlacementResult> SelectSiloGreedy(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+        private Task<SiloAddress> SelectSiloGreedy(PlacementStrategy strategy, GrainId grain, IPlacementRuntime context)
         {
             int minLoad = int.MaxValue;
             CachedLocalStat minLoadedSilo = null;
@@ -152,7 +149,7 @@ namespace Orleans.Runtime.Placement
             }
 
             if (minLoadedSilo != null) 
-                return MakePlacement(strategy, grain, context, minLoadedSilo);
+                return MakePlacement(minLoadedSilo);
             
             var debugLog = string.Format("Unable to select a candidate from {0} silos: {1}", localCache.Count, 
                 Utils.EnumerableToString(
@@ -162,7 +159,7 @@ namespace Orleans.Runtime.Placement
             throw new OrleansException(debugLog);
         }
 
-        public override Task<PlacementResult> OnAddActivation(
+        public override Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             return SelectSilo(strategy, target, context);
