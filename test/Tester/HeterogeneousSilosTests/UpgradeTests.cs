@@ -72,7 +72,7 @@ namespace Tester.HeterogeneousSilosTests
 
             waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
 
-            StartSiloV1().Wait(waitDelay);
+            StartSiloV1();
             client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
             client.Connect().Wait();
         }
@@ -153,6 +153,7 @@ namespace Tester.HeterogeneousSilosTests
 
             var waitingTask = grain0.LongRunningTask(TimeSpan.FromSeconds(5));
             var callBeforeUpgrade = grain0.GetVersion();
+            await Task.Delay(100); // Make sure requests are not sent out of order
             var callProvokingUpgrade = grain1.ProxyGetVersion(grain0);
 
             await waitingTask;
@@ -160,10 +161,9 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Equal(2, await callProvokingUpgrade);
         }
 
-        private async Task StartSiloV1()
+        private void StartSiloV1()
         {
             this.siloV1 = StartSilo(Silo.PrimarySiloName, assemblyGrainsV1Dir);
-            await Task.Delay(1000);
         }
 
         private async Task StartSiloV2()
