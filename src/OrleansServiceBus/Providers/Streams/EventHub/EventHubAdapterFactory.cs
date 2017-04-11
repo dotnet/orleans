@@ -221,7 +221,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             if (token != null)
@@ -263,7 +263,7 @@ namespace Orleans.ServiceBus.Providers
         private IEventHubQueueCache CreateCacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
             FixedSizeObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
         {
-            var cache = new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, this.SerializationManager);
+            var cache = CreateCache(checkpointer, cacheLogger, bufferPool, timePurge);
             if (adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
             {
                 var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
@@ -281,6 +281,12 @@ cache.AddCachePressureMonitor(avgMonitor);
 cache.AddCachePressureMonitor(slowConsumeMonitor);
             }
             return cache;
+        }
+
+        protected virtual IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, 
+            Logger cacheLogger, FixedSizeObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
+        {
+            return new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, SerializationManager);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
