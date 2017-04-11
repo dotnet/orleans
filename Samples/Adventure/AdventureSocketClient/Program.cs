@@ -26,15 +26,10 @@ namespace AdventureSocketClient
 
             GrainClient.Initialize(config);
 
-            MainAsync(args).Wait(-1); // Wait for ever, never timeout
+            MainAsync(args).Wait(); // Wait for ever, never timeout
         }
-
+       
         private static async Task MainAsync(string[] args)
-        {
-            RunServerAsync().Wait(-1);
-        }
-
-        static async Task RunServerAsync()
         {
             var bossGroup = new MultithreadEventLoopGroup(1);
             var workerGroup = new MultithreadEventLoopGroup();
@@ -50,7 +45,6 @@ namespace AdventureSocketClient
                     .Group(bossGroup, workerGroup)
                     .Channel<TcpServerSocketChannel>()
                     .Option(ChannelOption.SoBacklog, 100)
-//                    .Handler(new LoggingHandler(LogLevel.INFO))
                     .ChildHandler(new ActionChannelInitializer<ISocketChannel>(channel =>
                     {
                         IChannelPipeline pipeline = channel.Pipeline;

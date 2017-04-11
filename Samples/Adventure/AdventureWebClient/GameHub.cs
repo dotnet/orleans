@@ -178,7 +178,6 @@ namespace AdventureWebClient
             string name = Context.QueryString["userid"];
 
             string response = "";
-            bool close = false;
 
             if (string.IsNullOrEmpty(msg))
             {
@@ -188,7 +187,6 @@ namespace AdventureWebClient
             else if (string.Equals("End", msg, StringComparison.OrdinalIgnoreCase))
             {
                 response = "Have a good day!\r\n";
-                close = true;
             }
             else
             {
@@ -215,11 +213,6 @@ namespace AdventureWebClient
             {
                 Clients.Caller.AddResponse(response);
             }
-
-            //if (close)
-            //{
-            // Force disconnect?
-            //}
 
             return true;
         }

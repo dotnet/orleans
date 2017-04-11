@@ -72,7 +72,7 @@ namespace AdventureSocketClient
 
 
 
-        private async void ProcessMessage(IChannelHandlerContext contex, string msg)
+        private async void ProcessMessage(IChannelHandlerContext context, string msg)
         {
             string response = "";
             bool close = false;
@@ -96,7 +96,7 @@ namespace AdventureSocketClient
 
 
                     // Implement Observers pattern - https://dotnet.github.io/orleans/Documentation/Getting-Started-With-Orleans/Observers.html
-                    _message = new Message(contex);
+                    _message = new Message(context);
 
                     //Create a reference for Message usable for subscribing to the observable grain.
                     _messageInterface = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(_message);
@@ -125,14 +125,13 @@ namespace AdventureSocketClient
                 response = "Unexpected exception: " + ex;
                 close = true;
             }
+            
+            await context.WriteAndFlushAsync(response + "\r\n");
 
-            Task wait_close = contex.WriteAndFlushAsync(response + "\r\n");
             if (close)
-            {
-                Task.WaitAll(wait_close);
-                contex.CloseAsync();
+            {                
+                await context.CloseAsync();
             }
-
         }
 
         public override void ChannelReadComplete(IChannelHandlerContext contex)
@@ -140,10 +139,10 @@ namespace AdventureSocketClient
             contex.Flush();
         }
 
-        public override void ExceptionCaught(IChannelHandlerContext contex, Exception e)
+        public async override void ExceptionCaught(IChannelHandlerContext contex, Exception e)
         {
             Console.WriteLine("{0}", e.StackTrace);
-            contex.CloseAsync();
+            await contex.CloseAsync();
         }
 
         public override bool IsSharable => true;
