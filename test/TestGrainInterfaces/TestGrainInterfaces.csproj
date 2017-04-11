@@ -47,6 +47,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="CustomPlacement.cs" />
     <Compile Include="EventSourcing\IAccountGrain.cs" />
     <Compile Include="EventSourcing\IChatGrain.cs" />
     <Compile Include="EventSourcing\ICountersGrain.cs" />
