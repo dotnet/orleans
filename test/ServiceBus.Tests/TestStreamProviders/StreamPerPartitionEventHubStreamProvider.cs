@@ -1,11 +1,14 @@
-﻿
-using System;
+﻿using System;
 using System.Text;
+
 #if NETSTANDARD
 using Microsoft.Azure.EventHubs;
 #else
+
 using Microsoft.ServiceBus.Messaging;
+
 #endif
+
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -19,24 +22,33 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class StreamPerPartitionEventHubStreamProvider : PersistentStreamProvider<StreamPerPartitionEventHubStreamProvider.AdapterFactory>
     {
-        public class AdapterFactory : EventHubAdapterFactory
+        private class CacheFactory : IEventHubQueueCacheFactory
         {
-            private TimePurgePredicate timePurgePredicate = null;
+            private readonly EventHubStreamProviderSettings adapterSettings;
+            private readonly SerializationManager serializationManager;
+            private readonly Logger log;
 
-            public AdapterFactory()
+            public CacheFactory(EventHubStreamProviderSettings adapterSettings, SerializationManager serializationManager, Logger log)
             {
-                CacheFactory = CreateQueueCache;
+                this.adapterSettings = adapterSettings;
+                this.serializationManager = serializationManager;
+                this.log = log;
             }
 
-            private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger log)
+            public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
             {
-                if (timePurgePredicate != null)
-                {
-                    timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
-                }
+                var timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.SerializationManager);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.serializationManager);
                 return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, log);
+            }
+        }
+
+        public class AdapterFactory : EventHubAdapterFactory
+        {
+            protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
+            {
+                return new CacheFactory(providerSettings, SerializationManager, logger);
             }
         }
 
@@ -57,7 +69,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 #if NETSTANDARD
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
-                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
+                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);
 #endif
                 return new StreamPosition(stremIdentity, token);
             }

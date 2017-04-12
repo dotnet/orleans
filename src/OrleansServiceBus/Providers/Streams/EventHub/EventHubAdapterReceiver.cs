@@ -28,7 +28,7 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionSettings settings;
-        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory;
+        private readonly IEventHubQueueCacheFactory cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly Logger baseLogger;
         private readonly Logger logger;
@@ -55,7 +55,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
+            IEventHubQueueCacheFactory cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
             IEventHubReceiverMonitor monitor,
@@ -94,7 +94,7 @@ namespace Orleans.ServiceBus.Providers
             try
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
-                cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
+                cache = cacheFactory.CreateCache(settings.Partition, checkpointer, baseLogger);
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
                 receiver = await CreateReceiver(settings, offset, logger);
