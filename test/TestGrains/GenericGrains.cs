@@ -581,6 +581,8 @@ namespace UnitTests.Grains
 
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
+        private T lastValue;
+        
         public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
         {
             tc.CancellationToken.Register(() =>
@@ -589,6 +591,11 @@ namespace UnitTests.Grains
             });
 
             return TaskDone.Done;
+        }
+
+        public Task<T> GetLastValue()
+        {
+            return Task.FromResult(lastValue);
         }
 
         public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
@@ -646,6 +653,7 @@ namespace UnitTests.Grains
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
         {
             await Task.Delay(delay);
+            this.lastValue = t;
             return await Task.FromResult(t);
         }
 
