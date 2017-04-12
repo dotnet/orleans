@@ -204,6 +204,7 @@ namespace UnitTests.GrainInterfaces
         Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc);
         Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target);
         Task CancellationTokenCallbackThrow(GrainCancellationToken tc);
+        Task<T> GetLastValue();
     }
 
     public interface IGenericGrainWithConstraints<A, B, C> : IGrainWithStringKey

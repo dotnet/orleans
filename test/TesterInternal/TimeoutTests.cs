@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,16 +17,16 @@ namespace UnitTests
     {
         private readonly ITestOutputHelper output;
         private readonly TimeSpan originalTimeout;
-        
+
         public TimeoutTests(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
-            originalTimeout = RuntimeClient.Current.GetResponseTimeout();
+            originalTimeout = GrainClient.GetResponseTimeout();
         }
 
         public void Dispose()
         {
-            RuntimeClient.Current.SetResponseTimeout(originalTimeout);
+            GrainClient.SetResponseTimeout(originalTimeout);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
@@ -34,7 +36,7 @@ namespace UnitTests
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-            RuntimeClient.Current.SetResponseTimeout(timeout);
+            GrainClient.SetResponseTimeout(timeout);
 
             Task promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
             //promise = grain.LongMethodWithError(2000);
@@ -80,6 +82,39 @@ namespace UnitTests
             }
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
+        }
+
+
+        [Fact, TestCategory("SlowBVT")]
+        public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
+        {
+            var responseTimeout = TimeSpan.FromSeconds(2);
+            GrainClient.SetResponseTimeout(responseTimeout);
+
+            var target = GrainClient.GrainFactory.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
+
+            // First call should be successful, but client will not receive the response
+            var delay = TimeSpan.FromSeconds(5);
+            var firstCall = target.LongRunningTask(1, responseTimeout + delay);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            // Second call should be dropped by the silo
+            var secondCall = target.LongRunningTask(2, TimeSpan.Zero);
+
+            try
+            {
+                await Assert.ThrowsAsync<TimeoutException>(() => firstCall);
+                await Assert.ThrowsAsync<TimeoutException>(() => secondCall);
+            }
+            catch
+            {
+                output.WriteLine(firstCall.IsFaulted ? $"firstCall: faulted" : $"firstCall: {firstCall.Result}");
+                output.WriteLine(secondCall.IsFaulted ? $"secondCall: faulted" : $"secondCall: {secondCall.Result}");
+                throw;
+            }
+
+            await Task.Delay(delay);
+
+            Assert.Equal(1, await target.GetLastValue());
         }
     }
 }
