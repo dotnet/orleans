@@ -177,7 +177,7 @@ namespace Orleans.Runtime
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
             if (message.IsExpirableMessage(Config.Globals))
-                message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
+                message.TimeToLive = ResponseTimeout;
 
             if (!oneWay)
             {

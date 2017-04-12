@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -83,6 +84,39 @@ namespace UnitTests
             }
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
+        }
+
+
+        [Fact, TestCategory("SlowBVT")]
+        public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
+        {
+            var responseTimeout = TimeSpan.FromSeconds(2);
+            this.runtimeClient.SetResponseTimeout(responseTimeout);
+
+            var target = Client.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
+
+            // First call should be successful, but client will not receive the response
+            var delay = TimeSpan.FromSeconds(5);
+            var firstCall = target.LongRunningTask(1, responseTimeout + delay);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            // Second call should be dropped by the silo
+            var secondCall = target.LongRunningTask(2, TimeSpan.Zero);
+
+            try
+            {
+                await Assert.ThrowsAsync<TimeoutException>(() => firstCall);
+                await Assert.ThrowsAsync<TimeoutException>(() => secondCall);
+            }
+            catch
+            {
+                output.WriteLine(firstCall.IsFaulted ? $"firstCall: faulted" : $"firstCall: {firstCall.Result}");
+                output.WriteLine(secondCall.IsFaulted ? $"secondCall: faulted" : $"secondCall: {secondCall.Result}");
+                throw;
+            }
+
+            await Task.Delay(delay);
+
+            Assert.Equal(1, await target.GetLastValue());
         }
     }
 }
