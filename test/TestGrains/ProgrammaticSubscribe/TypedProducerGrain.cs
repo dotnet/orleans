@@ -99,11 +99,11 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         }
     }
 
-    public class TypedProducerGrainProducingString : TypedProducerGrain<string>, ITypedProducerGrainProducingString
+    public class TypedProducerGrainProducingApple : TypedProducerGrain<Apple>, ITypedProducerGrainProducingApple
     {
-        protected override Task ProducerOnNextAsync(IAsyncStream<string> theProducer)
+        protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer)
         {
-            return theProducer.OnNextAsync(this.numProducedItems.ToString());
+            return theProducer.OnNextAsync(new Apple(this.numProducedItems));
         }
     }
 }

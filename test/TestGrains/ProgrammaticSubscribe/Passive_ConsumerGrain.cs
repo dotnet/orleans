@@ -12,43 +12,17 @@ namespace UnitTests.Grains
     public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain
     {
         internal Logger logger;
-        private List<ConsumerObserver<int>> consumerObservers;
-        private List<StreamSubscriptionHandle<int>> consumerHandles;
-        private List<ConsumerObserver<string>> consumerObservers2;
-        private List<StreamSubscriptionHandle<string>> consumerHandles2;
+        private List<ICounterObserver> consumerObservers;
+        private List<IExternalStreamSubscriptionHandle> consumerHandles;
         private int onAddCalledCount;
-
-        public override async Task OnActivateAsync()
+        public override Task OnActivateAsync()
         {
             logger = base.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             onAddCalledCount = 0;
-            consumerObservers = new List<ConsumerObserver<int>>();
-            consumerHandles = new List<StreamSubscriptionHandle<int>>();
-            consumerObservers2 = new List<ConsumerObserver<string>>();
-            consumerHandles2 = new List<StreamSubscriptionHandle<string>>();
-            IStreamProvider streamProvider = base.GetStreamProvider("SMSProvider");
-            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
-            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
-
-            try
-            {
-                // adding onSubscriptionChangeAction for differnt stream provider
-                streamProvider = base.GetStreamProvider("SMSProvider2");
-                await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
-                await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
-            }
-            catch (KeyNotFoundException)
-            {
-                logger.Info("StreamProvider SMSProvider2 is not configured, skip its OnSubscriptionChangeAction configuration");
-            }
-        }
-
-        public async Task SetupOnSubscriptionChangeActionForProvider(string providerName)
-        {
-            var streamProvider = base.GetStreamProvider(providerName);
-            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
-            await streamProvider.SetOnSubscriptionChangeAction<string>(this.OnAdd2);
+            consumerObservers = new List<ICounterObserver>();
+            consumerHandles = new List<IExternalStreamSubscriptionHandle>();
+            return TaskDone.Done;
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
@@ -60,11 +34,6 @@ namespace UnitTests.Grains
         {
             int sum = 0;
             foreach (var observer in consumerObservers)
-            {
-                sum += observer.NumConsumed;
-            }
-
-            foreach (var observer in consumerObservers2)
             {
                 sum += observer.NumConsumed;
             }
@@ -82,13 +51,6 @@ namespace UnitTests.Grains
             }
             consumerHandles.Clear();
             consumerObservers.Clear();
-
-            foreach (var handle in consumerHandles2)
-            {
-                await handle.UnsubscribeAsync();
-            }
-            consumerHandles2.Clear();
-            consumerObservers2.Clear();
         }
 
         public override Task OnDeactivateAsync()
@@ -97,23 +59,24 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
-        private async Task OnAdd(StreamSubscriptionHandle<int> handle)
+        public async Task OnSubscribed(StreamSubscriptionHandle<int> handle)
         {
             logger.Info("OnAdd");
             this.onAddCalledCount++;
-            var observer = new ConsumerObserver<int>(this.logger);
-            var newhandle = await handle.ResumeAsync(observer);
-            this.consumerObservers.Add(observer);
+            var observer = new CounterObserver<int>(this.logger);
+            var newhandle = new ExternalStreamSubscriptionHandle<int>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
             this.consumerHandles.Add(newhandle);
+            this.consumerObservers.Add(observer);
         }
 
-        private async Task OnAdd2(StreamSubscriptionHandle<string> handle)
+        public async Task OnSubscribed(StreamSubscriptionHandle<IFruit> handle)
         {
-            logger.Info("OnAdd2");
-            var observer = new ConsumerObserver<string>(this.logger);
-            var newhandle = await handle.ResumeAsync(observer);
-            this.consumerObservers2.Add(observer);
-            this.consumerHandles2.Add(newhandle);
+            logger.Info("OnAdd");
+            this.onAddCalledCount++;
+            var observer = new CounterObserver<IFruit>(this.logger);
+            var newhandle = new ExternalStreamSubscriptionHandle<IFruit>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
+            this.consumerHandles.Add(newhandle);
+            this.consumerObservers.Add(observer);
         }
     }
 
@@ -121,27 +84,30 @@ namespace UnitTests.Grains
     {
         internal Logger logger;
 
-        public override async Task OnActivateAsync()
+        public override Task OnActivateAsync()
         {
             logger = base.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
             logger.Info("OnActivateAsync");
-            IStreamProvider streamProvider = base.GetStreamProvider("SMSProvider");
-            await streamProvider.SetOnSubscriptionChangeAction<int>(this.OnAdd);
+            return TaskDone.Done;
         }
 
         //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
-        private async Task OnAdd(StreamSubscriptionHandle<int> handle)
+        public async Task OnSubscribed(StreamSubscriptionHandle<int> handle)
         {
             await handle.UnsubscribeAsync();
         }
     }
 
+    public interface ICounterObserver
+    {
+        int NumConsumed { get; }
+    }
 
-    public class ConsumerObserver<T> : IAsyncObserver<T>
+    public class CounterObserver<T> : IAsyncObserver<T>, ICounterObserver
     {
         public int NumConsumed { get; private set; }
         private Logger logger;
-        internal ConsumerObserver(Logger logger)
+        internal CounterObserver(Logger logger)
         {
             this.NumConsumed = 0;
             this.logger = logger.GetSubLogger(this.GetType().Name);
