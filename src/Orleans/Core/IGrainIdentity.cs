@@ -12,12 +12,12 @@ namespace Orleans.Core
 
         string IdentityString { get; }
 
-	    bool IsClient { get; }
+        bool IsClient { get; }
 
-		int TypeCode { get; }
+        int TypeCode { get; }
 
-		long GetPrimaryKeyLong(out string keyExt);
+        long GetPrimaryKeyLong(out string keyExt);
 
         Guid GetPrimaryKey(out string keyExt);
-	}
+    }
 }

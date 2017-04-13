@@ -222,8 +222,8 @@ namespace Orleans.Runtime
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-			var typeCode = target.GrainIdentity.TypeCode;
-			IReadOnlyList<SiloAddress> silos;
+            var typeCode = target.GrainIdentity.TypeCode;
+            IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
                 var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();

@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 namespace Orleans.Runtime.Placement
 {
     internal interface IPlacementRuntime : IPlacementContext
-	{
+    {
         Logger Logger { get; }
 
         /// <summary>
@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Placement
         Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
-		
+        
         /// <summary>
         /// Try to get the transaction state of the activation if it is available on this silo
         /// </summary>
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Placement
         void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy strategy, string genericArguments = null);
     }
 
-	internal static class PlacementContextExtensions
+    internal static class PlacementRuntimeExtensions
     {
         public static Task<AddressesAndTag> Lookup(this IPlacementRuntime @this, GrainId grainId)
         {

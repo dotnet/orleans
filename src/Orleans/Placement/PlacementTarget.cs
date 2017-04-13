@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Placement
 
         public PlacementTarget(IGrainIdentity grainIdentity, int interfaceId, ushort interfaceVersion)
         {
-			GrainIdentity = grainIdentity;
+            GrainIdentity = grainIdentity;
             InterfaceId = interfaceId;
             InterfaceVersion = interfaceVersion;
         }

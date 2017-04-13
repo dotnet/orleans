@@ -4,12 +4,12 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.Placement
 {
-	public interface IPlacementContext
-	{
-		IList<SiloAddress> GetCompatibleSilos(PlacementTarget target);
+    public interface IPlacementContext
+    {
+        IList<SiloAddress> GetCompatibleSilos(PlacementTarget target);
 
-		SiloAddress LocalSilo { get; }
+        SiloAddress LocalSilo { get; }
 
-		SiloStatus LocalSiloStatus { get; }
-	}
+        SiloStatus LocalSiloStatus { get; }
+    }
 }

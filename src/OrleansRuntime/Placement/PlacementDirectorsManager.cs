@@ -9,12 +9,12 @@ namespace Orleans.Runtime.Placement
     internal class PlacementDirectorsManager
     {
         private readonly ConcurrentDictionary<Type, IPlacementDirector> directors = new ConcurrentDictionary<Type, IPlacementDirector>();
-		private readonly ConcurrentDictionary<Type, IActivationSelector> selectors = new ConcurrentDictionary<Type, IActivationSelector>();
-		private readonly PlacementStrategy defaultPlacementStrategy;
+        private readonly ConcurrentDictionary<Type, IActivationSelector> selectors = new ConcurrentDictionary<Type, IActivationSelector>();
+        private readonly PlacementStrategy defaultPlacementStrategy;
         private readonly ClientObserversPlacementDirector clientObserversPlacementDirector;
-	    private readonly IActivationSelector defaultActivationSelector;
+        private readonly IActivationSelector defaultActivationSelector;
 
-		private readonly IServiceProvider serviceProvider;
+        private readonly IServiceProvider serviceProvider;
 
         public PlacementDirectorsManager(
             IServiceProvider services,
@@ -25,8 +25,8 @@ namespace Orleans.Runtime.Placement
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.clientObserversPlacementDirector = clientObserversPlacementDirector;
             this.ResolveBuiltInStrategies();
-			// TODO: Make default selector configurable
-	        this.defaultActivationSelector = ResolveSelector(RandomPlacement.Singleton, true);
+            // TODO: Make default selector configurable
+            this.defaultActivationSelector = ResolveSelector(RandomPlacement.Singleton, true);
         }
 
         private IPlacementDirector ResolveDirector(PlacementStrategy strategy)
@@ -43,21 +43,21 @@ namespace Orleans.Runtime.Placement
             return result;
         }
 
-		private IActivationSelector ResolveSelector(PlacementStrategy strategy, bool addIfDoesNotExist = false)
-		{
-			IActivationSelector result;
-			var strategyType = strategy.GetType();
-			if (!this.selectors.TryGetValue(strategyType, out result) && addIfDoesNotExist)
-			{
-				var directorType = typeof(IActivationSelector<>).MakeGenericType(strategyType);
-				result = (IActivationSelector)this.serviceProvider.GetRequiredService(directorType);
-				this.selectors[strategyType] = result;
-			}
+        private IActivationSelector ResolveSelector(PlacementStrategy strategy, bool addIfDoesNotExist = false)
+        {
+            IActivationSelector result;
+            var strategyType = strategy.GetType();
+            if (!this.selectors.TryGetValue(strategyType, out result) && addIfDoesNotExist)
+            {
+                var directorType = typeof(IActivationSelector<>).MakeGenericType(strategyType);
+                result = (IActivationSelector)this.serviceProvider.GetRequiredService(directorType);
+                this.selectors[strategyType] = result;
+            }
 
-			return result ?? defaultActivationSelector;
-		}
+            return result ?? defaultActivationSelector;
+        }
 
-		public async Task<PlacementResult> SelectOrAddActivation(
+        public async Task<PlacementResult> SelectOrAddActivation(
                 ActivationAddress sendingAddress,
                 PlacementTarget targetGrain,
                 IPlacementRuntime context,
@@ -99,9 +99,9 @@ namespace Orleans.Runtime.Placement
 
             var director = ResolveDirector(strategy);
             return PlacementResult.SpecifyCreation(
-				await director.OnAddActivation(strategy, target, context), 
-				strategy, 
-				context.GetGrainTypeName(target.GrainIdentity.TypeCode));
+                await director.OnAddActivation(strategy, target, context), 
+                strategy, 
+                context.GetGrainTypeName(target.GrainIdentity.TypeCode));
         }
 
         private void ResolveBuiltInStrategies()

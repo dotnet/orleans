@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector<PreferLocalPlacement>
     {
-	    private Task<SiloAddress> cachedLocalSilo;
+        private Task<SiloAddress> cachedLocalSilo;
 
         public override Task<SiloAddress> 
             OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Placement
                 return base.OnAddActivation(strategy, target, context);
 
             cachedLocalSilo = cachedLocalSilo ?? Task.FromResult(context.LocalSilo);
-			return cachedLocalSilo;
+            return cachedLocalSilo;
         }
     }
 }

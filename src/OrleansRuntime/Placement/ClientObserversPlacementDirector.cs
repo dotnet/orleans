@@ -39,11 +39,11 @@ namespace Orleans.Runtime.Placement
                     throw new InvalidOperationException("Unsupported client type. Grain " + target);
             }
         }
-		
+        
         public override Task<SiloAddress> OnAddActivation(
-			PlacementStrategy strategy, 
-			PlacementTarget target, 
-			IPlacementContext context)
+            PlacementStrategy strategy, 
+            PlacementTarget target, 
+            IPlacementContext context)
         {
             throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainIdentity);
         }

@@ -149,9 +149,9 @@ namespace Orleans.Runtime
             return key;
         }
 
-	    public int TypeCode => Key.BaseTypeCode;
+        public int TypeCode => Key.BaseTypeCode;
 
-	    private static GrainId FindOrCreateGrainId(UniqueKey key)
+        private static GrainId FindOrCreateGrainId(UniqueKey key)
         {
             // Note: This is done here to avoid a wierd cyclic dependency / static initialization ordering problem involving the GrainId, Constants & Interner classes
             if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
