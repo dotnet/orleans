@@ -22,7 +22,6 @@ using Xunit;
 
 namespace ServiceBus.Tests.SlowConsumingTests
 {
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class EHSlowConsumingTests : OrleansTestingBase, IClassFixture<EHSlowConsumingTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

@@ -18,7 +18,6 @@ using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class EHSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHSubscriptionMultiplicityTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

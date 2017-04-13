@@ -22,7 +22,6 @@ using Xunit;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
         private readonly Fixture fixture;
