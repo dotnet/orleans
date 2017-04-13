@@ -106,19 +106,27 @@ namespace Orleans.Runtime.Placement
 
         private void ResolveBuiltInStrategies()
         {
-            var strategies = new PlacementStrategy[]
+            var statelessWorker = new StatelessWorkerPlacement();
+
+            var placementStrategies = new PlacementStrategy[]
             {
                 RandomPlacement.Singleton,
                 ActivationCountBasedPlacement.Singleton,
-                new StatelessWorkerPlacement(),
+                statelessWorker,
                 PreferLocalPlacement.Singleton
             };
-            foreach (var strategy in strategies)
+
+            foreach (var strategy in placementStrategies)
+                this.ResolveDirector(strategy);
+            
+            var selectorStrategies = new PlacementStrategy[]
             {
-                var director = this.ResolveDirector(strategy);
-	            if (director is IActivationSelector)
-		            this.ResolveSelector(strategy);
-            }
+                RandomPlacement.Singleton,
+                statelessWorker,
+            };
+
+            foreach (var strategy in selectorStrategies)
+                this.ResolveSelector(strategy, true);
         }
     }
 }
