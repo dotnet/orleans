@@ -18,8 +18,8 @@ namespace Orleans.ServiceBus.Providers
         {
         }
 
-        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings, SerializationManager serializationManager,
-            FixedSizeObjectPool<FixedSizeBuffer> bufferPool)
+        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
+            SerializationManager serializationManager, FixedSizeObjectPool<FixedSizeBuffer> bufferPool)
         {
             _providerSettings = providerSettings;
             _serializationManager = serializationManager;
@@ -32,31 +32,38 @@ namespace Orleans.ServiceBus.Providers
             return new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
         }
 
-        public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
+        public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
         {
-            var cache = CreateCache(checkpointer, cacheLogger, _bufferPool, _timePurge, _serializationManager);
-            if (_providerSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
+            var cache = CreateCache(checkpointer, logger, _bufferPool, _timePurge, _serializationManager);
+            AddCachePressureMonitors(cache, _providerSettings, logger);
+            return cache;
+        }
+
+        protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamProviderSettings providerSettings,
+            Logger cacheLogger)
+        {
+            if (providerSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
             {
-                var avgMonitor = new AveragingCachePressureMonitor(_providerSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
+                var avgMonitor = new AveragingCachePressureMonitor(
+                    providerSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
                 cache.AddCachePressureMonitor(avgMonitor);
             }
 
-            if (_providerSettings.SlowConsumingMonitorPressureWindowSize.HasValue
-                || _providerSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+            if (providerSettings.SlowConsumingMonitorPressureWindowSize.HasValue
+                || providerSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
             {
                 var slowConsumeMonitor = new SlowConsumingPressureMonitor(cacheLogger);
-                if (_providerSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
+                if (providerSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
                 {
-                    slowConsumeMonitor.FlowControlThreshold = _providerSettings.SlowConsumingMonitorFlowControlThreshold.Value;
+                    slowConsumeMonitor.FlowControlThreshold = providerSettings.SlowConsumingMonitorFlowControlThreshold.Value;
                 }
-                if (_providerSettings.SlowConsumingMonitorPressureWindowSize.HasValue)
+                if (providerSettings.SlowConsumingMonitorPressureWindowSize.HasValue)
                 {
-                    slowConsumeMonitor.PressureWindowSize = _providerSettings.SlowConsumingMonitorPressureWindowSize.Value;
+                    slowConsumeMonitor.PressureWindowSize = providerSettings.SlowConsumingMonitorPressureWindowSize.Value;
                 }
 
                 cache.AddCachePressureMonitor(slowConsumeMonitor);
             }
-            return cache;
         }
 
         protected virtual IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer,
