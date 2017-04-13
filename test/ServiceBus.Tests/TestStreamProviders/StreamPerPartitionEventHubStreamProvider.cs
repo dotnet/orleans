@@ -26,21 +26,20 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             private readonly EventHubStreamProviderSettings adapterSettings;
             private readonly SerializationManager serializationManager;
-            private readonly Logger log;
+            private readonly TimePurgePredicate timePurgePredicate;
 
-            public CacheFactory(EventHubStreamProviderSettings adapterSettings, SerializationManager serializationManager, Logger log)
+            public CacheFactory(EventHubStreamProviderSettings adapterSettings, SerializationManager serializationManager)
             {
                 this.adapterSettings = adapterSettings;
                 this.serializationManager = serializationManager;
-                this.log = log;
+                timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
             }
 
             public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
             {
-                var timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.serializationManager);
-                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, log);
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger);
             }
         }
 
@@ -48,7 +47,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                return new CacheFactory(providerSettings, SerializationManager, logger);
+                return new CacheFactory(providerSettings, SerializationManager);
             }
         }
 

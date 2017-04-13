@@ -9,34 +9,30 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly EventHubStreamProviderSettings _providerSettings;
         private readonly SerializationManager _serializationManager;
-        private readonly IObjectPool<FixedSizeBuffer> _bufferPool;
+        private IObjectPool<FixedSizeBuffer> _bufferPool;
         private readonly TimePurgePredicate _timePurge;
 
         public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
             SerializationManager serializationManager
-        ) : this(providerSettings, serializationManager, CreateBufferPool(providerSettings))
-        {
-        }
-
-        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
-            SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool)
+        )
         {
             _providerSettings = providerSettings;
             _serializationManager = serializationManager;
-            _bufferPool = bufferPool;
             _timePurge = new TimePurgePredicate(_providerSettings.DataMinTimeInCache, _providerSettings.DataMaxAgeInCache);
-        }
-
-        private static FixedSizeObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings)
-        {
-            return new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
         }
 
         public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
         {
-            var cache = CreateCache(checkpointer, logger, _bufferPool, _timePurge, _serializationManager);
+            var bufferPool = CreateBufferPool(_providerSettings);
+            var cache = CreateCache(checkpointer, logger, bufferPool, _timePurge, _serializationManager);
             AddCachePressureMonitors(cache, _providerSettings, logger);
             return cache;
+        }
+
+        protected virtual IObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings)
+        {
+            return _bufferPool ?? (_bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb,
+                () => new FixedSizeBuffer(1 << 20)));
         }
 
         protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamProviderSettings providerSettings,

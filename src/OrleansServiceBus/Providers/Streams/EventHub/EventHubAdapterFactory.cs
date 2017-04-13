@@ -85,7 +85,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Creates a message cache for an eventhub partition.
         /// </summary>
-        protected IEventHubQueueCacheFactory CacheFactory { get; set; }
+        protected Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> CacheFactory { get; set; }
 
         /// <summary>
         /// Creates a parition checkpointer.
@@ -151,7 +151,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (CacheFactory == null)
             {
-                CacheFactory = CreateCacheFactory(adapterSettings);
+                CacheFactory = CreateCacheFactory(adapterSettings).CreateCache;
             }
 
             if (StreamFailureHandlerFactory == null)
