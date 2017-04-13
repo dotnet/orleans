@@ -9,7 +9,7 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly EventHubStreamProviderSettings _providerSettings;
         private readonly SerializationManager _serializationManager;
-        private readonly FixedSizeObjectPool<FixedSizeBuffer> _bufferPool;
+        private readonly IObjectPool<FixedSizeBuffer> _bufferPool;
         private readonly TimePurgePredicate _timePurge;
 
         public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
@@ -19,7 +19,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
-            SerializationManager serializationManager, FixedSizeObjectPool<FixedSizeBuffer> bufferPool)
+            SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool)
         {
             _providerSettings = providerSettings;
             _serializationManager = serializationManager;
@@ -67,7 +67,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         protected virtual IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer,
-            Logger cacheLogger, FixedSizeObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge,
+            Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge,
             SerializationManager serializationManager)
         {
             return new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger, serializationManager);

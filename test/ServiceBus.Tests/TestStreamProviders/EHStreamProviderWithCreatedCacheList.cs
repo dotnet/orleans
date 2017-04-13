@@ -37,7 +37,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 }
 
                 protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
-                    FixedSizeObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
+                    IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
                 {
                     var cache = base.CreateCache(checkpointer, cacheLogger, bufferPool, timePurge, serializationManager);
                     _caches.Add(cache);
