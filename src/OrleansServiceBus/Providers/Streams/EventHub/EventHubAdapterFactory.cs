@@ -52,8 +52,6 @@ namespace Orleans.ServiceBus.Providers
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
-        private Func<NodeConfiguration> getNodeConfig;
-
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
@@ -118,8 +116,6 @@ namespace Orleans.ServiceBus.Providers
             serviceProvider = svcProvider;
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
             this.SerializationManager = this.serviceProvider.GetRequiredService<SerializationManager>();
-            this.getNodeConfig = svcProvider.GetRequiredService<Func<NodeConfiguration>>();
-
             adapterSettings = new EventHubStreamProviderSettings(providerName);
             adapterSettings.PopulateFromProviderConfig(providerConfig);
             hubSettings = adapterSettings.GetEventHubSettings(providerConfig, serviceProvider);
@@ -291,7 +287,8 @@ cache.AddCachePressureMonitor(slowConsumeMonitor);
                 Partition = streamQueueMapper.QueueToPartition(queueId),
             };
             Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
-            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(config.Hub.Path, config.Partition, recieverLogger), this.getNodeConfig);
+            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(config.Hub.Path, config.Partition, recieverLogger), 
+                this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>());
         }
 
         private async Task<string[]> GetPartitionIdsAsync()
