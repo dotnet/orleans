@@ -12,13 +12,24 @@ namespace Orleans.ServiceBus.Providers
         private readonly FixedSizeObjectPool<FixedSizeBuffer> _bufferPool;
         private readonly TimePurgePredicate _timePurge;
 
-        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings, SerializationManager serializationManager)
+        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
+            SerializationManager serializationManager
+        ) : this(providerSettings, serializationManager, CreateBufferPool(providerSettings))
+        {
+        }
+
+        public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings, SerializationManager serializationManager,
+            FixedSizeObjectPool<FixedSizeBuffer> bufferPool)
         {
             _providerSettings = providerSettings;
             _serializationManager = serializationManager;
-
-            _bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(_providerSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+            _bufferPool = bufferPool;
             _timePurge = new TimePurgePredicate(_providerSettings.DataMinTimeInCache, _providerSettings.DataMaxAgeInCache);
+        }
+
+        private static FixedSizeObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings)
+        {
+            return new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
         }
 
         public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
