@@ -162,7 +162,7 @@ namespace Orleans
         {
             internal PlacementStrategy PlacementStrategy { get; private set; }
 
-            internal PlacementAttribute(PlacementStrategy placement)
+            protected PlacementAttribute(PlacementStrategy placement)
             {
                 if (placement == null) throw new ArgumentNullException(nameof(placement));
 

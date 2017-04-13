@@ -24,7 +24,7 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementContext, ISiloStatusListener
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, ISiloStatusListener
     {
         /// <summary>
         /// Exception to indicate that the activation would have been a duplicate so messages pending for it should be redirected.
@@ -223,14 +223,14 @@ namespace Orleans.Runtime
         /// </summary>
         public Dispatcher Dispatcher { get; }
 
-        public IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target)
+        public IList<SiloAddress> GetCompatibleSilos(PlacementTarget target)
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = target.GrainId.GetTypeCode();
+            var typeCode = target.GrainIdentity.TypeCode;
             IReadOnlyList<SiloAddress> silos;
             if (target.InterfaceVersion > 0)
             {
@@ -383,7 +383,7 @@ namespace Orleans.Runtime
                 PlacementStrategy unused;
                 MultiClusterRegistrationStrategy unusedActivationStrategy;
                 string grainClassName;
-                GrainTypeManager.GetTypeInfo(grain.GetTypeCode(), out grainClassName, out unused, out unusedActivationStrategy);
+                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused, out unusedActivationStrategy);
                 report.GrainClassTypeName = grainClassName;
             }
             catch (Exception exc)
@@ -505,7 +505,7 @@ namespace Orleans.Runtime
                     return result;
                 }
                 
-                int typeCode = address.Grain.GetTypeCode();
+                int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
 
@@ -710,7 +710,7 @@ namespace Orleans.Runtime
             if (!GrainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
             {
                 // Lookup from grain type code
-                var typeCode = data.Grain.GetTypeCode();
+                var typeCode = data.Grain.TypeCode;
                 if (typeCode != 0)
                 {
                     PlacementStrategy unused;
@@ -1443,7 +1443,7 @@ namespace Orleans.Runtime
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 #endregion
-#region IPlacementContext
+#region IPlacementRuntime
 
         public Logger Logger => logger;
 

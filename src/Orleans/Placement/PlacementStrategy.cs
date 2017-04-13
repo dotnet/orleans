@@ -4,7 +4,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal abstract class PlacementStrategy
+    public abstract class PlacementStrategy
     {
     }
 

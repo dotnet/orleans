@@ -272,8 +272,10 @@ namespace Orleans.Runtime
             // Placement
             services.AddSingleton<PlacementDirectorsManager>();
             services.AddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
+            services.AddSingleton<IActivationSelector<RandomPlacement>, RandomPlacementDirector>();
             services.AddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
             services.AddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
+            services.AddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
             services.AddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
             services.AddSingleton<DefaultPlacementStrategy>();
             services.AddSingleton<ClientObserversPlacementDirector>();

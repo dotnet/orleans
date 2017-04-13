@@ -61,6 +61,7 @@
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
     <Compile Include="ConsumerEventCountingGrain.cs" />
+    <Compile Include="CustomPlacementGrains.cs" />
     <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
     <Compile Include="EventSourcing\AccountGrain.cs" />

@@ -149,10 +149,7 @@ namespace Orleans.Runtime
             return key;
         }
 
-        internal int GetTypeCode()
-        {
-            return Key.BaseTypeCode;
-        }
+        public int TypeCode => Key.BaseTypeCode;
 
         private static GrainId FindOrCreateGrainId(UniqueKey key)
         {
@@ -242,7 +239,7 @@ namespace Orleans.Runtime
             {
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
-                    var typeString = GetTypeCode().ToString("X");
+                    var typeString = TypeCode.ToString("X");
                     if (!detailed) typeString = typeString.Tail(8);
                     fullString = String.Format("*grn/{0}/{1}", typeString, idString);
                     break;
@@ -254,9 +251,9 @@ namespace Orleans.Runtime
                     break;
                 case UniqueKey.Category.SystemTarget:
                     string explicitName = Constants.SystemTargetName(this);
-                    if (GetTypeCode() != 0)
+                    if (TypeCode != 0)
                     {
-                        var typeStr = GetTypeCode().ToString("X");
+                        var typeStr = TypeCode.ToString("X");
                         return String.Format("{0}/{1}/{2}", explicitName, typeStr, idString);
                     }
                     fullString = explicitName;
@@ -282,10 +279,10 @@ namespace Orleans.Runtime
             return
                 String.Format(
                     "[GrainId: {0}, IdCategory: {1}, BaseTypeCode: {2} (x{3}), PrimaryKey: {4} (x{5}), UniformHashCode: {6} (0x{7, 8:X8}){8}]",
-                    ToDetailedString(),                        // 0
+                    ToDetailedString(),                // 0
                     Category,                          // 1
-                    GetTypeCode(),                     // 2
-                    GetTypeCode().ToString("X"),       // 3
+                    TypeCode,                          // 2
+                    TypeCode.ToString("X"),            // 3
                     pks,                               // 4
                     pksHex,                            // 5
                     GetUniformHashCode(),              // 6

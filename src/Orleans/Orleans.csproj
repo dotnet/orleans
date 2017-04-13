@@ -118,6 +118,9 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="LogConsistency\ILogViewAdaptorHost.cs" />
+    <Compile Include="Placement\IPlacementDirector.cs" />
+    <Compile Include="Placement\IPlacementContext.cs" />
+    <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
