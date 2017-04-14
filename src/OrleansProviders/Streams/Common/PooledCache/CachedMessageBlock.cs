@@ -59,6 +59,16 @@ namespace Orleans.Providers.Streams.Common
         public TCachedMessage NewestMessage => cachedMessages[NewestMessageIndex];
 
         /// <summary>
+        /// Message count in this block
+        /// </summary>
+        public int ItemCount { get
+            {
+                int count = writeIndex - readIndex;
+                return count >= 0 ? count : 0;
+            }  
+        }
+
+        /// <summary>
         /// Block of cached messages
         /// </summary>
         /// <param name="blockSize"></param>

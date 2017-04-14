@@ -192,6 +192,10 @@ namespace Orleans.ServiceBus.Providers
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
+
+            //if not under pressure, signal the cache to do a time based purge
+            if (!this.IsUnderPressure())
+                this.cache.SignalPurge();
             return false;
         }
 
@@ -202,7 +206,7 @@ namespace Orleans.ServiceBus.Providers
 
         public bool IsUnderPressure()
         {
-            return false;
+            return this.GetMaxAddCount() < MaxMessagesPerRead;
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)

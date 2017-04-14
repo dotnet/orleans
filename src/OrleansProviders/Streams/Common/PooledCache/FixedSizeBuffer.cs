@@ -77,8 +77,13 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public override void SignalPurge()
         {
-            count = 0;
             purgeAction?.Invoke(this);
+        }
+
+        /// <inheritdoc />
+        public override void OnResetState()
+        {
+            count = 0;
             purgeAction = null;
         }
     }
