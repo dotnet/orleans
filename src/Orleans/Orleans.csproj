@@ -184,6 +184,7 @@
     <Compile Include="Streams\Internal\StreamSubscriptionChangeHandler.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
+    <Compile Include="Utils\CachedReadConcurrentDictionary.cs" />
     <Compile Include="Utils\Factory.cs" />
     <Compile Include="Utils\IKeyedServiceCollection.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
