@@ -181,18 +181,20 @@ namespace Orleans
         {
             public RandomPlacementAttribute() :
                 base(RandomPlacement.Singleton)
-            { }
+            {
+            }
         }
 
         /// <summary>
         /// Marks a grain class as using the <c>PreferLocalPlacement</c> policy.
         /// </summary>
-        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false) ]
+        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
         public sealed class PreferLocalPlacementAttribute : PlacementAttribute
         {
             public PreferLocalPlacementAttribute() :
                 base(PreferLocalPlacement.Singleton)
-            { }
+            {
+            }
         }
 
         /// <summary>
@@ -203,7 +205,8 @@ namespace Orleans
         {
             public ActivationCountBasedPlacementAttribute() :
                 base(ActivationCountBasedPlacement.Singleton)
-            { }
+            {
+            }
         }
     }
 
@@ -270,38 +273,29 @@ namespace Orleans
             }
         }
 
-    /// <summary>
-    /// Used to mark a method as providing a copier function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class CopierMethodAttribute : Attribute
-    {
-    }
+        /// <summary>
+        /// Used to mark a method as providing a copier function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class CopierMethodAttribute : Attribute
+        {
+        }
 
-    /// <summary>
-    /// Used to mark a method as providing a serializer function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class SerializerMethodAttribute : Attribute
-    {
-    }
+        /// <summary>
+        /// Used to mark a method as providing a serializer function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class SerializerMethodAttribute : Attribute
+        {
+        }
 
-    /// <summary>
-    /// Used to mark a method as providing a deserializer function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class DeserializerMethodAttribute : Attribute
-    {
-    }
-
-    /// <summary>
-    /// Used to make a class for auto-registration as a serialization helper.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    [Obsolete("[RegisterSerializer] is obsolete, please use [Serializer(typeof(TargetType))] instead. Note that the signature of Register has changed to 'void Register(SerializationManager sm)'.")]
-    public sealed class RegisterSerializerAttribute : Attribute
-    {
-    }
+        /// <summary>
+        /// Used to mark a method as providing a deserializer function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class DeserializerMethodAttribute : Attribute
+        {
+        }
     }
 
     namespace Providers
@@ -355,11 +349,11 @@ namespace Orleans
 
     }
 
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
         public string Namespace { get; private set; }
-        
+
         // We have not yet come to an agreement whether the provider should be specified as well.
         public ImplicitStreamSubscriptionAttribute(string streamNamespace)
         {
