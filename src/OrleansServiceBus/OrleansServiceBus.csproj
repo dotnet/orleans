@@ -61,6 +61,7 @@
     <Compile Include="Providers\Streams\EventHub\EventHubCheckpointer.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubPartitionCheckpointEntity.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubQueueCache.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubQueueCacheFactory.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSequenceToken.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSequenceTokenV2.cs" />
@@ -68,6 +69,7 @@
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\ICheckpointerSettings.cs" />
+    <Compile Include="Providers\Streams\EventHub\IEventHubQueueCacheFactory.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />

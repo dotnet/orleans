@@ -1,62 +1,52 @@
 ﻿using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
-    class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
+    internal class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
     {
         public class AdapterFactory : EventHubAdapterFactory, IControllable
         {
-            private List<IEventHubQueueCache> createdCaches;
-            private FixedSizeObjectPool<FixedSizeBuffer> bufferPool;
-            private TimePurgePredicate timePurge;
-            private static int defaultMaxAddCount = 10;
+            private readonly List<IEventHubQueueCache> createdCaches;
+
             public AdapterFactory()
             {
                 createdCaches = new List<IEventHubQueueCache>();
-                CacheFactory = CreateQueueCache;
             }
 
-            private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
+            protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                // the same code block as with EventHubAdapterFactory to define default CacheFactory
-                // except for at the end we put the created cache in CreatedCaches list
-                if(this.bufferPool == null)
-                    this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                if(this.timePurge == null)
-                    this.timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
+                return new CacheFactory(providerSettings, SerializationManager, createdCaches);
+            }
 
-                //ser defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
-                var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(this.SerializationManager, bufferPool, timePurge), EventHubDataComparer.Instance, cacheLogger);
-                if (adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.HasValue)
-                {
-                    var avgMonitor = new AveragingCachePressureMonitor(adapterSettings.AveragingCachePressureMonitorFlowControlThreshold.Value, cacheLogger);
-                    cache.AddCachePressureMonitor(avgMonitor);
-                }
-                if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue
-                || adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
-                {
+            private class CacheFactory : EventHubQueueCacheFactory
+            {
+                private readonly List<IEventHubQueueCache> _caches;
 
-                    var slowConsumeMonitor = new SlowConsumingPressureMonitor(cacheLogger);
-                    if (adapterSettings.SlowConsumingMonitorFlowControlThreshold.HasValue)
-                        slowConsumeMonitor.FlowControlThreshold = adapterSettings.SlowConsumingMonitorFlowControlThreshold.Value;
-                    if (adapterSettings.SlowConsumingMonitorPressureWindowSize.HasValue)
-                        slowConsumeMonitor.PressureWindowSize = adapterSettings.SlowConsumingMonitorPressureWindowSize.Value;
-                    cache.AddCachePressureMonitor(slowConsumeMonitor);
+                public CacheFactory(EventHubStreamProviderSettings providerSettings,
+                    SerializationManager serializationManager, List<IEventHubQueueCache> caches)
+                    : base(providerSettings, serializationManager)
+                {
+                    _caches = caches;
                 }
-                this.createdCaches.Add(cache);
-                return cache;
+
+                protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
+                    IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
+                {
+                    var cache = base.CreateCache(checkpointer, cacheLogger, bufferPool, timePurge, serializationManager);
+                    _caches.Add(cache);
+                    return cache;
+                }
             }
 
             public static int IsCacheBackPressureTriggeredCommand = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 3;
+
             /// <summary>
             /// Only command expecting: determine whether back pressure algorithm on any of the created caches
             /// is triggered.
