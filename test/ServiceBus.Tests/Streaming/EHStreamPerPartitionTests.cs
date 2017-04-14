@@ -21,7 +21,6 @@ using Xunit;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {
         private readonly Fixture fixture;
