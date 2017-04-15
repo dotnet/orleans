@@ -36,6 +36,9 @@
     <file src="OrleansCodeGenerator.pdb" target="tools" />
     <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
     <file src="Microsoft.CodeAnalysis.dll" target="tools" />
+    <file src="Microsoft.Extensions.DependencyInjection.dll" target="tools" />
+    <file src="Microsoft.Extensions.DependencyInjection.Abstractions.dll" target="tools" />
+    <file src="Newtonsoft.Json.dll" target="tools" />
     <file src="System.Reflection.Metadata.dll" target="tools" />
     <file src="System.Collections.Immutable.dll" target="tools" />
   </files>

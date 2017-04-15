@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -140,8 +141,8 @@ namespace Orleans.Streams
         {
             await BindExtensionLazy();
 
-            List<GuidId> subscriptionIds = await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream, IsRewindable))
+            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
+            return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream, IsRewindable))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
 

@@ -71,7 +71,7 @@
     <Message Importance="high" Text="TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
 
-  <Target Name="OrleansDllBootstrapUsingCodeGen" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs" Condition="'$(Bootstrap)' != 'true'">
+  <Target Name="OrleansDllBootstrapUsingCodeGen" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs" Condition="'$(Bootstrap)' != 'true'">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
     <PropertyGroup>
       <!-- Visual Studio or MsBuild .sln build -->

@@ -10,14 +10,15 @@ using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
+using System.Linq;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
+    [TestCategory("ActivationCollector")]
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {
         private readonly ITestOutputHelper output;
         private TestCluster testCluster;
-        private Logger logger;
 
         public DeactivateOnIdleTests(ITestOutputHelper output)
         {
@@ -32,7 +33,6 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             testCluster = new TestCluster(options);
             testCluster.Deploy();
-            this.logger = testCluster.Client.Logger;
         }
         
         public void Dispose()
@@ -41,7 +41,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             testCluster = null;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTestInside_Basic()
         {
             Initialize();
@@ -56,7 +56,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.True(age.TotalMilliseconds < 2000, "Should be newly activated grain");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_1()
         {
             Initialize();
@@ -70,7 +70,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_2_NonReentrant()
         {
             Initialize();
@@ -92,7 +92,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_3_Reentrant()
         {
             Initialize();
@@ -114,7 +114,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_4_Timer()
         {
             Initialize();
@@ -127,7 +127,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await a.IncrCounter();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_5()
         {
             Initialize();
@@ -156,7 +156,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Stress")]
         public async Task DeactivateOnIdleTest_Stress_11()
         {
             Initialize();
@@ -169,13 +169,13 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdle_NonExistentActivation_1()
         {
             await DeactivateOnIdle_NonExistentActivation_Runner(0);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdle_NonExistentActivation_2()
         {
             await DeactivateOnIdle_NonExistentActivation_Runner(1);
@@ -190,39 +190,40 @@ namespace UnitTests.ActivationsLifeCycleTests
             options.ClientConfiguration.Gateways.RemoveAt(1);
             Initialize(options);
 
-            ICollectionTestGrain grain = await PickGrain();
-            Assert.NotNull(grain);
+            ICollectionTestGrain grain = await PickGrainInNonPrimary();
 
-            logger.Info("About to make a 1st GetAge() call.");
+            output.WriteLine("About to make a 1st GetAge() call.");
             TimeSpan age = await grain.GetAge();
-            logger.Info(age.ToString());
+            output.WriteLine(age.ToString());
 
             await grain.DeactivateSelf();
-            Thread.Sleep(3000);
+            await Task.Delay(3000);
 
             // ReSharper disable once PossibleNullReferenceException
             var thrownException = await Record.ExceptionAsync(() => grain.GetAge());
             if (forwardCount != 0)
             {
                 Assert.Null(thrownException);
-                logger.Info("\nThe 1st call after DeactivateSelf has NOT thrown any exception as expected, since forwardCount is {0}.\n", forwardCount);
+                output.WriteLine("\nThe 1st call after DeactivateSelf has NOT thrown any exception as expected, since forwardCount is {0}.\n", forwardCount);
             }
             else
             {
                 Assert.NotNull(thrownException);
                 Assert.IsType<OrleansException>(thrownException);
                 Assert.Contains("Non-existent activation", thrownException.Message);
-                logger.Info("\nThe 1st call after DeactivateSelf has thrown Non-existent activation exception as expected, since forwardCount is {0}.\n", forwardCount);
+                output.WriteLine("\nThe 1st call after DeactivateSelf has thrown Non-existent activation exception as expected, since forwardCount is {0}.\n", forwardCount);
 
                 // Try sending agan now and see it was fixed.
                 await grain.GetAge();
             }
         }
 
-        private async Task<ICollectionTestGrain> PickGrain()
+        private async Task<ICollectionTestGrain> PickGrainInNonPrimary()
         {
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 500; i++)
             {
+                if (i % 30 == 29) await Task.Delay(1000); // give some extra time to stabilize if it can't find a suitable grain
+
                 // Create grain such that:
                 // Its directory owner is not the Gateway silo. This way Gateway will use its directory cache.
                 // Its activation is located on the non Gateway silo as well.
@@ -238,13 +239,16 @@ namespace UnitTests.ActivationsLifeCycleTests
                 {
                     continue;
                 }
-                this.logger.Info("\nCreated grain with key {0} whose primary directory owner is silo {1} and which was activated on silo {2}\n", i, primaryForGrain.ToLongString(), siloHostingActivation);
+                this.output.WriteLine("\nCreated grain with key {0} whose primary directory owner is silo {1} and which was activated on silo {2}\n", i, primaryForGrain.ToLongString(), siloHostingActivation);
                 return grain;
             }
+
+            Assert.True(testCluster.GetActiveSilos().Count() > 1, "This logic requires at least 1 non-primary active silo");
+            Assert.True(false, "Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
             return null;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo()
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
@@ -259,7 +263,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional")]
         public async Task MissingActivation_WithDirectoryLazyDeregistration_SingleSilo()
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
@@ -276,7 +280,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact(Skip = "Needs investigation"), TestCategory("Functional"), TestCategory("ActivationCollector")]
+        [Fact(Skip = "Needs investigation"), TestCategory("Functional")]
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo_SecondaryFirst()
         {
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
@@ -294,7 +298,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             TimeSpan lazyDeregistrationDelay,
             bool forceCreationInSecondary = false)
         {
-            logger.Info("\n\n\n SMissingActivation_Runner.\n\n\n");
+            output.WriteLine("\n\n\n SMissingActivation_Runner.\n\n\n");
 
             var realGrainId = grainId;
 
@@ -398,14 +402,14 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 // Wait a bit
                 TimeSpan pause = lazyDeregistrationDelay.Multiply(2);
-                logger.Info($"Pausing for {0} because we are using lazy deregistration", pause);
+                output.WriteLine($"Pausing for {0} because we are using lazy deregistration", pause);
                 await Task.Delay(pause);
             }
 
             // Now send a message again; it should fail);
             var firstEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
             Assert.Contains("Non-existent activation", firstEx.Message);
-            logger.Info("Got 1st Non-existent activation Exception, as expected.");
+            output.WriteLine("Got 1st Non-existent activation Exception, as expected.");
 
             // Try again; it should succeed or fail, based on doLazyDeregistration
             if (lazyDeregistrationDelay > TimeSpan.Zero || forceCreationInSecondary)
@@ -417,7 +421,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // Since a new instance returned, we've to check that the label is no more prefixed with "hello_"
                 Assert.Equal(grainId.ToString(), newLabel);
 
-                logger.Info($"After 2nd call. newLabel = '{newLabel}'");
+                output.WriteLine($"After 2nd call. newLabel = '{newLabel}'");
 
                 if (forceCreationInSecondary)
                 {
@@ -425,20 +429,20 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                     output.WriteLine(
                         grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
-                    logger.Info(
+                    output.WriteLine(
                         grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
                 }
             }
             else
             {
                 var secondEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
-                logger.Info("Got 2nd exception - " + secondEx.GetBaseException().Message);
+                output.WriteLine("Got 2nd exception - " + secondEx.GetBaseException().Message);
                 Assert.True(
                     secondEx.Message.Contains("duplicate activation")
                     || secondEx.Message.Contains("Non-existent activation")
                     || secondEx.Message.Contains("Forwarding failed"),
                     "2nd exception message: " + secondEx);
-                logger.Info("Got 2nd exception, as expected.");
+                output.WriteLine("Got 2nd exception, as expected.");
             }
         }
     }

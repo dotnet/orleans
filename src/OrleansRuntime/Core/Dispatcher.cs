@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using Orleans.GrainDirectory;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
@@ -25,6 +25,7 @@ namespace Orleans.Runtime
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MessageFactory messagefactory;
+        private readonly SerializationManager serializationManager;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -37,7 +38,8 @@ namespace Orleans.Runtime
             ClusterConfiguration config,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
-            MessageFactory messagefactory)
+            MessageFactory messagefactory,
+            SerializationManager serializationManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -46,6 +48,7 @@ namespace Orleans.Runtime
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
+            this.serializationManager = serializationManager;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -372,7 +375,15 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.State == ActivationState.Invalid)
+                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
+                {
+                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (supportedVersion < request.InterfaceVersion)
+                        catalog.DeactivateActivationOnIdle(targetActivation);
+                }
+
+                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
                 {
                     ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
                     return;
@@ -619,45 +630,7 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
-			if (TrySendMessageToLocalActivation(message))
-            {
-               return;
-            }
-
             AsyncSendMessage(message, sendingActivation).Ignore();
-        }
-
-        private bool TrySendMessageToLocalActivation(Message message)
-        {
-            List<ActivationData> localActivation;
-
-	        if (message.TargetGrain.IsClient || message.SendingGrain.IsClient)
-			{
-		        return false;
-	        }
-
-            if (catalog.LocalLookup(message.TargetGrain, out localActivation))
-            {
-                // todo: consolidate with placement directors (e.g. use FastLookup) and incoming message queue
-                for (var i = 0; i < localActivation.Count; i++)
-                {
-                    var targetActivation = localActivation[i];
-                    if (targetActivation.IsStatelessWorker && localActivation.Count > 1)
-                    {
-                        var rand = new FastRandom(message.TargetGrain.GetHashCode());
-                        // should use placement director, for now using dirty 
-                        targetActivation = localActivation[rand.Next(localActivation.Count - 1)];
-                    }
-
-                    if (targetActivation.GrainInstance != null && targetActivation.State == ActivationState.Valid)
-                    {
-                        message.TargetAddress = targetActivation.Address;
-                        HandleIncomingRequest(message, targetActivation);
-                        return true;
-                    }
-                }
-            }
-            return false;
         }
 
         /// <summary>
@@ -677,8 +650,12 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
+            var request = message.IsUsingInterfaceVersions
+                ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
+                : null;
+            var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, message.TargetGrain, this.catalog, strategy);
+                message.SendingAddress, target, this.catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {

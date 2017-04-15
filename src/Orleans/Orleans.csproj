@@ -172,8 +172,19 @@
     <Compile Include="Services\IGrainService.cs" />
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionManager.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionManagerAdmin.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionManagerRetriever.cs" />
+    <Compile Include="Streams\Core\StreamSubscription.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionManager.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionManagerAdmin.cs" />
+    <Compile Include="Streams\Core\SubscriptionChangeHandler.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Utils\InterlockedExchangeLock.cs" />
+    <Compile Include="Streams\Providers\StreamProviderUtils.cs" />
+    <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
+    <Compile Include="Utils\Factory.cs" />
+    <Compile Include="Utils\IKeyedServiceCollection.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
@@ -443,7 +454,7 @@
     <!-- Show values of some useful properties -->
     <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
-  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs" Condition="'$(Bootstrap)' != 'true'">
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs" Condition="'$(Bootstrap)' != 'true'">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
     <PropertyGroup>
       <BootstrapOutputPath>$(OutDir)Bootstrap\</BootstrapOutputPath>
@@ -460,8 +471,8 @@
     <!-- Finally invoke code generator on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
-      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
-      <CodeGenFilename>$(IntermediateOutputPath)$(TargetName).codegen.cs</CodeGenFilename>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).orleans.g.args.txt</ArgsFile>
+      <CodeGenFilename>$(IntermediateOutputPath)$(TargetName).orleans.g.cs</CodeGenFilename>
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />

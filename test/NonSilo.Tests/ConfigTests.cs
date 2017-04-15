@@ -767,17 +767,23 @@ namespace UnitTests
             const string filename = "ClientConfig_NewAzure.xml";
 
             var client = new ClientBuilder().LoadConfiguration(filename).Build();
+            try
+            {
+                ClientConfiguration config = client.Configuration;
 
-            ClientConfiguration config = client.Configuration;
+                output.WriteLine(config);
 
-            output.WriteLine(config);
+                Assert.NotNull(config); // Client.CurrentConfig
 
-            Assert.NotNull(config); // Client.CurrentConfig
+                Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
 
-            Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
-
-            // GatewayProviderType
-            Assert.Equal(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider);
+                // GatewayProviderType
+                Assert.Equal(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider);
+            }
+            finally
+            {
+                client.Dispose();
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -919,7 +925,7 @@ namespace UnitTests
             const string filename = "Config_Azure_Default.xml";
 
             string deploymentId = "SiloConfig_Azure_Default" + TestConstants.random.Next();
-            string connectionString = TestDefaultConfiguration.DataConnectionString;
+            string connectionString = "UseDevelopmentStorage=true";
 
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
@@ -973,7 +979,7 @@ namespace UnitTests
             var config = new ClientConfiguration();
 
             config.DeploymentId = deploymentId;
-            config.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+            config.DataConnectionString = "UseDevelopmentStorage=true";
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
             config.PreferedGatewayIndex = 11;

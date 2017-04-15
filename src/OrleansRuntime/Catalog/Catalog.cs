@@ -153,7 +153,7 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 
         public Catalog(
-            SiloInitializationParameters siloInitializationParameters,
+            ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
@@ -168,8 +168,8 @@ namespace Orleans.Runtime
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
-            LocalSilo = siloInitializationParameters.SiloAddress;
-            localSiloName = siloInitializationParameters.Name;
+            LocalSilo = localSiloDetails.SiloAddress;
+            localSiloName = localSiloDetails.Name;
             directory = grainDirectory;
             activations = activationDirectory;
             this.scheduler = scheduler;
@@ -184,7 +184,7 @@ namespace Orleans.Runtime
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config);
-            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory);
+            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
             config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
@@ -215,15 +215,26 @@ namespace Orleans.Runtime
         /// </summary>
         public Dispatcher Dispatcher { get; }
 
-        public IList<SiloAddress> GetCompatibleSiloList(GrainId grain)
+        public IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target)
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = grain.GetTypeCode();
-            var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode).Intersect(AllActiveSilos).ToList();
+            var typeCode = target.GrainId.GetTypeCode();
+            IReadOnlyList<SiloAddress> silos;
+            if (target.InterfaceVersion > 0)
+            {
+                var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();
+                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, version);
+            }
+            else
+            {
+                silos = GrainTypeManager.GetSupportedSilos(typeCode);
+            }
+
+            var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
             if (compatibleSilos.Count == 0)
                 throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
 
@@ -716,12 +727,9 @@ namespace Orleans.Runtime
             {
                 Grain grain;
 
-                //Create a new instance of the given grain type
-                grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-
-                //for stateful grains, install storage bridge
-                if (grain is IStatefulGrain)
+                if (typeof(IStatefulGrain).IsAssignableFrom(grainType))
                 {
+                    //for stateful grains, install storage bridge
                     SetupStorageProvider(grainType, data);
 
                     var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
@@ -730,14 +738,19 @@ namespace Orleans.Runtime
 
                     storage.SetGrain(grain);
                 }
-
-                //for log-view grains, install log-view adaptor
-                else if (grain is ILogConsistentGrain)
-                {
-                    var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);                  
-                    grainCreator.InstallLogViewAdaptor(grain, grainType, 
-                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
-                        consistencyProvider, data.StorageProvider);
+                else
+                { 
+                    // Create a new instance of the given grain type
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
+                    
+                    // for log-view grains, install log-view adaptor
+                    if (grain is ILogConsistentGrain)
+                    {
+                        var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);
+                        grainCreator.InstallLogViewAdaptor(grain, grainType,
+                            grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
+                            consistencyProvider, data.StorageProvider);
+                    }
                 }
              
                 grain.Data = data;

@@ -7,7 +7,6 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Tester;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -18,6 +17,7 @@ namespace Tester.AzureUtils
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using AzureStore - Requires access to external Azure storage
     /// </summary>
+    [TestCategory("Azure"), TestCategory("Storage")]
     public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTests.Fixture>, IDisposable
     {
         public class Fixture
@@ -25,7 +25,6 @@ namespace Tester.AzureUtils
             public Fixture()
             {
                 LogManager.Initialize(new NodeConfiguration());
-                TestUtils.CheckForAzureStorage();
             }
         }
 
@@ -39,6 +38,7 @@ namespace Tester.AzureUtils
 
         public SiloInstanceTableManagerTests(ITestOutputHelper output)
         {
+            TestUtils.CheckForAzureStorage();
             this.output = output;
             logger = LogManager.GetLogger("SiloInstanceTableManagerTests", LoggerType.Application);
 
@@ -69,13 +69,13 @@ namespace Tester.AzureUtils
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public void SiloInstanceTable_Op_RegisterSiloInstance()
         {
             RegisterSiloInstance();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public void SiloInstanceTable_Op_ActivateSiloInstance()
         {
             RegisterSiloInstance();
@@ -83,7 +83,7 @@ namespace Tester.AzureUtils
             manager.ActivateSiloInstance(myEntry);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public void SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
@@ -91,7 +91,7 @@ namespace Tester.AzureUtils
             manager.UnregisterSiloInstance(myEntry);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
@@ -100,7 +100,7 @@ namespace Tester.AzureUtils
             Assert.True(didInsert, "Did insert");
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Register_CheckData()
         {
             const string testName = "SiloInstanceTable_Register_CheckData";
@@ -121,7 +121,7 @@ namespace Tester.AzureUtils
             logger.Info("End {0}", testName);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Activate_CheckData()
         {
             RegisterSiloInstance();
@@ -142,7 +142,7 @@ namespace Tester.AzureUtils
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Unregister_CheckData()
         {
             RegisterSiloInstance();
@@ -161,7 +161,7 @@ namespace Tester.AzureUtils
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public void SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             RegisterSiloInstance();
@@ -179,7 +179,7 @@ namespace Tester.AzureUtils
             Assert.Equal(myEntry.ProxyPort,  myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [SkippableFact, TestCategory("Functional")]
         public void SiloAddress_ToFrom_RowKey()
         {
             string ipAddress = "1.2.3.4";

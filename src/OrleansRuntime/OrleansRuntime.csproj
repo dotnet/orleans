@@ -63,6 +63,7 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />
     <Compile Include="Services\GrainServiceClient.cs" />
@@ -203,6 +204,7 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
+    <Compile Include="Utilities\FactoryUtility.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

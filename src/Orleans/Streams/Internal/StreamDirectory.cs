@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Stores all streams associated with a specific grain activation.
+    /// Stores all streams associated with a specific silo
     /// </summary>
     internal class StreamDirectory
     {

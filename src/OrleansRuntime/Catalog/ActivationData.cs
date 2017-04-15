@@ -124,6 +124,11 @@ namespace Orleans.Runtime
                 get { return 0; } // 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
             }
 
+            public ushort InterfaceVersion
+            {
+                get { return 0; }
+            }
+
             /// <summary>
             /// Gets the extension from this instance if it is available.
             /// </summary>

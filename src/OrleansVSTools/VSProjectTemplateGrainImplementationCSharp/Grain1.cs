@@ -7,7 +7,7 @@ namespace $safeprojectname$
     /// Grain implementation class $safeitemname$.
     /// </summary>
     public class $safeitemname$ : Grain, I$safeitemname$
-	{
-
-	}
+    {
+        
+    }
 }

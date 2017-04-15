@@ -8,13 +8,13 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// The registrar for the Cluster-Local Registration Strategy.
     /// </summary>
-    internal class ClusterLocalRegistrar : IGrainRegistrar
+    internal class ClusterLocalRegistrar : IGrainRegistrar<ClusterLocalRegistration>
     {
         private readonly GrainDirectoryPartition directoryPartition;
 
-        public ClusterLocalRegistrar(GrainDirectoryPartition partition)
+        public ClusterLocalRegistrar(LocalGrainDirectory directory)
         {
-            directoryPartition = partition;
+            directoryPartition = directory.DirectoryPartition;
         }
 
         public bool IsSynchronous { get { return true; } }

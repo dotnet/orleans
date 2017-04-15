@@ -7,6 +7,8 @@ using Orleans.Storage;
 using Orleans.Runtime.LogConsistency;
 using Orleans.GrainDirectory;
 using Orleans.Serialization;
+using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -22,22 +24,22 @@ namespace Orleans.Runtime
         private readonly Func<Type, ObjectFactory> createFactory;
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
-
-        private readonly SerializationManager serializationManager;
-        private readonly IInternalGrainFactory grainFactory;
+        
+        private readonly Factory<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> protocolServicesFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainCreator"/> class.
         /// </summary>
         /// <param name="services">Service provider used to create new grains</param>
         /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
-        /// <param name="serializationManager">The serialization manager.</param>
-        /// <param name="grainFactory"></param>
-        public GrainCreator(IServiceProvider services, Func<IGrainRuntime> getGrainRuntime, SerializationManager serializationManager, IInternalGrainFactory grainFactory)
+        /// <param name="protocolServicesFactory"></param>
+        public GrainCreator(
+            IServiceProvider services,
+            Func<IGrainRuntime> getGrainRuntime,
+            Factory<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> protocolServicesFactory)
         {
             this.services = services;
-            this.serializationManager = serializationManager;
-            this.grainFactory = grainFactory;
+            this.protocolServicesFactory = protocolServicesFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
             this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
@@ -100,11 +102,8 @@ namespace Orleans.Runtime
             Type stateType, IMultiClusterRegistrationStrategy mcRegistrationStrategy,
             ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
         {
-            // try to find a suitable logger that we can use to trace consistency protocol information
-            var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
-           
             // encapsulate runtime services used by consistency adaptors
-            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy, this.serializationManager, this.grainFactory);
+            var svc = this.protocolServicesFactory(grain, mcRegistrationStrategy);
 
             var state = Activator.CreateInstance(stateType);
 

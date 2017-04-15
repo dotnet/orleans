@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Core;
 using Orleans.LogConsistency;
 using Orleans.MultiCluster;
-using Orleans.Runtime;
 using Orleans.SystemTargetInterfaces;
 using Orleans.GrainDirectory;
 using Orleans.Serialization;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.LogConsistency
 {
@@ -21,45 +19,61 @@ namespace Orleans.Runtime.LogConsistency
     /// </summary>
     internal class ProtocolServices : ILogConsistencyProtocolServices
     {
-
-        public GrainReference GrainReference { get { return grain.GrainReference; } }
-
-        private Logger log;
-        private readonly IInternalGrainFactory grainFactory;
-
-        public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
-
-        private Grain grain;   // links to the grain that owns this service object
+        private static readonly object[] EmptyObjectArray = new object[0];
 
         // pseudo-configuration to use if there is no actual multicluster network
-        private static MultiClusterConfiguration PseudoMultiClusterConfiguration;
+        private static readonly Interner<string, MultiClusterConfiguration> PseudoMultiClusterConfigurations = new Interner<string, MultiClusterConfiguration>();
+        private static readonly Func<string, MultiClusterConfiguration> CreatePseudoConfig =
+            clusterId => new MultiClusterConfiguration(
+                DateTime.UtcNow,
+                new[] { clusterId }.ToList());
 
-        internal ProtocolServices(Grain gr, Logger log, IMultiClusterRegistrationStrategy strategy, SerializationManager serializationManager, IInternalGrainFactory grainFactory)
+        private readonly IMultiClusterOracle multiClusterOracle;
+
+        private readonly Logger log;
+        private readonly IInternalGrainFactory grainFactory;
+        private readonly Grain grain;   // links to the grain that owns this service object
+        private readonly MultiClusterConfiguration pseudoMultiClusterConfiguration;
+        
+        private readonly GlobalConfiguration globalConfig;
+
+        public ProtocolServices(
+            Grain gr,
+            Factory<string, Logger> logFactory,
+            IMultiClusterRegistrationStrategy strategy,
+            SerializationManager serializationManager,
+            IInternalGrainFactory grainFactory,
+            GlobalConfiguration globalConfig,
+            IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
-            this.log = log;
+            this.log = logFactory("LogConsistencyProtocolServices");
             this.grainFactory = grainFactory;
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
+            this.multiClusterOracle = multiClusterOracle;
+            this.globalConfig = globalConfig;
 
-            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+            if (!globalConfig.HasMultiClusterNetwork)
             {
                 // we are creating a default multi-cluster configuration containing exactly one cluster, this one.
-               PseudoMultiClusterConfiguration = new MultiClusterConfiguration(
-                   DateTime.UtcNow, new string[] { Silo.CurrentSilo.ClusterId }.ToList());
+                this.pseudoMultiClusterConfiguration = PseudoMultiClusterConfigurations.FindOrCreate(
+                    this.globalConfig.ClusterId,
+                    CreatePseudoConfig);
             }
         }
+        
+        public IMultiClusterRegistrationStrategy RegistrationStrategy { get; }
+
+        public GrainReference GrainReference => grain.GrainReference;
 
         public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
-            var silo = Silo.CurrentSilo;
-            var mycluster = silo.ClusterId;
-            var oracle = silo.LocalMultiClusterOracle;
 
-            log?.Verbose3("SendMessage {0}->{1}: {2}", mycluster, clusterId, payload);
+            log?.Verbose3("SendMessage {0}->{1}: {2}", this.globalConfig.ClusterId, clusterId, payload);
 
             // send the message to ourself if we are the destination cluster
-            if (mycluster == clusterId)
+            if (this.globalConfig.ClusterId == clusterId)
             {
                 var g = (ILogConsistencyProtocolParticipant)grain;
                 // we are on the same scheduler, so we can call the method directly
@@ -72,16 +86,16 @@ namespace Orleans.Runtime.LogConsistency
                 throw new ProtocolTransportException("cannot send protocol message to remote instance because there is only one global instance");
             }
 
-            if (PseudoMultiClusterConfiguration != null)
+            if (!this.MultiClusterEnabled)
                 throw new ProtocolTransportException("no such cluster");
 
             if (log != null && log.IsVerbose3)
             {
-                var gws = oracle.GetGateways();
+                var gws = this.multiClusterOracle.GetGateways();
                 log.Verbose3("Available Gateways:\n{0}", string.Join("\n", gws.Select((gw) => gw.ToString())));
             }
 
-            var clusterGateway = oracle.GetRandomClusterGateway(clusterId);
+            var clusterGateway = this.multiClusterOracle.GetRandomClusterGateway(clusterId);
 
             if (clusterGateway == null)
                 throw new ProtocolTransportException("no active gateways found for cluster");
@@ -89,7 +103,7 @@ namespace Orleans.Runtime.LogConsistency
             var repAgent = this.grainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
 
             // test hook
-            var filter = (oracle as MultiClusterNetwork.MultiClusterOracle).ProtocolMessageFilterForTesting;
+            var filter = (this.multiClusterOracle as MultiClusterOracle)?.ProtocolMessageFilterForTesting;
             if (filter != null && !filter(payload))
                 return null;
 
@@ -107,40 +121,34 @@ namespace Orleans.Runtime.LogConsistency
         /// <inheritdoc />
         public SerializationManager SerializationManager { get; }
 
-        public bool MultiClusterEnabled
-        {
-            get
-            {
-                return (PseudoMultiClusterConfiguration == null);
-            }
-        }
+        public bool MultiClusterEnabled => this.globalConfig.HasMultiClusterNetwork;
     
         public string MyClusterId
         {
             get
             {
-                return Silo.CurrentSilo.ClusterId;
+                return this.globalConfig.ClusterId;
             }
         }
+
+        private string ClusterDisplayName => this.MultiClusterEnabled ? " " + this.MyClusterId : string.Empty;
 
         public MultiClusterConfiguration MultiClusterConfiguration
         {
             get
             {
-                return PseudoMultiClusterConfiguration ?? Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
+                return this.pseudoMultiClusterConfiguration ?? this.multiClusterOracle.GetMultiClusterConfiguration();
             }
         }
 
         public IEnumerable<string> GetRemoteInstances()
         {
-            if (PseudoMultiClusterConfiguration == null
+            if (this.MultiClusterEnabled
                 && RegistrationStrategy != ClusterLocalRegistration.Singleton)
             {
-                var myclusterid = Silo.CurrentSilo.ClusterId;
-
-                foreach (var cluster in Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration().Clusters)
+                foreach (var cluster in this.multiClusterOracle.GetMultiClusterConfiguration().Clusters)
                 {
-                    if (cluster != myclusterid)
+                    if (cluster != this.globalConfig.ClusterId)
                         yield return cluster;
                 }
             }
@@ -148,32 +156,30 @@ namespace Orleans.Runtime.LogConsistency
 
         public void SubscribeToMultiClusterConfigurationChanges()
         {
-            if (PseudoMultiClusterConfiguration == null)
+            if (this.MultiClusterEnabled)
             {
                 // subscribe this grain to configuration change events
-                Silo.CurrentSilo.LocalMultiClusterOracle.SubscribeToMultiClusterConfigurationEvents(GrainReference);
+                this.multiClusterOracle.SubscribeToMultiClusterConfigurationEvents(GrainReference);
             }
         }
 
         public void UnsubscribeFromMultiClusterConfigurationChanges()
         {
-            if (PseudoMultiClusterConfiguration == null)
+            if (this.MultiClusterEnabled)
             {
                 // unsubscribe this grain from configuration change events
-                Silo.CurrentSilo.LocalMultiClusterOracle.UnSubscribeFromMultiClusterConfigurationEvents(GrainReference);
+                this.multiClusterOracle.UnSubscribeFromMultiClusterConfigurationEvents(GrainReference);
             }
-
         }
-
 
         public IEnumerable<string> ActiveClusters
         {
             get
             {
-                if (PseudoMultiClusterConfiguration != null)
-                    return PseudoMultiClusterConfiguration.Clusters;
+                if (!this.MultiClusterEnabled)
+                    return this.pseudoMultiClusterConfiguration.Clusters;
                 else
-                    return Silo.CurrentSilo.LocalMultiClusterOracle.GetActiveClusters();
+                    return this.multiClusterOracle.GetActiveClusters();
             }
         }
 
@@ -183,16 +189,16 @@ namespace Orleans.Runtime.LogConsistency
             log?.Error((int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
                 string.Format("{0}{1} Protocol Error: {2}",
                     grain.GrainReference,
-                    PseudoMultiClusterConfiguration == null ? "" : (" " + Silo.CurrentSilo.ClusterId),
+                    this.ClusterDisplayName,
                     msg));
 
             if (!throwexception)
                 return;
 
-            if (PseudoMultiClusterConfiguration != null)
+            if (!this.MultiClusterEnabled)
                 throw new OrleansException(string.Format("{0} (grain={1})", msg, grain.GrainReference));
             else
-                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, Silo.CurrentSilo.ClusterId));
+                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.globalConfig.ClusterId));
         }
 
         public void CaughtException(string where, Exception e)
@@ -200,7 +206,7 @@ namespace Orleans.Runtime.LogConsistency
             log?.Error((int)ErrorCode.LogConsistency_CaughtException,
                string.Format("{0}{1} Exception Caught at {2}",
                    grain.GrainReference,
-                   PseudoMultiClusterConfiguration == null ? "" : (" " + Silo.CurrentSilo.ClusterId),
+                   this.ClusterDisplayName,
                    where),e);
         }
 
@@ -209,7 +215,7 @@ namespace Orleans.Runtime.LogConsistency
             log?.Warn((int)ErrorCode.LogConsistency_UserCodeException,
                 string.Format("{0}{1} Exception caught in user code for {2}, called from {3}",
                    grain.GrainReference,
-                   PseudoMultiClusterConfiguration == null ? "" : (" " + Silo.CurrentSilo.ClusterId),
+                   this.ClusterDisplayName,
                    callback,
                    where), e);
         }
@@ -220,13 +226,11 @@ namespace Orleans.Runtime.LogConsistency
             {
                 var msg = string.Format("{0}{1} {2}",
                         grain.GrainReference,
-                        PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
+                        this.ClusterDisplayName,
                         string.Format(format, args));
                 log.Log(0, severity, msg, EmptyObjectArray, null);
             }
         }
-
-        private static readonly object[] EmptyObjectArray = new object[0];
     }
 
 }

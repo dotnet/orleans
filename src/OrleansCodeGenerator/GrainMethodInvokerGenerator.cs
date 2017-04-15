@@ -66,7 +66,8 @@ namespace Orleans.CodeGenerator
             var members = new List<MemberDeclarationSyntax>(GenerateGenericInvokerFields(grainType))
             {
                 GenerateInvokeMethod(grainType),
-                GenerateInterfaceIdProperty(grainType)
+                GenerateInterfaceIdProperty(grainType),
+                GenerateInterfaceVersionProperty(grainType),
             };
 
             // If this is an IGrainExtension, make the generated class implement IGrainExtensionMethodInvoker.
@@ -105,6 +106,20 @@ namespace Orleans.CodeGenerator
                 SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
             return
                 SF.PropertyDeclaration(typeof(int).GetTypeSyntax(), property.Name)
+                    .AddAccessorListAccessors(
+                        SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                            .AddBodyStatements(SF.ReturnStatement(returnValue)))
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword));
+        }
+
+        private static MemberDeclarationSyntax GenerateInterfaceVersionProperty(Type grainType)
+        {
+            var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceVersion);
+            var returnValue = SF.LiteralExpression(
+                SyntaxKind.NumericLiteralExpression,
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType))); 
+            return
+                SF.PropertyDeclaration(typeof(ushort).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
                         SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                             .AddBodyStatements(SF.ReturnStatement(returnValue)))

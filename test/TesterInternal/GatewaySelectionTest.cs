@@ -44,6 +44,7 @@ namespace UnitTests.MessageCenterTests
             var cfg = new ClientConfiguration();
             cfg.Gateways = null;
             bool failed = false;
+            IDisposable client = null;
             try
             {
                 new ClientBuilder().UseConfiguration(cfg).Build();
@@ -52,6 +53,10 @@ namespace UnitTests.MessageCenterTests
             {
                 output.WriteLine(exc.ToString());
                 failed = true;
+            }
+            finally
+            {
+                client?.Dispose();
             }
             Assert.True(failed, "GatewaySelection_EmptyList failed as GatewayManager did not throw on empty Gateway list.");
 

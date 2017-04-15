@@ -4,12 +4,30 @@ All notable end-user facing changes are documented in this file.
 ### [vNext]
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
-- Several major performance improvements
 - Add streaming support for types that are serialized using IExternalSerializers
 - Replace CallContext.LogicalSetData with AsyncLocal #2200
 - Providers are now constructed using Dependency Injection. The result is that all providers must have a single public constructor with either no arguments or arguments which can all be injected. The default container is used if no container is configured. [#2721](https://github.com/dotnet/orleans/pull/2721)
 - Bug fixes:
-  - Remove registration of IServiceProvider to itself #2749
+
+### [v1.4.1]
+- Improvements
+  - Fix a cleanup issue in TestCluster after a failure #2734
+  - Remove unnecessary service registration of IServiceProvider to itself, which improves support for 3rd party containers #2749
+  - Add a timeout for socket connection #2791
+  - Support for string grain id in OrleansManager.exe #2815
+  - Avoid reconnection to gateway no longer in the list returned by IGatewayListProvider #2824
+  - Handle absolute path in IntermediateOutputPath to address issue 2864 #2865, #2871
+  - Rename codegen file to be excluded from analyzers #2872
+  - ProviderTypeLoader: do not enumerate types in ReflectionOnly assembly. #2869
+  - Do not throw when calling Stop on AsynchQueueAgent after it was disposed.
+- Bug fixes
+  - NodeConfiguration.AdditionalAssemblyDirectories was not 'deeply' copied in the copy constructor #2758
+  - Fix AsReference() in generated code for null values #2756
+  - Avoid a NullReferenceException in SerializationManager.Register(...) #2768
+  - Fix missing check for empty deployment id #2786
+  - Fix to make OrleansPerfCounterTelemetryConsumer still work for grain-specific counters. (part of #2807)
+  - Fix typos in format strings #2853
+  - Fix null reference exception in simple queue cache. #2829 
 
 ### [v1.4.0]
 - Breaking changes

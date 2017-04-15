@@ -6,13 +6,13 @@ using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Tester;
 using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTestFixture>, IDisposable
+    [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
     {
         private readonly Logger logger;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
@@ -40,7 +40,7 @@ namespace Tester.AzureUtils
             return manager;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_1()
         {
             queueName = "Test-1-".ToLower() + Guid.NewGuid();
@@ -74,7 +74,7 @@ namespace Tester.AzureUtils
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_2()
         {
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
@@ -105,7 +105,7 @@ namespace Tester.AzureUtils
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_3_Init_MultipleThreads()
         {
             queueName = "Test-4-".ToLower() + Guid.NewGuid();
@@ -124,7 +124,7 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
             TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);

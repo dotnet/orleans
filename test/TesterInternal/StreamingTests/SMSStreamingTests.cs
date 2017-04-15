@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
@@ -7,8 +6,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Tester;
-using System.Collections.Generic;
 
 namespace UnitTests.StreamingTests
 {
@@ -25,18 +22,12 @@ namespace UnitTests.StreamingTests
                 var options = new TestClusterOptions(initialSilosCount: 4);
 
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
 
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
 
                 options.ClusterConfiguration.Globals.ServiceId = serviceId;
                 return new TestCluster(options);

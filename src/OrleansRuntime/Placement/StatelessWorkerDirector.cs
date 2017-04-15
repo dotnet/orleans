@@ -43,9 +43,9 @@ namespace Orleans.Runtime.Placement
             return Task.FromResult((PlacementResult)null);
         }
 
-        public Task<PlacementResult> OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+        public Task<PlacementResult> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var grainType = context.GetGrainTypeName(grain);
+            var grainType = context.GetGrainTypeName(target.GrainId);
             return Task.FromResult(
                 PlacementResult.SpecifyCreation(context.LocalSilo, strategy, grainType));
         }

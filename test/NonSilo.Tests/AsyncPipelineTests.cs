@@ -30,7 +30,7 @@ namespace UnitTests.AsyncPrimitivesTests
             Stopwatch watch = new Stopwatch();
             watch.Start();
             pipeline.Add(done[0]);
-            const int epsilon = 100;
+            const int epsilon = 130;
             var elapsed0 = watch.ElapsedMilliseconds;
             Assert.True(elapsed0 < epsilon, elapsed0.ToString());
             pipeline.Add(done[2]);
@@ -41,7 +41,8 @@ namespace UnitTests.AsyncPrimitivesTests
             Assert.True(step - epsilon <= elapsed2 && elapsed2 <= step + epsilon);
             pipeline.Wait();
             watch.Stop();
-            Assert.True(3 * step - epsilon <= watch.ElapsedMilliseconds && watch.ElapsedMilliseconds <= 3 * step + epsilon);
+            Assert.True(3 * step - epsilon <= watch.ElapsedMilliseconds, $"{watch.ElapsedMilliseconds}ms");
+            Assert.True(watch.ElapsedMilliseconds <= 3 * step + epsilon, $"{watch.ElapsedMilliseconds}ms");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]

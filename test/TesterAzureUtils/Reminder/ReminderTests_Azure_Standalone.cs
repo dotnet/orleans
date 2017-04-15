@@ -1,6 +1,4 @@
-﻿//#define USE_SQL_SERVER
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,7 +7,6 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
-using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -17,10 +14,11 @@ using Xunit.Abstractions;
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
-namespace UnitTests.TimerTests
+namespace Tester.AzureUtils.TimerTests
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class ReminderTests_Azure_Standalone
+    [TestCategory("Azure")]
+    public class ReminderTests_Azure_Standalone : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -42,7 +40,7 @@ namespace UnitTests.TimerTests
 
         #region Extra tests / experiments
 
-        [Fact, TestCategory("ReminderService"), TestCategory("Azure"), TestCategory("Performance")]
+        [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
             IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>());
@@ -58,7 +56,7 @@ namespace UnitTests.TimerTests
             await TestTableInsertRate(table, 500);
         }
 
-        [Fact, TestCategory("ReminderService"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("ReminderService")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string deploymentId = NewDeploymentId();

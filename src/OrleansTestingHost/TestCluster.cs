@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
+using System.Collections.Concurrent;
 
 namespace Orleans.TestingHost
 {
@@ -39,7 +40,7 @@ namespace Orleans.TestingHost
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
-        private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
+        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
 
         /// <summary>
         /// Client configuration to use when initializing the client
@@ -241,7 +242,11 @@ namespace Orleans.TestingHost
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
-        private static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
+        /// <summary>
+        /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
+        /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
+        /// </summary>
+        public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
         {
             TimeSpan stabilizationTime = TimeSpan.Zero;
             if (didKill)

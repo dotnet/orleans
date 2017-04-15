@@ -24,14 +24,14 @@ namespace Orleans.Runtime
 
 
         public ClientObserverRegistrar(
-            SiloInitializationParameters initializationParameters,
+            ILocalSiloDetails siloDetails,
             ILocalGrainDirectory dir,
             OrleansTaskScheduler scheduler,
             ClusterConfiguration config)
-            : base(Constants.ClientObserverRegistrarId, initializationParameters.SiloAddress)
+            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress)
         {
             grainDirectory = dir;
-            myAddress = initializationParameters.SiloAddress;
+            myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
             orleansConfig = config;
             logger = LogManager.GetLogger(typeof(ClientObserverRegistrar).Name);

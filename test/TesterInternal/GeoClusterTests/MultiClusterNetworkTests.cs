@@ -9,15 +9,16 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
+    [TestCategory("GeoCluster")]
     public class MultiClusterNetworkTests : TestingClusterHost
     {
         public MultiClusterNetworkTests(ITestOutputHelper output) : base(output)
-        { }
-
-       
+        {
+        }
 
         // We need use ClientWrapper to load a client object in a new app domain. 
         // This allows us to create multiple clients that are connected to different silos.
@@ -54,7 +55,7 @@ namespace Tests.GeoClusterTests
         }
 
 
-        [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task TestMultiClusterConf_1_1()
         {
             // use a random global service id for testing purposes
@@ -145,7 +146,7 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task TestMultiClusterConf_3_3()
         {
             // use a random global service id for testing purposes

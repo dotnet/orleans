@@ -8,31 +8,40 @@ using Orleans.SystemTargetInterfaces;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
+using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GlobalSingleInstanceActivationMaintainer : AsynchAgent
     {
+        private readonly object lockable = new object();
+        private readonly GlobalConfiguration config;
         private readonly LocalGrainDirectory router;
         private readonly Logger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly TimeSpan period;
-
-        internal GlobalSingleInstanceActivationMaintainer(LocalGrainDirectory router, Logger logger, GlobalConfiguration config, IInternalGrainFactory grainFactory)
-        {
-            this.router = router;
-            this.logger = logger;
-            this.grainFactory = grainFactory;
-            this.period = config.GlobalSingleInstanceRetryInterval;
-            logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
-
-        }
+        private readonly IMultiClusterOracle multiClusterOracle;
 
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
         // maintainer periodically takes and processes this list.
         private List<GrainId> doubtfulGrains = new List<GrainId>();
-        private object lockable = new object();
+
+        public GlobalSingleInstanceActivationMaintainer(
+            LocalGrainDirectory router,
+            Logger logger,
+            GlobalConfiguration config,
+            IInternalGrainFactory grainFactory,
+            IMultiClusterOracle multiClusterOracle)
+        {
+            this.router = router;
+            this.logger = logger;
+            this.grainFactory = grainFactory;
+            this.config = config;
+            this.multiClusterOracle = multiClusterOracle;
+            this.period = config.GlobalSingleInstanceRetryInterval;
+            logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
+        }
 
         public void TrackDoubtfulGrain(GrainId grain)
         {
@@ -69,11 +78,10 @@ namespace Orleans.Runtime.GrainDirectory
         // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
         protected override async void Run()
         {
-            var globalConfig = Silo.CurrentSilo.OrleansConfig.Globals;
-            if (!globalConfig.HasMultiClusterNetwork)
+            if (!this.config.HasMultiClusterNetwork)
                 return;
 
-            var myClusterId = globalConfig.ClusterId;
+            var myClusterId = this.config.ClusterId;
 
             while (router.Running)
             {
@@ -85,9 +93,8 @@ namespace Orleans.Runtime.GrainDirectory
                     logger.Verbose("GSIP:M running periodic check (having waited {0})", period);
 
                     // examine the multicluster configuration
-                    var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
-
-                    if (config == null || !config.Clusters.Contains(myClusterId))
+                    var multiClusterConfig = this.multiClusterOracle.GetMultiClusterConfiguration();
+                    if (multiClusterConfig == null || !multiClusterConfig.Clusters.Contains(myClusterId))
                     {
                         // we are not joined to the cluster yet/anymore. 
                         // go through all owned entries and make them doubtful
@@ -123,7 +130,7 @@ namespace Orleans.Runtime.GrainDirectory
                         // filter
                         logger.Verbose("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsVerbose2 ? string.Join(",", grains) : "");
 
-                        var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
+                        var remoteClusters = multiClusterConfig.Clusters.Where(id => id != myClusterId).ToList();
                         await router.Scheduler.QueueTask(
                             () => RunBatchedActivationRequests(remoteClusters, grains),
                             router.CacheValidator.SchedulingContext
@@ -177,15 +184,12 @@ namespace Orleans.Runtime.GrainDirectory
 
             var tasks = remoteClusters.Select(async remotecluster =>
             {
-                // find gateway
-                var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
-
-                // send batched request
+                // find gateway and send batched request
                 try
                 {
-                    var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
+                    var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster);
                     var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
-                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), Silo.CurrentSilo.ClusterId);
+                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.config.ClusterId);
                     batchResponses.Add(r);
                 }
                 catch (Exception e)

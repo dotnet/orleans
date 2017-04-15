@@ -13,9 +13,6 @@
     @if NOT "%VS120COMNTOOLS%"=="" (
       @set VSTOOLSDIR="%VS120COMNTOOLS%"
       @set VSVER=Visual Studio 2013
-    ) else (
-      @set VSTOOLSDIR="%VS110COMNTOOLS%"
-      @set VSVER=Visual Studio 2012
     )
   )
 )

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -22,7 +23,7 @@ namespace Orleans.Streams
 
         Task Validate();
 
-        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
         Task FaultSubscription(GuidId subscriptionId);
     }

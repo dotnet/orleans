@@ -272,6 +272,17 @@ namespace Orleans.Runtime
         /// <summary>
         /// Implemented in generated code.
         /// </summary>
+        protected virtual ushort InterfaceVersion
+        {
+            get
+            {
+                throw new InvalidOperationException("Should be overridden by subclass");
+            }
+        }
+
+        /// <summary>
+        /// Implemented in generated code.
+        /// </summary>
         public virtual bool IsCompatible(int interfaceId)
         {
             throw new InvalidOperationException("Should be overridden by subclass");
@@ -324,8 +335,8 @@ namespace Orleans.Runtime
                 SetGrainCancellationTokensTarget(arguments, this);
                 argsDeepCopy = (object[])this.RuntimeClient.SerializationManager.DeepCopy(arguments);
             }
-            
-            var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
+
+            var request = new InvokeMethodRequest(this.InterfaceId, this.InterfaceVersion, methodId, argsDeepCopy);
 
             if (IsUnordered)
                 options |= InvokeMethodOptions.Unordered;

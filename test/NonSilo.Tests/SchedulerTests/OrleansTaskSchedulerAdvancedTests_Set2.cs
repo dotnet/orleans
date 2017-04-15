@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
 using TestExtensions;
 using UnitTests.Grains;
@@ -16,24 +17,30 @@ namespace UnitTests.SchedulerTests
 {
     public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
-        private readonly ITestOutputHelper output;
         private static readonly object lockable = new object();
         private static readonly int waitFactor = Debugger.IsAttached ? 100 : 1;
-        private OrleansTaskScheduler masterScheduler;
-        private UnitTestSchedulingContext context;
         private static readonly SafeRandom random = new SafeRandom();
+        private readonly ITestOutputHelper output;
+        private readonly OrleansTaskScheduler masterScheduler;
+        private readonly UnitTestSchedulingContext context;
+        private readonly SiloPerformanceMetrics performanceMetrics;
+        private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
 
         public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
             this.output = output;
             OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             context = new UnitTestSchedulingContext();
-            masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
+            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup();
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup);
+            masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
         }
         
         public void Dispose()
         {
             masterScheduler.Stop();
+            this.performanceMetrics.Dispose();
+            this.runtimeStatisticsGroup.Dispose();
             LogManager.UnInitialize();
         }
 
@@ -654,7 +661,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             await Run_ActivationSched_Test1(scheduler, false);
@@ -663,7 +670,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1_Bounce()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             await Run_ActivationSched_Test1(scheduler, true);

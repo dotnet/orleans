@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The name of this client.
         /// </summary>
-        public static string ClientName = "Client";
+        public string ClientName { get; set; } = "Client";
 
         private string traceFilePattern;
         private readonly DateTime creationTimestamp;

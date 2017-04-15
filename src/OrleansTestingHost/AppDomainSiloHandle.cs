@@ -22,7 +22,7 @@ namespace Orleans.TestingHost
     {
         private bool isActive = true;
 
-        private Dictionary<string, GeneratedAssembly> additionalAssemblies;
+        private IDictionary<string, GeneratedAssembly> additionalAssemblies;
 
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
@@ -34,9 +34,9 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration, Dictionary<string, GeneratedAssembly> additionalAssemblies)
+        public static SiloHandle Create(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration, IDictionary<string, GeneratedAssembly> additionalAssemblies, string applicationBase = null)
         {
-            AppDomainSetup setup = GetAppDomainSetupInfo();
+            AppDomainSetup setup = GetAppDomainSetupInfo(applicationBase);
 
             var appDomain = AppDomain.CreateDomain(siloName, null, setup);
 
@@ -238,13 +238,13 @@ namespace Orleans.TestingHost
             Console.WriteLine(value.ToString());
         }
 
-        internal static AppDomainSetup GetAppDomainSetupInfo()
+        internal static AppDomainSetup GetAppDomainSetupInfo(string applicationBase)
         {
             var currentAppDomain = AppDomain.CurrentDomain;
 
             return new AppDomainSetup
             {
-                ApplicationBase = Environment.CurrentDirectory,
+                ApplicationBase = string.IsNullOrEmpty(applicationBase) ? Environment.CurrentDirectory : applicationBase,
                 ConfigurationFile = currentAppDomain.SetupInformation.ConfigurationFile,
                 ShadowCopyFiles = currentAppDomain.SetupInformation.ShadowCopyFiles,
                 ShadowCopyDirectories = currentAppDomain.SetupInformation.ShadowCopyDirectories,

@@ -128,6 +128,7 @@
     <Compile Include="ITimerGrain.cs" />
     <Compile Include="IValueTypeTestGrain.cs" />
     <Compile Include="IConsiderForCodeGenerationGrain.cs" />
+    <Compile Include="ProgramaticStreamSubscribe\IPassive_ConsumerGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerializerExclusions.cs" />
     <Compile Include="SerializerTestTypes.cs" />

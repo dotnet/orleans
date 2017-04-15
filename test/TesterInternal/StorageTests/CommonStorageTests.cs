@@ -52,43 +52,40 @@ namespace UnitTests.StorageTests.Relational
             //is ill chosen or the test failed due to another problem.
             var grainStates = Enumerable.Range(StartOfRange, CountOfRange).Select(i => this.GetTestReferenceAndState(string.Format(grainIdTemplate, i), null)).ToList();
 
-            await Task.WhenAll(grainStates.AsParallel()
-                .WithDegreeOfParallelism(8) // Limit parallelization of the first write to not stress out the system with deadlocks on INSERT
-                .Select(async grainData =>
-                {
-                    //A sanity checker that the first version really has null as its state. Then it is stored
-                    //to the database and a new version is acquired.
-                    var firstVersion = grainData.Item2.ETag;
-                    Assert.Equal(firstVersion, null);
+            // Avoid parallelization of the first write to not stress out the system with deadlocks on INSERT
+            foreach (var grainData in grainStates)
+            {
+                //A sanity checker that the first version really has null as its state. Then it is stored
+                //to the database and a new version is acquired.
+                var firstVersion = grainData.Item2.ETag;
+                Assert.Equal(firstVersion, null);
 
-                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
-                    var secondVersion = grainData.Item2.ETag;
-                    Assert.NotEqual(firstVersion, secondVersion);
-                }));
+                await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                var secondVersion = grainData.Item2.ETag;
+                Assert.NotEqual(firstVersion, secondVersion);
+            };
 
-            const int MaxNumberOfThreads = 25;
-            // The purpose of AsParallel is to ensure the storage provider will be tested from
+            int MaxNumberOfThreads = Environment.ProcessorCount * 3;
+            // The purpose of Parallel.ForEach is to ensure the storage provider will be tested from
             // multiple threads concurrently, as would happen in running system also.
             // Nevertheless limit the degree of parallelization (concurrent threads) to
             // avoid unnecessarily starving and growing the thread pool (which is very slow)
             // if a few threads coupled with parallelization via tasks can force most concurrency
             // scenarios.
 
-            var tasks = grainStates.AsParallel().WithDegreeOfParallelism(MaxNumberOfThreads)
-                .Select(async grainData =>
+            Parallel.ForEach(grainStates, new ParallelOptions { MaxDegreeOfParallelism = MaxNumberOfThreads }, grainData =>
+            {
+                // This loop writes the state consecutive times to the database to make sure its
+                // version is updated appropriately.
+                for (int k = 0; k < 10; ++k)
                 {
-                    // This loop writes the state consecutive times to the database to make sure its
-                    // version is updated appropriately.
-                    for (int k = 0; k < 10; ++k)
-                    {
-                        var versionBefore = grainData.Item2.ETag;
-                        await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                    var versionBefore = grainData.Item2.ETag;
+                    Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2).Wait();
 
-                        var versionAfter = grainData.Item2.ETag;
-                        Assert.NotEqual(versionBefore, versionAfter);
-                    }
-                });
-            await Task.WhenAll(tasks);
+                    var versionAfter = grainData.Item2.ETag;
+                    Assert.NotEqual(versionBefore, versionAfter);
+                }
+            });
         }
 
         /// <summary>

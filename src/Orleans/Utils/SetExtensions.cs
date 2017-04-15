@@ -180,5 +180,16 @@ namespace Orleans
             list1.AddRange(list2);
             return list1;
         }
+
+        public static T GetValueOrAddNew<T, TU>(this Dictionary<TU, T> dictionary, TU key) where T : new()
+        {
+            T result;
+            if (dictionary.TryGetValue(key, out result))
+                return result;
+
+            result = new T();
+            dictionary[key] = result;
+            return result;
+        }
     }
 }

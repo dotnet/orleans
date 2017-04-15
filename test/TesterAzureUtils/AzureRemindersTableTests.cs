@@ -15,7 +15,7 @@ namespace UnitTests.RemindersTest
     /// Tests for operation of Orleans Reminders Table using Azure
     /// </summary>
     [TestCategory("Reminders"), TestCategory("Azure")]
-    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTestFixture>
+    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
         public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
@@ -33,6 +33,7 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
+            TestUtils.CheckForAzureStorage();
             return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
         }
 

@@ -40,6 +40,8 @@ namespace Orleans
         /// </summary>
         public int InterfaceId => this.invoker.InterfaceId;
 
+        public ushort InterfaceVersion => this.invoker.InterfaceVersion;
+
         /// <summary>
         /// Invoke a grain method.
         /// Invoker classes in generated code implement this method to provide a method call jump-table to map invoke

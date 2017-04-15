@@ -24,7 +24,7 @@ namespace Tester.ClientConnectionTests
             this.runtimeClient = this.HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("SlowBVT")]
         public async Task EventSendWhenDisconnectedFromCluster()
         {
             var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();

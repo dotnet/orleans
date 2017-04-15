@@ -42,9 +42,9 @@ namespace Orleans.Runtime.Placement
 
 
         public override Task<PlacementResult> 
-            OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+            OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + grain);
+            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainId);
         }
     }
 }

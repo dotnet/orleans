@@ -2,7 +2,7 @@ using System.Linq;
 
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans
+namespace Orleans.Runtime
 {
     /// <summary>
     /// Extension methods for <see cref="IServiceCollection"/>.
