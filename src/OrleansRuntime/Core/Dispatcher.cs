@@ -625,23 +625,61 @@ namespace Orleans.Runtime
                    !(ex.GetBaseException() is ClientNotAvailableException);
         }
 
-        // this is a compatibility method for portions of the code base that don't use
-        // async/await yet, which is almost everything. there's no liability to discarding the
-        // Task returned by AsyncSendMessage()
-        internal void SendMessage(Message message, ActivationData sendingActivation = null)
-        {
-            AsyncSendMessage(message, sendingActivation).Ignore();
-        }
+		// this is a compatibility method for portions of the code base that don't use
+		// async/await yet, which is almost everything. there's no liability to discarding the
+		// Task returned by AsyncSendMessage()
+		internal void SendMessage(Message message, ActivationData sendingActivation = null)
+		{
+			if (TrySendMessageToLocalActivation(message))
+			{
+				return;
+			}
 
-        /// <summary>
-        /// Resolve target address for a message
-        /// - use transaction info
-        /// - check ordering info in message and sending activation
-        /// - use sender's placement strategy
-        /// </summary>
-        /// <param name="message"></param>
-        /// <returns>Resolve when message is addressed (modifies message fields)</returns>
-        private async Task AddressMessage(Message message)
+			AsyncSendMessage(message, sendingActivation).Ignore();
+		}
+
+		private bool TrySendMessageToLocalActivation(Message message)
+		{
+			List<ActivationData> localActivation;
+
+			if (message.TargetGrain.IsClient || message.SendingGrain.IsClient)
+			{
+				return false;
+			}
+
+			if (catalog.LocalLookup(message.TargetGrain, out localActivation))
+			{
+				// todo: consolidate with placement directors (e.g. use FastLookup) and incoming message queue
+				for (var i = 0; i < localActivation.Count; i++)
+				{
+					var targetActivation = localActivation[i];
+					if (targetActivation.IsStatelessWorker && localActivation.Count > 1)
+					{
+						//var rand = new FastRandom(message.TargetGrain.GetHashCode());
+						// should use placement director, for now using dirty 
+						// targetActivation = localActivation[rand.Next(localActivation.Count - 1)];
+					}
+
+					if (targetActivation.GrainInstance != null && targetActivation.State == ActivationState.Valid)
+					{
+						message.TargetAddress = targetActivation.Address;
+						HandleIncomingRequest(message, targetActivation);
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+		
+		/// <summary>
+		/// Resolve target address for a message
+		/// - use transaction info
+		/// - check ordering info in message and sending activation
+		/// - use sender's placement strategy
+		/// </summary>
+		/// <param name="message"></param>
+		/// <returns>Resolve when message is addressed (modifies message fields)</returns>
+		private async Task AddressMessage(Message message)
         {
             var targetAddress = message.TargetAddress;
             if (targetAddress.IsComplete) return;
