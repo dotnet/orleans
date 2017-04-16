@@ -65,6 +65,7 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="Placement\HashBasedPlacementDirector.cs" />
     <Compile Include="Placement\IActivationSelector.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />

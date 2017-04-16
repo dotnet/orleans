@@ -186,6 +186,27 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Marks a grain class as using the <c>HashBasedPlacement</c> policy.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+        public sealed class HashBasedPlacementAttribute : PlacementAttribute
+        {
+            // for testing
+            internal bool SortSiloList { get; }
+
+            public HashBasedPlacementAttribute() :
+                base(HashBasedPlacement.Singleton)
+            {}
+
+            // for testing
+            internal HashBasedPlacementAttribute(bool sortSiloList = false)
+                : base(sortSiloList ? new HashBasedPlacement(true) : HashBasedPlacement.Singleton)
+            {
+                this.SortSiloList = sortSiloList;
+            }
+        }
+
+        /// <summary>
         /// Marks a grain class as using the <c>PreferLocalPlacement</c> policy.
         /// </summary>
         [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]

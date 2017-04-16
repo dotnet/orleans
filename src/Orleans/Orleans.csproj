@@ -120,6 +120,7 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="LogConsistency\ILogViewAdaptorHost.cs" />
+    <Compile Include="Placement\HashBasedPlacement.cs" />
     <Compile Include="Placement\IPlacementDirector.cs" />
     <Compile Include="Placement\IPlacementContext.cs" />
     <Compile Include="Placement\PlacementTarget.cs" />
