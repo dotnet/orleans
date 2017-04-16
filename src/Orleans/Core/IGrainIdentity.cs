@@ -19,5 +19,7 @@ namespace Orleans.Core
         long GetPrimaryKeyLong(out string keyExt);
 
         Guid GetPrimaryKey(out string keyExt);
+
+        uint GetUniformHashCode();
     }
 }

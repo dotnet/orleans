@@ -96,7 +96,7 @@ namespace Orleans
             throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
-        internal static IGrainIdentity GetGrainIdentity(IGrain grain)
+        public static IGrainIdentity GetGrainIdentity(this IGrain grain)
         {
             var grainBase = grain as Grain;
             if (grainBase != null)
