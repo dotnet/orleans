@@ -1,19 +1,17 @@
 ﻿using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.CustomPlacementTests
 {
@@ -85,6 +83,30 @@ namespace Tester.CustomPlacementTests
             for (int i = 1; i < nGrains; i++)
             {
                 Assert.NotEqual(excludedSilo, tasks[i].Result);
+            }
+        }
+
+        [Fact]
+        public async Task HashBasedPlacement()
+        {
+            const int nGrains = 100;
+
+            Task<string>[] tasks = new Task<string>[nGrains];
+            List<IGrainIdentity> grains = new List<IGrainIdentity>();
+            for (int i = 0; i < nGrains; i++)
+            {
+                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                    "UnitTests.Grains.HashBasedPlacementGrain");
+                grains.Add(g.GetGrainIdentity());
+                tasks[i] = g.GetRuntimeInstanceId();
+            }
+
+            await Task.WhenAll(tasks);
+
+            for (int i = 0; i < nGrains; i++)
+            {
+                var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
+                Assert.Equal(silos[hash % silos.Length], tasks[i].Result);
             }
         }
     }
