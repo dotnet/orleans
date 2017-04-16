@@ -22,8 +22,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansManager.exe" target="lib\net451" />
-    <file src="OrleansManager.pdb" target="lib\net451" />
+    <file src="OrleansManager.exe" target="lib\net461" />
+    <file src="OrleansManager.pdb" target="lib\net461" />
     <file src="OrleansManager.exe.config" target="tools" />
     <file src="ClientConfiguration.xml" target="tools" />
     <file src="$SRC_DIR$OrleansManager\**\*.cs" target="src" />

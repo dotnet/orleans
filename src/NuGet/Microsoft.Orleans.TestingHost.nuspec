@@ -21,13 +21,13 @@
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
-      <dependency id="Microsoft.Extensions.Configuration.Binder" version="1.0.0" />
+      <dependency id="Microsoft.Extensions.Configuration.Binder" version="1.1.1" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTestingHost.dll" target="lib\net451" />
-    <file src="OrleansTestingHost.pdb" target="lib\net451" />
-    <file src="OrleansTestingHost.xml" target="lib\net451" />
+    <file src="OrleansTestingHost.dll" target="lib\net461" />
+    <file src="OrleansTestingHost.pdb" target="lib\net461" />
+    <file src="OrleansTestingHost.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansTestingHost\**\*.cs" target="src" />
   </files>
 </package>

@@ -3,7 +3,7 @@
     "NewRelic.Agent.Api": "5.10.59.0"
   },
   "frameworks": {
-    "net451": {}
+    "net461": {}
   },
   "runtimes": {
     "win-anycpu": {},
