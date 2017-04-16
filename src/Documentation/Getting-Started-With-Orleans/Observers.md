@@ -64,15 +64,17 @@ class HelloGrain : Grain, IHello
     }
 
     // Clients call this to subscribe.
-    public async Task Subscribe(IChat observer)
+    public Task Subscribe(IChat observer)
     {
         _subsManager.Subscribe(observer);
+        return TaskDone.Done
     }
 
     //Also clients use this to unsubscribe themselves to no longer receive the messages.
-    public async Task UnSubscribe(IChat observer)
+    public Task UnSubscribe(IChat observer)
     {
-        _SubsManager.Unsubscribe(observer);
+        _subsManager.Unsubscribe(observer);
+        return TaskDone.Done
     }
 }
 ```
@@ -82,7 +84,7 @@ To send the message to clients the `Notify` method of the `ObserverSubscriptionM
 ``` csharp
 public Task SendUpdateMessage(string message)
 {
-    _SubsManager.Notify(s => s.ReceiveMessage(message));
+    _subsManager.Notify(s => s.ReceiveMessage(message));
     return TaskDone.Done;
 }
 
