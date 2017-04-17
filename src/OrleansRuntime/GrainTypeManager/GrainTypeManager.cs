@@ -25,7 +25,6 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
-        private ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>> supportedSilosCache;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
         {
@@ -50,7 +49,6 @@ namespace Orleans.Runtime
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
-            supportedSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
         }
 
         public void Start(bool strict = true)
@@ -151,24 +149,14 @@ namespace Orleans.Runtime
             return supportedSilosByTypeCode[typeCode];
         }
 
-        internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, ushort version)
-        {
-            var key = Tuple.Create(typeCode, ifaceId, version);
-            return supportedSilosCache.GetOrAdd(
-                key,
-                tuple =>
-                {
-                    var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
-                    return supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
-                });
-        }
-
         internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, IReadOnlyList<ushort> versions)
         {
             var result = new List<SiloAddress>();
             foreach (var version in versions)
             {
-                result.AddRange(GetSupportedSilos(typeCode, ifaceId, version));
+                var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
+                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
+                result.AddRange(silosWithCorrectVersion);
             }
             return result;
         }
@@ -284,8 +272,6 @@ namespace Orleans.Runtime
             var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, this.defaultPlacementStrategy);
             var newSupportedSilosByTypeCode = new Dictionary<int, List<SiloAddress>>();
             var newSupportedSilosByInterface = new Dictionary<int, Dictionary<ushort, List<SiloAddress>>>();
-            var newInterfaceVersions = new Dictionary<int, HashSet<ushort>>();
-
             foreach (var kvp in grainInterfaceMapsBySilo)
             {
                 newClusterGrainInterfaceMap.AddMap(kvp.Value);
@@ -294,9 +280,6 @@ namespace Orleans.Runtime
                 {
                     var ifaceId = supportedInterface.InterfaceId;
                     var version = supportedInterface.InterfaceVersion;
-
-                    var ifaceVersions = newInterfaceVersions.GetValueOrAddNew(ifaceId);
-                    ifaceVersions.Add(version);
 
                     var supportedSilosByVersion = newSupportedSilosByInterface.GetValueOrAddNew(ifaceId);
                     var supportedSilosForVersion = supportedSilosByVersion.GetValueOrAddNew(version);
@@ -314,7 +297,6 @@ namespace Orleans.Runtime
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
             supportedSilosByInterface = newSupportedSilosByInterface;
-            supportedSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
         }
 
         private class InvokerData
