@@ -9,6 +9,7 @@ using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans.Serialization
 {
@@ -1643,12 +1644,12 @@ namespace Orleans.Serialization
 
         internal static void SerializeType(object obj, ISerializationContext context, Type expected)
         {
-            context.StreamWriter.Write(((Type)obj).OrleansTypeKeyString());
+            context.StreamWriter.Write(RuntimeTypeNameFormatter.Format((Type)obj));
         }
 
         internal static object DeserializeType(Type expected, IDeserializationContext context)
         {
-            return context.SerializationManager.ResolveTypeName(context.StreamReader.ReadString());
+            return Type.GetType(context.StreamReader.ReadString());
         }
 
         internal static object CopyType(object obj, ICopyContext context)
