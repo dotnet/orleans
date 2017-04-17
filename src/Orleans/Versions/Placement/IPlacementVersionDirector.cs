@@ -6,7 +6,7 @@ namespace Orleans.Versions.Placement
 {
     public interface IVersionPlacementDirector
     {
-        ushort GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, IVersionCompatibilityDirector versionCompatibilityDirector);
+        IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, IVersionCompatibilityDirector versionCompatibilityDirector);
     }
 
     public interface IVersionPlacementDirector<TPolicy> : IVersionPlacementDirector where TPolicy : VersionPlacementStrategy

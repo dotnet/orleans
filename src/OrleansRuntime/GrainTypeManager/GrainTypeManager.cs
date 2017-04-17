@@ -163,6 +163,16 @@ namespace Orleans.Runtime
                 });
         }
 
+        internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, IReadOnlyList<ushort> versions)
+        {
+            var result = new List<SiloAddress>();
+            foreach (var version in versions)
+            {
+                result.AddRange(GetSupportedSilos(typeCode, ifaceId, version));
+            }
+            return result;
+        }
+
         internal IReadOnlyList<ushort> GetAvailableVersions(int ifaceId)
         {
             return supportedSilosByInterface[ifaceId].Keys.ToList();

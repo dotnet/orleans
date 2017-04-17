@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Placement;
 using Orleans.Versions.Compatibility;
@@ -23,7 +24,7 @@ namespace Orleans.Runtime.Versions
             this.directors = new ConcurrentDictionary<int, CachedVersionDirector>();
         }
 
-        public ushort GetSuitableVersion(int ifaceId, ushort requestedVersion)
+        public IReadOnlyList<ushort> GetSuitableVersion(int ifaceId, ushort requestedVersion)
         {
             var director = this.directors.GetOrAdd(ifaceId, GetDirector);
             return director.GetSuitableVersion(requestedVersion);
