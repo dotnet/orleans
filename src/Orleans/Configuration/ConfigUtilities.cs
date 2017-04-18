@@ -627,22 +627,14 @@ namespace Orleans.Runtime.Configuration
 #if !NETSTANDARD_TODO
 			// TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
-            sb.Append("   Is .NET 4.5=").AppendLine(IsNet45OrNewer().ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
+            sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile);
 #endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))
                 .AppendLine();
             return sb.ToString();
-        }
-
-        internal static bool IsNet45OrNewer()
-        {
-            // From: http://stackoverflow.com/questions/8517159/how-to-detect-at-runtime-that-net-version-4-5-currently-running-your-code
-
-            // Class "ReflectionContext" exists from .NET 4.5 onwards.
-            return Type.GetType("System.Reflection.ReflectionContext", false) != null;
         }
     }
 }
