@@ -40,17 +40,11 @@
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
+  
   <ItemGroup>
-    <Compile Include="..\..\..\test\GoogleUtils.Tests\ProtobufSerialization\Addressbook.cs">
-      <Link>ProtobufSerialization\Addressbook.cs</Link>
-    </Compile>
-	<Compile Include="..\..\..\test\GoogleUtils.Tests\ProtobufSerialization\Counter.cs">
-      <Link>ProtobufSerialization\Counter.cs</Link>
-    </Compile> 
-	<Compile Include="..\..\..\test\GoogleUtils.Tests\ProtobufSerialization\ProtobufSerializationTests.cs">
-      <Link>ProtobufSerialization\ProtobufSerializationTests.cs</Link>
-    </Compile> 	
+    <Compile Include="..\..\..\test\GoogleUtils.Tests\**\*.cs" Exclude="..\..\..\test\GoogleUtils.Tests\obj\**\*.cs;..\..\..\test\GoogleUtils.Tests\bin\**\*.cs;..\..\..\test\GoogleUtils.Tests\Properties\*.cs" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="App.config" />
 	<None Include="..\..\..\test\GoogleUtils.Tests\ProtobufSerialization\addressbook.proto">
