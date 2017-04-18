@@ -210,6 +210,7 @@
     <Compile Include="Versions\Compatibility\AllVersionsCompatibilityDirector.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatilityDirector.cs" />
     <Compile Include="Versions\Compatibility\CompatibilityDirectorManager.cs" />
+    <Compile Include="Versions\Placement\AllCompatibleVersionsDirector.cs" />
     <Compile Include="Versions\Placement\LatestVersionDirector.cs" />
     <Compile Include="Versions\Placement\MinimumVersionDirector.cs" />
     <Compile Include="Versions\Placement\VersionDirectorManager.cs" />

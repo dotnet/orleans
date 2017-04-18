@@ -600,7 +600,7 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
             GrainServiceConfigurations = new GrainServiceConfigurations();
             DefaultVersionCompatibilityStrategy = BackwardCompatible.Singleton;
-            DefaultVersionPlacementStrategy = MinimumVersionPlacement.Singleton;
+            DefaultVersionPlacementStrategy = AllCompatibleVersions.Singleton;
         }
 
         public override string ToString()
