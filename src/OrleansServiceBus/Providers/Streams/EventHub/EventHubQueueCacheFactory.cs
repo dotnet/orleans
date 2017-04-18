@@ -5,6 +5,9 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Factory class to configure and create IEventHubQueueCache
+    /// </summary>
     public class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
         private readonly EventHubStreamProviderSettings _providerSettings;
@@ -12,6 +15,11 @@ namespace Orleans.ServiceBus.Providers
         private IObjectPool<FixedSizeBuffer> _bufferPool;
         private readonly TimePurgePredicate _timePurge;
 
+        /// <summary>
+        /// Constructor for EventHubQueueCacheFactory
+        /// </summary>
+        /// <param name="providerSettings"></param>
+        /// <param name="serializationManager"></param>
         public EventHubQueueCacheFactory(EventHubStreamProviderSettings providerSettings,
             SerializationManager serializationManager
         )
@@ -21,6 +29,14 @@ namespace Orleans.ServiceBus.Providers
             _timePurge = new TimePurgePredicate(_providerSettings.DataMinTimeInCache, _providerSettings.DataMaxAgeInCache);
         }
 
+        /// <summary>
+        /// Function which create an EventHubQueueCache, which by default will configure the EventHubQueueCache using configuration in CreateBufferPool function
+        /// and AddCachePressureMonitors function.
+        /// </summary>
+        /// <param name="partition"></param>
+        /// <param name="checkpointer"></param>
+        /// <param name="logger"></param>
+        /// <returns></returns>
         public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
         {
             var bufferPool = CreateBufferPool(_providerSettings);
@@ -29,12 +45,24 @@ namespace Orleans.ServiceBus.Providers
             return cache;
         }
 
+        /// <summary>
+        /// Function used to configure BufferPool for EventHubQueueCache. User can override this function to provide more customization on BufferPool creation
+        /// </summary>
+        /// <param name="providerSettings"></param>
+        /// <returns></returns>
         protected virtual IObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings)
         {
             return _bufferPool ?? (_bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb,
                 () => new FixedSizeBuffer(1 << 20)));
         }
 
+        /// <summary>
+        /// Function used to configure cache pressure monitors for EventHubQueueCache. 
+        /// User can override this function to provide more customization on cache pressure monitors
+        /// </summary>
+        /// <param name="cache"></param>
+        /// <param name="providerSettings"></param>
+        /// <param name="cacheLogger"></param>
         protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamProviderSettings providerSettings,
             Logger cacheLogger)
         {
@@ -62,6 +90,16 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
+        /// <summary>
+        /// Default function to be called to create an EventhubQueueCache in IEventHubQueueCacheFactory.CreateCache method. User can 
+        /// override this method to add more customization.
+        /// </summary>
+        /// <param name="checkpointer"></param>
+        /// <param name="cacheLogger"></param>
+        /// <param name="bufferPool"></param>
+        /// <param name="timePurge"></param>
+        /// <param name="serializationManager"></param>
+        /// <returns></returns>
         protected virtual IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer,
             Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge,
             SerializationManager serializationManager)

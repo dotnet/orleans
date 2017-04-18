@@ -22,24 +22,26 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                return new CacheFactory(providerSettings, SerializationManager, createdCaches);
+                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches);
             }
 
-            private class CacheFactory : EventHubQueueCacheFactory
+            private class CacheFactoryForTesting : EventHubQueueCacheFactory
             {
                 private readonly List<IEventHubQueueCache> _caches;
 
-                public CacheFactory(EventHubStreamProviderSettings providerSettings,
+                public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
                     SerializationManager serializationManager, List<IEventHubQueueCache> caches)
                     : base(providerSettings, serializationManager)
                 {
                     _caches = caches;
                 }
-
+                private const int defaultMaxAddCount = 2;
                 protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
                     IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
                 {
-                    var cache = base.CreateCache(checkpointer, cacheLogger, bufferPool, timePurge, serializationManager);
+                    //set defaultMaxAddCount to 2 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
+                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool, timePurge), 
+                        EventHubDataComparer.Instance, cacheLogger);
                     _caches.Add(cache);
                     return cache;
                 }

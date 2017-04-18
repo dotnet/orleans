@@ -13,7 +13,6 @@ using ServiceBus.Tests.TestStreamProviders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -119,9 +118,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
             var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
             //set up producer and start producing
-            var producer = this.fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, StreamNamespace, StreamProviderName);
-            await producer.StartPeriodicProducing();
+            await producer.StartPeriodicProducing(TimeSpan.FromMilliseconds(100));
 
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
