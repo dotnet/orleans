@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Placement;
+using TestVersionGrainInterfaces;
 using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
@@ -59,6 +60,33 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         public Task DoNotUpgradeProxyCallWithPendingRequestTest()
         {
             return ProxyCallNoPendingRequest(1);
+        }
+    }
+
+    [TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    public class RandomCompatibleVersionTests : UpgradeTestsBase
+    {
+        protected override VersionPlacementStrategy VersionPlacementStrategy => AllCompatibleVersions.Singleton;
+        protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => AllVersionsCompatible.Singleton;
+
+        [Fact]
+        public async Task CreateActivationWithBothVersionTest()
+        {
+            const int numberOfGrains = 100;
+
+            await DeployCluster();
+            await StartSiloV2();
+
+            var versionCounter = new int[2];
+
+            for (var i = 0; i < numberOfGrains; i++)
+            {
+                var v = await Client.GetGrain<IVersionUpgradeTestGrain>(i).GetVersion();
+                versionCounter[v - 1]++;
+            }
+
+            Assert.InRange(versionCounter[0], 40, 60);
+            Assert.InRange(versionCounter[1], 40, 60);
         }
     }
 }

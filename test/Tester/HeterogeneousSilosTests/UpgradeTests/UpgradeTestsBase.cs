@@ -147,7 +147,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(expectedVersion, await callProvokingUpgrade);
         }
 
-        private async Task DeployCluster()
+        protected async Task DeployCluster()
         {
             this.options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
