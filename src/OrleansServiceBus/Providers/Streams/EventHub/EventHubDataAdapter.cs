@@ -273,8 +273,8 @@ namespace Orleans.ServiceBus.Providers
                 // no block or block full, get new block and try again
                 currentBuffer = bufferPool.Allocate();
                 if (this.OnBlockAllocated == null)
-                    throw new OrleansException("Eviction strategy's OnBlockAllocated is set for current data adapter, this will affect cache purging");
-                //keep track of allocated buffers in cache's eviction strategy
+                    throw new OrleansException("Eviction strategy's OnBlockAllocated is not set for current data adapter, this will affect cache purging");
+                //call EvictionStrategy's OnBlockAllocated method
                 this.OnBlockAllocated.Invoke(currentBuffer);
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))

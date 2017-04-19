@@ -55,7 +55,7 @@ namespace Orleans.Providers
             private readonly TSerializer serializer;
             private FixedSizeBuffer currentBuffer;
 
-            public Action<IDisposable> PurgeAction { private get; set; }
+            public Action<IDisposable> OnBlockAllocated { private get; set; }
 
             public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, TSerializer serializer)
             {
@@ -88,7 +88,10 @@ namespace Orleans.Providers
                 {
                     // no block or block full, get new block and try again
                     currentBuffer = bufferPool.Allocate();
-                    currentBuffer.SetPurgeAction(PurgeAction);
+                    if (this.OnBlockAllocated == null)
+                        throw new OrleansException("Eviction strategy's OnBlockAllocated is not set for current data adapter, this will affect cache purging");
+                    //call EvictionStrategy's OnBlockAllocated method
+                    this.OnBlockAllocated.Invoke(currentBuffer);
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
