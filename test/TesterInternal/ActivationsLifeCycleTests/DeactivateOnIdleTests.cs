@@ -56,7 +56,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.True(age.TotalMilliseconds < 2000, "Should be newly activated grain");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_1()
         {
             Initialize();
