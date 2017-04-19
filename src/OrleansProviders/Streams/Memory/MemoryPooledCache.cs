@@ -27,7 +27,9 @@ namespace Orleans.Providers
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
             cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger);
-            dataAdapter.PurgeAction = cache.Purge;
+            var evictionStrategy = new ExplicitEvictionStrategy();
+            evictionStrategy.PurgeObservable = cache;
+            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
         }
 
         private class CacheDataComparer : ICacheDataComparer<MemoryMessageData>
@@ -46,6 +48,57 @@ namespace Orleans.Providers
             {
                 int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
                 return results == 0 && cachedMessage.StreamNamespace == streamIdentity.Namespace;
+            }
+        }
+
+        private class ExplicitEvictionStrategy : IEvictionStrategy<MemoryMessageData>
+        {
+            private FixedSizeBuffer currentBuffer;
+            public IPurgeObservable<MemoryMessageData> PurgeObservable { set; private get; }
+
+            public Action<MemoryMessageData?, MemoryMessageData?> OnPurged { get; set; }
+
+            public void PerformPurge(DateTime utcNow)
+            {
+                //do nothing, purge in MemoryPooledCache is triggered by block pool and conduct by OnFreeBlockRequest method
+            }
+
+            public void OnBlockAllocated(IDisposable newBlock)
+            {
+                var newBuffer = newBlock as FixedSizeBuffer;
+                this.currentBuffer = newBuffer;
+                this.currentBuffer.SetPurgeAction(this.OnFreeBlockRequest);
+            }
+
+            private bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest)
+            {
+                var purgedResource = (FixedSizeBuffer)purgeRequest;
+                // if we're purging our current buffer, don't use it any more
+                if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
+                {
+                    currentBuffer = null;
+                }
+                return cachedMessage.Payload.Array == purgedResource.Id;
+            }
+
+            private void OnFreeBlockRequest(IDisposable purgeRequest)
+            {
+                //if the cache is empty, then nothing to purge, return
+                if (this.PurgeObservable.ItemCount == 0)
+                    return;
+                var itemCountBeforePurge = this.PurgeObservable.ItemCount;
+                MemoryMessageData neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+                MemoryMessageData? lastMessagePurged = null;
+                while (this.PurgeObservable.ItemCount != 0)
+                {
+                    var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
+                    if (ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
+                    {
+                        break;
+                    }
+                    lastMessagePurged = oldestMessageInCache;
+                    this.PurgeObservable.RemoveOldestMessage();
+                }
             }
         }
 
@@ -120,17 +173,6 @@ namespace Orleans.Providers
             {
                 return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace),
                     new EventSequenceTokenV2(queueMessage.SequenceNumber));
-            }
-
-            public bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
-            {
-                var purgedResource = (FixedSizeBuffer) purgeRequest;
-                // if we're purging our current buffer, don't use it any more
-                if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
-                {
-                    currentBuffer = null;
-                }
-                return cachedMessage.Payload.Array == purgedResource.Id;
             }
         }
 
