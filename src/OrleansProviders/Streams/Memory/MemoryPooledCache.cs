@@ -58,30 +58,8 @@ namespace Orleans.Providers
 
             public Action<MemoryMessageData?, MemoryMessageData?> OnPurged { get; set; }
 
-            public void PerformPurge(DateTime utcNow)
-            {
-                //do nothing, purge in MemoryPooledCache is triggered by block pool and conduct by OnFreeBlockRequest method
-            }
-
-            public void OnBlockAllocated(IDisposable newBlock)
-            {
-                var newBuffer = newBlock as FixedSizeBuffer;
-                this.currentBuffer = newBuffer;
-                this.currentBuffer.SetPurgeAction(this.OnFreeBlockRequest);
-            }
-
-            private bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest)
-            {
-                var purgedResource = (FixedSizeBuffer)purgeRequest;
-                // if we're purging our current buffer, don't use it any more
-                if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
-                {
-                    currentBuffer = null;
-                }
-                return cachedMessage.Payload.Array == purgedResource.Id;
-            }
-
-            private void OnFreeBlockRequest(IDisposable purgeRequest)
+            //Explicitly purge all messages in purgeRequestBlock
+            public void PerformPurge(DateTime utcNow, IDisposable purgeRequest)
             {
                 //if the cache is empty, then nothing to purge, return
                 if (this.PurgeObservable.ItemCount == 0)
@@ -99,6 +77,29 @@ namespace Orleans.Providers
                     lastMessagePurged = oldestMessageInCache;
                     this.PurgeObservable.RemoveOldestMessage();
                 }
+            }
+
+            public void OnBlockAllocated(IDisposable newBlock)
+            {
+                var newBuffer = newBlock as FixedSizeBuffer;
+                this.currentBuffer = newBuffer;
+                this.currentBuffer.SetPurgeAction(this.PerformPurge);
+            }
+
+            private bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest)
+            {
+                var purgedResource = (FixedSizeBuffer)purgeRequest;
+                // if we're purging our current buffer, don't use it any more
+                if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
+                {
+                    currentBuffer = null;
+                }
+                return cachedMessage.Payload.Array == purgedResource.Id;
+            }
+
+            private void PerformPurge(IDisposable purgeRequest)
+            {
+                this.PerformPurge(DateTime.UtcNow, purgeRequest);
             }
         }
 

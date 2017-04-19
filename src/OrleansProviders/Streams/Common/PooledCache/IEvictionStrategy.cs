@@ -26,7 +26,8 @@ namespace Orleans.Providers.Streams.Common
         /// Method which should be called when pulling agent try to do a purge on the cache
         /// </summary>
         /// <param name="utcNow"></param>
-        void PerformPurge(DateTime utcNow);
+        /// <param name="purgeRequest"></param>
+        void PerformPurge(DateTime utcNow, IDisposable purgeRequest = null);
 
         /// <summary>
         /// Method which should be called when data adapter allocated a new block
