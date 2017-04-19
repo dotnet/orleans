@@ -229,16 +229,9 @@ namespace Orleans.Runtime
                 return AllActiveSilos;
 
             var typeCode = target.GrainId.GetTypeCode();
-            IReadOnlyList<SiloAddress> silos;
-            if (target.InterfaceVersion > 0)
-            {
-                var versions = versionDirectorManager.GetSuitableVersion(target.InterfaceId, target.InterfaceVersion);
-                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, versions);
-            }
-            else
-            {
-                silos = GrainTypeManager.GetSupportedSilos(typeCode);
-            }
+            var silos = target.InterfaceVersion > 0
+                ? versionDirectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
+                : GrainTypeManager.GetSupportedSilos(typeCode);
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
             if (compatibleSilos.Count == 0)
