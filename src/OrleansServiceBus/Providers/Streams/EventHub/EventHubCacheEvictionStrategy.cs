@@ -112,9 +112,13 @@ namespace Orleans.ServiceBus.Providers
 
         private void OnFreeBlockRequest(IDisposable block)
         {
-            while (this.purgedBuffers.Count > 0)
+            var purgeCandidate = block as FixedSizeBuffer;
+            //free all blocks before purgeCandidate and purgeCandidate
+            if (this.purgedBuffers.Contains(purgeCandidate))
             {
-                this.purgedBuffers.Dequeue().Dispose();
+                while (this.purgedBuffers.Peek() != purgeCandidate)
+                    this.purgedBuffers.Dequeue().Dispose();
+                purgeCandidate.Dispose();
             }
         }
 

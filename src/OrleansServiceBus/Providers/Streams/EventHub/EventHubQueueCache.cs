@@ -209,7 +209,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheDataAdapter">adapts queue data to cache</param>
         /// <param name="comparer">compares stream information to cached data</param>
         /// <param name="logger">cache logger</param>
-        /// <param name="evictionStrategy">eviction strategy for the cache<</param>
+        /// <param name="evictionStrategy">eviction strategy for the cache</param>
         public EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, 
             ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
             : base(defaultMaxAddCount, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy)
