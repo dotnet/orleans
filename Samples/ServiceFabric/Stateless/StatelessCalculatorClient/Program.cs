@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Fabric;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GrainInterfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime.Configuration;
 
@@ -17,21 +18,27 @@ namespace StatelessCalculatorClient
     {
         static void Main(string[] args)
         {
-            var serviceName = new Uri("fabric:/StatelessCalculatorApp/StatelessCalculatorService");
-
-            var config = new ClientConfiguration
-            {
-                DeploymentId = Regex.Replace(serviceName.PathAndQuery.Trim('/'), "[^a-zA-Z0-9_]", "_"),
-                GatewayProvider = ClientConfiguration.GatewayProviderType.Custom,
-                CustomGatewayProviderAssemblyName = typeof(OrleansServiceFabricExtensions).Assembly.FullName,
-                DataConnectionString = "fabric:/StatelessCalculatorApp/StatelessCalculatorService"
-            };
-            GrainClient.Initialize(config);
-            Run(args, GrainClient.GrainFactory).Wait();
+            Run(args).Wait();
         }
 
-        private static async Task Run(string[] args, IGrainFactory grainFactory)
+        private static async Task Run(string[] args)
         {
+            var serviceName = new Uri("fabric:/StatelessCalculatorApp/StatelessCalculatorService");
+            
+            var client = new ClientBuilder()
+                .UseConfiguration(new ClientConfiguration())
+                .AddServiceFabric(serviceName)
+                .ConfigureServices(
+                    services =>
+                    {
+                        // Some deployments require a custom FabricClient, eg so that cluster endpoints and certificates can be configured.
+                        // A pre-configured FabricClient can be injected.
+                        var fabricClient = new FabricClient();
+                        services.AddSingleton(fabricClient);
+                    })
+                .Build();
+            await client.Connect();
+
             double result;
             if (args.Length < 1)
             {
@@ -43,16 +50,16 @@ namespace StatelessCalculatorClient
 
             var value = args.Length > 1 ? double.Parse(args[1]) : 0;
 
-            var calculator = grainFactory.GetGrain<ICalculatorGrain>(Guid.Empty);
+            var calculator = client.GetGrain<ICalculatorGrain>(Guid.Empty);
             var observer = new CalculatorObserver();
-            var observerReference = await grainFactory.CreateObjectReference<ICalculatorObserver>(observer);
+            var observerReference = await client.CreateObjectReference<ICalculatorObserver>(observer);
             var cancellationTokenSource = new CancellationTokenSource();
             var subscriptionTask = StaySubscribed(calculator, observerReference, cancellationTokenSource.Token);
             
             switch (args[0].ToLower())
             {
                 case "stress":
-                    result = await StressTest(grainFactory);
+                    result = await StressTest(client);
                     break;
                 case "add":
                 case "+":

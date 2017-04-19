@@ -61,18 +61,11 @@ namespace StatelessCalculatorService
         public ClusterConfiguration GetClusterConfiguration()
         {
             var config = new ClusterConfiguration();
-            config.Globals.DeploymentId = Regex.Replace(
-                this.Context.ServiceName.PathAndQuery.Trim('/'),
-                "[^a-zA-Z0-9_]",
-                "_");
             config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
-            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            config.Globals.MembershipTableAssembly = typeof(OrleansServiceFabricExtensions).Assembly.FullName;
             config.Globals.DataConnectionString = "UseDevelopmentStorage=true";
-            config.Defaults.StartupTypeName = typeof(ClusterStartup).AssemblyQualifiedName;
-            //config.Defaults.DefaultTraceLevel = Severity.Verbose;
-            LogManager.LogConsumers.Add(new EventSourceLogger());
             config.Globals.RegisterBootstrapProvider<BootstrapProvider>("booter");
+            config.Defaults.StartupTypeName = typeof(ClusterStartup).AssemblyQualifiedName;
+            LogManager.LogConsumers.Add(new EventSourceLogger());
             return config;
         }
 
