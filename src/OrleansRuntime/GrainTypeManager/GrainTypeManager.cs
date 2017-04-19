@@ -158,6 +158,9 @@ namespace Orleans.Runtime
                 var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
                 result.AddRange(silosWithCorrectVersion);
             }
+            // We need to sort this so the list of silos returned will
+            // be the same accross all silos in the cluster
+            result.Sort();
             return result;
         }
 
@@ -293,6 +296,12 @@ namespace Orleans.Runtime
                     var supportedSilos = newSupportedSilosByTypeCode.GetValueOrAddNew(grainType);
                     supportedSilos.Add(kvp.Key);
                 }
+            }
+            foreach (var silos in newSupportedSilosByTypeCode.Values)
+            {
+                // We need to sort this so the list of silos returned will
+                // be the same accross all silos in the cluster
+                silos.Sort(); 
             }
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
