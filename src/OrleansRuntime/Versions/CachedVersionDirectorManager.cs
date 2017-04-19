@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans.Runtime.Versions.Compatibility;
@@ -11,6 +12,7 @@ namespace Orleans.Runtime.Versions
     {
         private readonly GrainTypeManager grainTypeManager;
         private ConcurrentDictionary<int, CachedVersionDirector> directors;
+        private readonly Func<int, CachedVersionDirector> getDirectorFunc;
 
         public VersionPlacementDirectorManager VersionPlacementDirectorManager { get; }
 
@@ -22,11 +24,12 @@ namespace Orleans.Runtime.Versions
             this.VersionPlacementDirectorManager = versionPlacementDirectorManager;
             this.CompatibilityDirectorManager = compatibilityDirectorManager;
             this.directors = new ConcurrentDictionary<int, CachedVersionDirector>();
+            this.getDirectorFunc = GetDirector;
         }
 
         public IReadOnlyList<ushort> GetSuitableVersion(int ifaceId, ushort requestedVersion)
         {
-            var director = this.directors.GetOrAdd(ifaceId, GetDirector);
+            var director = this.directors.GetOrAdd(ifaceId, getDirectorFunc);
             return director.GetSuitableVersion(requestedVersion);
         }
 

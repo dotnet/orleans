@@ -12,6 +12,7 @@ namespace Orleans.Runtime.Versions
         private readonly IVersionCompatibilityDirector versionCompatibility;
         private readonly IReadOnlyList<ushort> availableVersions;
         private readonly ConcurrentDictionary<ushort, IReadOnlyList<ushort>> cachedResults;
+        private readonly Func<ushort, IReadOnlyList<ushort>> getSuitableVersionFunc;
 
         public CachedVersionDirector(IVersionPlacementDirector versionPlacement, IVersionCompatibilityDirector versionCompatibility, IReadOnlyList<ushort> availableVersions)
         {
@@ -19,11 +20,12 @@ namespace Orleans.Runtime.Versions
             this.versionCompatibility = versionCompatibility;
             this.availableVersions = availableVersions;
             this.cachedResults = new ConcurrentDictionary<ushort, IReadOnlyList<ushort>>();
+            this.getSuitableVersionFunc = GetSuitableVersionImpl;
         }
 
         public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion)
         {
-            return cachedResults.GetOrAdd(requestedVersion, GetSuitableVersionImpl);
+            return cachedResults.GetOrAdd(requestedVersion, getSuitableVersionFunc);
         }
 
         private IReadOnlyList<ushort> GetSuitableVersionImpl(ushort requestedVersion)
