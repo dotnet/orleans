@@ -51,7 +51,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <inheritdoc />
-        public void PerformPurge(DateTime nowUtc)
+        public void PerformPurge(DateTime nowUtc, IDisposable purgeRequest)
         {
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.ItemCount == 0)

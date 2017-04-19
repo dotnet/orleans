@@ -28,9 +28,6 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
-        /// <summary>
-        /// Eviction stretagy manage purge related events
-        /// </summary>
         private IEvictionStrategy<TCachedMessage> evictionStrategy;
         /// <summary>
         /// Logic used to store queue position
@@ -52,6 +49,7 @@ namespace Orleans.ServiceBus.Providers
             this.defaultMaxAddCount = defaultMaxAddCount;
             Checkpointer = checkpointer;
             cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer, logger);
+            this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
             this.evictionStrategy.PurgeObservable = cache;
             cacheDataAdapter.OnBlockAllocated = this.evictionStrategy.OnBlockAllocated;
