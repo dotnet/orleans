@@ -26,8 +26,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
         internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
         public bool IsRewindable { get { return false; } }
-        [NonSerialized]
-        private readonly AsyncLock bindExtLock = new AsyncLock();
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
@@ -66,12 +64,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (stateManager.PresetState(ProviderState.Closed)) stateManager.CommitState();
             return TaskDone.Done;
-        }
-
-        public async Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
-        {
-            var consumerExtension = await Orleans.Streams.Providers.StreamProviderUtils.BindExtensionLazy(providerRuntime, logger, IsRewindable, bindExtLock);
-            await consumerExtension.SetOnSubscriptionChangeAction<T>(onAdd);
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()

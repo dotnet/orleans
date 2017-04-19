@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Tester;
 using TestExtensions;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
@@ -92,12 +91,12 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        public Task StartClustersAndClients(params int[] silos)
+        public Task StartClustersAndClients(params short[] silos)
         {
             return StartClustersAndClients(null, null, silos);
         }
 
-        public Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params int[] silos)
+        public Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params short[] silos)
         {
             WriteLog("Creating clusters and clients...");
             var stopwatch = new System.Diagnostics.Stopwatch();
@@ -493,7 +492,7 @@ namespace UnitTests.GeoClusterTests
                 AssertEqual(1, val, gref);
                 var newid = Clients[1][0].GetRuntimeId(x);
                 WriteLog("{2} sees Grain {0} at {1}", gref, newid, ClusterNames[1]);
-                Assert.True(Clusters[ClusterNames[1]].Silos[0].SiloAddress.ToString() == newid);
+                Assert.True(Clusters[ClusterNames[1]].Silos.First().SiloAddress.ToString() == newid);
             });
         }
     }

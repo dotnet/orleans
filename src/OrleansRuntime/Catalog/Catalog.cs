@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.GrainDirectory;
@@ -21,12 +20,14 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams.Core;
+using Orleans.Streams;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Placement;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementContext, ISiloStatusListener
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, ISiloStatusListener
     {
         /// <summary>
         /// Exception to indicate that the activation would have been a duplicate so messages pending for it should be redirected.
@@ -136,6 +137,9 @@ namespace Orleans.Runtime
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
+        private IStreamProviderRuntime providerRuntime;
+        private IStreamProviderManager providerManager;
+        private IServiceProvider serviceProvider;
         private readonly Logger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
@@ -152,7 +156,6 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
-
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
         private readonly CachedVersionDirectorManager versionDirectorManager;
 
@@ -170,7 +173,10 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
-            CachedVersionDirectorManager versionDirectorManager)
+            IStreamProviderRuntime providerRuntime,
+            IStreamProviderManager providerManager,
+            IServiceProvider serviceProvider,
+			CachedVersionDirectorManager versionDirectorManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = localSiloDetails.SiloAddress;
@@ -186,7 +192,9 @@ namespace Orleans.Runtime
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             this.versionDirectorManager = versionDirectorManager;
-
+            this.providerRuntime = providerRuntime;
+            this.serviceProvider = serviceProvider;
+            this.providerManager = providerManager;
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config);
@@ -221,14 +229,14 @@ namespace Orleans.Runtime
         /// </summary>
         public Dispatcher Dispatcher { get; }
 
-        public IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target)
+        public IList<SiloAddress> GetCompatibleSilos(PlacementTarget target)
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (this.config.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = target.GrainId.GetTypeCode();
+            var typeCode = target.GrainIdentity.TypeCode;
             var silos = target.InterfaceVersion > 0
                 ? versionDirectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
                 : GrainTypeManager.GetSupportedSilos(typeCode);
@@ -248,7 +256,7 @@ namespace Orleans.Runtime
         internal void SetLogConsistencyManager(ILogConsistencyProviderManager logConsistencyManager)
         {
             logConsistencyProviderManager = logConsistencyManager;
-        } 
+        }
 
         internal void Start()
         {
@@ -374,7 +382,7 @@ namespace Orleans.Runtime
                 PlacementStrategy unused;
                 MultiClusterRegistrationStrategy unusedActivationStrategy;
                 string grainClassName;
-                GrainTypeManager.GetTypeInfo(grain.GetTypeCode(), out grainClassName, out unused, out unusedActivationStrategy);
+                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused, out unusedActivationStrategy);
                 report.GrainClassTypeName = grainClassName;
             }
             catch (Exception exc)
@@ -496,7 +504,7 @@ namespace Orleans.Runtime
                     return result;
                 }
                 
-                int typeCode = address.Grain.GetTypeCode();
+                int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
 
@@ -701,7 +709,7 @@ namespace Orleans.Runtime
             if (!GrainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
             {
                 // Lookup from grain type code
-                var typeCode = data.Grain.GetTypeCode();
+                var typeCode = data.Grain.TypeCode;
                 if (typeCode != 0)
                 {
                     PlacementStrategy unused;
@@ -738,10 +746,10 @@ namespace Orleans.Runtime
                     storage.SetGrain(grain);
                 }
                 else
-                { 
+                {
                     // Create a new instance of the given grain type
                     grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-                    
+
                     // for log-view grains, install log-view adaptor
                     if (grain is ILogConsistentGrain)
                     {
@@ -751,7 +759,12 @@ namespace Orleans.Runtime
                             consistencyProvider, data.StorageProvider);
                     }
                 }
-             
+                
+                Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap;
+                //if grain implements IStreamSubscriptionObserver<T>, then can get a set of subscriptionObserver from it
+                if(TryGetStreamSubscriptionObservers(grainType, grain, out observerProxyMap))
+                    InstallStreamConsumerExtension(data, observerProxyMap);
+
                 grain.Data = data;
                 data.SetGrainInstance(grain);
             }
@@ -760,6 +773,35 @@ namespace Orleans.Runtime
             activations.IncrementGrainCounter(grainClassName);
 
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
+        }
+
+        private void InstallStreamConsumerExtension(ActivationData result, Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
+        {
+            var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
+            if (invoker == null)
+                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
+            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.providerManager, observerProxyMap);
+            var handler = new StreamConsumerExtension(this.providerRuntime, subscriptionChangeHandler);
+            result.TryAddExtension(invoker, handler);
+        }
+
+        private bool TryGetStreamSubscriptionObservers(Type grainType, IAddressable grain, out Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
+        {
+            var interfaces = grainType.GetInterfaces();
+            var subObserverProxyMap = new Dictionary<Type, IStreamSubscriptionObserverProxy>();
+            foreach (var interf in interfaces)
+            {
+                //use GetTypeInfo for netstandard compatible
+                if (interf.GetTypeInfo().IsGenericType && (interf.GetGenericTypeDefinition().GetTypeInfo().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
+                {
+                    var typeParam = interf.GetGenericArguments()[0];
+                    var observerProxy = (IStreamSubscriptionObserverProxy)this.serviceProvider.GetService(interf);
+                    observerProxy.SubscriptionObserver = grain;
+                    subObserverProxyMap.Add(typeParam, observerProxy);
+                }
+            }
+            observerProxyMap = subObserverProxyMap;
+            return subObserverProxyMap.Count > 0;
         }
 
         private void SetupStorageProvider(Type grainType, ActivationData data)
@@ -871,7 +913,6 @@ namespace Orleans.Runtime
 
             return defaultFactory;
         }
-       
 
         private async Task SetupActivationState(ActivationData result, string grainType)
         {
@@ -1401,7 +1442,7 @@ namespace Orleans.Runtime
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 #endregion
-#region IPlacementContext
+#region IPlacementRuntime
 
         public Logger Logger => logger;
 

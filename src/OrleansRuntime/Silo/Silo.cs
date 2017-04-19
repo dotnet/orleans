@@ -213,6 +213,7 @@ namespace Orleans.Runtime
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
             services.AddTransient<Func<NodeConfiguration>>(sp => () => initializationParams.NodeConfig);
+            services.AddTransient(typeof(IStreamSubscriptionObserver<>),typeof(StreamSubscriptionObserverProxy<>));
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.AddSingleton<SerializationManager>();
@@ -276,8 +277,10 @@ namespace Orleans.Runtime
             // Placement
             services.AddSingleton<PlacementDirectorsManager>();
             services.AddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
+            services.AddSingleton<IActivationSelector<RandomPlacement>, RandomPlacementDirector>();
             services.AddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
             services.AddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
+            services.AddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
             services.AddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
             services.AddSingleton<DefaultPlacementStrategy>();
             services.AddSingleton<ClientObserversPlacementDirector>();

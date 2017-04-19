@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementContext context)
+        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
             // first, check if we can find an activation for this client in the cache or local directory partition
             AddressesAndTag addresses;
@@ -39,12 +39,13 @@ namespace Orleans.Runtime.Placement
                     throw new InvalidOperationException("Unsupported client type. Grain " + target);
             }
         }
-
-
-        public override Task<PlacementResult> 
-            OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        
+        public override Task<SiloAddress> OnAddActivation(
+            PlacementStrategy strategy, 
+            PlacementTarget target, 
+            IPlacementContext context)
         {
-            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainId);
+            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainIdentity);
         }
     }
 }

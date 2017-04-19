@@ -140,6 +140,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             var waitingTask = grain0.LongRunningTask(TimeSpan.FromSeconds(5));
             var callBeforeUpgrade = grain0.GetVersion();
+            await Task.Delay(100); // Make sure requests are not sent out of order
             var callProvokingUpgrade = grain1.ProxyGetVersion(grain0);
 
             await waitingTask;

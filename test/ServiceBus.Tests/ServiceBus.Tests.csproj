@@ -127,12 +127,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="SlowConsumingTests\EHSlowConsumingTests.cs" />
+    <Compile Include="SlowConsumingTests\EventHubStreamProviderSettingsTests.cs" />
     <Compile Include="Streaming\EHClientStreamTests.cs" />
     <Compile Include="Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs" />
     <Compile Include="Streaming\EHStreamPerPartitionTests.cs" />
     <Compile Include="Streaming\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="Streaming\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="Streaming\TimePurgePredicateTests.cs" />
+    <Compile Include="TestStreamProviders\EHStreamProviderWithCreatedCacheList.cs" />
     <Compile Include="TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestEventHubStreamProvider.cs" />
   </ItemGroup>

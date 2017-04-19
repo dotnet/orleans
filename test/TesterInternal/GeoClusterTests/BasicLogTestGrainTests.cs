@@ -8,17 +8,18 @@ using Orleans.Runtime.Configuration;
 using UnitTests.GrainInterfaces;
 using Orleans.TestingHost;
 using Xunit;
-using Assert = Xunit.Assert;
 using TestExtensions;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
+    [TestCategory("GeoCluster")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
         private Random random;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -43,35 +44,36 @@ namespace Tests.GeoClusterTests
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
+            fixture.EnsurePreconditionsMet();
             this.random = new Random();
         }
 
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task DefaultStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
         }
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task MemoryStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainMemoryStorage");
         }
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task SharedStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedStateStorage");
         }
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task SharedLogStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedLogStorage");
         }
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task CustomStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
         }
-        [Fact, TestCategory("GeoCluster")]
+        [SkippableFact]
         public async Task GsiStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.GsiLogTestGrain");

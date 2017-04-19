@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Streams.Core;
-using Orleans.Streams.Providers;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -52,8 +51,6 @@ namespace Orleans.Providers.Streams.Common
         private SerializationManager serializationManager;
         private IRuntimeClient runtimeClient;
         private IStreamSubscriptionManager streamSubscriptionManager;
-        [NonSerialized]
-        private readonly AsyncLock bindExtLock = new AsyncLock();
         public string Name { get; private set; }
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -142,12 +139,6 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
             stateManager.CommitState();
-        }
-
-        public async Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAdd)
-        {
-            var consumerExtension = await StreamProviderUtils.BindExtensionLazy(providerRuntime, logger, IsRewindable, bindExtLock);
-            await consumerExtension.SetOnSubscriptionChangeAction<T>(onAdd);
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()

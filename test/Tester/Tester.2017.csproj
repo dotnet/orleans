@@ -36,6 +36,7 @@
     <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.2017.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.2017.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.2017.csproj" />
+    <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.2017.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

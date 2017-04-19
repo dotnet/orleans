@@ -36,5 +36,11 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="message"></param>
         /// <returns></returns>
         bool TryGetNextMessage(object cursorObj, out IBatchContainer message);
+
+        /// <summary>
+        /// Add cache pressure monitor to the cache's back pressure algorithm
+        /// </summary>
+        /// <param name="monitor"></param>
+        void AddCachePressureMonitor(ICachePressureMonitor monitor);
     }
 }

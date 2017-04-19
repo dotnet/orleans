@@ -62,6 +62,7 @@
     <Compile Include="GrainServiceTests\GrainServiceTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTestsBase.cs" />
+    <Compile Include="Placement\CustomPlacementTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\SerializationTestsUtils.cs" />

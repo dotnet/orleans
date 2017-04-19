@@ -61,6 +61,7 @@
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
     <Compile Include="ConsumerEventCountingGrain.cs" />
+    <Compile Include="CustomPlacementGrains.cs" />
     <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
     <Compile Include="EventSourcing\AccountGrain.cs" />
@@ -72,6 +73,7 @@
     <Compile Include="EventSourcing\SeatReservationGrain.cs" />
     <Compile Include="GrainService\CustomGrainService.cs" />
     <Compile Include="GrainService\GrainServiceTestGrain.cs" />
+    <Compile Include="ProgrammaticSubscribe\IExternalStreamSubscriptionHandle.cs" />
     <Compile Include="ProgrammaticSubscribe\Passive_ConsumerGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\SubscribeGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\TypedProducerGrain.cs" />
@@ -118,6 +120,7 @@
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleDIGrain.cs" />
     <Compile Include="MultipleConstructorsSimpleGrain.cs" />
+    <Compile Include="SlowConsumingGrains\SlowConsumingGrain.cs" />
     <Compile Include="SQLAdapter\CustomerGrain.cs" />
     <Compile Include="SQLAdapter\DeviceGrain.cs" />
     <Compile Include="SQLAdapter\ICustomerState.cs" />

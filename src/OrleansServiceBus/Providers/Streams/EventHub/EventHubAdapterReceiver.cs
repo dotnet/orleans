@@ -45,6 +45,7 @@ namespace Orleans.ServiceBus.Providers
 
         // Receiver life cycle
         private int recieverState = ReceiverShutdown;
+
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
         private readonly Func<NodeConfiguration> getNodeConfig;
@@ -159,7 +160,7 @@ namespace Orleans.ServiceBus.Providers
             TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
 #else
             TimeSpan oldest = dequeueTimeUtc - messages[0].EnqueuedTimeUtc;
-            TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].EnqueuedTimeUtc; 
+            TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].EnqueuedTimeUtc;
 #endif
             monitor.TrackAgeOfMessagesRead(oldest, newest);
 
@@ -176,7 +177,7 @@ namespace Orleans.ServiceBus.Providers
 #if NETSTANDARD
                     messages[0].SystemProperties.Offset,
 #else
-                    messages[0].Offset,  
+                    messages[0].Offset,
 #endif
                     DateTime.UtcNow);
             }
@@ -250,7 +251,8 @@ namespace Orleans.ServiceBus.Providers
 #if NETSTANDARD
         private static async Task<PartitionReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
 #else
-        private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger) 
+
+        private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
 #endif
         {
             bool offsetInclusive = true;
@@ -261,7 +263,7 @@ namespace Orleans.ServiceBus.Providers
             };
             EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
 #else
-            EventHubClient client = EventHubClient.CreateFromConnectionString(partitionSettings.Hub.ConnectionString, partitionSettings.Hub.Path); 
+            EventHubClient client = EventHubClient.CreateFromConnectionString(partitionSettings.Hub.ConnectionString, partitionSettings.Hub.Path);
 
             EventHubConsumerGroup consumerGroup = client.GetConsumerGroup(partitionSettings.Hub.ConsumerGroup);
             if (partitionSettings.Hub.PrefetchCount.HasValue)
@@ -281,7 +283,7 @@ namespace Orleans.ServiceBus.Providers
 #if NETSTANDARD
                 EventHubPartitionRuntimeInformation partitionInfo =
 #else
-                PartitionRuntimeInformation partitionInfo = 
+                PartitionRuntimeInformation partitionInfo =
 #endif
                     await client.GetPartitionRuntimeInformationAsync(partitionSettings.Partition);
                 offset = partitionInfo.LastEnqueuedOffset;
@@ -296,7 +298,7 @@ namespace Orleans.ServiceBus.Providers
 
             return receiver;
 #else
-            return await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive); 
+            return await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive);
 #endif
         }
 

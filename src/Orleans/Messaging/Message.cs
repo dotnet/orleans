@@ -278,13 +278,22 @@ namespace Orleans.Runtime
             set {  Headers.Result = value; }
         }
 
-        public DateTime? Expiration
+        public TimeSpan? TimeToLive
         {
-            get { return Headers.Expiration; }
-            set { Headers.Expiration = value; }
+            get { return Headers.TimeToLive; }
+            set { Headers.TimeToLive = value; }
         }
 
-        public bool IsExpired => Expiration.HasValue && DateTime.UtcNow > Expiration.Value;
+        public bool IsExpired
+        {
+            get
+            {
+                if (!TimeToLive.HasValue)
+                    return false;
+                
+                return TimeToLive <= TimeSpan.Zero;
+            }
+        }
 
         public bool IsExpirableMessage(IMessagingConfiguration config)
         {
@@ -551,7 +560,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
             AppendIfExists(HeadersContainer.Headers.CATEGORY, sb, (m) => m.Category);
             AppendIfExists(HeadersContainer.Headers.DIRECTION, sb, (m) => m.Direction);
-            AppendIfExists(HeadersContainer.Headers.EXPIRATION, sb, (m) => m.Expiration);
+            AppendIfExists(HeadersContainer.Headers.TIME_TO_LIVE, sb, (m) => m.TimeToLive);
             AppendIfExists(HeadersContainer.Headers.FORWARD_COUNT, sb, (m) => m.ForwardCount);
             AppendIfExists(HeadersContainer.Headers.GENERIC_GRAIN_TYPE, sb, (m) => m.GenericGrainType);
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
@@ -729,7 +738,7 @@ namespace Orleans.Runtime
                 CORRELATION_ID = 1 << 3,
                 DEBUG_CONTEXT = 1 << 4,
                 DIRECTION = 1 << 5,
-                EXPIRATION = 1 << 6,
+                TIME_TO_LIVE = 1 << 6,
                 FORWARD_COUNT = 1 << 7,
                 NEW_GRAIN_TYPE = 1 << 8,
                 GENERIC_GRAIN_TYPE = 1 << 9,
@@ -773,7 +782,7 @@ namespace Orleans.Runtime
             private bool _isNewPlacement;
             private bool _isUsingIfaceVersion;
             private ResponseTypes _result;
-            private DateTime? _expiration;
+            private TimeSpan? _timeToLive;
             private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
             private string _newGrainType;
@@ -781,6 +790,12 @@ namespace Orleans.Runtime
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
+            private readonly DateTime _localCreationTime;
+
+            public HeadersContainer()
+            {
+                _localCreationTime = DateTime.UtcNow;
+            }
 
             public Categories Category
             {
@@ -953,12 +968,15 @@ namespace Orleans.Runtime
                 }
             }
 
-            public DateTime? Expiration
+            public TimeSpan? TimeToLive
             {
-                get { return _expiration; }
+                get
+                {
+                    return _timeToLive - (DateTime.UtcNow - _localCreationTime);
+                }
                 set
                 {
-                    _expiration = value;
+                    _timeToLive = value;
                 }
             }
 
@@ -1064,7 +1082,7 @@ namespace Orleans.Runtime
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
-                headers = _expiration == null ? headers & ~Headers.EXPIRATION : headers | Headers.EXPIRATION;
+                headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
                 headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
                 headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
@@ -1109,8 +1127,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     writer.Write((byte)input.Direction.Value);
 
-                if ((headers & Headers.EXPIRATION) != Headers.NONE)
-                    writer.Write(input.Expiration.Value);
+                if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
+                    writer.Write(input.TimeToLive.Value);
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
                     writer.Write(input.ForwardCount);
@@ -1229,8 +1247,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     result.Direction = (Message.Directions)reader.ReadByte();
 
-                if ((headers & Headers.EXPIRATION) != Headers.NONE)
-                    result.Expiration = reader.ReadDateTime();
+                if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
+                    result.TimeToLive = reader.ReadTimeSpan();
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
                     result.ForwardCount = reader.ReadInt();

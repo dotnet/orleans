@@ -4,7 +4,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.Placement
 {
-    internal interface IPlacementContext
+    internal interface IPlacementRuntime : IPlacementContext
     {
         Logger Logger { get; }
 
@@ -21,13 +21,7 @@ namespace Orleans.Runtime.Placement
         Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
-
-        IList<SiloAddress> GetCompatibleSiloList(PlacementTarget target);
-
-        SiloAddress LocalSilo { get; }
-
-        SiloStatus LocalSiloStatus { get; }
-
+        
         /// <summary>
         /// Try to get the transaction state of the activation if it is available on this silo
         /// </summary>
@@ -39,15 +33,15 @@ namespace Orleans.Runtime.Placement
         void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy strategy, string genericArguments = null);
     }
 
-    internal static class PlacementContextExtensions
+    internal static class PlacementRuntimeExtensions
     {
-        public static Task<AddressesAndTag> Lookup(this IPlacementContext @this, GrainId grainId)
+        public static Task<AddressesAndTag> Lookup(this IPlacementRuntime @this, GrainId grainId)
         {
             AddressesAndTag l;
             return @this.FastLookup(grainId, out l) ? Task.FromResult(l) : @this.FullLookup(grainId); 
         }
 
-        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementContext @this, int typeCode, string genericArguments = null)
+        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
         {
             string unused;
             PlacementStrategy placement;
@@ -56,12 +50,12 @@ namespace Orleans.Runtime.Placement
             return placement;
         }
 
-        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementContext @this, GrainId grainId, string genericArguments = null)
+        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
         {
-            return @this.GetGrainPlacementStrategy(grainId.GetTypeCode(), genericArguments);
+            return @this.GetGrainPlacementStrategy(grainId.TypeCode, genericArguments);
         }
 
-        public static string GetGrainTypeName(this IPlacementContext @this, int typeCode, string genericArguments = null)
+        public static string GetGrainTypeName(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
         {
             string grainClass;
             PlacementStrategy unused;
@@ -70,14 +64,14 @@ namespace Orleans.Runtime.Placement
             return grainClass;
         }
 
-        public static string GetGrainTypeName(this IPlacementContext @this, GrainId grainId, string genericArguments = null)
+        public static string GetGrainTypeName(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
         {
-            return @this.GetGrainTypeName(grainId.GetTypeCode(), genericArguments);
+            return @this.GetGrainTypeName(grainId.TypeCode, genericArguments);
         }
 
-        public static void GetGrainTypeInfo(this IPlacementContext @this, GrainId grainId, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
+        public static void GetGrainTypeInfo(this IPlacementRuntime @this, GrainId grainId, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
-            @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out placement, out activationStrategy, genericArguments);
+            @this.GetGrainTypeInfo(grainId.TypeCode, out grainClass, out placement, out activationStrategy, genericArguments);
         }
     }
 }

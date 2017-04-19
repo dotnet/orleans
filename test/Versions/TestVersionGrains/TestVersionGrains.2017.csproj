@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>TestVersionGrains</RootNamespace>
+    <AssemblyName>TestVersionGrains</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutDir)' != ''">
+    <OutDir>$(OutDir)\TestVersionGrainsV2</OutDir>
+    <OutputPath>$(OutDir)</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+  </ItemGroup>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\..\..\src\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\..\..\src\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

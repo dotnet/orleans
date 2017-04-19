@@ -6,13 +6,12 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using TestExtensions;
 using Orleans.EventSourcing.Common;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
@@ -21,8 +20,19 @@ namespace Tests.GeoClusterTests
     ///  (concurrent reading and updating, update propagation, conflict resolution)
     ///  on a multicluster with the desired number of clusters
     /// </summary>
-    public class LogConsistencyTestFixture : TestingClusterHost
+    public class LogConsistencyTestFixture : IDisposable
     {
+        TestingClusterHost _hostedMultiCluster;
+
+        public TestingClusterHost MultiCluster
+        {
+            get { return _hostedMultiCluster ?? (_hostedMultiCluster = new TestingClusterHost()); }
+        }
+
+        public void EnsurePreconditionsMet()
+        {
+            TestUtils.CheckForAzureStorage();
+        }
 
         #region client wrappers
 
@@ -133,15 +143,13 @@ namespace Tests.GeoClusterTests
 
         public void StartClustersIfNeeded(int numclusters, ITestOutputHelper output)
         {
-            this.output = output;
-
-            if (Clusters.Count != numclusters)
+            if (MultiCluster.Clusters.Count != numclusters)
             {
-                if (Clusters.Count > 0)
-                    StopAllClientsAndClusters();
+                if (MultiCluster.Clusters.Count > 0)
+                    MultiCluster.StopAllClientsAndClusters();
 
 
-                WriteLog("Creating {0} clusters and clients...", numclusters);
+                output.WriteLine("Creating {0} clusters and clients...", numclusters);
                 this.numclusters = numclusters;
 
                 Assert.True(numclusters >= 2);
@@ -161,32 +169,31 @@ namespace Tests.GeoClusterTests
                 for (int i = 0; i < numclusters; i++)
                 {
                     var clustername = Cluster[i] = ((char)('A' + i)).ToString();
-                    NewGeoCluster(globalserviceid, clustername, 1,
+                    MultiCluster.NewGeoCluster(globalserviceid, clustername, 1,
                         cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString, cfg));
-                    Client[i] = this.NewClient(clustername, 0, ClientWrapper.Factory);
+                    Client[i] = this.MultiCluster.NewClient(clustername, 0, ClientWrapper.Factory);
                 }
 
-                WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
+                output.WriteLine("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
 
                 // wait for configuration to stabilize
-                WaitForLivenessToStabilizeAsync().WaitWithThrow(TimeSpan.FromMinutes(1));
+                MultiCluster.WaitForLivenessToStabilizeAsync().WaitWithThrow(TimeSpan.FromMinutes(1));
 
                 Client[0].InjectClusterConfiguration(Cluster);
-                WaitForMultiClusterGossipToStabilizeAsync(false).WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 1));
+                MultiCluster.WaitForMultiClusterGossipToStabilizeAsync(false).WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 1));
 
                 stopwatch.Stop();
-                WriteLog("Multicluster is ready (elapsed = {0}).", stopwatch.Elapsed);
+                output.WriteLine("Multicluster is ready (elapsed = {0}).", stopwatch.Elapsed);
             }
             else
             {
-                WriteLog("Reusing existing {0} clusters and clients.", numclusters);
+                output.WriteLine("Reusing existing {0} clusters and clients.", numclusters);
             }
         }
 
-        public override void Dispose()
+        public virtual void Dispose()
         {
-            base.output = null; // cannot trace during dispose from fixtures
-            base.Dispose();
+            _hostedMultiCluster?.Dispose();
         }
 
         protected ClientWrapper[] Client;
@@ -196,15 +203,10 @@ namespace Tests.GeoClusterTests
 
         private const int Xyz = 333;
 
-        public async Task RunChecksOnGrainClass(string grainClass, bool may_update_in_all_clusters, int phases)
+        public async Task RunChecksOnGrainClass(string grainClass, bool may_update_in_all_clusters, int phases, ITestOutputHelper output)
         {
-            Random random = new Random();
-
-            Func<int> GetRandom = () =>
-            {
-                lock (random)
-                    return random.Next();
-            };
+            var random = new SafeRandom();
+            Func<int> GetRandom = () => random.Next();
 
             Func<Task> checker1 = () => Task.Run(() =>
             {
@@ -212,21 +214,21 @@ namespace Tests.GeoClusterTests
                 var grainidentity = string.Format("grainref={0}", Client[0].GetGrainRef(grainClass, x));
                 // force creation of replicas
                 for (int i = 0; i < numclusters; i++) 
-                   AssertEqual(0, Client[i].GetALocal(grainClass, x), grainidentity); 
+                   Assert.Equal(0, Client[i].GetALocal(grainClass, x)); 
                 // write global on client 0
                 Client[0].SetAGlobal(grainClass, x, Xyz);
                 // read global on other clients
                 for (int i = 1; i < numclusters; i++)
                 {
                     int r = Client[i].GetAGlobal(grainClass, x);
-                    AssertEqual(Xyz, r, grainidentity);
+                    Assert.Equal(Xyz, r);
                 }
                 // check local stability
                 for (int i = 0; i < numclusters; i++)
-                    AssertEqual(Xyz, Client[i].GetALocal(grainClass, x), grainidentity);
+                    Assert.Equal(Xyz, Client[i].GetALocal(grainClass, x));
                 // check versions
                 for (int i = 0; i < numclusters; i++)
-                    AssertEqual(1, Client[i].GetConfirmedVersion(grainClass, x), grainidentity);
+                    Assert.Equal(1, Client[i].GetConfirmedVersion(grainClass, x));
             });
 
             Func<Task> checker2 = () => Task.Run(() =>
@@ -239,11 +241,11 @@ namespace Tests.GeoClusterTests
                 for (int i = 1; i < numclusters; i++)
                 {
                     int r = Client[i].GetAGlobal(grainClass, x);
-                    AssertEqual(1, r, grainidentity);
+                    Assert.Equal(1, r);
                 }
                 // check versions
                 for (int i = 0; i < numclusters; i++)
-                    AssertEqual(1, Client[i].GetConfirmedVersion(grainClass, x), grainidentity);
+                    Assert.Equal(1, Client[i].GetConfirmedVersion(grainClass, x));
             });
 
             Func<Task> checker2b = () => Task.Run(() =>
@@ -251,18 +253,18 @@ namespace Tests.GeoClusterTests
                 int x = GetRandom();
                 var grainidentity = string.Format("grainref={0}", Client[0].GetGrainRef(grainClass, x));
                 // force first creation on replica 1
-                AssertEqual(0, Client[1].GetAGlobal(grainClass, x), grainidentity);
+                Assert.Equal(0, Client[1].GetAGlobal(grainClass, x));
                 // increment on replica 0
                 Client[0].IncrementAGlobal(grainClass, x);
                 // expect on other replicas
                 for (int i = 1; i < numclusters; i++)
                 {
                     int r = Client[i].GetAGlobal(grainClass, x);
-                    AssertEqual(1, r, grainidentity);
+                    Assert.Equal(1, r);
                 }
                 // check versions
                 for (int i = 0; i < numclusters; i++)
-                    AssertEqual(1, Client[i].GetConfirmedVersion(grainClass, x), grainidentity);
+                    Assert.Equal(1, Client[i].GetConfirmedVersion(grainClass, x));
             });
 
             Func<int, Task> checker3 = (int numupdates) => Task.Run(() =>
@@ -284,14 +286,14 @@ namespace Tests.GeoClusterTests
                 }
 
                 // push & get all
-                AssertEqual(numupdates, Client[0].GetAGlobal(grainClass, x), grainidentity); 
+                Assert.Equal(numupdates, Client[0].GetAGlobal(grainClass, x)); 
 
                 for (int i = 1; i < numclusters; i++)
-                    AssertEqual(numupdates, Client[i].GetAGlobal(grainClass, x), grainidentity); // get all
+                    Assert.Equal(numupdates, Client[i].GetAGlobal(grainClass, x)); // get all
 
                 // check versions
                 for (int i = 0; i < numclusters; i++)
-                    AssertEqual(numupdates, Client[i].GetConfirmedVersion(grainClass, x), grainidentity);
+                    Assert.Equal(numupdates, Client[i].GetConfirmedVersion(grainClass, x));
             });
 
             Func<Task> checker4 = () => Task.Run(() =>
@@ -367,7 +369,7 @@ namespace Tests.GeoClusterTests
                     Task.WhenAll(t)
                 );
 
-                AssertEqual(true, done.All(b => b), string.Format("checker6({0}): update did not propagate within 20 sec", preload));
+                Assert.True(done.All(b => b), string.Format("checker6({0}): update did not propagate within 20 sec", preload));
             };
 
             Func<int, Task> checker7 = (int variation) => Task.Run(async () =>
@@ -384,9 +386,9 @@ namespace Tests.GeoClusterTests
                 // write conditional on client 0, should always succeed
                 {
                     var result = Client[0].SetAConditional(grainClass, x, Xyz);
-                    AssertEqual(0, result.Item1, grainidentity);
-                    AssertEqual(true, result.Item2, grainidentity);
-                    AssertEqual(1, Client[0].GetConfirmedVersion(grainClass, x), grainidentity);
+                    Assert.Equal(0, result.Item1);
+                    Assert.Equal(true, result.Item2);
+                    Assert.Equal(1, Client[0].GetConfirmedVersion(grainClass, x));
                 }
 
                 if ((variation / 4) % 2 == 1)
@@ -397,30 +399,30 @@ namespace Tests.GeoClusterTests
                     var result = Client[1].SetAConditional(grainClass, x, 444);
                     if (result.Item1 == 0) // was stale, thus failed
                     {
-                        AssertEqual(false, result.Item2, grainidentity);
+                        Assert.Equal(false, result.Item2);
                         // must have updated as a result
-                        AssertEqual(1, Client[1].GetConfirmedVersion(grainClass, x), grainidentity);
+                        Assert.Equal(1, Client[1].GetConfirmedVersion(grainClass, x));
                         // check stability
-                        AssertEqual(Xyz, Client[0].GetALocal(grainClass, x), grainidentity);
-                        AssertEqual(Xyz, Client[1].GetALocal(grainClass, x), grainidentity);
-                        AssertEqual(Xyz, Client[0].GetAGlobal(grainClass, x), grainidentity);
-                        AssertEqual(Xyz, Client[1].GetAGlobal(grainClass, x), grainidentity);
+                        Assert.Equal(Xyz, Client[0].GetALocal(grainClass, x));
+                        Assert.Equal(Xyz, Client[1].GetALocal(grainClass, x));
+                        Assert.Equal(Xyz, Client[0].GetAGlobal(grainClass, x));
+                        Assert.Equal(Xyz, Client[1].GetAGlobal(grainClass, x));
                     }
                     else // was up-to-date, thus succeeded
                     {
-                        AssertEqual(true, result.Item2, grainidentity);
-                        AssertEqual(1, result.Item1, grainidentity);
+                        Assert.Equal(true, result.Item2);
+                        Assert.Equal(1, result.Item1);
                         // version is now 2
-                        AssertEqual(2, Client[1].GetConfirmedVersion(grainClass, x), grainidentity);
+                        Assert.Equal(2, Client[1].GetConfirmedVersion(grainClass, x));
                         // check stability
-                        AssertEqual(444, Client[1].GetALocal(grainClass, x), grainidentity);
-                        AssertEqual(444, Client[0].GetAGlobal(grainClass, x), grainidentity);
-                        AssertEqual(444, Client[1].GetAGlobal(grainClass, x), grainidentity);
+                        Assert.Equal(444, Client[1].GetALocal(grainClass, x));
+                        Assert.Equal(444, Client[0].GetAGlobal(grainClass, x));
+                        Assert.Equal(444, Client[1].GetAGlobal(grainClass, x));
                     }
                 }
             });
 
-            WriteLog("Running individual short tests");
+            output.WriteLine("Running individual short tests");
 
             // first, run short ones in sequence
             await checker1();
@@ -445,15 +447,15 @@ namespace Tests.GeoClusterTests
                 await checker7(7);
 
                 // run tests under blocked notification to force race one way
-                SetProtocolMessageFilterForTesting(Cluster[0], msg => ! (msg is INotificationMessage));
+                MultiCluster.SetProtocolMessageFilterForTesting(Cluster[0], msg => ! (msg is INotificationMessage));
                 await checker7(0);
                 await checker7(1);
                 await checker7(2);
                 await checker7(3);
-                SetProtocolMessageFilterForTesting(Cluster[0], _ => true);
+                MultiCluster.SetProtocolMessageFilterForTesting(Cluster[0], _ => true);
             }
 
-            WriteLog("Running individual longer tests");
+            output.WriteLine("Running individual longer tests");
 
             // then, run slightly longer tests
             if (phases != 0)
@@ -462,7 +464,7 @@ namespace Tests.GeoClusterTests
                 await checker3(phases);
             }
 
-            WriteLog("Running many concurrent test instances");
+            output.WriteLine("Running many concurrent test instances");
 
             var tasks = new List<Task>();
             for (int i = 0; i < phases; i++)

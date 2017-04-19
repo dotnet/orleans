@@ -9,8 +9,10 @@ namespace Orleans.Runtime.Placement
     internal class PlacementDirectorsManager
     {
         private readonly ConcurrentDictionary<Type, IPlacementDirector> directors = new ConcurrentDictionary<Type, IPlacementDirector>();
+        private readonly ConcurrentDictionary<Type, IActivationSelector> selectors = new ConcurrentDictionary<Type, IActivationSelector>();
         private readonly PlacementStrategy defaultPlacementStrategy;
         private readonly ClientObserversPlacementDirector clientObserversPlacementDirector;
+        private readonly IActivationSelector defaultActivationSelector;
 
         private readonly IServiceProvider serviceProvider;
 
@@ -23,6 +25,8 @@ namespace Orleans.Runtime.Placement
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.clientObserversPlacementDirector = clientObserversPlacementDirector;
             this.ResolveBuiltInStrategies();
+            // TODO: Make default selector configurable
+            this.defaultActivationSelector = ResolveSelector(RandomPlacement.Singleton, true);
         }
 
         private IPlacementDirector ResolveDirector(PlacementStrategy strategy)
@@ -39,24 +43,38 @@ namespace Orleans.Runtime.Placement
             return result;
         }
 
+        private IActivationSelector ResolveSelector(PlacementStrategy strategy, bool addIfDoesNotExist = false)
+        {
+            IActivationSelector result;
+            var strategyType = strategy.GetType();
+            if (!this.selectors.TryGetValue(strategyType, out result) && addIfDoesNotExist)
+            {
+                var directorType = typeof(IActivationSelector<>).MakeGenericType(strategyType);
+                result = (IActivationSelector)this.serviceProvider.GetRequiredService(directorType);
+                this.selectors[strategyType] = result;
+            }
+
+            return result ?? defaultActivationSelector;
+        }
+
         public async Task<PlacementResult> SelectOrAddActivation(
                 ActivationAddress sendingAddress,
                 PlacementTarget targetGrain,
-                IPlacementContext context,
+                IPlacementRuntime context,
                 PlacementStrategy strategy)
         {
             if (targetGrain.IsClient)
             {
-                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain.GrainId, context);
+                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, (GrainId) targetGrain.GrainIdentity, context);
                 if (res == null)
                 {
-                    throw new ClientNotAvailableException(targetGrain.GrainId);
+                    throw new ClientNotAvailableException(targetGrain.GrainIdentity);
                 }
                 return res;
             }
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;
-            var result = await SelectActivation(targetGrain.GrainId, context, actualStrategy);
+            var result = await SelectActivation((GrainId) targetGrain.GrainIdentity, context, actualStrategy);
             if (result != null) return result;
 
             return await AddActivation(targetGrain, context, actualStrategy);
@@ -64,38 +82,51 @@ namespace Orleans.Runtime.Placement
 
         private Task<PlacementResult> SelectActivation(
             GrainId targetGrain, 
-            IPlacementContext context, 
+            IPlacementRuntime context, 
             PlacementStrategy strategy)
         {
-            var director = ResolveDirector(strategy);
+            var director = ResolveSelector(strategy);
             return director.OnSelectActivation(strategy, targetGrain, context);
         }
 
-        private Task<PlacementResult> AddActivation(
+        private async Task<PlacementResult> AddActivation(
                 PlacementTarget target,
-                IPlacementContext context,
+                IPlacementRuntime context,
                 PlacementStrategy strategy)
         {
             if (target.IsClient)
                 throw new InvalidOperationException("Client grains are not activated using the placement subsystem.");
 
             var director = ResolveDirector(strategy);
-            return director.OnAddActivation(strategy, target, context);
+            return PlacementResult.SpecifyCreation(
+                await director.OnAddActivation(strategy, target, context), 
+                strategy, 
+                context.GetGrainTypeName(target.GrainIdentity.TypeCode));
         }
 
         private void ResolveBuiltInStrategies()
         {
-            var strategies = new PlacementStrategy[]
+            var statelessWorker = new StatelessWorkerPlacement();
+
+            var placementStrategies = new PlacementStrategy[]
             {
                 RandomPlacement.Singleton,
                 ActivationCountBasedPlacement.Singleton,
-                new StatelessWorkerPlacement(),
+                statelessWorker,
                 PreferLocalPlacement.Singleton
             };
-            foreach (var strategy in strategies)
-            {
+
+            foreach (var strategy in placementStrategies)
                 this.ResolveDirector(strategy);
-            }
+            
+            var selectorStrategies = new PlacementStrategy[]
+            {
+                RandomPlacement.Singleton,
+                statelessWorker,
+            };
+
+            foreach (var strategy in selectorStrategies)
+                this.ResolveSelector(strategy, true);
         }
     }
 }

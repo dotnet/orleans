@@ -5,12 +5,9 @@ namespace Orleans.Runtime.Placement
     /// <summary>
     /// Interface for placement directors.
     /// </summary>
-    internal interface IPlacementDirector
+    public interface IPlacementDirector
     {
-        Task<PlacementResult> OnSelectActivation(
-            PlacementStrategy strategy, GrainId target, IPlacementContext context);
-
-        Task<PlacementResult> OnAddActivation(
+        Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context);
     }
 
@@ -18,7 +15,7 @@ namespace Orleans.Runtime.Placement
     /// Interface for placement directors implementing the specified strategy.
     /// </summary>
     /// <typeparam name="TStrategy">The placement strategy which this director implements.</typeparam>
-    internal interface IPlacementDirector<TStrategy> : IPlacementDirector
+    public interface IPlacementDirector<TStrategy> : IPlacementDirector
         where TStrategy : PlacementStrategy
     {
     }

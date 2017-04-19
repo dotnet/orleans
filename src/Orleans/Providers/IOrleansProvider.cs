@@ -104,6 +104,17 @@ namespace Orleans.Providers
             return config.Properties.TryGetValue(key, out s) ? int.Parse(s) : settingDefault;
         }
 
+        public static bool TryGetDoubleProperty(this IProviderConfiguration config, string key, out double setting)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            setting = 0;
+            return config.Properties.TryGetValue(key, out s) ? double.TryParse(s, out setting) : false;
+        }
+
         public static string GetProperty(this IProviderConfiguration config, string key, string settingDefault)
         {
             if (config == null)
@@ -162,6 +173,17 @@ namespace Orleans.Providers
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
+        }
+
+        public static bool TryGetTimeSpanProperty(this IProviderConfiguration config, string key, out TimeSpan setting)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            setting = TimeSpan.Zero;
+            return config.Properties.TryGetValue(key, out s) ? TimeSpan.TryParse(s, out setting) : false;
         }
     }
 

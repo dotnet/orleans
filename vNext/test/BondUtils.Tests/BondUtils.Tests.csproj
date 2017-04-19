@@ -40,11 +40,11 @@
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\test\BondUtils.Tests\Serialization\BondSerializationTests.cs">
-      <Link>Serialization\BondSerializationTests.cs</Link>
-    </Compile>    
+    <Compile Include="..\..\..\test\BondUtils.Tests\**\*.cs" Exclude="..\..\..\test\BondUtils.Tests\obj\**\*.cs;..\..\..\test\BondUtils.Tests\bin\**\*.cs;..\..\..\test\BondUtils.Tests\Properties\*.cs" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="App.config" />
     <None Include="BondUtils.Tests.xunit.runner.json">

@@ -37,46 +37,7 @@ namespace UnitTests.Serialization
             JObject output = fixture.SerializationManager.RoundTripSerializationForTesting(input);
             Assert.Equal(input.ToString(), output.ToString());
         }
-
-#pragma warning disable 618
-        [RegisterSerializer]
-#pragma warning restore 618
-        public class JObjectSerializationExample1
-        {
-            public static bool RegisterWasCalled;
-            public static object DeepCopier(object original, ICopyContext context)
-            {
-                // I assume JObject is immutable, so no need to deep copy.
-                // Alternatively, can copy via JObject.ToString and JObject.Parse().
-                return original;
-            }
-
-            public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
-            {
-                var input = (JObject)untypedInput;
-                string str = input.ToString();
-                context.SerializationManager.Serialize(str, context.StreamWriter);
-            }
-
-            public static object Deserializer(Type expected, IDeserializationContext context)
-            {
-                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
-                return JObject.Parse(str);
-            }
-
-            public static void Register(SerializationManager serializationManager)
-            {
-                RegisterWasCalled = true;
-                serializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
-            }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
-        public void SerializationTests_RegisterMethod_IsCalled()
-        {
-            Assert.True(JObjectSerializationExample1.RegisterWasCalled);
-        }
-
+        
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_InnerTypes_TypeNameHandling()
         {

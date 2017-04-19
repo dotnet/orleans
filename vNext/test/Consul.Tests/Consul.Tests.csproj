@@ -26,17 +26,11 @@
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\test\Consul.Tests\LivenessTests.cs">
-      <Link>LivenessTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Consul.Tests\ConsulMembershipTableTest.cs">
-      <Link>ConsulMembershipTableTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Consul.Tests\ConsulTestUtils.cs">
-      <Link>ConsulTestUtils.cs</Link>
-    </Compile>
+    <Compile Include="..\..\..\test\Consul.Tests\**\*.cs" Exclude="..\..\..\test\Consul.Tests\obj\**\*.cs;..\..\..\test\Consul.Tests\bin\**\*.cs;..\..\..\test\Consul.Tests\Properties\*.cs" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="App.config" />
     <None Include="Consul.Tests.xunit.runner.json">

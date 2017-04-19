@@ -21,5 +21,6 @@
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.2017.csproj" />
     <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
+    <ProjectReference Include="..\..\TestExtensions\TestExtensions.2017.csproj" />
   </ItemGroup>
 </Project>

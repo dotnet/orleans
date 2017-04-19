@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
@@ -22,28 +19,23 @@ namespace Tests.GeoClusterTests
     /// </summary>
     public class TestingClusterHost : IDisposable
     {
+        public readonly Dictionary<string, ClusterInfo> Clusters = new Dictionary<string, ClusterInfo>();
 
-        protected readonly Dictionary<string, ClusterInfo> Clusters;
-        private TestingSiloHost siloHost;
-
-
-        public TestingSiloOptions siloOptions { get; set; }
         protected ITestOutputHelper output;
 
-        private TimeSpan gossipStabilizationTime;
+        private TimeSpan gossipStabilizationTime = TimeSpan.FromSeconds(10);
 
         public TestingClusterHost(ITestOutputHelper output = null)
         {
             this.output = output;
-            Clusters = new Dictionary<string, ClusterInfo>();
             TestUtils.CheckForAzureStorage();
         }
-      
 
-        protected struct ClusterInfo
+        public struct ClusterInfo
         {
-            public List<SiloHandle> Silos;  // currently active silos
+            public TestCluster Cluster;
             public int SequenceNumber; // we number created clusters in order of creation
+            public IEnumerable<SiloHandle> Silos => Cluster.GetActiveSilos();
         }
 
         public void WriteLog(string format, params object[] args)
@@ -127,7 +119,9 @@ namespace Tests.GeoClusterTests
 
         public Task WaitForLivenessToStabilizeAsync()
         {
-            return this.siloHost.WaitForLivenessToStabilizeAsync();
+            return this.Clusters.Any() 
+                ? this.Clusters.First().Value.Cluster.WaitForLivenessToStabilizeAsync()
+                : Task.Delay(gossipStabilizationTime);
         }
 
         private static TimeSpan GetGossipStabilizationTime(GlobalConfiguration global)
@@ -139,18 +133,12 @@ namespace Tests.GeoClusterTests
             return stabilizationTime;
         }
 
-        public void StopSilo(SiloHandle instance)
-        {
-            siloHost.StopSilo(instance);
-        }
-        public void KillSilo(SiloHandle instance)
-        {
-            siloHost.KillSilo(instance);
-        }
-
         public void StopAllSilos()
         {
-            siloHost.StopAllSilos();
+            foreach (var cluster in Clusters.Values)
+            {
+                cluster.Cluster.StopAllSilos();
+            }
         }
 
         public ParallelOptions paralleloptions = new ParallelOptions() { MaxDegreeOfParallelism = 4 };
@@ -170,7 +158,7 @@ namespace Tests.GeoClusterTests
 
         #region Cluster Creation
 
-        public void NewGeoCluster(Guid globalServiceId, string clusterId, int numSilos, Action<ClusterConfiguration> customizer = null)
+        public void NewGeoCluster(Guid globalServiceId, string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
         {
             Action<ClusterConfiguration> extendedcustomizer = config =>
                 {
@@ -194,61 +182,40 @@ namespace Tests.GeoClusterTests
         }
 
 
-        public void NewCluster(string clusterId, int numSilos, Action<ClusterConfiguration> customizer = null)
+        public void NewCluster(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
         {
+            TestCluster testCluster;
             lock (Clusters)
             {
                 var myCount = Clusters.Count;
 
                 WriteLog("Starting Cluster {0}  ({1})...", myCount, clusterId);
 
-                if (myCount == 0)
+                var options = new TestClusterOptions(initialSilosCount: numSilos)
                 {
-                    TestingSiloHost.StopAllSilosIfRunning();
-                    this.siloHost = TestingSiloHost.CreateUninitialized();
-                }
-
-                var silohandles = new SiloHandle[numSilos];
-
-                var options = new TestingSiloOptions
-                {
-                    StartClient = false,
-                    AdjustConfig = customizer,
-                    BasePort = GetPortBase(myCount),
-                    ProxyBasePort = GetProxyBase(myCount)
+                    BaseSiloPort = GetPortBase(myCount),
+                    BaseGatewayPort = GetProxyBase(myCount)
                 };
-                silohandles[0] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Primary, options, 0);
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
 
-                Parallel.For(1, numSilos, paralleloptions, i =>
-                {
-                    silohandles[i] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, i);
-                });
+                customizer?.Invoke(options.ClusterConfiguration);
+                testCluster = new TestCluster(options.ClusterConfiguration, null);
+                testCluster.Deploy();
 
                 Clusters[clusterId] = new ClusterInfo
                 {
-                    Silos = silohandles.ToList(),
+                    Cluster = testCluster,
                     SequenceNumber = myCount
                 };
 
                 if (myCount == 0)
-                    gossipStabilizationTime = GetGossipStabilizationTime(this.siloHost.Globals);
+                    gossipStabilizationTime = GetGossipStabilizationTime(options.ClusterConfiguration.Globals);
 
-                WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", silohandles.Select(s => s.ToString())));
+                WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", testCluster.GetActiveSilos().Select(s => s.ToString())));
             }
         }
 
-        public void AddSiloToCluster(string clusterId, string siloName, Action<ClusterConfiguration> customizer = null)
-        {
-            var clusterinfo = Clusters[clusterId];
-
-            var options = new TestingSiloOptions
-            {
-                StartClient = false,
-                AdjustConfig = customizer
-            };
-
-            var silo = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, clusterinfo.Silos.Count);
-        }
         public virtual void Dispose()
         {
             StopAllClientsAndClusters();
@@ -289,8 +256,7 @@ namespace Tests.GeoClusterTests
                 Parallel.ForEach(Clusters.Keys, paralleloptions, key =>
                 {
                     var info = Clusters[key];
-                    Parallel.For(1, info.Silos.Count, i => siloHost.StopSilo(info.Silos[i]));
-                    siloHost.StopSilo(info.Silos[0]);
+                    info.Cluster.StopAllSilos();
                 });
                 Clusters.Clear();
             }
@@ -362,7 +328,7 @@ namespace Tests.GeoClusterTests
             var name = string.Format("Client-{0}-{1}", clusterId, clientNumber);
 
             // clients are assigned to silos round-robin
-            var gatewayport = ci.Silos[clientNumber % ci.Silos.Count].NodeConfiguration.ProxyGatewayEndpoint.Port;
+            var gatewayport = ci.Silos.ElementAt(clientNumber).ProxyAddress.Endpoint.Port;
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
             
@@ -438,7 +404,7 @@ namespace Tests.GeoClusterTests
         private SiloHandle GetActiveSiloInClusterByName(string clusterId, string siloName)
         {
             if (Clusters[clusterId].Silos == null) return null;
-            return Clusters[clusterId].Silos.Find(s => s.Name == siloName);
+            return Clusters[clusterId].Cluster.GetActiveSilos().FirstOrDefault(s => s.Name == siloName);
         }
     }
 }
