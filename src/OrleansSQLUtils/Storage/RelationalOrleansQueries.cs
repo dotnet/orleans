@@ -35,15 +35,19 @@ namespace Orleans.SqlUtils
         /// </summary>
         private readonly DbStoredQueries dbStoredQueries;
 
+        private readonly IGrainReferenceConverter grainReferenceConverter;
+
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="storage">the underlying relational storage</param>
         /// <param name="dbStoredQueries">Orleans functional queries</param>
-        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries)
+        /// <param name="grainReferenceConverter"></param>
+        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries, IGrainReferenceConverter grainReferenceConverter)
         {
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
+            this.grainReferenceConverter = grainReferenceConverter;
         }
 
         /// <summary>
@@ -52,13 +56,14 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString)
+        /// <param name="grainReferenceConverter"></param>
+        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString, IGrainReferenceConverter grainReferenceConverter)
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 
             var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
 
-            return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
+            return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)), grainReferenceConverter);
         }
 
         private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider)
@@ -204,7 +209,7 @@ namespace Orleans.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainReference grainRef)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, DbStoredQueries.Converters.GetReminderEntry, command =>
+            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command) {ServiceId = serviceId, GrainId = grainRef.ToKeyString()},
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -221,7 +226,7 @@ namespace Orleans.SqlUtils
         {
             var query = (int) beginHash < (int) endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, DbStoredQueries.Converters.GetReminderEntry, command =>
+            return ReadAsync(query, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command) {ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash},
                 ret => new ReminderTableData(ret.ToList()));
         }
@@ -237,7 +242,7 @@ namespace Orleans.SqlUtils
         internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainReference grainRef,
             string reminderName)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowKey, DbStoredQueries.Converters.GetReminderEntry, command =>
+            return ReadAsync(dbStoredQueries.ReadReminderRowKey, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
                 new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

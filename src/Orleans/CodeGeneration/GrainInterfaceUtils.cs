@@ -4,14 +4,15 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
 {
     internal static class GrainInterfaceUtils
     {
+        private static readonly IEqualityComparer<MethodInfo> MethodComparer = new MethodInfoComparer();
+
         [Serializable]
         internal class RulesViolationException : ArgumentException
         {
@@ -48,9 +49,8 @@ namespace Orleans.CodeGeneration
                 flags |= BindingFlags.DeclaredOnly;
 
             MethodInfo[] infos = grainType.GetMethods(flags);
-            IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
             foreach (var methodInfo in infos)
-                if (!methodInfos.Contains(methodInfo, methodComparer))
+                if (!methodInfos.Contains(methodInfo, MethodComparer))
                     methodInfos.Add(methodInfo);
 
             return methodInfos.ToArray();
@@ -116,24 +116,43 @@ namespace Orleans.CodeGeneration
             var dict = new Dictionary<int, Type>();
 
             if (IsGrainInterface(type))
-                dict.Add(ComputeInterfaceId(type), type);
-
+                dict.Add(GetGrainInterfaceId(type), type);
+            
             Type[] interfaces = type.GetInterfaces();
             foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
-                dict.Add(ComputeInterfaceId(interfaceType), interfaceType);
+                dict.Add(GetGrainInterfaceId(interfaceType), interfaceType);
 
             return dict;
         }
         
         public static int ComputeMethodId(MethodInfo methodInfo)
         {
-            var strMethodId = new StringBuilder(methodInfo.Name + "(");
+            var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
+            if (attr != null) return attr.MethodId;
+
+            var strMethodId = new StringBuilder(methodInfo.Name);
+
+            if (methodInfo.IsGenericMethodDefinition)
+            {
+                strMethodId.Append('<');
+                var first = true;
+                foreach (var arg in methodInfo.GetGenericArguments())
+                {
+                    if (!first) strMethodId.Append(',');
+                    else first = false;
+                    strMethodId.Append(arg.Name);
+                }
+
+                strMethodId.Append('>');
+            }
+
+            strMethodId.Append('(');
             ParameterInfo[] parameters = methodInfo.GetParameters();
             bool bFirstTime = true;
             foreach (ParameterInfo info in parameters)
             {
                 if (!bFirstTime)
-                    strMethodId.Append(",");
+                    strMethodId.Append(',');
 
                 strMethodId.Append(info.ParameterType.Name);
                 var typeInfo = info.ParameterType.GetTypeInfo();
@@ -145,13 +164,22 @@ namespace Orleans.CodeGeneration
                 }
                 bFirstTime = false;
             }
-            strMethodId.Append(")");
+            strMethodId.Append(')');
             return Utils.CalculateIdHash(strMethodId.ToString());
         }
 
         public static int GetGrainInterfaceId(Type grainInterface)
         {
             return GetTypeCode(grainInterface);
+        }
+
+        public static ushort GetGrainInterfaceVersion(Type grainInterface)
+        {
+            if (typeof(IGrainExtension).IsAssignableFrom(grainInterface))
+                return 0;
+
+            var attr = grainInterface.GetTypeInfo().GetCustomAttribute<VersionAttribute>();
+            return attr?.Version ?? Constants.DefaultInterfaceVersion;
         }
 
         public static bool IsTaskBasedInterface(Type type)
@@ -164,13 +192,6 @@ namespace Orleans.CodeGeneration
         public static bool IsGrainType(Type grainType)
         {
             return typeof (IGrain).IsAssignableFrom(grainType);
-        }
-
-        public static int ComputeInterfaceId(Type interfaceType)
-        {
-            var ifaceName = TypeUtils.GetFullName(interfaceType);
-            var ifaceId = Utils.CalculateIdHash(ifaceName);
-            return ifaceId;
         }
 
         public static int GetGrainClassTypeCode(Type grainClass)
@@ -191,8 +212,11 @@ namespace Orleans.CodeGeneration
             List<string> violations;
             if (!TryValidateInterfaceRules(type, out violations))
             {
-                foreach (var violation in violations)
-                    ConsoleText.WriteLine("ERROR: " + violation);
+                if (ConsoleText.IsConsoleAvailable)
+                {
+                    foreach (var violation in violations)
+                        ConsoleText.WriteLine("ERROR: " + violation);
+                }
 
                 throw new RulesViolationException(
                     string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);
@@ -308,35 +332,37 @@ namespace Orleans.CodeGeneration
 
             public bool Equals(MethodInfo x, MethodInfo y)
             {
-                var xString = new StringBuilder(x.Name);
-                var yString = new StringBuilder(y.Name);
+                return string.Equals(GetSignature(x), GetSignature(y), StringComparison.Ordinal);
+            }
 
-                ParameterInfo[] parms = x.GetParameters();
-                foreach (ParameterInfo info in parms)
+            private static string GetSignature(MethodInfo method)
+            {
+                var result = new StringBuilder(method.Name);
+
+                if (method.IsGenericMethodDefinition)
                 {
-                    var typeInfo = info.ParameterType.GetTypeInfo();
-                    xString.Append(typeInfo.Name);
-                    if (typeInfo.IsGenericType)
+                    foreach (var arg in method.GetGenericArguments())
                     {
-                        Type[] args = info.ParameterType.GetGenericArguments();
-                        foreach (Type arg in args)
-                            xString.Append(arg.Name);
+                        result.Append(arg.Name);
                     }
                 }
 
-                parms = y.GetParameters();
-                foreach (ParameterInfo info in parms)
+                var parms = method.GetParameters();
+                foreach (var info in parms)
                 {
-                    yString.Append(info.ParameterType.Name);
                     var typeInfo = info.ParameterType.GetTypeInfo();
+                    result.Append(typeInfo.Name);
                     if (typeInfo.IsGenericType)
                     {
-                        Type[] args = info.ParameterType.GetGenericArguments();
-                        foreach (Type arg in args)
-                            yString.Append(arg.Name);
+                        var args = info.ParameterType.GetGenericArguments();
+                        foreach (var arg in args)
+                        {
+                            result.Append(arg.Name);
+                        }
                     }
                 }
-                return String.CompareOrdinal(xString.ToString(), yString.ToString()) == 0;
+
+                return result.ToString();
             }
 
             public int GetHashCode(MethodInfo obj)

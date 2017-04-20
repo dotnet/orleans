@@ -35,6 +35,11 @@ namespace UnitTests.GrainInterfaces
     public interface ILocalPlacementTestGrain : IPlacementTestGrain
     { }
 
+    internal interface IDefaultPlacementTestGrain
+    {
+        bool IsDefaultPlacementRandom();
+    }
+
     //----------------------------------------------------------//
     // Interfaces for LocalContent grain case, when grain is activated on every silo by bootstrap provider.
 

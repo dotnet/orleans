@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using UnitTests.GrainInterfaces;
-using System.Globalization;
-using System.Threading;
-using System.Reflection;
-using Orleans.Async;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -55,7 +52,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "AzureStore")]
-    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    public class SimpleGenericGrainUsingAzureStorageAndLongGrainName<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureStorageAndLongGrainName<T>
     {
         public async Task<T> EchoAsync(T entity)
         {
@@ -584,6 +581,8 @@ namespace UnitTests.Grains
 
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
+        private T lastValue;
+        
         public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
         {
             tc.CancellationToken.Register(() =>
@@ -592,6 +591,11 @@ namespace UnitTests.Grains
             });
 
             return TaskDone.Done;
+        }
+
+        public Task<T> GetLastValue()
+        {
+            return Task.FromResult(lastValue);
         }
 
         public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
@@ -649,6 +653,7 @@ namespace UnitTests.Grains
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
         {
             await Task.Delay(delay);
+            this.lastValue = t;
             return await Task.FromResult(t);
         }
 

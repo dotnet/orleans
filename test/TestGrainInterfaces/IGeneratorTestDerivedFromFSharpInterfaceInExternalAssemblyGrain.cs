@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+﻿#if !EXCLUDEFSHARP
 using Orleans;
 using UnitTests.FSharpInterfaces;
 
@@ -10,3 +10,4 @@ namespace UnitTests.GrainInterfaces
     {
     }
 }
+#endif

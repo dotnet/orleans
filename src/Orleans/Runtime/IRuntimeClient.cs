@@ -1,8 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Storage;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -14,7 +13,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Grain Factory to get and cast grain references.
         /// </summary>
-        GrainFactory InternalGrainFactory { get; }
+        IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
         /// Provides client application code with access to an Orleans logger.
@@ -25,7 +24,23 @@ namespace Orleans.Runtime
         /// A unique identifier for the current client.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
-        string Identity { get; }
+        string CurrentActivationIdentity { get; }
+
+        /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+
+        /// <summary>
+        /// Global pre-call interceptor function
+        /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
+        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
+        /// such as <c>Orleans.RequestContext</c> will be picked up.
+        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
+        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
+        /// </summary>
+        /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
+        ClientInvokeCallback ClientInvokeCallback { get; set; }
 
         /// <summary>
         /// Get the current response timeout setting for this client.
@@ -43,47 +58,19 @@ namespace Orleans.Runtime
 
         void ReceiveResponse(Message message);
 
-        /// <summary>
-        /// Return the currently storage provider configured for this grain, or null if no storage provider configured for this grain.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">If called from outside grain class</exception>
-        IStorageProvider CurrentStorageProvider { get; }
-
-        Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
-
-        Task UnregisterReminder(IGrainReminder reminder);
-
-        Task<IGrainReminder> GetReminder(string reminderName);
-
-        Task<List<IGrainReminder>> GetReminders();
-
-        Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
-
         void Reset(bool cleanup);
 
         GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
         void DeleteObjectReference(IAddressable obj);
-
-        IActivationData CurrentActivationData { get; }
-
-        ActivationAddress CurrentActivationAddress { get; }
-
-        SiloAddress CurrentSilo { get; }
-
-        void DeactivateOnIdle(ActivationId id);
-
+        
         Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
 
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainTypeResolver GrainTypeResolver { get; }
 
-        string CaptureRuntimeEnvironment();
-
-        IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
-
-        SiloStatus GetSiloStatus(SiloAddress siloAddress);
+        SerializationManager SerializationManager { get; }
 
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
     }

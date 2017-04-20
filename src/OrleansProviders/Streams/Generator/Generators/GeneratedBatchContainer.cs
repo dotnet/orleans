@@ -1,21 +1,20 @@
 
 using System;
 using System.Collections.Generic;
-using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
 {
-    [Serializable]
     internal class GeneratedBatchContainer : IBatchContainer
     {
-        public Guid StreamGuid { get; private set; }
-        public string StreamNamespace { get; private set; }
-        public StreamSequenceToken SequenceToken { get { return RealToken; } }
-        public EventSequenceToken RealToken { get; private set; }
-        public object Payload { get; private set; }
+        public Guid StreamGuid { get; }
+        public string StreamNamespace { get; }
+        public StreamSequenceToken SequenceToken => RealToken;
+        public EventSequenceTokenV2 RealToken { get;  }
+        public object Payload { get; }
 
-        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, EventSequenceToken token)
+        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, EventSequenceTokenV2 token)
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;

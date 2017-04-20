@@ -1,13 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
-  <Import Project="..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.props" Condition="Exists('..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.props')" />
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props" Condition="Exists('..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props')" />
   <PropertyGroup>
-    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
-    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">14.0</VisualStudioVersion>
-    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
-    <TargetFrameworkProfile />
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
+    <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -15,14 +10,19 @@
     <Platform>AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{E8BF3F9B-EAA4-48E9-AC31-59DE955B60EE}</ProjectGuid>
-    <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>OrleansVSTools</RootNamespace>
     <AssemblyName>OrleansVSTools</AssemblyName>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>OrleansVSTools.snk</AssemblyOriginatorKeyFile>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <IncludeAssemblyInVSIXContainer>false</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,242 +31,139 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
     <CopyVsixExtensionFiles>False</CopyVsixExtensionFiles>
     <DeployExtension>False</DeployExtension>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Build.Framework" />
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.VisualStudio.Imaging, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Imaging.14.2.25123\lib\net45\Microsoft.VisualStudio.Imaging.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.OLE.Interop, Version=7.1.40304.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.OLE.Interop.7.10.6070\lib\Microsoft.VisualStudio.OLE.Interop.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.14.0, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.14.0.14.2.25123\lib\Microsoft.VisualStudio.Shell.14.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Immutable.10.0, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Immutable.10.0.10.0.30319\lib\net40\Microsoft.VisualStudio.Shell.Immutable.10.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Immutable.11.0, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Immutable.11.0.11.0.50727\lib\net45\Microsoft.VisualStudio.Shell.Immutable.11.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Immutable.12.0, Version=12.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Immutable.12.0.12.0.21003\lib\net45\Microsoft.VisualStudio.Shell.Immutable.12.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Immutable.14.0, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Immutable.14.0.14.2.25123\lib\net45\Microsoft.VisualStudio.Shell.Immutable.14.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop, Version=7.1.40304.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.7.10.6071\lib\Microsoft.VisualStudio.Shell.Interop.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop.10.0, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.10.0.10.0.30319\lib\Microsoft.VisualStudio.Shell.Interop.10.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop.11.0, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.11.0.11.0.61030\lib\Microsoft.VisualStudio.Shell.Interop.11.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop.12.0, Version=12.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.12.0.12.0.30110\lib\Microsoft.VisualStudio.Shell.Interop.12.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop.8.0, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.8.0.8.0.50727\lib\Microsoft.VisualStudio.Shell.Interop.8.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Shell.Interop.9.0, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.Shell.Interop.9.0.9.0.30729\lib\Microsoft.VisualStudio.Shell.Interop.9.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.TextManager.Interop, Version=7.1.40304.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.TextManager.Interop.7.10.6070\lib\Microsoft.VisualStudio.TextManager.Interop.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.TextManager.Interop.8.0, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <HintPath>..\packages\Microsoft.VisualStudio.TextManager.Interop.8.0.8.0.50727\lib\Microsoft.VisualStudio.TextManager.Interop.8.0.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Threading, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Threading.14.1.131\lib\net45\Microsoft.VisualStudio.Threading.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Utilities, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Utilities.14.2.25123\lib\net45\Microsoft.VisualStudio.Utilities.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Validation, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.VisualStudio.Validation.14.1.111\lib\net45\Microsoft.VisualStudio.Validation.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Design" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <COMReference Include="EnvDTE">
-      <Guid>{80CC9F66-E7D8-4DDD-85B6-D9E6CD0E93E2}</Guid>
-      <VersionMajor>8</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="EnvDTE100">
-      <Guid>{26AD1324-4B7C-44BC-84F8-B86AED45729F}</Guid>
-      <VersionMajor>10</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="EnvDTE80">
-      <Guid>{1A31287A-4D7D-413E-8E32-3B374931BD89}</Guid>
-      <VersionMajor>8</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="EnvDTE90">
-      <Guid>{2CE2370E-D744-4936-A090-3FFFE667B0E1}</Guid>
-      <VersionMajor>9</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="Microsoft.VisualStudio.CommandBars">
-      <Guid>{1CBA492E-7263-47BB-87FE-639000619B15}</Guid>
-      <VersionMajor>8</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="stdole">
-      <Guid>{00020430-0000-0000-C000-000000000046}</Guid>
-      <VersionMajor>2</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>primary</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Guids.cs" />
-    <Compile Include="GlobalSuppressions.cs" />
-    <Compile Include="OrleansVSToolsPackage.cs" />
-    <Compile Include="..\..\Build\GlobalAssemblyInfo.cs">
-      <Link>Properties\GlobalAssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="VSPackage.resx">
-      <MergeWithCTO>true</MergeWithCTO>
-      <ManifestResourceName>VSPackage</ManifestResourceName>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="..\packages\Microsoft.Orleans.Core.1.2.0\Microsoft.Orleans.Core.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Core.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Core.1.4.0\Microsoft.Orleans.Core.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Core.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.CounterControl.1.2.0\Microsoft.Orleans.CounterControl.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.CounterControl.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.CounterControl.1.4.0\Microsoft.Orleans.CounterControl.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.CounterControl.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.4.0\Microsoft.Orleans.OrleansCodeGenerator.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansHost.1.2.0\Microsoft.Orleans.OrleansHost.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansHost.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.4.0\Microsoft.Orleans.OrleansCodeGenerator.Build.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansProviders.1.2.0\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansHost.1.4.0\Microsoft.Orleans.OrleansHost.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansHost.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansProviders.1.4.0\Microsoft.Orleans.OrleansProviders.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Server.1.2.0\Microsoft.Orleans.Server.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Server.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansRuntime.1.4.0\Microsoft.Orleans.OrleansRuntime.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.0.0\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Server.1.4.0\Microsoft.Orleans.Server.1.4.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Server.1.4.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Common.1.0.0\Microsoft.CodeAnalysis.Common.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\Microsoft.CodeAnalysis.Analyzers.1.1.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Analyzers.1.1.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.CSharp.1.0.0\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.CodeAnalysis.Common.1.3.2\Microsoft.CodeAnalysis.Common.1.3.2.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Common.1.3.2.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.Extensions.DependencyInjection.1.0.0\Microsoft.Extensions.DependencyInjection.1.0.0.nupkg">
+    <Content Include="..\packages\Microsoft.CodeAnalysis.CSharp.1.3.2\Microsoft.CodeAnalysis.CSharp.1.3.2.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.CSharp.1.3.2.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\Microsoft.Extensions.DependencyInjection.1.0.0\Microsoft.Extensions.DependencyInjection.1.0.0.nupkg">
       <Link>Packages\Microsoft.Extensions.DependencyInjection.1.0.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0.nupkg">
+    <Content Include="..\packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0.nupkg">
       <Link>Packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Newtonsoft.Json.7.0.1\Newtonsoft.Json.7.0.1.nupkg">
-      <Link>Packages\Newtonsoft.Json.7.0.1.nupkg</Link>
+    <Content Include="..\packages\System.Collections.4.0.11\System.Collections.4.0.11.nupkg">
+      <Link>Packages\System.Collections.4.0.11.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\System.Collections.Immutable.1.1.36\System.Collections.Immutable.1.1.36.nupkg">
-      <Link>Packages\System.Collections.Immutable.1.1.36.nupkg</Link>
+    <Content Include="..\packages\System.Collections.Concurrent.4.0.12\System.Collections.Concurrent.4.0.12.nupkg">
+      <Link>Packages\System.Collections.Concurrent.4.0.12.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\System.Reflection.Metadata.1.0.21\System.Reflection.Metadata.1.0.21.nupkg">
-      <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
+    <Content Include="..\packages\System.Collections.Immutable.1.1.37\System.Collections.Immutable.1.1.37.nupkg">
+      <Link>Packages\System.Collections.Immutable.1.1.37.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Templates.Grains.1.2.0\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg</Link>
+    <Content Include="..\packages\System.ComponentModel.4.0.1\System.ComponentModel.4.0.1.nupkg">
+      <Link>Packages\System.ComponentModel.4.0.1.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Templates.Interfaces.1.2.0\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg</Link>
+    <Content Include="..\packages\System.Diagnostics.Debug.4.0.11\System.Diagnostics.Debug.4.0.11.nupkg">
+      <Link>Packages\System.Diagnostics.Debug.4.0.11.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg</Link>
+    <Content Include="..\packages\System.Globalization.4.0.11\System.Globalization.4.0.11.nupkg">
+      <Link>Packages\System.Globalization.4.0.11.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Linq.4.1.0\System.Linq.4.1.0.nupkg">
+      <Link>Packages\System.Linq.4.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Linq.Expressions.4.1.0\System.Linq.Expressions.4.1.0.nupkg">
+      <Link>Packages\System.Linq.Expressions.4.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Reflection.4.1.0\System.Reflection.4.1.0.nupkg">
+      <Link>Packages\System.Reflection.4.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Reflection.Metadata.1.2.0\System.Reflection.Metadata.1.2.0.nupkg">
+      <Link>Packages\System.Reflection.Metadata.1.2.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Resources.ResourceManager.4.0.1\System.Resources.ResourceManager.4.0.1.nupkg">
+      <Link>Packages\System.Resources.ResourceManager.4.0.1.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Runtime.Extensions.4.1.0\System.Runtime.Extensions.4.1.0.nupkg">
+      <Link>Packages\System.Runtime.Extensions.4.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Threading.4.0.11\System.Threading.4.0.11.nupkg">
+      <Link>Packages\System.Threading.4.0.11.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.Threading.Tasks.4.0.11\System.Threading.Tasks.4.0.11.nupkg">
+      <Link>Packages\System.Threading.Tasks.4.0.11.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\FSharp.Core.4.1.0.2\FSharp.Core.4.1.0.2.nupkg">
+      <Link>Packages\FSharp.Core.4.1.0.2.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\System.ValueTuple.4.3.0\System.ValueTuple.4.3.0.nupkg">
+      <Link>Packages\System.ValueTuple.4.3.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\packages\Newtonsoft.Json.9.0.1\Newtonsoft.Json.9.0.1.nupkg">
+      <Link>Packages\Newtonsoft.Json.9.0.1.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <None Include="OrleansVSTools.snk" />
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
@@ -276,28 +173,45 @@
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="Orleans-nuget.png">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="Orleans.ico">
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="Resources\Package.ico" />
   </ItemGroup>
   <ItemGroup>
+    <Analyzer Include="..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.Analyzers.dll" />
+    <Analyzer Include="..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.Analyzers.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VSItemTemplateGrainImplementationCSharp\VSItemTemplateGrainImplementationCSharp.csproj">
+      <Project>{C434AA5A-B324-4F08-AA11-028642B96881}</Project>
+      <Name>VSItemTemplateGrainImplementationCSharp</Name>
+      <VSIXSubPath>ItemTemplates</VSIXSubPath>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\VSItemTemplateGrainImplementationFSharp\VSItemTemplateGrainImplementationFSharp.fsproj">
+      <Project>{0F56F737-7B9D-4546-823B-BCD41565E0DE}</Project>
+      <Name>VSItemTemplateGrainImplementationFSharp</Name>
+      <VSIXSubPath>ItemTemplates</VSIXSubPath>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
+    </ProjectReference>
     <ProjectReference Include="..\VSItemTemplateGrainImplementationVB\VSItemTemplateGrainImplementationVB.vbproj">
       <Project>{8FDFBB7C-0F32-40CC-823A-81B1530BC8F2}</Project>
       <Name>VSItemTemplateGrainImplementationVB</Name>
       <VSIXSubPath>ItemTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
-    <ProjectReference Include="..\VSItemTemplateGrainImplementation\VSItemTemplateGrainImplementation.csproj">
-      <Project>{C434AA5A-B324-4F08-AA11-028642B96881}</Project>
-      <Name>VSItemTemplateGrainImplementation</Name>
+    <ProjectReference Include="..\VSItemTemplateGrainInterfaceCSharp\VSItemTemplateGrainInterfaceCSharp.csproj">
+      <Project>{4DBFB7F4-512C-4963-880A-7D1D367D5C11}</Project>
+      <Name>VSItemTemplateGrainInterfaceCSharp</Name>
       <VSIXSubPath>ItemTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\VSItemTemplateGrainInterfaceVB\VSItemTemplateGrainInterfaceVB.vbproj">
       <Project>{2E959617-E541-4985-8582-4E6733F0AEF7}</Project>
@@ -305,34 +219,23 @@
       <VSIXSubPath>ItemTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
-    <ProjectReference Include="..\VSItemTemplateGrainInterface\VSItemTemplateGrainInterface.csproj">
-      <Project>{4DBFB7F4-512C-4963-880A-7D1D367D5C11}</Project>
-      <Name>VSItemTemplateGrainInterface</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <VSIXSubPath>ItemTemplates</VSIXSubPath>
-      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
-    </ProjectReference>
-    <ProjectReference Include="..\VSItemTemplatePersistedGrainVB\VSItemTemplatePersistedGrainVB.vbproj">
-      <Project>{D67CA1CC-594C-4A79-AD73-33A2D9052E89}</Project>
-      <Name>VSItemTemplatePersistedGrainVB</Name>
-      <VSIXSubPath>ItemTemplates</VSIXSubPath>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
-    </ProjectReference>
-    <ProjectReference Include="..\VSItemTemplatePersistedGrain\VSItemTemplatePersistedGrain.csproj">
-      <Project>{F37D4936-BCBC-4CF4-AC9C-6FAAF954BF94}</Project>
-      <Name>VSItemTemplatePersistedGrain</Name>
-      <VSIXSubPath>ItemTemplates</VSIXSubPath>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
-    </ProjectReference>
-    <ProjectReference Include="..\VSProjectSiloHost\VSProjectSiloHost.csproj">
+    <ProjectReference Include="..\VSProjectSiloHostCSharp\VSProjectSiloHostCSharp.csproj">
       <Project>{8442DCB5-A97F-432C-8EF5-E0B540A6C8B6}</Project>
-      <Name>VSProjectSiloHost</Name>
+      <Name>VSProjectSiloHostCSharp</Name>
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\VSProjectTemplateGrainImplementationCSharp\VSProjectTemplateGrainImplementationCSharp.csproj">
+      <Project>{527A4A5D-DCF6-4483-95A3-5E3BA7FBF663}</Project>
+      <Name>VSProjectTemplateGrainImplementationCSharp</Name>
+      <VSIXSubPath>ProjectTemplates</VSIXSubPath>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\VSProjectTemplateGrainImplementationFSharp\VSProjectTemplateGrainImplementationFSharp.fsproj">
       <Project>{BDE229A2-4F54-4463-9FFA-81ACBEE4E890}</Project>
@@ -340,6 +243,7 @@
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\VSProjectTemplateGrainImplementationVB\VSProjectTemplateGrainImplementationVB.vbproj">
       <Project>{4B8B1878-571F-45FF-965B-FB5D2F988671}</Project>
@@ -347,13 +251,15 @@
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
-    <ProjectReference Include="..\VSProjectTemplateGrainImplementation\VSProjectTemplateGrainImplementation.csproj">
-      <Project>{527A4A5D-DCF6-4483-95A3-5E3BA7FBF663}</Project>
-      <Name>VSProjectTemplateGrainImplementation</Name>
+    <ProjectReference Include="..\VSProjectTemplateGrainInterfaceCSharp\VSProjectTemplateGrainInterfaceCSharp.csproj">
+      <Project>{94D7BBD0-33AE-4CAB-A398-585281C5459A}</Project>
+      <Name>VSProjectTemplateGrainInterfaceCSharp</Name>
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\VSProjectTemplateGrainInterfaceVB\VSProjectTemplateGrainInterfaceVB.vbproj">
       <Project>{DEE27EC0-6A60-4508-BF6B-3B96C919AEF5}</Project>
@@ -361,37 +267,20 @@
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
-    </ProjectReference>
-    <ProjectReference Include="..\VSProjectTemplateGrainInterface\VSProjectTemplateGrainInterface.csproj">
-      <Project>{94D7BBD0-33AE-4CAB-A398-585281C5459A}</Project>
-      <Name>VSProjectTemplateGrainInterface</Name>
-      <VSIXSubPath>ProjectTemplates</VSIXSubPath>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <IncludeOutputGroupsInVSIX>TemplateProjectOutputGroup%3b</IncludeOutputGroupsInVSIX>
+      <Private>false</Private>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <UseCodebase>true</UseCodebase>
   </PropertyGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
-  <PropertyGroup>
-    <PostBuildEvent>
-    </PostBuildEvent>
-  </PropertyGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Condition="Exists('..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\tools\VSSDK\Microsoft.VsSDK.targets')" Project="..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\tools\VSSDK\Microsoft.VsSDK.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.targets'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.targets'))" />
   </Target>
-  <Import Project="..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.targets" Condition="Exists('..\packages\Microsoft.VSSDK.BuildTools.14.2.25201\build\Microsoft.VSSDK.BuildTools.targets')" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <Import Project="..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.targets" Condition="Exists('..\packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.targets')" />
 </Project>

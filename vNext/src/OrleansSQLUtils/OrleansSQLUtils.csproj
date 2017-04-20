@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansSQLUtils</PackageId>
+    <Title>Microsoft Orleans SQL Utilities</Title>
+    <Description>Library of utility types for relational storage of Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET SQL</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansSQLUtils\**\*.cs" Exclude="..\..\..\src\OrleansSQLUtils\Properties\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.cs;..\..\..\src\OrleansSQLUtils\bin\**\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.sql;..\..\..\src\OrleansSQLUtils\bin\**\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.Common" Version="4.3.0" />
+    <PackageReference Include="System.Xml.XmlSerializer" Version="4.3.0" />
+    <PackageReference Include="System.Reflection" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\MySql\</PackagePath>
+    </None>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\PostgreSql\</PackagePath>
+    </None>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
+    </None>
+  </ItemGroup>
+</Project>

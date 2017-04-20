@@ -1,4 +1,7 @@
+using Orleans.Runtime;
+using Orleans.Streams.Core;
 using System;
+using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
@@ -8,7 +11,6 @@ namespace Orleans.Streams
         string Name { get; }
 
         IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
-
         /// <summary>
         /// Determines whether this is a rewindable provider - supports creating rewindable streams 
         /// (streams that allow subscribing from previous point in time).
@@ -17,3 +19,4 @@ namespace Orleans.Streams
         bool IsRewindable { get; }
     }
 }
+

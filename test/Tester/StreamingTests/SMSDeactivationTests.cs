@@ -1,13 +1,12 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
-using Xunit;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.Grains;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
@@ -15,11 +14,11 @@ namespace UnitTests.StreamingTests
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
-        private DeactivationTestRunner runner;
+        private readonly DeactivationTestRunner runner;
 
         public SMSDeactivationTests()
         {
-            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
+            runner = new DeactivationTestRunner(SMSStreamProviderName, this.Client);
         }
 
         public override TestCluster CreateTestCluster()

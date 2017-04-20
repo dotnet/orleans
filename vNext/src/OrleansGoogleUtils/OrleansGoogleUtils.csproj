@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansGoogleUtils</PackageId>
+    <Title>Microsoft Orleans Google Utilities</Title>
+    <Description>Library of utility types for Google of Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET ProtoBuf</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansGoogleUtils\**\*.cs" Exclude="..\..\..\src\OrleansGoogleUtils\Properties\*.cs;..\..\..\src\OrleansGoogleUtils\obj\**\*.cs;..\..\..\src\OrleansGoogleUtils\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

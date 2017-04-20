@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Xunit;
 using Xunit.Abstractions;
+using System.Linq;
 
 namespace UnitTests.StreamingTests
 {
@@ -13,10 +14,10 @@ namespace UnitTests.StreamingTests
     {
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
 
-        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestingSiloHost siloHost)
+        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestCluster siloHost)
         {
-            SiloAddress primSilo = siloHost.Primary.Silo.SiloAddress;
-            SiloAddress secSilo = siloHost.Secondary?.Silo.SiloAddress;
+            SiloAddress primSilo = siloHost.Primary.SiloAddress;
+            SiloAddress secSilo = siloHost.SecondarySilos.First()?.SiloAddress;
             logger.Info("\n\n**START********************** {0} ********************************* \n\n"
                         + "Running with initial silos Primary={1} Secondary={2} StreamId={3} StreamType={4} \n\n",
                 testName, primSilo, secSilo, streamId, streamProviderName);
@@ -27,14 +28,14 @@ namespace UnitTests.StreamingTests
             logger.Info("\n\n--END------------------------ {0} --------------------------------- \n\n", testName);
         }
 
-        internal static IStreamPubSub GetStreamPubSub()
+        internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)
         {
-            return GrainClient.CurrentStreamProviderRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
+            return client.StreamProviderRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
         }
 
-        internal static async Task CheckPubSubCounts(ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamId, string streamProviderName, string streamNamespace)
+        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamId, string streamProviderName, string streamNamespace)
         {
-            var pubSub = GetStreamPubSub();
+            var pubSub = GetStreamPubSub(client);
 
             int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, streamNamespace);
 
@@ -55,7 +56,7 @@ namespace UnitTests.StreamingTests
             output.WriteLine(fmtMsg);
             if (expected != -1)
             {
-                Assert.AreEqual(expected, actual, msg, args);
+                Assert.Equal(expected, actual);
             }
         }
     }

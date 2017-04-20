@@ -3,16 +3,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if !NETSTANDARD_TODO
+using System.Reflection.PortableExecutable;
+#endif
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
     internal class AssemblyLoader
     {
+#if !NETSTANDARD_TODO
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
         private readonly Logger logger;
+
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
         internal bool SimulateReflectionOnlyLoadFailure { get; set; }
@@ -32,9 +38,6 @@ namespace Orleans.Runtime
             SimulateLoadCriteriaFailure = false;
             SimulateReflectionOnlyLoadFailure = false;
             RethrowDiscoveryExceptions = false;
-
-            // Ensure that each assembly which is loaded is processed.
-            AssemblyProcessor.Initialize();
         }
         
         /// <summary>
@@ -78,8 +81,8 @@ namespace Orleans.Runtime
             loader.logger.Info("{0} assemblies loaded.", count);
             return discoveredAssemblyLocations;
         }
-
-        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
+#endif
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
         {
             try
             {
@@ -87,19 +90,18 @@ namespace Orleans.Runtime
                 var foundType =
                     TypeUtils.GetTypes(
                         assembly,
-                        type =>
-                        typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
+                        type => typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface,
+                        logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
                 }
 
-                return (T)Activator.CreateInstance(foundType, true);
+                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
             }
-            catch (FileNotFoundException exception)
+            catch (FileNotFoundException)
             {
-                logger.Warn(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exception.Message, exception);
+                logger.Info(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, $"Failed to find assembly {assemblyName} to create instance of {typeof(T)}.");
                 return null;
             }
             catch (Exception exc)
@@ -109,14 +111,14 @@ namespace Orleans.Runtime
             }
         }
 
-        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
+        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
         {
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(assemblyName));
                 var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
 
-                return (T)Activator.CreateInstance(foundType, true);
+                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
             }
             catch (Exception exc)
             {
@@ -125,6 +127,7 @@ namespace Orleans.Runtime
             }
         }
 
+#if !NETSTANDARD_TODO
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(
@@ -320,24 +323,32 @@ namespace Orleans.Runtime
             {
                 if (SimulateReflectionOnlyLoadFailure)
                     throw NewTestUnexpectedException();
-                
-                assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
+
+                if (IsCompatibleWithCurrentProcess(pathName, out complaints))
+                {
+                    assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
+                }
+                else
+                {
+                    assembly = null;
+                    return false;
+                }
             }
-            catch (FileLoadException e)
+            catch (FileLoadException ex)
             {
                 assembly = null;
                 if (!InterpretFileLoadException(pathName, out complaints))
-                    complaints = ReportUnexpectedException(e);
+                    complaints = ReportUnexpectedException(ex);
 
                 if (RethrowDiscoveryExceptions)
                     throw;
                 
                 return false;
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 assembly = null;
-                complaints = ReportUnexpectedException(e);
+                complaints = ReportUnexpectedException(ex);
 
                 if (RethrowDiscoveryExceptions)
                     throw;
@@ -347,6 +358,74 @@ namespace Orleans.Runtime
 
             complaints = null;
             return true;
+        }
+
+        private static bool IsCompatibleWithCurrentProcess(string fileName, out string[] complaints)
+        {
+            complaints = null;
+            Stream peImage = null;
+
+            try
+            {
+                peImage = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using (var peReader = new PEReader(peImage, PEStreamOptions.PrefetchMetadata))
+                {
+                    peImage = null;
+                    if (peReader.HasMetadata)
+                    {
+                        var processorArchitecture = ProcessorArchitecture.MSIL;
+
+                        var isPureIL = (peReader.PEHeaders.CorHeader.Flags & CorFlags.ILOnly) != 0;
+
+                        if (peReader.PEHeaders.PEHeader.Magic == PEMagic.PE32Plus)
+                            processorArchitecture = ProcessorArchitecture.Amd64;
+                        else if ((peReader.PEHeaders.CorHeader.Flags & CorFlags.Requires32Bit) != 0 || !isPureIL)
+                            processorArchitecture = ProcessorArchitecture.X86;
+
+                        var isLoadable = (isPureIL && processorArchitecture == ProcessorArchitecture.MSIL) ||
+                                             (Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.Amd64) ||
+                                             (!Environment.Is64BitProcess && processorArchitecture == ProcessorArchitecture.X86);
+
+                        if (!isLoadable)
+                        {
+                            complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the compliled for a different processor architecture." };
+                        }
+
+                        return isLoadable;
+                    }
+                    else
+                    {
+                        complaints = new[] { $"The file {fileName} does not contain any CLR metadata, probably it is a native file." };
+                        return false;
+                    }
+                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (BadImageFormatException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch (MissingMethodException)
+            {
+                complaints = new[] { "MissingMethodException occured. Please try to add a BindingRedirect for System.Collections.ImmutableCollections to the App.config file to correct this error." };
+                return false;
+            }
+            catch (Exception ex)
+            {
+                complaints = new[] { LogFormatter.PrintException(ex) };
+                return false;
+            }
+            finally
+            {
+                peImage?.Dispose();
+            }
         }
 
         private void LogComplaint(string pathName, string complaint)
@@ -428,5 +507,6 @@ namespace Orleans.Runtime
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
         }
+#endif
     }
 }

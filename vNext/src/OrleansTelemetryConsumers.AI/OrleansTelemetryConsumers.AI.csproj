@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
+    <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
+    <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Azure Application-Insights</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansTelemetryConsumers.AI\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.AI\Properties\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,13 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Stores all streams associated with a specific grain activation.
+    /// Stores all streams associated with a specific silo
     /// </summary>
     internal class StreamDirectory
     {

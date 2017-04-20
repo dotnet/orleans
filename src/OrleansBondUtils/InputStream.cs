@@ -2,7 +2,6 @@ namespace Orleans.Serialization
 {
     using System;
     using System.Text;
-
     using Bond.IO;
 
     internal sealed class InputStream : IInputStream, ICloneable<InputStream>
@@ -103,7 +102,7 @@ namespace Orleans.Serialization
         {
             if (reader == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(reader));
             }
 
             return new InputStream(reader);

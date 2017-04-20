@@ -3,64 +3,67 @@ using System.Collections.Generic;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
-using Assert = Xunit.Assert;
+using Xunit.Abstractions;
+using Orleans.Runtime.Configuration;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
-    public class BasicMultiClusterTest : TestingClusterHost, IDisposable
+    [TestCategory("GeoCluster")]
+    public class BasicMultiClusterTest 
     {
-        // Kill all clients and silos.
-        public void Dispose()
-        {
-            try
-            {
-                StopAllClientsAndClusters();
-            }
-            catch (Exception e)
-            {
-                WriteLog("Exception caught in test cleanup function: {0}", e);
-            }
-        }
 
         // We use ClientWrapper to load a client object in a new app domain. 
         // This allows us to create multiple clients that are connected to different silos.
         // this client is used to call into the management grain.
-        public class ClientWrapper : ClientWrapperBase
+        public class ClientWrapper : TestingClusterHost.ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport) : base(name, gatewayport)
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
+                // use null clusterId, in this test, because we are testing non-geo clients
+                : base(name, gatewayport, null, customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+                this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
             IManagementGrain systemManagement;
 
-            public Dictionary<SiloAddress,SiloStatus> GetHosts()
+            public Dictionary<SiloAddress, SiloStatus> GetHosts()
             {
-                return systemManagement.GetHosts().Result;
+                return systemManagement.GetHosts().GetResult();
             }
         }
 
-        [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
-        //[Timeout(120000)]
+        public BasicMultiClusterTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        private ITestOutputHelper output;
+
+        [SkippableFact, TestCategory("Functional")]
         public void CreateTwoIndependentClusters()
         {
-            // create cluster A with one silo and clientA
-            var clusterA = "A";
-            NewCluster(clusterA, 1);
-            var clientA = NewClient<ClientWrapper>(clusterA, 0);
+            using (var host = new TestingClusterHost(output))
+            {
+                // create cluster A with one silo and clientA
+                var clusterA = "A";
+                host.NewCluster(clusterA, 1);
+                var clientA = host.NewClient(clusterA, 0, ClientWrapper.Factory);
 
-            // create cluster B with 5 silos and clientB
-            var clusterB = "B";
-            NewCluster(clusterB, 5);
-            var clientB = NewClient<ClientWrapper>(clusterB, 0);
+                // create cluster B with 5 silos and clientB
+                var clusterB = "B";
+                host.NewCluster(clusterB, 5);
+                var clientB = host.NewClient(clusterB, 0, ClientWrapper.Factory);
 
-            // call management grain in each cluster to count the silos
-            var silos_in_A = clientA.GetHosts().Count;
-            var silos_in_B = clientB.GetHosts().Count;
+                // call management grain in each cluster to count the silos
+                var silos_in_A = clientA.GetHosts().Count;
+                var silos_in_B = clientB.GetHosts().Count;
 
-            Assert.Equal(1, silos_in_A);
-            Assert.Equal(5, silos_in_B);
-
-            StopAllClientsAndClusters(); // don't rely on VS to clean up in a timely way... do it explicitly
+                Assert.Equal(1, silos_in_A);
+                Assert.Equal(5, silos_in_B);
+            }
         }
     }
 }

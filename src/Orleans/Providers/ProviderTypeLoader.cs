@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -74,7 +73,7 @@ namespace Orleans.Providers
 
             try
             {
-                foreach (var type in assembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(assembly, logger))
                 {
                     ProcessType(type);
                 }
@@ -88,6 +87,14 @@ namespace Orleans.Providers
 
         private static void ProcessNewAssembly(object sender, AssemblyLoadEventArgs args)
         {
+#if !NETSTANDARD
+            // If the assembly is loaded for reflection only avoid processing it.
+            if (args.LoadedAssembly.ReflectionOnly)
+            {
+                return;
+            }
+#endif
+
             // We do this under the lock to avoid race conditions when an assembly is added 
             // while a type manager is initializing.
             lock (managers)
@@ -95,7 +102,7 @@ namespace Orleans.Providers
                 // We assume that it's better to fetch and iterate through the list of types once,
                 // and the list of TypeManagers many times, rather than the other way around.
                 // Certainly it can't be *less* efficient to do it this way.
-                foreach (var type in args.LoadedAssembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(args.LoadedAssembly, logger))
                 {
                     foreach (var mgr in managers)
                     {

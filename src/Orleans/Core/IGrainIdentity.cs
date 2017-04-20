@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Core
 {
@@ -15,6 +11,10 @@ namespace Orleans.Core
         string PrimaryKeyString { get; }
 
         string IdentityString { get; }
+
+        bool IsClient { get; }
+
+        int TypeCode { get; }
 
         long GetPrimaryKeyLong(out string keyExt);
 

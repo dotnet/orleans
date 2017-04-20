@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+    <ItemGroup>
+    <Compile Include="..\..\..\test\TesterAzureUtils\**\*.cs" Exclude="..\..\..\test\TesterAzureUtils\obj\**\*.cs;..\..\..\test\TesterAzureUtils\bin\**\*.cs;..\..\..\test\TesterAzureUtils\Properties\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="Tester.AzureUtils.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\test\TesterAzureUtils\Config_AzureBlobStorage.xml">
+      <Link>Config_AzureBlobStorage.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\TesterAzureUtils\Config_AzureTableStorage.xml">
+      <Link>Config_AzureTableStorage.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 
 namespace Orleans.Messaging
@@ -17,9 +18,12 @@ namespace Orleans.Messaging
 
     internal abstract class OutgoingMessageSender : AsynchQueueAgent<Message>
     {
-        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config)
+        private readonly SerializationManager serializationManager;
+
+        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config, SerializationManager serializationManager)
             : base(nameSuffix, config)
         {
+            this.serializationManager = serializationManager;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -43,11 +47,18 @@ namespace Orleans.Messaging
             int headerLength = 0;
             try
             {
-                data = msg.Serialize(out headerLength);
+                int bodyLength;
+                data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
+                if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
+                {
+                    this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                        headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
+                    if (this.Log.IsVerbose3) this.Log.Verbose3("Sending large message {0}", msg.ToLongString());
+                }
             }
             catch (Exception exc)
             {
-                OnMessageSerializationFailure(msg, exc);
+                this.OnMessageSerializationFailure(msg, exc);
                 return;
             }
 

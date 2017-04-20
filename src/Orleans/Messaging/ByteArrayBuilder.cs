@@ -192,7 +192,7 @@ namespace Orleans.Runtime
             }
 
             completedBuffers.AddRange(b);
-            completedLength += b.Select(buff => buff.Count).Sum();
+            completedLength += b.Sum(buff => buff.Count);
 
             currentBuffer = null;
             currentOffset = 0;
@@ -357,7 +357,7 @@ namespace Orleans.Runtime
             EnsureRoomFor(sizeof(int));
             tempIntArray[0] = i;
             Buffer.BlockCopy(tempIntArray, 0, currentBuffer, currentOffset, sizeof(int));
-            currentOffset += sizeof (int);
+            currentOffset += sizeof(int);
             return this;
         }
 

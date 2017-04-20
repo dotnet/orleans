@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 
 namespace Tester
@@ -22,7 +22,12 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            bool usingLocalWAS = StorageTestConstants.UsingAzureLocalStorageEmulator;
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new SkipException("No connection string found. Skipping");
+            }
+
+            bool usingLocalWAS = string.Equals(TestDefaultConfiguration.DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
 
             if (!usingLocalWAS)
             {
@@ -90,11 +95,11 @@ namespace Tester
             ServicePointManager.UseNagleAlgorithm = false;
         }
 
-        public static async Task<int> GetActivationCount(string fullTypeName)
+        public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string fullTypeName)
         {
             int result = 0;
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
             foreach (var stat in stats)
             {
@@ -102,6 +107,27 @@ namespace Tester
                     result += stat.ActivationCount;
             }
             return result;
+        }
+    }
+
+    public static class RequestContextTestUtils
+    {
+        public static void SetActivityId(Guid id)
+        {
+#if NETSTANDARD
+            RequestContext.ActivityId.Value = id;
+#else
+            Trace.CorrelationManager.ActivityId = id;
+#endif
+        }
+
+        public static Guid GetActivityId()
+        {
+#if NETSTANDARD
+            return RequestContext.ActivityId.Value;
+#else
+            return Trace.CorrelationManager.ActivityId;
+#endif
         }
     }
 }

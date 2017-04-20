@@ -1,0 +1,92 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.Core</PackageId>
+    <Title>Microsoft Orleans Core Library</Title>
+    <Description>
+      Core library of Microsoft Orleans used both on the client and server.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>Orleans</AssemblyName>
+    <RootNamespace>Orleans</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+    <Content Update="Configuration\OrleansConfiguration.xsd">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
+    </Content>
+    <Content Include="..\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
+    </Content>
+    <None Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="1.0.0" />
+    <PackageReference Include="Newtonsoft.Json" version="9.0.1" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.1.37" />
+    <PackageReference Include="System.Reflection.Metadata" Version="1.2.0" />
+  </ItemGroup>
+  <PropertyGroup>
+    <OrleansBootstrapSteps>
+      GenerateVersionNumber;
+      LogBuildProperties;
+      OrleansDllBootstrapUsingCodeGen
+    </OrleansBootstrapSteps>
+  </PropertyGroup>
+  <Target Name="OrleansBootstrap" AfterTargets="BeforeCompile" DependsOnTargets="$(OrleansBootstrapSteps)" Condition="'$(Bootstrap)' != 'true'" />
+  <Target Name="GenerateVersionNumber" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
+    <Message Text="GenerateVersionNumber" />
+    <PropertyGroup>
+      <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>1</BuildNumber>
+    </PropertyGroup>
+  </Target>
+  <Target Name="LogBuildProperties">
+    <Message Importance="high" Text="[Build Properties]" />
+    <!-- Show values of some useful properties -->
+    <Message Importance="high" Text="TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
+  </Target>
+  <Target Name="OrleansDllBootstrapUsingCodeGen" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs" Condition="'$(Bootstrap)' != 'true'">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
+    <PropertyGroup>
+      <!-- Visual Studio or MsBuild .sln build -->
+      <BootstrapOutputPath>$(ProjectDir)..\Bootstrap\</BootstrapOutputPath>
+      <!-- Build.cmd build -->
+      <BootstrapOutputPath Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</BootstrapOutputPath>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN;ORLEANS_BOOTSTRAP</ExcludeCodeGen>
+    </PropertyGroup>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
+    <!-- Compile code generator -->
+    <MSBuild Projects="$(ProjectDir)..\ClientGenerator\BootstrapCodegen.2017.proj" Properties="BootstrapOutputPath=$(BootstrapOutputPath);Bootstrap=true" Targets="Build" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="true" />
+    <!-- Finally invoke code generator on the recently built Orleans.dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator finished" Importance="high" />
+  </Target>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" Condition="'$(Bootstrap)' != 'true'" />
+  <!--End Orleans -->
+</Project>

@@ -1,22 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.ExceptionServices;
-using System.Runtime.Remoting;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
+using Orleans.Streams;
 using Orleans.TestingHost.Utils;
+using System.Collections.Concurrent;
 
 namespace Orleans.TestingHost
 {
+
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
-    /// Runs a Primary and optionally secondary silos in seperate app domains, and client in the main app domain.
+    /// Runs a Primary and optionally secondary silos in separate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process on demand if required for particular test cases.
     /// </summary>
     /// <remarks>
@@ -25,23 +28,71 @@ namespace Orleans.TestingHost
     /// </remarks>
     public class TestCluster
     {
+        /// <summary>
+        /// Primary silo handle
+        /// </summary>
         public SiloHandle Primary { get; private set; }
+
+        /// <summary>
+        /// List of handles to the secondary silos
+        /// </summary>
         public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
 
-        protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
+        private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
+        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
+
+        /// <summary>
+        /// Client configuration to use when initializing the client
+        /// </summary>
         public ClientConfiguration ClientConfiguration { get; private set; }
 
+        /// <summary>
+        /// Cluster configuration
+        /// </summary>
         public ClusterConfiguration ClusterConfiguration { get; private set; }
 
         private readonly StringBuilder log = new StringBuilder();
 
+        /// <summary>
+        /// DeploymentId of the cluster
+        /// </summary>
         public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
 
-        public IGrainFactory GrainFactory { get; private set; }
+        /// <summary>
+        /// The internal client interface.
+        /// </summary>
+        internal IInternalClusterClient InternalClient { get; private set; }
 
-        protected Logger logger => GrainClient.Logger;
+        /// <summary>
+        /// The client.
+        /// </summary>
+        public IClusterClient Client => this.InternalClient;
+
+        /// <summary>
+        /// GrainFactory to use in the tests
+        /// </summary>
+        public IGrainFactory GrainFactory => this.Client;
+
+        /// <summary>
+        /// The client-side <see cref="StreamProviderManager"/>.
+        /// </summary>
+        public IStreamProviderManager StreamProviderManager { get; private set; }
+
+        /// <summary>
+        /// GrainFactory to use in the tests
+        /// </summary>
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
+
+        /// <summary>
+        /// Client-side <see cref="IServiceProvider"/> to use in the tests.
+        /// </summary>
+        public IServiceProvider ServiceProvider => this.Client.ServiceProvider;
+        
+        /// <summary>
+        /// SerializationManager to use in the tests
+        /// </summary>
+        public SerializationManager SerializationManager { get; private set; }
 
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
@@ -160,10 +211,10 @@ namespace Orleans.TestingHost
             WriteLog("GetActiveSilos: Primary={0} + {1} Additional={2}",
                 Primary, additionalSilos.Count, Runtime.Utils.EnumerableToString(additionalSilos));
 
-            if (Primary?.Silo != null) yield return Primary;
+            if (Primary?.IsActive == true) yield return Primary;
             if (additionalSilos.Count > 0)
                 foreach (var s in additionalSilos)
-                    if (s?.Silo != null)
+                    if (s?.IsActive == true)
                         yield return s;
         }
 
@@ -175,7 +226,7 @@ namespace Orleans.TestingHost
         public SiloHandle GetSiloForAddress(SiloAddress siloAddress)
         {
             List<SiloHandle> activeSilos = GetActiveSilos().ToList();
-            var ret = activeSilos.FirstOrDefault(s => s.Silo.SiloAddress.Equals(siloAddress));
+            var ret = activeSilos.FirstOrDefault(s => s.SiloAddress.Equals(siloAddress));
             return ret;
         }
 
@@ -191,7 +242,11 @@ namespace Orleans.TestingHost
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
-        private static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
+        /// <summary>
+        /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
+        /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
+        /// </summary>
+        public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
         {
             TimeSpan stabilizationTime = TimeSpan.Zero;
             if (didKill)
@@ -270,9 +325,17 @@ namespace Orleans.TestingHost
         {
             try
             {
-                GrainClient.Uninitialize();
+                this.InternalClient?.Close().Wait();
             }
-            catch (Exception exc) { WriteLog("Exception Uninitializing grain client: {0}", exc); }
+            catch (Exception exc)
+            {
+                WriteLog("Exception Uninitializing grain client: {0}", exc);
+            }
+            finally
+            {
+                this.InternalClient?.Dispose();
+                this.InternalClient = null;
+            }
 
             StopSilo(Primary);
         }
@@ -325,7 +388,7 @@ namespace Orleans.TestingHost
         /// </summary>
         public void KillClient()
         {
-            GrainClient.HardKill();
+            this.InternalClient?.Abort();
         }
 
         /// <summary>
@@ -336,7 +399,7 @@ namespace Orleans.TestingHost
         {
             if (instance != null)
             {
-                var type = instance.Silo.Type;
+                var type = instance.Type;
                 var siloName = instance.Name;
                 StopSilo(instance);
                 var newInstance = StartOrleansSilo(type, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName]);
@@ -371,59 +434,8 @@ namespace Orleans.TestingHost
         #region Private methods
 
         /// <summary>
-        /// Imports assemblies generated by runtime code generation from the provided silo.
+        /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
         /// </summary>
-        /// <param name="siloHandle">The silo.</param>
-        private void ImportGeneratedAssemblies(SiloHandle siloHandle)
-        {
-            var generatedAssemblies = TryGetGeneratedAssemblies(siloHandle);
-            if (generatedAssemblies != null)
-            {
-                foreach (var assembly in generatedAssemblies)
-                {
-                    // If we have never seen generated code for this assembly before, or generated code might be
-                    // newer, store it for later silo creation.
-                    byte[] existing;
-                    if (!this.additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
-                    {
-                        this.additionalAssemblies[assembly.Key] = assembly.Value;
-                    }
-                }
-            }
-        }
-
-        private Dictionary<string, byte[]> TryGetGeneratedAssemblies(SiloHandle siloHandle)
-        {
-            var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
-            {
-                try
-                {
-                    var silo = siloHandle.Silo;
-                    if (silo?.TestHook != null)
-                    {
-                        var generatedAssemblies = new Silo.TestHooks.GeneratedAssemblies();
-                        silo.TestHook.UpdateGeneratedAssemblies(generatedAssemblies);
-
-                        return generatedAssemblies.Assemblies;
-                    }
-                }
-                catch (Exception exc)
-                {
-                    WriteLog("UpdateGeneratedAssemblies threw an exception. Ignoring it. Exception: {0}", exc);
-                }
-
-                return null;
-            });
-
-            // best effort to try to import generated assemblies, otherwise move on.
-            if (tryToRetrieveGeneratedAssemblies.Wait(TimeSpan.FromSeconds(3)))
-            {
-                return tryToRetrieveGeneratedAssemblies.Result;
-            }
-
-            return null;
-        }
-
         public void InitializeClient()
         {
             WriteLog("Initializing Grain Client");
@@ -435,10 +447,12 @@ namespace Orleans.TestingHost
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
 
-            GrainClient.Initialize(clientConfig);
-            GrainFactory = GrainClient.GrainFactory;
+            this.InternalClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(clientConfig).Build();
+            this.InternalClient.Connect().Wait();
+            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+            this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }
-
+        
         private async Task InitializeAsync(IEnumerable<string> siloNames)
         {
             var silos = siloNames.ToList();
@@ -469,7 +483,7 @@ namespace Orleans.TestingHost
                 }
                 catch (Exception)
                 {
-                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception != null).Select(t => t.Result));
+                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
                     throw;
                 }
 
@@ -489,127 +503,33 @@ namespace Orleans.TestingHost
             return StartOrleansSilo(this, type, clusterConfig, nodeConfig);
         }
 
+        /// <summary>
+        /// Start a new silo in the target cluster
+        /// </summary>
+        /// <param name="cluster">The TestCluster in which the silo should be deployed</param>
+        /// <param name="type">The type of the silo to deploy</param>
+        /// <param name="clusterConfig">The cluster config to use</param>
+        /// <param name="nodeConfig">The configuration for the silo to deploy</param>
+        /// <returns>A handle to the silo deployed</returns>
         public static SiloHandle StartOrleansSilo(TestCluster cluster, Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
             var siloName = nodeConfig.SiloName;
 
             cluster.WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, clusterConfig.ToString(siloName));
-            AppDomain appDomain;
-            Silo silo = cluster.LoadSiloInNewAppDomain(siloName, type, clusterConfig, out appDomain);
-
-            silo.Start();
-
-            SiloHandle retValue = new SiloHandle
-            {
-                Name = siloName,
-                Silo = silo,
-                NodeConfiguration = nodeConfig,
-                Endpoint = silo.SiloAddress.Endpoint,
-                AppDomain = appDomain,
-            };
-            cluster.ImportGeneratedAssemblies(retValue);
-            return retValue;
+            var handle = cluster.LoadSiloInNewAppDomain(siloName, type, clusterConfig, nodeConfig);
+            return handle;
         }
 
         private void StopOrleansSilo(SiloHandle instance, bool stopGracefully)
         {
-            var silo = instance.Silo;
-            if (stopGracefully)
-            {
-                try
-                {
-                    silo?.Shutdown();
-                }
-                catch (RemotingException re)
-                {
-                    WriteLog(re); /* Ignore error */
-                }
-                catch (Exception exc)
-                {
-                    WriteLog(exc);
-                    throw;
-                }
-            }
-
-            ImportGeneratedAssemblies(instance);
-
-            try
-            {
-                UnloadSiloInAppDomain(instance.AppDomain);
-            }
-            catch (Exception exc)
-            {
-                WriteLog(exc);
-                throw;
-            }
-
-            instance.AppDomain = null;
-            instance.Silo = null;
-            instance.Process = null;
+            instance.StopSilo(stopGracefully);
+            instance.Dispose();
         }
 
-        private Silo LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, out AppDomain appDomain)
+        private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            AppDomainSetup setup = GetAppDomainSetupInfo();
-
-            appDomain = AppDomain.CreateDomain(siloName, null, setup);
-
-            // Load each of the additional assemblies.
-            Silo.TestHooks.CodeGeneratorOptimizer optimizer = null;
-            foreach (var assembly in this.additionalAssemblies.Where(asm => asm.Value != null))
-            {
-                if (optimizer == null)
-                {
-                    optimizer =
-                        (Silo.TestHooks.CodeGeneratorOptimizer)
-                        appDomain.CreateInstanceFromAndUnwrap(
-                            "OrleansRuntime.dll",
-                            typeof(Silo.TestHooks.CodeGeneratorOptimizer).FullName,
-                            false,
-                            BindingFlags.Default,
-                            null,
-                            null,
-                            CultureInfo.CurrentCulture,
-                            new object[] { });
-                }
-
-                optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
-            }
-
-            var args = new object[] { siloName, type, config };
-
-            var silo = (Silo)appDomain.CreateInstanceFromAndUnwrap(
-                "OrleansRuntime.dll", typeof(Silo).FullName, false,
-                BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
-                new object[] { });
-
-            appDomain.UnhandledException += ReportUnobservedException;
-
-            return silo;
-        }
-
-        private void UnloadSiloInAppDomain(AppDomain appDomain)
-        {
-            if (appDomain != null)
-            {
-                appDomain.UnhandledException -= ReportUnobservedException;
-                AppDomain.Unload(appDomain);
-            }
-        }
-
-        private static AppDomainSetup GetAppDomainSetupInfo()
-        {
-            AppDomain currentAppDomain = AppDomain.CurrentDomain;
-
-            return new AppDomainSetup
-            {
-                ApplicationBase = Environment.CurrentDirectory,
-                ConfigurationFile = currentAppDomain.SetupInformation.ConfigurationFile,
-                ShadowCopyFiles = currentAppDomain.SetupInformation.ShadowCopyFiles,
-                ShadowCopyDirectories = currentAppDomain.SetupInformation.ShadowCopyDirectories,
-                CachePath = currentAppDomain.SetupInformation.CachePath
-            };
+            return AppDomainSiloHandle.Create(siloName, type, config, nodeConfiguration, this.additionalAssemblies);
         }
 
         #endregion

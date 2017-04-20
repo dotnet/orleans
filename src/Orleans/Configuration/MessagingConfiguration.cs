@@ -13,6 +13,10 @@ namespace Orleans.Runtime.Configuration
     public interface IMessagingConfiguration
     {
         /// <summary>
+        /// The OpenConnectionTimeout attribute specifies the timeout before a connection open is assumed to have failed
+        /// </summary>
+        TimeSpan OpenConnectionTimeout { get; set; }
+        /// <summary>
         /// The ResponseTimeout attribute specifies the default timeout before a request is assumed to have failed.
         /// </summary>
         TimeSpan ResponseTimeout { get; set; }
@@ -61,13 +65,6 @@ namespace Orleans.Runtime.Configuration
         ///  This is the period of time a gateway will wait before dropping a disconnected client.
         /// </summary>
         TimeSpan ClientDropTimeout { get; set; }
-        /// <summary>
-        /// The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-        /// of the custom Orleans serializer.
-        /// This parameter is intended for use only for testing and troubleshooting.
-        /// In production, the custom Orleans serializer should always be used because it performs significantly better.
-        /// </summary>
-        bool UseStandardSerializer { get; set; }
 
         /// <summary>
         /// The size of a buffer in the messaging buffer pool.
@@ -83,18 +80,14 @@ namespace Orleans.Runtime.Configuration
         int BufferPoolPreallocationSize { get; set; }
 
         /// <summary>
-        /// Whether to use automatic batching of messages. Default is false.
-        /// </summary>
-        bool UseMessageBatching { get; set; }
-        /// <summary>
-        /// The maximum batch size for automatic batching of messages, when message batching is used.
-        /// </summary>
-        int MaxMessageBatchingSize { get; set; }
-
-        /// <summary>
         /// The list of serialization providers
         /// </summary>
         List<TypeInfo> SerializationProviders { get; }
+
+        /// <summary>
+        /// Gets the fallback serializer, used as a last resort when no other serializer is able to serialize an object.
+        /// </summary>
+        TypeInfo FallbackSerializationProvider { get; set; }
     }
 
     /// <summary>
@@ -103,6 +96,7 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class MessagingConfiguration : IMessagingConfiguration
     {
+        public TimeSpan OpenConnectionTimeout { get; set; }
         public TimeSpan ResponseTimeout { get; set; }
         public int MaxResendCount { get; set; }
         public bool ResendOnTimeout { get; set; }
@@ -113,15 +107,10 @@ namespace Orleans.Runtime.Configuration
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
         public TimeSpan ClientDropTimeout { get; set; }
-        public bool UseStandardSerializer { get; set; }
-        public bool UseJsonFallbackSerializer { get; set; }
 
         public int BufferPoolBufferSize { get; set; }
         public int BufferPoolMaxSize { get; set; }
         public int BufferPoolPreallocationSize { get; set; }
-
-        public bool UseMessageBatching { get; set; }
-        public int MaxMessageBatchingSize { get; set; }
 
         /// <summary>
         /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwared from one silo to another.
@@ -131,13 +120,13 @@ namespace Orleans.Runtime.Configuration
         public int MaxForwardCount { get; set; }
 
         public List<TypeInfo> SerializationProviders { get; private set; }
+        public TypeInfo FallbackSerializationProvider { get; set; }
         internal double RejectionInjectionRate { get; set; }
         internal double MessageLossInjectionRate { get; set; }
 
         private static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
-        private const bool DEFAULT_USE_STANDARD_SERIALIZER = false;
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
@@ -147,8 +136,6 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
         private const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
         private const double DEFAULT_ERROR_INJECTION_RATE = 0.0;
-        private const bool DEFAULT_USE_MESSAGE_BATCHING = false;
-        private const int DEFAULT_MAX_MESSAGE_BATCH_SIZE = 10;
 
         private readonly bool isSiloConfig;
 
@@ -156,6 +143,7 @@ namespace Orleans.Runtime.Configuration
         {
             isSiloConfig = isSilo;
 
+            OpenConnectionTimeout = Constants.DEFAULT_OPENCONNECTION_TIMEOUT;
             ResponseTimeout = Constants.DEFAULT_RESPONSE_TIMEOUT;
             MaxResendCount = 0;
             ResendOnTimeout = DEFAULT_RESEND_ON_TIMEOUT;
@@ -166,7 +154,6 @@ namespace Orleans.Runtime.Configuration
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
             ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
             ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
-            UseStandardSerializer = DEFAULT_USE_STANDARD_SERIALIZER;
 
             BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = DEFAULT_BUFFER_POOL_MAX_SIZE;
@@ -184,8 +171,6 @@ namespace Orleans.Runtime.Configuration
                 RejectionInjectionRate = 0.0;
                 MessageLossInjectionRate = 0.0;
             }
-            UseMessageBatching = DEFAULT_USE_MESSAGE_BATCHING;
-            MaxMessageBatchingSize = DEFAULT_MAX_MESSAGE_BATCH_SIZE;
             SerializationProviders = new List<TypeInfo>();
         }
 
@@ -209,15 +194,9 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.AppendFormat("       Client Sender Buckets: {0}", ClientSenderBuckets).AppendLine();
             }
-            sb.AppendFormat("       Use standard (.NET) serializer: {0}", UseStandardSerializer)
-                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
-            sb.AppendFormat("       Use fallback json serializer: {0}", UseJsonFallbackSerializer)
-                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
             sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolBufferSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Max Size: {0}", BufferPoolMaxSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Preallocation Size: {0}", BufferPoolPreallocationSize).AppendLine();
-            sb.AppendFormat("       Use Message Batching: {0}", UseMessageBatching).AppendLine();
-            sb.AppendFormat("       Max Message Batching Size: {0}", MaxMessageBatchingSize).AppendLine();
 
             if (isSiloConfig)
             {
@@ -226,6 +205,7 @@ namespace Orleans.Runtime.Configuration
 
             SerializationProviders.ForEach(sp =>
                 sb.AppendFormat("       Serialization provider: {0}", sp.FullName).AppendLine());
+            sb.AppendFormat("       Fallback serializer: {0}", this.FallbackSerializationProvider?.FullName).AppendLine();
             return sb.ToString();
         }
 
@@ -282,19 +262,6 @@ namespace Orleans.Runtime.Configuration
                                                             "Invalid integer value for the ClientSenderBuckets attribute on the Messaging element");
                 }
             }
-            if (child.HasAttribute("UseStandardSerializer"))
-            {
-                UseStandardSerializer =
-                    ConfigUtilities.ParseBool(child.GetAttribute("UseStandardSerializer"),
-                                              "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
-            }
-
-            if (child.HasAttribute("UseJsonFallbackSerializer"))
-            {
-                UseJsonFallbackSerializer =
-                    ConfigUtilities.ParseBool(child.GetAttribute("UseJsonFallbackSerializer"),
-                                              "invalid boolean value for the UseJsonFallbackSerializer attribute on the Messaging element");
-            }
             
             //--
             if (child.HasAttribute("BufferPoolBufferSize"))
@@ -312,16 +279,6 @@ namespace Orleans.Runtime.Configuration
                 BufferPoolPreallocationSize = ConfigUtilities.ParseInt(child.GetAttribute("BufferPoolPreallocationSize"),
                                                           "Invalid integer value for the BufferPoolPreallocationSize attribute on the Messaging element");
             }
-            if (child.HasAttribute("UseMessageBatching"))
-            {
-                UseMessageBatching = ConfigUtilities.ParseBool(child.GetAttribute("UseMessageBatching"),
-                                                          "Invalid boolean value for the UseMessageBatching attribute on the Messaging element");
-            }
-            if (child.HasAttribute("MaxMessageBatchingSize"))
-            {
-                MaxMessageBatchingSize = ConfigUtilities.ParseInt(child.GetAttribute("MaxMessageBatchingSize"),
-                                                          "Invalid integer value for the MaxMessageBatchingSize attribute on the Messaging element");
-            }
             //--
             if (isSiloConfig)
             {
@@ -334,15 +291,20 @@ namespace Orleans.Runtime.Configuration
 
             if (child.HasChildNodes)
             {
-                var serializerNode = child.ChildNodes.Cast<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
+                var serializerNode = child.ChildNodes.OfType<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
                 if (serializerNode != null && serializerNode.HasChildNodes)
                 {
-                    var typeNames = serializerNode.ChildNodes.Cast<XmlElement>()
+                    var typeNames = serializerNode.ChildNodes.OfType<XmlElement>()
                         .Where(n => n.Name == "Provider")
                         .Select(e => e.Attributes["type"])
                         .Where(a => a != null)
                         .Select(a => a.Value);
-                    var types = typeNames.Select(t => ConfigUtilities.ParseFullyQualifiedType(t, "The type specification for the 'type' attribute of the Provider element could not be loaded"));
+                    var types =
+                        typeNames.Select(
+                            t =>
+                            ConfigUtilities.ParseFullyQualifiedType(
+                                t,
+                                $"The type specification for the 'type' attribute of the Provider element could not be loaded. Type specification: '{t}'."));
                     foreach (var type in types)
                     {
                         var typeinfo = type.GetTypeInfo();
@@ -352,6 +314,22 @@ namespace Orleans.Runtime.Configuration
                             SerializationProviders.Add(typeinfo);
                         }
                     }
+                }
+
+                var fallbackSerializerNode = child.ChildNodes.OfType<XmlElement>().FirstOrDefault(n => n.Name == "FallbackSerializationProvider");
+                if (fallbackSerializerNode != null)
+                {
+                    var typeName = fallbackSerializerNode.Attributes["type"]?.Value;
+                    if (string.IsNullOrWhiteSpace(typeName))
+                    {
+                        var msg = "The FallbackSerializationProvider element requires a 'type' attribute specifying the fully-qualified type name of the serializer.";
+                        throw new FormatException(msg);
+                    }
+
+                    var type = ConfigUtilities.ParseFullyQualifiedType(
+                        typeName,
+                        $"The type specification for the 'type' attribute of the FallbackSerializationProvider element could not be loaded. Type specification: '{typeName}'.");
+                    this.FallbackSerializationProvider = type.GetTypeInfo();
                 }
             }
         }

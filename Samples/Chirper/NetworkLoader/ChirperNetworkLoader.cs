@@ -292,19 +292,19 @@ namespace Orleans.Samples.Chirper.Network.Loader
             {
                 message = String.Format(message, args);
             }
-            message = String.Format("[{0}]   {1}", TraceLogger.PrintDate(DateTime.UtcNow), message);
+            message = $"[{DateTime.UtcNow:s}]   {message}";
             Console.WriteLine(message);
         }
         internal void ReportError(string msg, Exception exc)
         {
-            msg = "*****\t" + msg + "\n   --->" + TraceLogger.PrintException(exc);
+            msg = "*****\t" + msg + "\n   --->" + exc;
             ReportError(msg);
         }
         internal void ReportError(string msg)
         {
             Interlocked.Increment(ref numErrors);
 
-            msg = string.Format("Error Time: {0:G}\n\t{1}", TraceLogger.PrintDate(DateTime.UtcNow), msg);
+            msg = $"Error Time: {DateTime.UtcNow:s}\n\t{msg}";
             Console.WriteLine(msg);
         }
         #endregion

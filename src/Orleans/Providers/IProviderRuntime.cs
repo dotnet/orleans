@@ -1,8 +1,8 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
@@ -20,7 +20,6 @@ namespace Orleans.Providers
         /// Provides a logger to be used by the provider. 
         /// </summary>
         /// <param name="loggerName">Name of the logger being requested.</param>
-        /// <param name="logType">Type of the logger being requested.</param>
         /// <returns>Object reference to the requested logger.</returns>
         /// <seealso cref="LoggerType"/>
         Logger GetLogger(string loggerName);
@@ -67,6 +66,15 @@ namespace Orleans.Providers
     {
         // for now empty, later can add storage specific runtime capabilities.
     }
+
+    /// <summary>
+    /// Provider-facing interface for log consistency
+    /// </summary>
+    public interface ILogConsistencyProviderRuntime : IProviderRuntime
+    {
+        // for now empty, later can add provider specific runtime capabilities.
+    }
+
 
     /// <summary>
     /// Handles the invocation of the provided <paramref name="request"/>.

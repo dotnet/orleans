@@ -4,12 +4,208 @@ All notable end-user facing changes are documented in this file.
 ### [vNext]
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
+- Add streaming support for types that are serialized using IExternalSerializers
+- Replace CallContext.LogicalSetData with AsyncLocal #2200
+- Providers are now constructed using Dependency Injection. The result is that all providers must have a single public constructor with either no arguments or arguments which can all be injected. The default container is used if no container is configured. [#2721](https://github.com/dotnet/orleans/pull/2721)
+- Bug fixes:
 
-- Support for global multi cluster deployoment #1108 #1109 #1800
-- Removed OrleansDependencyInjection package and instead Orleans references Microsoft.Extensions.DepedencyInjection #1911 #1901 #1878
-  - Now using Microsoft.Extensions.DepedencyInjection.ServiceProvider as the default service provider if the user does not override it.
-  - Grains are still not being injected automatically unless the user opts in by specifying his own Startup configuration that returns a service provider.
+### [v1.4.1]
+- Improvements
+  - Fix a cleanup issue in TestCluster after a failure #2734
+  - Remove unnecessary service registration of IServiceProvider to itself, which improves support for 3rd party containers #2749
+  - Add a timeout for socket connection #2791
+  - Support for string grain id in OrleansManager.exe #2815
+  - Avoid reconnection to gateway no longer in the list returned by IGatewayListProvider #2824
+  - Handle absolute path in IntermediateOutputPath to address issue 2864 #2865, #2871
+  - Rename codegen file to be excluded from analyzers #2872
+  - ProviderTypeLoader: do not enumerate types in ReflectionOnly assembly. #2869
+  - Do not throw when calling Stop on AsynchQueueAgent after it was disposed.
+- Bug fixes
+  - NodeConfiguration.AdditionalAssemblyDirectories was not 'deeply' copied in the copy constructor #2758
+  - Fix AsReference() in generated code for null values #2756
+  - Avoid a NullReferenceException in SerializationManager.Register(...) #2768
+  - Fix missing check for empty deployment id #2786
+  - Fix to make OrleansPerfCounterTelemetryConsumer still work for grain-specific counters. (part of #2807)
+  - Fix typos in format strings #2853
+  - Fix null reference exception in simple queue cache. #2829 
 
+### [v1.4.0]
+- Breaking changes
+  - All grain instances and providers are constructed using the configured Dependency Injection container. The result is that all grains must have a single parameterless public constructor or single constructor with arguments which can all be injected. If no container is configured, the default container will be used. [#2485](https://github.com/dotnet/orleans/pull/2485)
+- Known issues
+  - When the silo starts up, it will register IServiceProvider in the container, which can be a circular reference registration when using 3rd party containers such as AutoFac. This is being addressed for 1.4.1, but there is a simple workaround for it at [#2747](https://github.com/dotnet/orleans/issues/2747)
+  - The build-time code generator required (and automatically added) a file named `Properties\orleans.codegen.cs` to the project where codegen was being ran. The new MSBuild targets no longer do that, so when upgrading a solution with a previous version of Orleans, you can safely delete this orleans.codegen.cs file from your grain projects.
+
+- Improvements
+  - Support for grains with generic methods #2670
+  - Do native PE files check before assembly loading to avoid misleading warnings on startup #2714
+  - Throw explicit exception when using streams not in Orleans Context #2683
+  - Several improvements to `JournaledGrain` API #2651 #2720
+  - Allow overriding MethodId using [MethodId(id)] on interface methods #2660
+- Bug fixes
+  - EventHubSequenceToken not used consistently #2724
+  - Support grains with generic state where the state param do not match the grain type params #2715
+  - Fix ServiceFabric IFabricServiceSiloResolver registration in DI container #2712
+  - Fix ConditionalCheckFailedException when updating silo 'IAmAlive' field in DynamoDB #2678
+  - Ensure DynamoDB Gateway Provider only returns silos with a proxy port configured #2679
+  - Fix e-Tag issue in AzureBlobStorage when calling ClearStateAsync (#2669)
+  - Other minor fixes: #2729 #2691
+
+### [v1.4.0-beta]
+- Noteworthy breaking changes:
+  - Azure table storage throws InconsistentStateException #2630
+- Improvements
+  - Optional IL-based fallback serializer #2162
+  - IncomingMessageAcceptor sockets change from APM to EAP #2275
+  - Show clearer error when ADO.NET provider fails to init #2303, #2306
+  - In client, when a gateway connection close reroute not yet sent message to another gateway #2298
+  - MySQL Script: Minor syntax tweak to support previous server versions #2342
+  - Azure Queue provider message visibility config #2401
+  - Propagate exceptions during message body deserialization #2364
+  - Check IAddressable before DeepCopy #2383
+  - Modified stream types to not use fallback serializer and allow external #2330
+  - Add "Custom/" prefix for NewRelic metrics #2453
+  - Ignore named EventWaitHandle when not available in platform #2462
+  - Heterogenous silos support  #2443
+  - Update to Consul 0.7.0.3 nuget package, because of breaking change in Consul API. #2498
+  - Grain Services by @jamescarter-le #2531
+  - Expose IMembershipOracle & related interfaces #2557
+  - Trigger registration of clients connected to the gateways in the directory when a silo is dead #2587
+  - Log Consistency Providers #1854
+  - In XML config, if SystemStoreType set to Custom but no ReminderTableAssembly are specified, assume that ReminderServiceProviderType is set to Disabled #2589
+  - In config XML, when SystemStoreType is set to MembershipTableGrain, set ReminderServiceType to ReminderTableGrain #2590
+  - Service Fabric cluster membership providers #2542
+  - Adds optional native JSON support to MySQL #2288
+  - Allow serializers to have multiple [Serializer(...)] attributes #2611
+  - Removed GrainStateStorageBridge from GrainCreator to allow better control of the IStorage used when using non-silo unit tests. #2243
+  - Failsafe Exception serialization #2633
+  - Added a data adapter to azure queue stream provider #2658
+  - Client cluster disconnection #2628
+  - Tooling improvements in build-time codegen #2523
+- Performance
+  - Several major performance improvements: #2220, #2221, #2170, #2218, #2312, #2524, #2510, #2481, #2579
+  - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
+- Bug fixes
+  - Empty deployment Id in Azure #2230
+  - Remove zero length check in Protobuf serializer #2251
+  - Make PreferLocalPlacement activate in other silos when shutting down #2276
+  - Reset GrainClient.ClientInvokeCallback when uninitializing GrainClient #2299
+  - Fix ObjectDisposedException in networking layer #2302
+  - Reset client gateway reciever buffer on socket reset. #2316
+  - Removed calling Trace.Close() from TelemetryConsumer.Close() #2396
+  - Removes deadlocking and corrupted hashing in SQL storage provider #2395
+  - Fix #2358: Invoke interceptor broken for generic grains #2502
+  - Only a hard coded set of statistics were going to telemetry consumers.  Now all non-string statistics are tracked. #2513
+  - Fix invocation interception for grain extensions #2514
+  - Fix type assertion in AdaptiveDirectoryCacheMaintainer #2525
+  - MembershipTableFactory should call InitializeMembershipTable on membership table. #2537
+  - CodeGen: fix check on parameters to generic types with serializers #2575
+  - EventHubQueueCache failing to write checkpoints on purge #2613
+  - Fix code copy-paste errors discovered by Coverity #2639
+  - GrainServices are now Started by the Silo on Startup #2642
+
+### [v1.3.1]
+- Improvements
+  - Ability to specify interleaving per message type (was needed for Orleankka) #2246
+  - Support serialization of enums backed by non-Int32 fields #2237 
+  - Add TGrainState constraints to document clearly what is needed by folks implementing stateful grains. #1923
+  - Serialization fixes #2295
+  - Update OrleansConfiguration.xsd with DI info #2314
+  - Reroute client messages via a different gateway upon a gateway disconnection #2298
+  - Add helper methods to ease ADO.NET configuration #2291
+  - EventHubStreamProvider improvements #2377
+  - Add queue flow controller that is triggered by silo load shedding. #2378
+  - Modify JenkinsHash to be stateless. #2403
+  - EventHub flow control customization knobs #2408
+- Performance
+  - Invoker codegen: methods returning Task<object> do not need Box() calls #2221
+  - CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
+  - Remove contention point in GrainDirectoryPartition #2170
+  - Optimize the scheduler, remove redundant semaphore and interlocked exchange. #2218
+  - Remove delegate allocation #2312
+  - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
+  - Provide better handling in Grain when the GrainRuntime or GrainIdentity is null #2338
+- Bug fixes
+  - Reset client gateway reciever buffer on socket reset. #2316
+  - Removes potential deadlocking and corrupted hashing in ADO.NET storage provider #2395
+  - LoadShedQueueFlowControl cast fix #2405
+
+### [v1.3.0]
+- Bug fixes:
+  - Ignore empty deployment Id in Azure #2230 
+  - Remove zero length check in Protobuf serializer #2251 
+  - Make PreferLocalPlacement revert to RandomPlacement on non-active silos #2276 
+- Updated MemoryStreamProvider to support custom message serialization #2271 
+
+### [v1.3.0-beta2]
+- Support for geo-distributed multi-cluster deployments #1108 #1109 #1800
+- Providers
+  - Remove confusing parameter from AzureSilo.Start #2109
+  - Minimal Service Fabric integration #2120
+  - Update blob storage provider to throw on storage exceptions #1902
+  - Decode protobuf using MessageParser, not dynamic #2136
+  - Service Provider is no longer required by EventHubAdapter #2044
+  - Preliminary relational persistence queries #1682
+  - Add a function that checks the connection string for use during initialization #1987
+  - Added new Amazon AWS basic Orleans providers [#2006](https://github.com/dotnet/orleans/issues/2006)
+  - A new ADO.NET storage provider that is significantly easier to setup, which replaces the the previous one. This change is not backwards compatible and does not support sharding
+  (likely be replaced later with Orleans sharding provider). The most straightforward migration plan is likely to persist the state classes from Orleans application code.
+  More information in [#1682](https://github.com/dotnet/orleans/pull/1682) and in [#1682 (comment)](https://github.com/dotnet/orleans/pull/1682#issuecomment-234371701).
+  - Support for PostgreSql #2113
+  - Memory Storage eTag enforcement less strict. #1885
+  - Added option to perform provider commands quietly #1762
+  - CreateOrleansTables_SqlServer.sql: Removed support for SQL Server 2000 and 2005 #1779
+- Streaming
+  - EventHub stream provider made more extensible #1861 1714
+  - EventHub stream provider with improved monitoring logging #1857 #2146
+  - EventHub stream provider time based message purge #2093
+  - Add Memory Stream Provider #2063
+  - Persistent stream pulling agent now uses exponential backoff #2078
+  - Add dynamic adding / removing stream providers functionality. #1966
+  - Consistent implicit subscription Id generation. #1828
+  - Event hub stream provider EventData to cached data mapping #1727
+- Bug fixes
+  - CodeGen: fix generated DeepCopy method to call RecordObject earlier #2135
+  - Fix support for serializing SByte[] #2140
+  - Fix synchronization bug in Orleans/Async/BatchWorker #2133
+  - Fix #2119 by allowing full uninitialization in SiloHost #2127
+  - Persistent Stream Provider initialization timeout fix. #2065
+  - Some EventHub stream provider bug fixes #1760 #1935 #1921 #1922
+  - Allow comments in configuration XML #1994
+  - Fixed null MethodInfo in Interceptors #1938
+  - Object Pools not pooling fix. #1937 
+  - Harden explicit subscription pubsub system #1884
+  - Fix #1869. Grain Extensions + method interception should function correctly #1874
+  - Fix bug with generic state parameter caused by inconsistent use of grainClassName / genericArgument / genericInterface #1897
+  - Throw meaningful exception if grain timer is created outside grain context #1858
+  - Do not deactivate Stateless Workers upon grain directory partition shutdown. #1838
+  - Fixed a NullReferenceException bug in ClientObserverRegistrar. #1823
+- Test
+  - Allow liveness config in TestCluster #1818
+  - Fix for strange bug in BondSerializer #1790
+  - Some improvements for unit testing #1792 #1802
+- Other
+  - Move JSON serialization methods into OrleansJsonSerializer #2206
+  - Updated package dependencies for Azure Storage, ServiceBus, ZooKeeperNetEx, Protobuf and codegen related
+  - Remove UseStandardSerializer and UseJsonFallbackSerializer options #2193 #2204
+  - Make IGrainFactory injectable #2192
+  - Recover types from ReflectionTypeLoadException #2164
+  - Moved Orleans Performance Counters into its own Telemetry Consumer. Now you need to explicitly register the `OrleansPerfCounterTelemetryConsumer` either by code or XML. More information in [#2122](https://github.com/dotnet/orleans/pull/2122) and docs will come later. `Microsoft.Orleans.CounterControl` can still be used to install the performance counters or you can use `InstallUtil.exe OrleansTelemetryConsumers.Counters.dll` to install it without depending on `OrleansCounterControl.exe`
+  - New PowerShell client Module #1990
+  - Expose property IsLongKey for IAddressable #1939
+  - Removed OrleansDependencyInjection package and instead Orleans references Microsoft.Extensions.DepedencyInjection #1911 #1901 #1878
+  - Now using Microsoft.Extensions.DepedencyInjection.ServiceProvider as the default service provider if the user does not override it. Grains are still not being injected automatically unless the user opts in by specifying his own Startup configuration that returns a service provider.
+  - Do not require explicitly registering grains in ServiceCollection #1901
+  - Support cancellation tokens in grain method signatures #1599
+  - ClusterConfiguration extension for setting Startup class #1842
+  - Log more runtime statistics on the client. #1778
+  - Added ManagementGrain.GetDetailedHosts() #1794
+  - Can get a list of active grains in Orleans for monitoring #1772 
+  - Rename InstanceName to SiloName. #1740
+  - Reworked documentation to use DocFX #1970
+
+### [v1.2.4]
+- Bug fix: Prevent null reference exception after clearing PubSubRendezvousGrain state #2040
   
 ### [v1.2.3]
 - Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
@@ -22,6 +218,8 @@ The idea is to track end-user facing changes as they occur.*
   - interception works with Streams and grain extensions #1874
   - Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. #1885
   - Other minor bug fixes #1823
+- Known issues:
+  - It is not advisable for your Orleans application to depend on WindowsAzure.Storage >= 7.0 due to #1912. This new constraint applies to previously released Orleans versions too. Will be fixed in 1.3.0.
   
 ### [v1.2.2]
 - Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. #1804

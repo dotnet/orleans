@@ -5,8 +5,8 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -71,13 +71,18 @@ namespace Orleans.Serialization
 
             if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
             {
-                result = typeInfo.GetFields().All(f => !(f.FieldType == t) && IsOrleansShallowCopyable(f.FieldType));
+                result = IsValueTypeFieldsShallowCopyable(typeInfo);
                 shallowCopyableTypes[t] = result;
                 return result;
             }
 
             shallowCopyableTypes[t] = false;
             return false;
+        }
+
+        private static bool IsValueTypeFieldsShallowCopyable(TypeInfo typeInfo)
+        {
+            return typeInfo.GetFields().All(f => f.FieldType != typeInfo.AsType() && IsOrleansShallowCopyable(f.FieldType));
         }
 
         internal static bool IsSpecializationOf(this Type t, Type match)
@@ -204,7 +209,7 @@ namespace Orleans.Serialization
                 // Guard against invalid type constraints, which appear when generating code for some languages.
                 foreach (var parameter in typeInfo.GenericTypeParameters)
                 {
-                    if (parameter.GetTypeInfo().GetGenericParameterConstraints().Any(IsSpecialClass))
+                    if (parameter.GetTypeInfo().GetGenericParameterConstraints().Any(t => IsSpecialClass(t)))
                     {
                         return true;
                     }
@@ -264,6 +269,26 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Returns <see langword="true"/> if the provided <paramref name="type"/> is publicly accessible and <see langword="false"/> otherwise.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// <see langword="true"/> if the provided <paramref name="type"/> is publicly accessible and <see langword="false"/> otherwise.
+        /// </returns>
+        public static bool IsTypePublic(Type type)
+        {
+            while (true)
+            {
+                var typeInfo = type.GetTypeInfo();
+
+                if (!typeInfo.IsPublic) return false;
+                if (typeInfo.BaseType == null) return true;
+
+                type = typeInfo.BaseType;
+            }
+        }
+
+        /// <summary>
         /// Returns true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise.
         /// </summary>
         /// <param name="fromAssembly">The assembly containing internal types.</param>
@@ -280,9 +305,16 @@ namespace Orleans.Serialization
             }
 
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
-            var serializationAssemblyName = toAssembly.GetName().FullName;
+            var fullName = toAssembly.GetName().FullName;
+            var shortName = toAssembly.GetName().Name;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
-            return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
+            foreach (var attr in internalsVisibleTo)
+            {
+                if (string.Equals(attr.AssemblyName, fullName, StringComparison.Ordinal)) return true;
+                if (string.Equals(attr.AssemblyName, shortName, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
         }
 
         private static bool IsSpecialClass(Type type)

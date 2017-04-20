@@ -1,110 +1,75 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Orleans.CodeGeneration
 {
-    using Orleans.Runtime;
-
     /// <summary>
     /// For internal (run-time) use only.
     /// Base class of all the activation attributes 
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1813:AvoidUnsealedAttributes"), AttributeUsage(System.AttributeTargets.All)]
+    [AttributeUsage(System.AttributeTargets.All)]
     public abstract class GeneratedAttribute : Attribute
     {
         /// <summary>
-        /// Gets or sets the type which this implementation applies to.
+        /// Initializes a new instance of the <see cref="GeneratedAttribute"/> class.
         /// </summary>
-        public string ForGrainType { get; protected set; }
-
-        /// <summary>
-        /// Gets or sets the type which this implementation applies to.
-        /// </summary>
-        public Type GrainType { get; protected set; }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        protected GeneratedAttribute(string forGrainType)
+        /// <param name="targetType">The type which this implementation applies to.</param>
+        protected GeneratedAttribute(Type targetType)
         {
-            ForGrainType = forGrainType;
+            this.TargetType = targetType;
         }
 
         /// <summary>
+        /// Gets the type which this implementation applies to.
         /// </summary>
-        protected GeneratedAttribute() { }
-    }
-    
-    [AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class GrainStateAttribute : GeneratedAttribute
-    {
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainStateAttribute(string forGrainType)
-        {
-            ForGrainType = forGrainType;
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainStateAttribute(Type forGrainType)
-        {
-            GrainType = forGrainType;
-            ForGrainType = forGrainType.GetParseableName();
-        }
+        public Type TargetType { get; }
     }
 
+    /// <summary>
+    /// Identifies a class that knows how to map the messages targeting a specifies interface ID to a grain (CLR) interface.
+    /// </summary>
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class MethodInvokerAttribute : GeneratedAttribute
     {
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public MethodInvokerAttribute(string forGrainType, int interfaceId, Type grainType = null)
+        /// <summary>Initializes a new instance of the <see cref="MethodInvokerAttribute"/> class.</summary>
+        /// <param name="targetType">The grain implementation type</param>
+        /// <param name="interfaceId">The ID assigned to the interface by Orleans</param>
+        public MethodInvokerAttribute(Type targetType, int interfaceId)
+            : base(targetType)
         {
-            ForGrainType = forGrainType;
             InterfaceId = interfaceId;
-            GrainType = grainType;
         }
 
-        public int InterfaceId { get; private set; }
+        /// <summary>Gets the ID assigned to the interface by Orleans</summary>
+        public int InterfaceId { get; }
     }
 
+    /// <summary>Identifies a concrete grain reference to an interface ID</summary>
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class GrainReferenceAttribute : GeneratedAttribute
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="GrainReferenceAttribute"/> class.
         /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainReferenceAttribute(string forGrainType)
+        /// <param name="targetType">The type which this implementation applies to.</param>
+        public GrainReferenceAttribute(Type targetType)
+            : base(targetType)
         {
-            ForGrainType = forGrainType;
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainReferenceAttribute(Type forGrainType)
-        {
-            GrainType = forGrainType;
-            ForGrainType = forGrainType.GetParseableName();
         }
     }
 
-    [AttributeUsage(System.AttributeTargets.Class)]
+    /// <summary>
+    /// Identifies a class that contains all the serializer methods for a type.
+    /// </summary>
+    [AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
     public sealed class SerializerAttribute : GeneratedAttribute
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="SerializerAttribute"/> class.
         /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public SerializerAttribute(Type forGrainType)
+        /// <param name="targetType">The type that this implementation can serialize.</param>
+        public SerializerAttribute(Type targetType)
+            : base(targetType)
         {
-            GrainType = forGrainType;
-            ForGrainType = forGrainType.GetParseableName();
         }
     }
 }

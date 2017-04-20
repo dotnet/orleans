@@ -1,7 +1,6 @@
 using System;
-using System.Reflection;
 using Orleans.GrainDirectory;
-using System.Linq;
+
 namespace Orleans
 {
     namespace Concurrency
@@ -76,6 +75,28 @@ namespace Orleans
         }
 
         /// <summary>
+        /// The MayInterleaveAttribute attribute is used to mark classes 
+        /// that want to control request interleaving via supplied method callback.
+        /// </summary>
+        /// <remarks>
+        /// The callback method name should point to a public static function declared on the same class 
+        /// and having the following signature: <c>public static bool MayInterleave(InvokeMethodRequest req)</c>
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class MayInterleaveAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the callback method
+            /// </summary>
+            internal string CallbackMethodName { get; private set; }
+
+            public MayInterleaveAttribute(string callbackMethodName)
+            {
+                CallbackMethodName = callbackMethodName;
+            }
+        }
+
+        /// <summary>
         /// The Immutable attribute indicates that instances of the marked class or struct are never modified
         /// after they are created.
         /// </summary>
@@ -100,7 +121,18 @@ namespace Orleans
 
             internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
             {
-                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+                this.RegistrationStrategy = strategy;
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class will have a single instance across all available clusters. Any requests in any clusters will be forwarded to the single activation instance.
+        /// </summary>
+        public class GlobalSingleInstanceAttribute : RegistrationAttribute
+        {
+            public GlobalSingleInstanceAttribute()
+                : base(GlobalSingleInstanceRegistration.Singleton)
+            {
             }
         }
 
@@ -130,9 +162,11 @@ namespace Orleans
         {
             internal PlacementStrategy PlacementStrategy { get; private set; }
 
-            internal PlacementAttribute(PlacementStrategy placement)
+            protected PlacementAttribute(PlacementStrategy placement)
             {
-                PlacementStrategy = placement ?? PlacementStrategy.GetDefault();
+                if (placement == null) throw new ArgumentNullException(nameof(placement));
+
+                PlacementStrategy = placement;
             }
         }
 
@@ -147,18 +181,20 @@ namespace Orleans
         {
             public RandomPlacementAttribute() :
                 base(RandomPlacement.Singleton)
-            { }
+            {
+            }
         }
 
         /// <summary>
         /// Marks a grain class as using the <c>PreferLocalPlacement</c> policy.
         /// </summary>
-        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false) ]
+        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
         public sealed class PreferLocalPlacementAttribute : PlacementAttribute
         {
             public PreferLocalPlacementAttribute() :
                 base(PreferLocalPlacement.Singleton)
-            { }
+            {
+            }
         }
 
         /// <summary>
@@ -169,7 +205,8 @@ namespace Orleans
         {
             public ActivationCountBasedPlacementAttribute() :
                 base(ActivationCountBasedPlacement.Singleton)
-            { }
+            {
+            }
         }
     }
 
@@ -191,39 +228,74 @@ namespace Orleans
             {
                 TypeCode = typeCode;
             }
-    }
+        }
 
-    /// <summary>
-    /// Used to mark a method as providing a copier function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class CopierMethodAttribute : Attribute
-    {
-    }
+        /// <summary>
+        /// Specifies the method id for the interface method which this attribute is declared on.
+        /// </summary>
+        /// <remarks>
+        /// Method ids must be unique for all methods in a given interface.
+        /// This attribute is only applicable for interface method declarations, not for method definitions on classes.
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class MethodIdAttribute : Attribute
+        {
+            /// <summary>
+            /// Gets the method id for the interface method this attribute is declared on.
+            /// </summary>
+            public int MethodId { get; }
 
-    /// <summary>
-    /// Used to mark a method as providinga serializer function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class SerializerMethodAttribute : Attribute
-    {
-    }
+            /// <summary>
+            /// Specifies the method id for the interface method which this attribute is declared on.
+            /// </summary>
+            /// <remarks>
+            /// Method ids must be unique for all methods in a given interface.
+            /// This attribute is only valid only on interface method declarations, not on method definitions.
+            /// </remarks>
+            /// <param name="methodId">The method id.</param>
+            public MethodIdAttribute(int methodId)
+            {
+                this.MethodId = methodId;
+            }
+        }
 
-    /// <summary>
-    /// Used to mark a method as providing a deserializer function for that type.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class DeserializerMethodAttribute : Attribute
-    {
-    }
+        /// <summary>
+        /// The VersionAttribute allows to specify the version number of the interface
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Interface)]
+        public sealed class VersionAttribute : Attribute
+        {
+            public ushort Version { get; private set; }
 
-    /// <summary>
-    /// Used to make a class for auto-registration as a serialization helper.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class RegisterSerializerAttribute : Attribute
-    {
-    }
+            public VersionAttribute(ushort version)
+            {
+                Version = version;
+            }
+        }
+
+        /// <summary>
+        /// Used to mark a method as providing a copier function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class CopierMethodAttribute : Attribute
+        {
+        }
+
+        /// <summary>
+        /// Used to mark a method as providing a serializer function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class SerializerMethodAttribute : Attribute
+        {
+        }
+
+        /// <summary>
+        /// Used to mark a method as providing a deserializer function for that type.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class DeserializerMethodAttribute : Attribute
+        {
+        }
     }
 
     namespace Providers
@@ -239,80 +311,49 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StorageProviderAttribute : Attribute
         {
-            public StorageProviderAttribute()
-            {
-                    ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
-            }
             /// <summary>
-            /// The name of the storage provider to ne used for persisting state for this grain.
+            /// The name of the provider to be used for persisting of grain state
             /// </summary>
             public string ProviderName { get; set; }
+
+            public StorageProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
+            }
         }
+
+        /// <summary>
+        /// The [Orleans.Providers.LogConsistencyProvider] attribute is used to define which consistency provider to use for grains using the log-view state abstraction.
+        /// <para>
+        /// Specifying [Orleans.Providers.LogConsistencyProvider] property is recommended for all grains that derive
+        /// from ILogConsistentGrain, such as JournaledGrain.
+        /// If no [Orleans.Providers.LogConsistencyProvider] attribute is  specified, then the runtime tries to locate
+        /// one as follows. First, it looks for a 
+        /// "Default" provider in the configuration file, then it checks if the grain type defines a default.
+        /// If a consistency provider cannot be located for this grain, then the grain will fail to load into the Silo.
+        /// </para>
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class LogConsistencyProviderAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the provider to be used for consistency
+            /// </summary>
+            public string ProviderName { get; set; }
+
+            public LogConsistencyProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;
+            }
+        }
+
     }
 
-    [AttributeUsage(AttributeTargets.Interface)]
-    internal sealed class FactoryAttribute : Attribute
-    {
-        public enum FactoryTypes
-        {
-            Grain,
-            ClientObject,
-            Both
-        };
-
-        private readonly FactoryTypes factoryType;
-
-        public FactoryAttribute(FactoryTypes factoryType)
-        {
-            this.factoryType = factoryType;
-        }
-
-        internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
-        {
-            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
-
-            // if no attributes are specified, we default to FactoryTypes.Grain.
-            if (0 == attribs.Length)
-                return FactoryTypes.Grain;
-            
-            // otherwise, we'll consider all of them and aggregate the specifications
-            // like flags.
-            FactoryTypes? result = null;
-            foreach (var i in attribs)
-            {
-                var a = (FactoryAttribute)i;
-                if (result.HasValue)
-                {
-                    if (a.factoryType == FactoryTypes.Both)
-                        result = a.factoryType;
-                    else if (a.factoryType != result.Value)
-                        result = FactoryTypes.Both;
-                }
-                else
-                    result = a.factoryType;
-            }
-
-            if (result.Value == FactoryTypes.Both)
-            {
-                throw 
-                    new NotSupportedException(
-                        "Orleans doesn't currently support generating both a grain and a client object factory but we really want to!");
-            }
-            
-            return result.Value;
-        }
-
-        public static FactoryTypes CollectFactoryTypesSpecified<T>()
-        {
-            return CollectFactoryTypesSpecified(typeof(T));
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
         public string Namespace { get; private set; }
-        
+
         // We have not yet come to an agreement whether the provider should be specified as well.
         public ImplicitStreamSubscriptionAttribute(string streamNamespace)
         {

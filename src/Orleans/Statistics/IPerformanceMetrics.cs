@@ -331,14 +331,21 @@ namespace Orleans.Runtime
     [Serializable]
     internal class DetailedGrainReport
     {
-        public GrainId Grain { get; set; } 
-        public SiloAddress SiloAddress { get; set; } // silo on which these statistics come from
-        public string SiloName { get; set; }        // silo on which these statistics come from
-        public List<ActivationAddress> LocalCacheActivationAddresses { get; set; } // activation addresses in the local directory cache
-        public List<ActivationAddress> LocalDirectoryActivationAddresses { get; set; } // activation addresses in the local directory.
-        public SiloAddress PrimaryForGrain { get; set; } // primary silo for this grain
-        public string GrainClassTypeName { get; set; }   // the name of the class that implements this grain.
-        public List<string> LocalActivations { get; set; } // activations on this silo
+        public GrainId Grain { get; set; }
+        /// <summary>silo on which these statistics come from</summary>
+        public SiloAddress SiloAddress { get; set; }
+        /// <summary>silo on which these statistics come from</summary>
+        public string SiloName { get; set; }
+        /// <summary>activation addresses in the local directory cache</summary>
+        public List<ActivationAddress> LocalCacheActivationAddresses { get; set; }
+        /// <summary>activation addresses in the local directory.</summary>
+        public List<ActivationAddress> LocalDirectoryActivationAddresses { get; set; }
+        /// <summary>primary silo for this grain</summary>
+        public SiloAddress PrimaryForGrain { get; set; }
+        /// <summary>the name of the class that implements this grain.</summary>
+        public string GrainClassTypeName { get; set; }
+        /// <summary>activations on this silo</summary>
+        public List<string> LocalActivations { get; set; }
 
         public override string ToString()
         {

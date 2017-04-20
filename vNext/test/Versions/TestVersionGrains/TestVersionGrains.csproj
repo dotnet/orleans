@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(OutputPath)' != ''">
+    <OutDir>$(OutputPath)\$(TargetFramework)\TestVersionGrainsV1</OutDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\..\test\Versions\TestVersionGrains\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrains\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains\obj\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains\Properties\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

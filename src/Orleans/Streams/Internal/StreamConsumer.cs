@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -140,8 +141,8 @@ namespace Orleans.Streams
         {
             await BindExtensionLazy();
 
-            List<GuidId> subscriptionIds = await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream, IsRewindable))
+            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
+            return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
 
@@ -191,7 +192,7 @@ namespace Orleans.Streams
                     {
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
                         var tup = await providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                            () => new StreamConsumerExtension(providerRuntime, IsRewindable));
+                            () => new StreamConsumerExtension(providerRuntime));
                         myExtension = tup.Item1;
                         myGrainReference = tup.Item2;
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        

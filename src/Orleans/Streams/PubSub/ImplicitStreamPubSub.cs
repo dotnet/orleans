@@ -1,21 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
     internal class ImplicitStreamPubSub : IStreamPubSub
     {
+        private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitTable;
 
-        public ImplicitStreamPubSub(ImplicitStreamSubscriberTable implicitPubSubTable)
+        public ImplicitStreamPubSub(IInternalGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitPubSubTable)
         {
             if (implicitPubSubTable == null)
             {
                 throw new ArgumentNullException("implicitPubSubTable");
             }
 
+            this.grainFactory = grainFactory;
             this.implicitTable = implicitPubSubTable;
         }
 
@@ -24,7 +28,7 @@ namespace Orleans.Streams
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (String.IsNullOrWhiteSpace(streamId.Namespace)) return Task.FromResult(result);
 
-            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId);
+            IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
@@ -49,6 +53,10 @@ namespace Orleans.Streams
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
+            if (!IsImplicitSubscriber(subscriptionId, streamId))
+            {
+                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
+            }
             return TaskDone.Done;
         }
 
@@ -62,9 +70,26 @@ namespace Orleans.Streams
             return Task.FromResult(0);
         }
 
-        public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
-            return Task.FromResult(new List<GuidId> { CreateSubscriptionId(streamId, streamConsumer) });
+            if (streamConsumer != null)
+            {
+                var subscriptionId = CreateSubscriptionId(streamId, streamConsumer);
+                var grainId = streamConsumer as GrainReference;
+                return Task.FromResult(new List<StreamSubscription>
+                { new StreamSubscription(subscriptionId.Guid, streamId.ProviderName, streamId, grainId.GrainId) });
+            }
+            else
+            {
+                var implicitConsumers = this.implicitTable.GetImplicitSubscribers(streamId, grainFactory);
+                var subscriptions = implicitConsumers.Select(consumer =>
+                {
+                    var grainRef = consumer.Value as GrainReference;
+                    var subId = consumer.Key;
+                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainRef.GrainId);
+                }).ToList();
+                return Task.FromResult(subscriptions);
+            }   
         }
 
         internal bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)

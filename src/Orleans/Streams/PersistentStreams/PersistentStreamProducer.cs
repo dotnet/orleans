@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -9,13 +10,15 @@ namespace Orleans.Streams
     {
         private readonly StreamImpl<T> stream;
         private readonly IQueueAdapter queueAdapter;
+        private readonly SerializationManager serializationManager;
 
         internal bool IsRewindable { get; private set; }
 
-        internal PersistentStreamProducer(StreamImpl<T> stream, IStreamProviderRuntime providerUtilities, IQueueAdapter queueAdapter, bool isRewindable)
+        internal PersistentStreamProducer(StreamImpl<T> stream, IStreamProviderRuntime providerUtilities, IQueueAdapter queueAdapter, bool isRewindable, SerializationManager serializationManager)
         {
             this.stream = stream;
             this.queueAdapter = queueAdapter;
+            this.serializationManager = serializationManager;
             IsRewindable = isRewindable;
             var logger = providerUtilities.GetLogger(this.GetType().Name);
             if (logger.IsVerbose) logger.Verbose("Created PersistentStreamProducer for stream {0}, of type {1}, and with Adapter: {2}.",
@@ -24,12 +27,12 @@ namespace Orleans.Streams
 
         public Task OnNextAsync(T item, StreamSequenceToken token)
         {
-            return queueAdapter.QueueMessageAsync(stream.StreamId.Guid, stream.StreamId.Namespace, item, token, Runtime.RequestContext.Export());
+            return this.queueAdapter.QueueMessageAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, item, token, RequestContext.Export(this.serializationManager));
         }
 
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
         {
-            return queueAdapter.QueueMessageBatchAsync(stream.StreamId.Guid, stream.StreamId.Namespace, batch, token, Runtime.RequestContext.Export());
+            return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, batch, token, RequestContext.Export(this.serializationManager));
         }
 
         public Task OnCompletedAsync()

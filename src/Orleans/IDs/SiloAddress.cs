@@ -186,24 +186,24 @@ namespace Orleans.Runtime
         {
             if (uniformHashCache != null) return uniformHashCache;
 
-            var jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
             var hashes = new List<uint>();
             for (int i = 0; i < numHashes; i++)
             {
-                uint hash = GetUniformHashCode(jenkinsHash, i);
+                uint hash = GetUniformHashCode(i);
                 hashes.Add(hash);
             }
             uniformHashCache = hashes;
             return uniformHashCache;
         }
 
-        private uint GetUniformHashCode(JenkinsHash jenkinsHash, int extraBit)
+        private uint GetUniformHashCode(int extraBit)
         {
             var writer = new BinaryTokenStreamWriter();
             writer.Write(this);
             writer.Write(extraBit);
             byte[] bytes = writer.ToByteArray();
-            return jenkinsHash.ComputeHash(bytes);
+            writer.ReleaseBuffers();
+            return JenkinsHash.ComputeHash(bytes);
         }
 
         /// <summary>

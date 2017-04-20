@@ -1,0 +1,79 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="4.19.0" />
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHClientStreamTests.cs">
+      <Link>Streaming\EHClientStreamTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs">
+      <Link>Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHStreamPerPartitionTests.cs">
+      <Link>Streaming\EHStreamPerPartitionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHStreamProviderCheckpointTests.cs">
+      <Link>Streaming\EHStreamProviderCheckpointTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHSubscriptionMultiplicityTests.cs">
+      <Link>Streaming\EHSubscriptionMultiplicityTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\TimePurgePredicateTests.cs">
+      <Link>Streaming\TimePurgePredicateTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs">
+      <Link>TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\TestStreamProviders\TestEventHubStreamProvider.cs">
+      <Link>TestStreamProviders\TestEventHubStreamProvider.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="ServiceBus.Tests.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

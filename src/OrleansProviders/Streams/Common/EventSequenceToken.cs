@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -43,15 +42,6 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Sequence number of next event batch in the stream
-        /// </summary>
-        /// <returns></returns>
-        public EventSequenceToken NextSequenceNumber()
-        {
-            return new EventSequenceToken(SequenceNumber + 1, EventIndex);
-        }
-
-        /// <summary>
         /// Creates a sequence token for a specific event in the current batch
         /// </summary>
         /// <param name="eventInd"></param>
@@ -59,11 +49,6 @@ namespace Orleans.Providers.Streams.Common
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
             return new EventSequenceToken(SequenceNumber, eventInd);
-        }
-
-        internal static long Distance(EventSequenceToken first, EventSequenceToken second)
-        {
-            return first.SequenceNumber - second.SequenceNumber;
         }
 
         /// <summary>
@@ -112,12 +97,20 @@ namespace Orleans.Providers.Streams.Common
             return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }
 
+        /// <summary>
+        /// GetHashCode method for current EventSequenceToken
+        /// </summary>
+        /// <returns> Hash code for current EventSequenceToken object </returns>
         public override int GetHashCode()
         {
             // why 397?
             return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
         }
 
+        /// <summary>
+        /// ToString method
+        /// </summary>
+        /// <returns> A string which represent current EventSequenceToken object </returns>
         public override string ToString()
         {
             return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);

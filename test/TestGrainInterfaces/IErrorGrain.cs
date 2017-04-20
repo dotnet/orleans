@@ -13,7 +13,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetAxBError(int a, int b);
         Task LongMethod(int waitTime);
         Task LongMethodWithError(int waitTime);
-        Task DelayMethod(int waitTime);
+        Task DelayMethod(int milliseconds);
         Task Dispose();
         Task<int> UnobservedErrorImmideate();
         Task<int> UnobservedErrorDelayed();

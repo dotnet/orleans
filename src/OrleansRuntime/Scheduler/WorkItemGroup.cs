@@ -4,8 +4,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
-using Orleans.Runtime.Configuration;
-
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -443,7 +441,7 @@ namespace Orleans.Runtime.Scheduler
 
         private void ReportWorkGroupProblemWithBacktrace(string what, ErrorCode errorCode)
         {
-            var st = new StackTrace();
+            var st = Utils.GetStackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
             log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
         }

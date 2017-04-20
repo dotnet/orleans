@@ -1,5 +1,8 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+using Orleans.TestingHost;
 
 namespace UnitTests.TestHelper
 {
@@ -33,7 +36,7 @@ namespace UnitTests.TestHelper
             //Console.WriteLine("DB file = {0}", dbFile.FullName);
 
             string connectionString = string.Format(
-                @"Data Source=(LocalDB)\v11.0;"
+                @"Data Source=(localdb)\mssqllocaldb;"
                 + @"AttachDbFilename={0};"
                 + @"Integrated Security=True;"
                 + @"Connect Timeout=30",
@@ -67,6 +70,16 @@ namespace UnitTests.TestHelper
             {
                 //Console.WriteLine("DB file is writeable {0}", dbFile.FullName);
             }
+        }
+
+        /// <summary>Gets a detailed grain report from a specified silo</summary>
+        /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="grainId">The grain id we are requesting information from</param>
+        /// <param name="siloHandle">The target silo that should provide this information from it's cache</param>
+        internal static Task<DetailedGrainReport> GetDetailedGrainReport(IInternalGrainFactory grainFactory, GrainId grainId, SiloHandle siloHandle)
+        {
+            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.ProxyAddress);
+            return siloControl.GetDetailedGrainReport(grainId);
         }
     }
 }

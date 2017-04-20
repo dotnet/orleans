@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Item" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+  <TemplateData>
+    <Name>Orleans Grain Class</Name>
+    <Description>An empty Orleans grain class</Description>
+    <Icon>GrainImplementationCSharp.ico</Icon>
+    <ProjectType>CSharp</ProjectType>
+    <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
+    <DefaultName>MyGrain.cs</DefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <References>
+      <Reference>
+        <Assembly>System</Assembly>
+      </Reference>
+    </References>
+    <ProjectItem ReplaceParameters="true">GrainImplementationClassTemplate.cs</ProjectItem>
+  </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.Orleans.Core" version="1.4.0" />
+    </packages>
+  </WizardData>
+</VSTemplate>

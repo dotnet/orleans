@@ -1,30 +1,35 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager
+    internal class ClientStatisticsManager : IDisposable
     {
+        private readonly ClientConfiguration config;
+        private readonly IServiceProvider serviceProvider;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private readonly Logger logger ;
+        private readonly Logger logger;
 
-        internal ClientStatisticsManager(IStatisticsConfiguration config)
+        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider)
         {
+            this.config = config;
+            this.serviceProvider = serviceProvider;
             runtimeStats = new RuntimeStatisticsGroup();
-            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
+            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager);
             logger = LogManager.GetLogger(GetType().Name);
-        }
 
-        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
-        {
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
             ApplicationRequestsStatisticsGroup.Init(config.ResponseTimeout);
+        }
 
+        internal async Task Start(StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
+        {
             runtimeStats.Start();
 
             // Configure Metrics
@@ -54,7 +59,7 @@ namespace Orleans.Runtime
             else if (config.UseAzureSystemStore)
             {
                 // Hook up to publish client metrics to Azure storage table
-                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
                 await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
                 tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats)
                 {
@@ -72,7 +77,7 @@ namespace Orleans.Runtime
                 }
                 else if (config.UseAzureSystemStore)
                 {
-                    var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                    var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
                     await statsDataPublisher.Init(false, config.DataConnectionString, config.DeploymentId,
                         transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;
@@ -83,9 +88,7 @@ namespace Orleans.Runtime
 
         internal void Stop()
         {
-            if (runtimeStats != null)
-                runtimeStats.Stop();
-
+            runtimeStats?.Stop();
             runtimeStats = null;
 
             if (logStatistics != null)
@@ -96,10 +99,18 @@ namespace Orleans.Runtime
 
             logStatistics = null;
 
-            if (tableStatistics != null)
-                tableStatistics.Dispose();
-
+            tableStatistics?.Dispose();
             tableStatistics = null;
+        }
+
+        public void Dispose()
+        {
+            if (runtimeStats != null)
+                runtimeStats.Dispose();
+            runtimeStats = null;
+            if (logStatistics != null)
+                logStatistics.Dispose();
+            logStatistics = null;
         }
     }
 }

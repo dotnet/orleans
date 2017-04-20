@@ -1,23 +1,22 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
-using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
+using TestExtensions;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
+        private readonly Fixture fixture;
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -33,15 +32,29 @@ namespace UnitTests.StreamingTests
                 options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
                 return new TestCluster(options);
             }
+
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                TestUtils.CheckForAzureStorage();
+            }
         }
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+#pragma warning disable 618
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+#pragma warning restore 618
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+        public PullingAgentManagementTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+            this.fixture.EnsurePreconditionsMet();
+        }
+
+        [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);;
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
             await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
 
@@ -59,7 +72,7 @@ namespace UnitTests.StreamingTests
 
         private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
         {
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
             Assert.Equal(2, states.Length);
@@ -75,7 +88,7 @@ namespace UnitTests.StreamingTests
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
             if (expectedState == PersistentStreamProviderState.AgentsStarted)
             {
-                Assert.Equal(AzureQueueAdapterFactory.NumQueuesDefaultValue, totalNumAgents);
+                Assert.Equal(AzureQueueAdapterConstants.NumQueuesDefaultValue, totalNumAgents);
             }
             else
             {

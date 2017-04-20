@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.TestingHost</PackageId>
+    <Title>Microsoft Orleans Testing Host Library</Title>
+    <Description>Microsoft Orleans library for hosting a silo in a testing project.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\..\src\OrleansTestingHost\**\*.cs"
+      Exclude="
+        ..\..\..\src\OrleansTestingHost\obj\**\*.cs;
+        ..\..\..\src\OrleansTestingHost\bin\**\*.cs;
+        ..\..\..\src\OrleansTestingHost\Properties\*.cs;
+        ..\..\..\src\OrleansTestingHost\TestingSiloHost.cs;
+        ..\..\..\src\OrleansTestingHost\TestingSiloOptions.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="1.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
+      <Link>ClientConfigurationForTesting.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
+    </Content>
+  </ItemGroup>
+</Project>

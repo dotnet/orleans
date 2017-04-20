@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.PersistentStreams
@@ -13,6 +14,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
     public class AzureTableStorageStreamFailureHandler<TEntity> : IStreamFailureHandler where TEntity : StreamDeliveryFailureEntity, new()
     {
         private static readonly Func<TEntity> DefaultCreateEntity = () => new TEntity();
+        private readonly SerializationManager serializationManager;
         private readonly string deploymentId;
         private readonly AzureTableDataManager<TEntity> dataManager;
         private readonly Func<TEntity> createEntity;
@@ -20,12 +22,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Delivery failure handler that writes failures to azure table storage.
         /// </summary>
+        /// <param name="serializationManager"></param>
         /// <param name="faultOnFailure"></param>
         /// <param name="deploymentId"></param>
         /// <param name="tableName"></param>
         /// <param name="storageConnectionString"></param>
         /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(bool faultOnFailure, string deploymentId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
+        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, bool faultOnFailure, string deploymentId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
         {
             if (string.IsNullOrEmpty(deploymentId))
             {
@@ -39,6 +42,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             {
                 throw new ArgumentNullException("storageConnectionString");
             }
+            this.serializationManager = serializationManager;
             this.deploymentId = deploymentId;
             ShouldFaultSubsriptionOnError = faultOnFailure;
             this.createEntity = createEntity ?? DefaultCreateEntity;
@@ -108,7 +112,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             failureEntity.StreamProviderName = streamProviderName;
             failureEntity.StreamGuid = streamIdentity.Guid;
             failureEntity.StreamNamespace = streamIdentity.Namespace;
-            failureEntity.SetSequenceToken(sequenceToken);
+            failureEntity.SetSequenceToken(this.serializationManager, sequenceToken);
             failureEntity.SetPartitionKey(deploymentId);
             failureEntity.SetRowkey();
             await dataManager.CreateTableEntryAsync(failureEntity);

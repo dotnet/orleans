@@ -1,7 +1,7 @@
-﻿using System;
+﻿#if !EXCLUDEFSHARP
 using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
 using Orleans;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -18,3 +18,4 @@ namespace UnitTests.Grains
         }
     }
 }
+#endif

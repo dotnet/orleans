@@ -1,8 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<ClientConfiguration xmlns="urn:orleans">
-  <SystemStore
-    DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleansdata1;AccountKey=SOMETHING1"/>
-  <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" WriteTraces="false">
-    <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
-  </Tracing>
-</ClientConfiguration>

@@ -10,6 +10,10 @@
 		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot;" />
 	</Target>
 
+        <PropertyGroup>
+                <NugetDownloadUrl>https://dist.nuget.org/win-x86-commandline/v4.0.0/nuget.exe</NugetDownloadUrl>
+        </PropertyGroup>
+
 	<PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
 		<CodeTaskAssembly Condition="'$(MSBuildAssemblyVersion)' == ''">$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll</CodeTaskAssembly>
 		<!-- In VS2013, the assembly contains the VS version. -->
@@ -19,12 +23,13 @@
 	</PropertyGroup>
 
 	<Target Name="DownloadNuGet" Condition="'$(OS)' == 'Windows_NT' And !Exists('$(NuGetExe)')">
-		<DownloadNuGet TargetPath="$(NuGetExe)" />
+		<DownloadNuGet TargetPath="$(NuGetExe)" NugetDownloadUrl="$(NugetDownloadUrl)" />
 	</Target>
 
 	<UsingTask TaskName="DownloadNuGet" TaskFactory="CodeTaskFactory" AssemblyFile="$(CodeTaskAssembly)">
 		<ParameterGroup>
 			<TargetPath ParameterType="System.String" Required="true" />
+			<NugetDownloadUrl ParameterType="System.String" Required="true" />
 		</ParameterGroup>
 		<Task>
 			<Reference Include="System.Core" />
@@ -42,7 +47,7 @@
 
                     Log.LogMessage("Downloading latest version of NuGet.exe...");
                     WebClient webClient = new WebClient();
-                    webClient.DownloadFile("https://dist.nuget.org/win-x86-commandline/latest/nuget.exe", TargetPath);
+                    webClient.DownloadFile(NugetDownloadUrl, TargetPath);
 
                     return true;
                 }

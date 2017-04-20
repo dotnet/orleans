@@ -1,6 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using Orleans.GrainDirectory;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -9,38 +11,29 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class RegistrarManager
     {
-        private readonly Dictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
+        private readonly GrainTypeManager grainTypeManager;
+        private readonly object registrarLock = new object();
+        private readonly IServiceProvider serviceProvider;
 
-        public static RegistrarManager Instance { get; private set; }
+        private IReadOnlyDictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
 
-
-        private RegistrarManager()
+        public RegistrarManager(IServiceProvider serviceProvider, GrainTypeManager grainTypeManager)
         {
-        }
-
-        public static void InitializeGrainDirectoryManager(LocalGrainDirectory router)
-        {
-            Instance = new RegistrarManager();
-            Instance.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(router.DirectoryPartition));
-        }
-
-        private void Register<TStrategy>(IGrainRegistrar directory)
-            where TStrategy : MultiClusterRegistrationStrategy
-        {
-            this.registrars.Add(typeof(TStrategy), directory);
+            this.grainTypeManager = grainTypeManager;
+            this.serviceProvider = serviceProvider;
         }
 
         public IGrainRegistrar GetRegistrarForGrain(GrainId grainId)
         {
             MultiClusterRegistrationStrategy strategy;
 
-            var typeCode = grainId.GetTypeCode();
+            var typeCode = grainId.TypeCode;
 
             if (typeCode != 0)
             {
                 string unusedGrainClass;
                 PlacementStrategy unusedPlacement;
-                GrainTypeManager.Instance.GetTypeInfo(grainId.GetTypeCode(), out unusedGrainClass, out unusedPlacement, out strategy);
+                this.grainTypeManager.GetTypeInfo(grainId.TypeCode, out unusedGrainClass, out unusedPlacement, out strategy);
             }
             else
             {
@@ -48,7 +41,40 @@ namespace Orleans.Runtime.GrainDirectory
                 strategy = ClusterLocalRegistration.Singleton; // default
             }
 
-            return this.registrars[strategy.GetType()];
+            return this.GetRegistrar(strategy);
+        }
+
+        private IGrainRegistrar GetRegistrar(IMultiClusterRegistrationStrategy strategy)
+        {
+            IGrainRegistrar result;
+            var strategyType = strategy.GetType();
+            if (!this.registrars.TryGetValue(strategyType, out result))
+            {
+                result = this.AddRegistrar(strategyType);
+            }
+
+            return result;
+        }
+
+        private IGrainRegistrar AddRegistrar(Type strategyType)
+        {
+            IGrainRegistrar registrar;
+            lock (this.registrarLock)
+            {
+                if (!this.registrars.TryGetValue(strategyType, out registrar))
+                {
+                    var directorType = typeof(IGrainRegistrar<>).MakeGenericType(strategyType);
+                    registrar = (IGrainRegistrar) this.serviceProvider.GetRequiredService(directorType);
+                    var newRegistrars = new Dictionary<Type, IGrainRegistrar>((Dictionary<Type, IGrainRegistrar>)this.registrars)
+                    {
+                        [strategyType] = registrar
+                    };
+
+                    this.registrars = newRegistrars;
+                }
+            }
+
+            return registrar;
         }
     }
 }

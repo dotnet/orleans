@@ -9,12 +9,14 @@ namespace Orleans.Runtime.MembershipService
     [Serializable]
     internal class InMemoryMembershipTable
     {
+        private readonly SerializationManager serializationManager;
         private readonly Dictionary<SiloAddress, Tuple<MembershipEntry, string>> siloTable;
         private TableVersion tableVersion;
         private long lastETagCounter;
 
-        public InMemoryMembershipTable()
+        public InMemoryMembershipTable(SerializationManager serializationManager)
         {
+            this.serializationManager = serializationManager;
             siloTable = new Dictionary<SiloAddress, Tuple<MembershipEntry, string>>();
             lastETagCounter = 0;
             tableVersion = new TableVersion(0, NewETag());
@@ -23,14 +25,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableData Read(SiloAddress key)
         {
             return siloTable.ContainsKey(key) ? 
-                new MembershipTableData((Tuple<MembershipEntry, string>)SerializationManager.DeepCopy(siloTable[key]), tableVersion) 
+                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(siloTable[key]), tableVersion) 
                 : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
             return new MembershipTableData(siloTable.Values.Select(tuple => 
-                new Tuple<MembershipEntry, string>((MembershipEntry)SerializationManager.DeepCopy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
+                new Tuple<MembershipEntry, string>((MembershipEntry)this.serializationManager.DeepCopy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
         public TableVersion ReadTableVersion()

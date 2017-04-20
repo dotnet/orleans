@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -42,7 +42,7 @@ namespace Orleans.Streams
 
         private static StreamId FindOrCreateStreamId(StreamIdInternerKey key)
         {
-            return streamIdInternCache.Value.FindOrCreate(key, () => new StreamId(key));
+            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
         }
 
         #region IComparable<StreamId> Members
@@ -77,7 +77,6 @@ namespace Orleans.Streams
         {
             if (uniformHashCache == 0)
             {
-                JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
                 byte[] guidBytes = Guid.ToByteArray();
                 byte[] providerBytes = Encoding.UTF8.GetBytes(ProviderName);
                 byte[] allBytes;
@@ -95,7 +94,7 @@ namespace Orleans.Streams
                     Array.Copy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
                     Array.Copy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
                 }
-                uniformHashCache = jenkinsHash.ComputeHash(allBytes);
+                uniformHashCache = JenkinsHash.ComputeHash(allBytes);
             }
             return uniformHashCache;
         }
@@ -166,8 +165,8 @@ namespace Orleans.Streams
             int cmp1 = Guid.CompareTo(other.Guid);
             if (cmp1 == 0)
             {
-                int cmp2 = string.Compare(ProviderName, other.ProviderName, StringComparison.InvariantCulture);
-                return cmp2 == 0 ? string.Compare(Namespace, other.Namespace, StringComparison.InvariantCulture) : cmp2;
+                int cmp2 = string.Compare(ProviderName, other.ProviderName, StringComparison.Ordinal);
+                return cmp2 == 0 ? string.Compare(Namespace, other.Namespace, StringComparison.Ordinal) : cmp2;
             }
             
             return cmp1;

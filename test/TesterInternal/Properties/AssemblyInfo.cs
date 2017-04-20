@@ -1,8 +1,7 @@
 using System.Reflection;
-using System.Runtime.InteropServices;
-
-using Orleans.CodeGeneration;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -20,4 +19,7 @@ using System.Runtime.CompilerServices;
 [assembly: Guid("6fac9056-5fb2-44ef-a3ba-63aa58f09428")]
 [assembly: SkipCodeGeneration]
 [assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]

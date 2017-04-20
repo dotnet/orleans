@@ -6,9 +6,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
-
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -107,7 +106,7 @@ namespace Orleans.Serialization
 
         /// <summary> Return the output stream as a set of <c>ArraySegment</c>. </summary>
         /// <returns>Data from this stream, converted to output type.</returns>
-        public IList<ArraySegment<byte>> ToBytes()
+        public List<ArraySegment<byte>> ToBytes()
         {
             return ab.ToBytes();
         }
@@ -313,6 +312,12 @@ namespace Orleans.Serialization
             ab.Append(b);
         }
 
+        /// <summary> Write a list of byte array segments to the stream. </summary>
+        public void Write(List<ArraySegment<byte>> bytes)
+        {
+            ab.Append(bytes);
+        }
+
         /// <summary> Write the specified number of bytes to the stream, starting at the specified offset in the input <c>byte[]</c>. </summary>
         /// <param name="b">The input data to be written.</param>
         /// <param name="offset">The offset into the inout byte[] to start writing bytes from.</param>
@@ -453,7 +458,6 @@ namespace Orleans.Serialization
             // GrainId must not be null
             Write(addr.Grain);
             Write(addr.Activation ?? ActivationId.Zero);
-            Write((byte) addr.Status);
         }
 
         /// <summary> Write a <c>SiloAddress</c> value to the stream. </summary>

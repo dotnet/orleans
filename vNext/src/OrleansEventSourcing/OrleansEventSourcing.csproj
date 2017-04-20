@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.EventSourcing</PackageId>
+    <Title>Microsoft Orleans Event-Sourcing</Title>
+    <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Event-Sourcing</PackageTags>
+  </PropertyGroup>
+	
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansEventSourcing\**\*.cs" Exclude="..\..\..\src\OrleansEventSourcing\obj\**\*.cs;..\..\..\src\OrleansEventSourcing\bin\**\*.cs;..\..\..\src\OrleansEventSourcing\Properties\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CSharp" Version="4.3.0" />
+    <PackageReference Include="System.Dynamic.Runtime" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

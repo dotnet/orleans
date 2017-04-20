@@ -898,10 +898,8 @@ namespace UnitTests.Grains
             _observers = new Dictionary<string, IConsumerObserver>();
             // discuss: Note that we need to know the provider that will be used in advance. I think it would be beneficial if we specified the provider as an argument to ImplicitConsumerActivationAttribute.
 
-
-            await Task.WhenAll(
-                BecomeConsumer(this.GetPrimaryKey(), "SMSProvider", "TestNamespace1"),
-                BecomeConsumer(this.GetPrimaryKey(), "AzureQueueProvider", "TestNamespace1"));
+            var activeStreamProviders = Runtime.StreamProviderManager.GetStreamProviders().Select(x => x.Name).ToList();
+            await Task.WhenAll(activeStreamProviders.Select(stream => BecomeConsumer(this.GetPrimaryKey(), stream, "TestNamespace1")));
         }
 
         public override Task OnDeactivateAsync()

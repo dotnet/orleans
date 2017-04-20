@@ -4,11 +4,11 @@
     <id>Microsoft.Orleans.OrleansHost</id>
     <version>$version$</version>
     <title>Microsoft Orleans Silo Host</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Default silo host of Microsoft Orleans - OrleansHost.exe.
     </summary>
@@ -25,7 +25,8 @@
   <files>
     <file src="OrleansHost.exe" target="lib\net451" />
     <file src="OrleansHost.pdb" target="lib\net451" />
-    <file src="OrleansHost.exe.config" target="lib\net451" />
+    <file src="OrleansHost.exe.config" target="tools" />
     <file src="$SRC_DIR$OrleansHost\**\*.cs" target="src" />
+    <file src="Microsoft.Orleans.OrleansHost.targets" target="build" />
   </files>
 </package>

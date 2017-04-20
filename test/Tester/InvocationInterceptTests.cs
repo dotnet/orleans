@@ -3,14 +3,13 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.General
 {
     using System;
-
     using Orleans;
 
     public class InvocationInterceptTests : TestClusterPerTest
@@ -31,10 +30,10 @@ namespace UnitTests.General
         /// Ensures that the invocation interceptor is invoked around method calls.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackTest()
         {
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
             
             // This grain method reads the context and returns it
             var context = await grain.GetRequestContext();
@@ -46,13 +45,13 @@ namespace UnitTests.General
         /// Ensures that the invocation interceptor is invoked for stream subscribers.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackWithStreamTest()
         {
-            var streamProvider = GrainClient.GetStreamProvider("SMSProvider");
+            var streamProvider = this.Client.GetStreamProvider("SMSProvider");
             var id = Guid.NewGuid();
             var stream = streamProvider.GetStream<int>(id, "InterceptedStream");
-            var grain = GrainFactory.GetGrain<IStreamInterceptionGrain>(id);
+            var grain = this.GrainFactory.GetGrain<IStreamInterceptionGrain>(id);
 
             // The intercepted grain should double the value passed to the stream.
             const int TestValue = 43;

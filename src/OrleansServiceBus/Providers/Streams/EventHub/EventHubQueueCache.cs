@@ -1,8 +1,13 @@
 ﻿
 using System;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -22,7 +27,7 @@ namespace Orleans.ServiceBus.Providers
         /// Underlying message cache implementation
         /// </summary>
         protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
-        private readonly AveragingCachePressureMonitor cachePressureMonitor;
+        private readonly AggregatedCachePressureMonitor cachePressureMonitor;
 
         /// <summary>
         /// Logic used to store queue position
@@ -44,8 +49,16 @@ namespace Orleans.ServiceBus.Providers
             cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer, logger);
             cacheDataAdapter.PurgeAction = cache.Purge;
             cache.OnPurged = OnPurge;
+            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger);
+        }
 
-            cachePressureMonitor = new AveragingCachePressureMonitor();
+        /// <summary>
+        /// Add cache pressure monitor to the cache's back pressure algorithm
+        /// </summary>
+        /// <param name="monitor"></param>
+        public void AddCachePressureMonitor(ICachePressureMonitor monitor)
+        {
+            this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
         /// <summary>
@@ -97,7 +110,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public int GetMaxAddCount()
         {
-            return cachePressureMonitor.IsUnderPressure() ? 0 : defaultMaxAddCount;
+            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
         }
 
         /// <summary>
@@ -133,69 +146,60 @@ namespace Orleans.ServiceBus.Providers
             if (!cache.TryGetNextMessage(cursorObj, out message))
                 return false;
             double cachePressureContribution;
-            if (TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution))
-            {
-                cachePressureMonitor.RecordCachePressureContribution(cachePressureContribution);
-            }
+            cachePressureMonitor.RecordCachePressureContribution(
+                TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
+                    ? cachePressureContribution
+                    : 0.0);
             return true;
         }
 
-        private class AveragingCachePressureMonitor
-        {
-            const double pressureThreshold = 1.0/3.0;
-
-            private double accumulatedCachePressure;
-            private int cachePressureContributionCount;
-
-            public void RecordCachePressureContribution(double cachePressureContribution)
-            {
-                accumulatedCachePressure += cachePressureContribution;
-                cachePressureContributionCount++;
-            }
-
-            public bool IsUnderPressure()
-            {
-                if (cachePressureContributionCount == 0)
-                    return false;
-
-                double pressure = accumulatedCachePressure/cachePressureContributionCount;
-
-                cachePressureContributionCount = 0;
-                accumulatedCachePressure = 0;
-
-                return pressure > pressureThreshold;
-            }
-        }
     }
 
     /// <summary>
     /// Message cache that stores EventData as a CachedEventHubMessage in a pooled message cache
     /// </summary>
     public class EventHubQueueCache : EventHubQueueCache<CachedEventHubMessage>
-    {
+    {    
         private readonly Logger log;
 
         /// <summary>
         /// Construct cache given a buffer pool.  Will use default data adapter
         /// </summary>
-        /// <param name="checkpointer"></param>
-        /// <param name="bufferPool"></param>
-        /// <param name="logger"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
-            : this(checkpointer, new EventHubDataAdapter(bufferPool), logger)
+        /// <param name="checkpointer">queue checkpoint writer</param>
+        /// <param name="bufferPool">buffer pool cache should use for raw buffers</param>
+        /// <param name="timePurge">predicate used to trigger time based purges</param>
+        /// <param name="logger">cache logger</param>
+        /// <param name="serializationManager"></param>
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger, SerializationManager serializationManager)
+            : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool, timePurge), EventHubDataComparer.Instance, logger)
         {
         }
 
         /// <summary>
         /// Construct cache given a custom data adapter.
         /// </summary>
-        /// <param name="checkpointer"></param>
-        /// <param name="cacheDataAdapter"></param>
-        /// <param name="logger"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, Logger logger)
-            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, EventHubDataComparer.Instance, logger)
+        /// <param name="checkpointer">queue checkpoint writer</param>
+        /// <param name="cacheDataAdapter">adapts queue data to cache</param>
+        /// <param name="comparer">compares stream information to cached data</param>
+        /// <param name="logger">cache logger</param>
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger)
+            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, comparer, logger)
         {
-            log = logger.GetSubLogger("-ehcache");
+            log = logger.GetSubLogger(this.GetType().Name);
+        }
+
+        /// <summary>
+        /// Construct cache given a custom data adapter.
+        /// </summary>
+        /// <param name="defaultMaxAddCount">Max number of message that can be added to cache from single read</param>
+        /// <param name="checkpointer">queue checkpoint writer</param>
+        /// <param name="cacheDataAdapter">adapts queue data to cache</param>
+        /// <param name="comparer">compares stream information to cached data</param>
+        /// <param name="logger">cache logger</param>
+        public EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger)
+            : base(defaultMaxAddCount, checkpointer, cacheDataAdapter, comparer, logger)
+        {
+            log = logger.GetSubLogger(this.GetType().Name);
         }
 
         /// <summary>
@@ -205,10 +209,11 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="newestItem"></param>
         protected override void OnPurge(CachedEventHubMessage? lastItemPurged, CachedEventHubMessage? newestItem)
         {
-            if (log.IsInfo && lastItemPurged.HasValue && newestItem.HasValue)
+            if (log.IsVerbose && lastItemPurged.HasValue && newestItem.HasValue)
             {
-                log.Info($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
+                log.Verbose($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
             }
+            base.OnPurge(lastItemPurged, newestItem);
         }
 
         /// <summary>
@@ -247,7 +252,6 @@ namespace Orleans.ServiceBus.Providers
             IEventHubPartitionLocation location = (IEventHubPartitionLocation) token;
             double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
             long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
-
             // pressure is the ratio of the distance from the front of the cache to the 
             cachePressureContribution = distanceFromNewestMessage/cacheSize;
 

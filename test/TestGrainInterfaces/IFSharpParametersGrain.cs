@@ -1,9 +1,5 @@
-﻿using Orleans;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿#if !EXCLUDEFSHARP
+using Orleans;
 using UnitTests.FSharpInterfaces;
 
 namespace UnitTests.GrainInterfaces
@@ -12,3 +8,4 @@ namespace UnitTests.GrainInterfaces
     {
     }
 }
+#endif

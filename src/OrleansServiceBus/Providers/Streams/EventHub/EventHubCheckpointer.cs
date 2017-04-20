@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
 using Orleans.AzureUtils;
 using Orleans.Streams;
 
@@ -19,8 +18,18 @@ namespace Orleans.ServiceBus.Providers
         private Task inProgressSave;
         private DateTime? throttleSavesUntilUtc;
 
-        public bool CheckpointExists { get { return entity != null && entity.Offset != EventHubConsumerGroup.StartOfStream; } }
+        /// <summary>
+        /// Indicates if a checkpoint exists
+        /// </summary>
+        public bool CheckpointExists => entity != null && entity.Offset != EventHubConstants.StartOfStream;
 
+        /// <summary>
+        /// Factory function that creates and initializes the checkpointer
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <param name="streamProviderName"></param>
+        /// <param name="partition"></param>
+        /// <returns></returns>
         public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition)
         {
             var checkpointer = new EventHubCheckpointer(settings, streamProviderName, partition);
@@ -32,15 +41,15 @@ namespace Orleans.ServiceBus.Providers
         {
             if (settings == null)
             {
-                throw new ArgumentNullException("settings");
+                throw new ArgumentNullException(nameof(settings));
             }
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
-                throw new ArgumentNullException("streamProviderName");
+                throw new ArgumentNullException(nameof(streamProviderName));
             }
             if (string.IsNullOrWhiteSpace(partition))
             {
-                throw new ArgumentNullException("partition");
+                throw new ArgumentNullException(nameof(partition));
             }
             persistInterval = settings.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.TableName, settings.DataConnectionString);
@@ -52,6 +61,10 @@ namespace Orleans.ServiceBus.Providers
             return dataManager.InitTableAsync();
         }
 
+        /// <summary>
+        /// Loads a checkpoint
+        /// </summary>
+        /// <returns></returns>
         public async Task<string> Load()
         {
             Tuple<EventHubPartitionCheckpointEntity, string> results =
@@ -63,10 +76,15 @@ namespace Orleans.ServiceBus.Providers
             return entity.Offset;
         }
 
+        /// <summary>
+        /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <param name="utcNow"></param>
         public void Update(string offset, DateTime utcNow)
         {
             // if offset has not changed, do nothing
-            if (string.Compare(entity.Offset, offset, StringComparison.InvariantCulture)==0)
+            if (string.Compare(entity.Offset, offset, StringComparison.Ordinal) == 0)
             {
                 return;
             }

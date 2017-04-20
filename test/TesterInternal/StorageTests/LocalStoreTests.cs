@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using TestExtensions;
+using UnitTests.Persistence;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -22,31 +23,17 @@ namespace UnitTests.StorageTests
         File,
         Sql
     }
-
-    public class LocalStoreTestsFixture : IDisposable
-    {
-        public LocalStoreTestsFixture()
-        {
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
-        }
-
-        public void Dispose()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-    }
-
-    public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
+    
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class LocalStoreTests
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-        public LocalStoreTests(ITestOutputHelper output)
+        public LocalStoreTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            LocalDataStoreInstance.LocalDataStore = null;
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -56,7 +43,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
             var stateProperties = AsDictionary(state);
             var keys = GetKeys(name, reference);
@@ -66,9 +53,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
-            Assert.AreEqual(state.A, data["A"], "A");
-            Assert.AreEqual(state.B, data["B"], "B");
-            Assert.AreEqual(state.C, data["C"], "C");
+            Assert.Equal(state.A,  data["A"]);  // "A"
+            Assert.Equal(state.B,  data["B"]);  // "B"
+            Assert.Equal(state.C,  data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -78,7 +65,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -90,9 +77,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.State.A, data["A"], "A");
-            Assert.AreEqual(state.State.B, data["B"], "B");
-            Assert.AreEqual(state.State.C, data["C"], "C");
+            Assert.Equal(state.State.A,  data["A"]);  // "A"
+            Assert.Equal(state.State.B,  data["B"]);  // "B"
+            Assert.Equal(state.State.C,  data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -102,7 +89,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
 
             output.WriteLine("Using store = {0}", store.GetType().FullName);
@@ -117,17 +104,17 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var storedData = store.ReadRow(keys);
             output.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, storedData, eTag), sw.Elapsed);
-            Assert.IsNotNull(data, "Should get some data from Read");
+            Assert.NotNull(data); // Should get some data from Read
 
             sw.Restart();
             bool ok = store.DeleteRow(keys, eTag);
-            Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
+            Assert.True(ok, $"Row deleted OK after {sw.Elapsed}. Etag={eTag} Keys={StorageProviderUtils.PrintKeys(keys)}");
 
             sw.Restart();
             storedData = store.ReadRow(keys); // Try to re-read after delete
             output.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
-            Assert.IsNotNull(data, "Should not get null data from Re-Read");
-            Assert.IsTrue(storedData.Count == 0, "Should get no data from Re-Read but got: {0}", StorageProviderUtils.PrintData(storedData));
+            Assert.NotNull(data); // Should not get null data from Re-Read
+            Assert.True(storedData.Count == 0, $"Should get no data from Re-Read but got: {StorageProviderUtils.PrintData(storedData)}");
 
             sw.Restart();
             const string oldEtag = null;
@@ -138,7 +125,7 @@ namespace UnitTests.StorageTests
 
             sw.Restart();
             ok = store.DeleteRow(keys, eTag);
-            Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
+            Assert.True(ok, $"Row deleted OK after {sw.Elapsed}. Etag={eTag} Keys={StorageProviderUtils.PrintKeys(keys)}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -178,7 +165,7 @@ namespace UnitTests.StorageTests
 
             var results = store.ReadMultiRow(keys);
 
-            Assert.AreEqual(2, results.Count, "Count");
+            Assert.Equal(2,  results.Count);  // "Count"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -188,7 +175,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
             Stopwatch sw = new Stopwatch();
@@ -204,9 +191,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.A, data["A"], "A");
-            Assert.AreEqual(state.B, data["B"], "B");
-            Assert.AreEqual(state.C, data["C"], "C");
+            Assert.Equal(state.A,  data["A"]);  // "A"
+            Assert.Equal(state.B,  data["B"]);  // "B"
+            Assert.Equal(state.C,  data["C"]);  // "C"
         }
 
         // ---------- Utility methods ----------
@@ -228,41 +215,4 @@ namespace UnitTests.StorageTests
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
         }
     }
-
-    #region Grain State class for these tests
-
-    [Serializable]
-    public class TestStoreGrainState
-    {
-        public string A { get; set; }
-        public int B { get; set; }
-        public long C { get; set; }
-
-        internal static GrainState<TestStoreGrainState> NewRandomState(int? aPropertyLength = null)
-        {
-            return new GrainState<TestStoreGrainState>
-            {
-                State = new TestStoreGrainState
-                {
-                    A = aPropertyLength == null
-                        ? TestConstants.random.Next().ToString(CultureInfo.InvariantCulture)
-                        : GenerateRandomDigitString(aPropertyLength.Value),
-                    B = TestConstants.random.Next(),
-                    C = TestConstants.random.Next()
-                }
-            };
-        }
-
-        private static string GenerateRandomDigitString(int stringLength)
-        {
-            var characters = new char[stringLength];
-            for (var i = 0; i < stringLength; ++i)
-            {
-                characters[i] = (char)TestConstants.random.Next('0', '9' + 1);
-            }
-            return new string(characters);
-        }
-    }
-
-    #endregion Grain State class for these tests
 }

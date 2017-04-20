@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.CounterControl</PackageId>
+    <Title>Microsoft Orleans Performance Counter Tool</Title>
+    <Description>
+      Tool that registers performance counter categories for performance counters published by Orleans runtime.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans.Counter.Control</RootNamespace>
+    <AssemblyName>OrleansCounterControl</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net451'">
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />
+    <ProjectReference Include="..\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="app.manifest">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Microsoft.Orleans.CounterControl.targets">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

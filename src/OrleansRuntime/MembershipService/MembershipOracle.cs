@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
-        private readonly IMembershipTable membershipTableProvider;
+        private readonly MembershipTableFactory membershipTableFactory;
+        private readonly IInternalGrainFactory grainFactory;
+        private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
         private readonly LoggerImpl logger;
@@ -27,8 +28,8 @@ namespace Orleans.Runtime.MembershipService
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = SiloMessageSender.CONNECTION_RETRY_DELAY;
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
-        private static TimeSpan EXP_BACKOFF_ERROR_MAX;
-        private static TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
+        private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
+        private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
 
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
@@ -37,11 +38,12 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
-        internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
+        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {
+            this.membershipTableFactory = membershipTableFactory;
+            this.grainFactory = grainFactory;
             logger = LogManager.GetLogger("MembershipOracle");
-            membershipTableProvider = membershipTable;
             membershipOracleData = new MembershipOracleData(silo, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
             orleansConfig = silo.OrleansConfig;
@@ -59,6 +61,9 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
+
+                // Create the membership table.
+                this.membershipTableProvider = await this.membershipTableFactory.GetMembershipTable();
 
                 // randomly delay the startup, so not all silos write to the table at once.
                 // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
@@ -145,7 +150,12 @@ namespace Orleans.Runtime.MembershipService
                         timerGetTableUpdates.Dispose();
 
                     timerGetTableUpdates = GrainTimer.FromTimerCallback(
-                        OnGetTableUpdateTimer, null, randomTableOffset, orleansConfig.Globals.TableRefreshTimeout, "Membership.ReadTableTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnGetTableUpdateTimer,
+                        null,
+                        randomTableOffset,
+                        orleansConfig.Globals.TableRefreshTimeout,
+                        "Membership.ReadTableTimer");
                     
                     timerGetTableUpdates.Start();
 
@@ -153,12 +163,17 @@ namespace Orleans.Runtime.MembershipService
                         timerProbeOtherSilos.Dispose();
 
                     timerProbeOtherSilos = GrainTimer.FromTimerCallback(
-                        OnProbeOtherSilosTimer, null, randomProbeOffset, orleansConfig.Globals.ProbeTimeout, "Membership.ProbeTimer");
+                        this.RuntimeClient.Scheduler,
+                        OnProbeOtherSilosTimer,
+                        null,
+                        randomProbeOffset,
+                        orleansConfig.Globals.ProbeTimeout,
+                        "Membership.ProbeTimer");
                     
                     timerProbeOtherSilos.Start();
                 };
                 orleansConfig.OnConfigChange(
-                    "Globals/Liveness", () => InsideRuntimeClient.Current.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
+                    "Globals/Liveness", () => this.RuntimeClient.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
 
                 configure();
                 logger.Info(ErrorCode.MembershipFinishBecomeActive, "-Finished BecomeActive.");
@@ -178,7 +193,12 @@ namespace Orleans.Runtime.MembershipService
                 timerIAmAliveUpdateInTable.Dispose();
 
             timerIAmAliveUpdateInTable = GrainTimer.FromTimerCallback(
-                OnIAmAliveUpdateInTableTimer, null, TimeSpan.Zero, orleansConfig.Globals.IAmAliveTablePublishTimeout, "Membership.IAmAliveTimer");
+                this.RuntimeClient.Scheduler,
+                OnIAmAliveUpdateInTableTimer,
+                null,
+                TimeSpan.Zero,
+                orleansConfig.Globals.IAmAliveTablePublishTimeout,
+                "Membership.IAmAliveTimer");
 
             timerIAmAliveUpdateInTable.Start();
         }
@@ -254,7 +274,7 @@ namespace Orleans.Runtime.MembershipService
 
         private bool IsFunctionalMBR(SiloStatus status)
         {
-            return status.Equals(SiloStatus.Active) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping);
+            return status == SiloStatus.Active || status == SiloStatus.ShuttingDown || status == SiloStatus.Stopping;
         }
 
         public bool IsFunctionalDirectory(SiloAddress silo)
@@ -319,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
 
         #region Table update/insert processing
 
-        private static Task<bool> MembershipExecuteWithRetries(
+        private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction, 
             TimeSpan timeout)
         {
@@ -330,8 +350,8 @@ namespace Orleans.Runtime.MembershipService
                     (result, i) => result == false,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
             );
         }
 
@@ -401,7 +421,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus)
         {
             MembershipTableData table;
-            if (newStatus.Equals(SiloStatus.Active))
+            if (newStatus == SiloStatus.Active)
             {
                 table = await membershipTableProvider.ReadAll();
             }
@@ -441,7 +461,7 @@ namespace Orleans.Runtime.MembershipService
             myEntry.Status = newStatus;
             myEntry.IAmAliveTime = now;
 
-            if (newStatus.Equals(SiloStatus.Active) && orleansConfig.Globals.ValidateInitialConnectivity)
+            if (newStatus == SiloStatus.Active && orleansConfig.Globals.ValidateInitialConnectivity)
                 await GetJoiningPreconditionPromise(table);
             
             TableVersion next = table.Version.Next();
@@ -455,12 +475,12 @@ namespace Orleans.Runtime.MembershipService
         {
             // send pings to all Active nodes, that are known to be alive
             List<MembershipEntry> members = table.Members.Select(tuple => tuple.Item1).Where(
-                entry => entry.Status.Equals(SiloStatus.Active) &&
+                entry => entry.Status == SiloStatus.Active &&
                         !entry.SiloAddress.Equals(MyAddress) &&
                         !HasMissedIAmAlives(entry, false)).ToList();
 
             logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.MembershipSendingPreJoinPing, "About to send pings to {0} nodes in order to validate communication in the Joining state. Pinged nodes = {1}",
-                members.Count, Utils.EnumerableToString(members, entry => entry.ToFullString(true)));
+                members.Count.ToString(), Utils.EnumerableToString(members, entry => entry.ToFullString(true)));
 
             var pingPromises = new List<Task>();
             foreach (var entry in members)
@@ -544,7 +564,7 @@ namespace Orleans.Runtime.MembershipService
         {
             foreach (var entry in table.Members.Select(tuple => tuple.Item1).
                                                             Where(entry => !entry.SiloAddress.Equals(MyAddress)).
-                                                            Where(entry => entry.Status.Equals(SiloStatus.Active)))
+                                                            Where(entry => entry.Status == SiloStatus.Active))
             {
                 HasMissedIAmAlives(entry, true);
             }
@@ -960,20 +980,20 @@ namespace Orleans.Runtime.MembershipService
             // get all valid (non-expired) votes
             var freshVotes = entry.GetFreshVotes(orleansConfig.Globals.DeathVoteExpirationTimeout);
 
-            if (logger.IsVerbose2) logger.Verbose2("-Current number of fresh Voters for {0} is {1}", silo.ToLongString(), freshVotes.Count);
+            if (logger.IsVerbose2) logger.Verbose2("-Current number of fresh Voters for {0} is {1}", silo.ToLongString(), freshVotes.Count.ToString());
 
             if (freshVotes.Count >= orleansConfig.Globals.NumVotesForDeathDeclaration)
             {
                 // this should not happen ...
                 var str = String.Format("-Silo {0} is suspected by {1} which is more or equal than {2}, but is not marked as dead. This is a bug!!!",
-                    entry.SiloAddress.ToLongString(), freshVotes.Count, orleansConfig.Globals.NumVotesForDeathDeclaration);
+                    entry.SiloAddress.ToLongString(), freshVotes.Count.ToString(), orleansConfig.Globals.NumVotesForDeathDeclaration.ToString());
                 logger.Error(ErrorCode.Runtime_Error_100053, str);
                 KillMyselfLocally("Found a bug 1! Will commit suicide.");
                 return false;
             }
 
             // handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = membershipOracleData.GetSiloStatuses(status => status.Equals(SiloStatus.Active), true).Count;
+            int activeSilos = membershipOracleData.GetSiloStatuses(status => status == SiloStatus.Active, true).Count;
             // find if I have already voted
             int myVoteIndex = freshVotes.FindIndex(voter => MyAddress.Equals(voter.Item1));
 
@@ -1114,9 +1134,9 @@ namespace Orleans.Runtime.MembershipService
 
         #endregion
 
-        private static IMembershipService GetOracleReference(SiloAddress silo)
+        private IMembershipService GetOracleReference(SiloAddress silo)
         {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
+            return this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
         }
     }
 }

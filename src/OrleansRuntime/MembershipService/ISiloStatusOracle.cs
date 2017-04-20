@@ -4,9 +4,10 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    // Interface for local, per-silo authorative source of information about status of other silos.
-    // A local interface for local communication between in-silo runtime components and this ISiloStatusOracle.
-    internal interface ISiloStatusOracle
+    /// <summary>
+    /// Authoritative local, per-silo source for information about the status of other silos.
+    /// </summary>
+    public interface ISiloStatusOracle
     {
         /// <summary>
         /// Current status of this silo.
@@ -66,13 +67,11 @@ namespace Orleans.Runtime
         /// <returns>A list of silo statuses.</returns>
         Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
 
-
         /// <summary>
         /// Get a list of silos that are designated to function as gateways.
         /// </summary>
         /// <returns></returns>
         IReadOnlyList<SiloAddress> GetApproximateMultiClusterGateways();
-
 
         /// <summary>
         /// Get the name of a silo. 

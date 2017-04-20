@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 
 namespace Orleans.Runtime
@@ -12,7 +11,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Check if <paramref name="n"/> is our responsibility to serve
         /// </summary>
-        /// <param name="id"></param>
         /// <returns>true if the reminder is in our responsibility range, false otherwise</returns>
         bool InRange(uint n);
 

@@ -36,7 +36,7 @@ namespace Orleans.Azure.Samples.Web
             }
             catch (Exception exc)
             {
-                Trace.WriteLine("Run() failed with " + exc.ToString());
+                Trace.WriteLine("Run() failed with " + exc);
             }
         }
 

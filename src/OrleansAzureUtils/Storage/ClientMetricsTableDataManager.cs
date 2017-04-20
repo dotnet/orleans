@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;

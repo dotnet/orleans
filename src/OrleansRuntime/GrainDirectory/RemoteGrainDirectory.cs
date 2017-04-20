@@ -41,14 +41,14 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, singleActivation, 1)));
         }
 
-        public Task UnregisterAsync(ActivationAddress address, bool force, int hopCount)
+        public Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount)
         {
-            return router.UnregisterAsync(address, force, hopCount);
+            return router.UnregisterAsync(address, cause, hopCount);
         }
 
-        public Task UnregisterManyAsync(List<ActivationAddress> addresses, int hopCount)
+        public Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount)
         {
-            return router.UnregisterManyAsync(addresses, hopCount);
+            return router.UnregisterManyAsync(addresses, cause, hopCount);
         }
 
         public  Task DeleteGrainAsync(GrainId grainId, int hopCount)
@@ -79,7 +79,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // the grain entry has been updated -- fetch and return its current version
-                    var lookupResult = partition.LookUpGrain(tuple.Item1);
+                    var lookupResult = partition.LookUpActivations(tuple.Item1);
                     // validate that the entry is still in the directory (i.e., it was not removed concurrently)
                     if (lookupResult.Addresses != null)
                     {
@@ -104,25 +104,6 @@ namespace Orleans.Runtime.GrainDirectory
         {
             router.HandoffManager.RemoveHandoffPartition(source);
             return TaskDone.Done;
-        }
-        
-        /// <summary>
-        /// This method is called before retrying to access the current owner of a grain, following
-        /// a request that was sent to us, while we are not the owner of the given grain.
-        /// This may happen if during the time the request was on its way, a ring has changed 
-        /// (new servers came up / failed down).
-        /// Here we might take some actions before the actual retrial is done.
-        /// For example, we might back-off for some random time.
-        /// </summary>
-        /// <param name="retries"></param>
-        protected void PrepareForRetry(int retries)
-        {
-            // For now, we do not do anything special ...
-        }
-
-        private IRemoteGrainDirectory GetDirectoryReference(SiloAddress target)
-        {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, target);
         }
     }
 }

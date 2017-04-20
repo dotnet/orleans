@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 
 namespace Orleans.SqlUtils
 {
@@ -210,11 +211,11 @@ namespace Orleans.SqlUtils
         /// <param name="parameters">The parameters.</param>
         /// <param name="nameMap">Maps a given property name to another one defined in the map.</param>
         /// <remarks>Does not support collection parameters currently. Does not cache reflection results.</remarks>
-        public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null)
+        public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null) 
         {
             if(!EqualityComparer<T>.Default.Equals(parameters, default(T)))
             {
-                var properties = parameters.GetType().GetProperties();
+                var properties = parameters.GetType().GetTypeInfo().GetProperties();
                 for(int i = 0; i < properties.Length; ++i)
                 {
                     var property = properties[i];

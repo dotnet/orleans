@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansProviders</PackageId>
+    <Title>Microsoft Orleans Providers</Title>
+    <Description>Library of built-in persistence and stream providers included in Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\..\src\OrleansProviders\**\*.cs"
+      Exclude="
+        ..\..\..\src\OrleansProviders\obj\**\*.cs;
+        ..\..\..\src\OrleansProviders\bin\**\*.cs;
+        ..\..\..\src\OrleansProviders\Properties\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

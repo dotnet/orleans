@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.1.0" />
+    <PackageReference Include="xunit.abstractions" Version="2.0.1" />
+    <PackageReference Include="xunit.core" Version="2.2.0" />
+    <PackageReference Include="xunit.extensibility.core" Version="2.2.0" />
+    <PackageReference Include="xunit.extensibility.execution" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestExtensions\BaseClusterFixture.cs">
+      <Link>BaseClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestEnvironmentFixture.cs">
+      <Link>TestEnvironmentFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\SerializationTestEnvironment.cs">
+      <Link>SerializationTestEnvironment.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\DefaultClusterFixture.cs">
+      <Link>DefaultClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\HostedTestClusterBase.cs">
+      <Link>HostedTestClusterBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\MockStorageProvider.cs">
+      <Link>MockStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\OrleansTestingBase.cs">
+      <Link>OrleansTestingBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestCategory.cs">
+      <Link>TestCategory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestConstants.cs">
+      <Link>TestConstants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestDefaultConfiguration.cs">
+      <Link>TestDefaultConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestOutputHelperExtensions.cs">
+      <Link>TestOutputHelperExtensions.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
-﻿using Orleans;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 
 namespace TestGrainInterfaces
 {
@@ -21,6 +21,7 @@ namespace TestGrainInterfaces
     {
         public CircularTest2 CircularTest2 { get; set; }
     }
+
     [Serializable]
     public class CircularTest2
     {

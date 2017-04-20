@@ -1,5 +1,4 @@
 using System.Threading;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime

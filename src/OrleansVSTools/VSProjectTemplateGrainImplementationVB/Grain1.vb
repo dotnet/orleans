@@ -1,11 +1,17 @@
-﻿''' <summary>
-''' Orleans grain implementation class $safeitemname$
-''' </summary>
-Public Class $safeitemname$
-    Inherits Grain
-    Implements I$safeitemname$
+﻿Imports Orleans
 
-    ' TODO: replace placeholder grain interface with actual 
-    '       grain communication interface(s).
+Namespace $safeprojectname$
 
-End Class
+    ''' <summary>
+    ''' Orleans grain implementation class $safeitemname$
+    ''' </summary>
+    Public Class $safeitemname$
+        Inherits Grain
+        Implements I$safeitemname$
+
+        ' TODO: replace placeholder grain interface with actual 
+        '       grain communication interface(s).
+
+    End Class
+
+End Namespace

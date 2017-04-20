@@ -1,9 +1,9 @@
 using System;
 using System.Net;
 using System.Threading;
-
-using Orleans.Runtime.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
         private IncomingMessageAcceptor ima;
         private static readonly Logger log = LogManager.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
+        internal Func<Message, bool> ShouldDrop;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
@@ -22,6 +23,8 @@ namespace Orleans.Runtime.Messaging
         internal IOutboundMessageQueue OutboundQueue { get; set; }
         internal IInboundMessageQueue InboundQueue { get; set; }
         internal SocketManager SocketManager;
+        private readonly SerializationManager serializationManager;
+        private readonly MessageFactory messageFactory;
         internal bool IsBlockingApplicationMessages { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get; private set; }
         
@@ -37,9 +40,22 @@ namespace Orleans.Runtime.Messaging
 
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
 
-        public MessageCenter(IPEndPoint here, int generation, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)
+        public MessageCenter(
+            ILocalSiloDetails siloDetails,
+            NodeConfiguration nodeConfig,
+            IMessagingConfiguration config,
+            SerializationManager serializationManager,
+            ISiloPerformanceMetrics metrics,
+            MessageFactory messageFactory,
+            Factory<MessageCenter, Gateway> gatewayFactory)
         {
-            Initialize(here, generation, config, metrics);
+            this.serializationManager = serializationManager;
+            this.messageFactory = messageFactory;
+            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
+            if (nodeConfig.IsGatewayNode)
+            {
+                Gateway = gatewayFactory(this);
+            }
         }
 
         private void Initialize(IPEndPoint here, int generation, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)
@@ -47,23 +63,17 @@ namespace Orleans.Runtime.Messaging
             if(log.IsVerbose3) log.Verbose3("Starting initialization.");
 
             SocketManager = new SocketManager(config);
-            ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo);
+            ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager);
             MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
             MessagingConfiguration = config;
             InboundQueue = new InboundMessageQueue();
-            OutboundQueue = new OutboundMessageQueue(this, config);
-            Gateway = null;
+            OutboundQueue = new OutboundMessageQueue(this, config, this.serializationManager);
             Metrics = metrics;
             
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
 
             if (log.IsVerbose3) log.Verbose3("Completed initialization.");
-        }
-
-        public void InstallGateway(IPEndPoint gatewayAddress)
-        {
-            Gateway = new Gateway(this, gatewayAddress);
         }
 
         public void Start()
@@ -177,8 +187,8 @@ namespace Orleans.Runtime.Messaging
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
             MessagingStatisticsGroup.OnRejectedMessage(msg);
-            if (string.IsNullOrEmpty(reason)) reason = String.Format("Rejection from silo {0} - Unknown reason.", MyAddress);
-            Message error = msg.CreateRejectionResponse(rejectionType, reason);
+            if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo {0} - Unknown reason.", MyAddress);
+            Message error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
             // rejection msgs are always originated in the local silo, they are never remote.
             InboundQueue.PostMessage(error);
         }

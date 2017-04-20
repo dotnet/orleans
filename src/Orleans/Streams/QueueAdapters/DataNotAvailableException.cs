@@ -1,6 +1,6 @@
 using System;
-using Orleans.Runtime;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -14,9 +14,26 @@ namespace Orleans.Streams
         public DataNotAvailableException(string message) : base(message) { }
         public DataNotAvailableException(string message, Exception inner) : base(message, inner) { }
 
+#if !NETSTANDARD
         public DataNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
+    }
+
+    [Serializable]
+    public class CacheFullException : OrleansException
+    {
+        public CacheFullException() : this("Queue message cache is full") { }
+        public CacheFullException(string message) : base(message) { }
+        public CacheFullException(string message, Exception inner) : base(message, inner) { }
+
+#if !NETSTANDARD
+        public CacheFullException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+#endif
     }
 }

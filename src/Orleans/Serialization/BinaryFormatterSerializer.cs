@@ -1,16 +1,13 @@
-﻿using System;
+﻿#if !NETSTANDARD_TODO
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#if !DNXCORE50
+#if !NETSTANDARD
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
@@ -26,14 +23,17 @@ namespace Orleans.Serialization
             return itemType.GetTypeInfo().IsSerializable;
         }
 
-        public object DeepCopy(object source)
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null)
             {
                 return null;
             }
 
-            var formatter = new BinaryFormatter();
+            var formatter = new BinaryFormatter
+            {
+                Context = new StreamingContext(StreamingContextStates.All, context)
+            };
             object ret = null;
             using (var memoryStream = new MemoryStream())
             {
@@ -47,8 +47,9 @@ namespace Orleans.Serialization
             return ret;
         }
 
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
+            var writer = context.StreamWriter;
             if (writer == null)
             {
                 throw new ArgumentNullException("writer");
@@ -60,7 +61,10 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var formatter = new BinaryFormatter();
+            var formatter = new BinaryFormatter
+            {
+                Context = new StreamingContext(StreamingContextStates.All, context)
+            };
             byte[] bytes;
             using (var memoryStream = new MemoryStream())
             {
@@ -73,16 +77,21 @@ namespace Orleans.Serialization
             writer.Write(bytes);
         }
 
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             if (reader == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(reader));
             }
 
             var n = reader.ReadInt();
             var bytes = reader.ReadBytes(n);
-            var formatter = new BinaryFormatter();
+            var formatter = new BinaryFormatter
+            {
+                Context = new StreamingContext(StreamingContextStates.All, context)
+            };
+
             object retVal = null;
             using (var memoryStream = new MemoryStream(bytes))
             {
@@ -127,4 +136,5 @@ namespace Orleans.Serialization
         }
     }
 }
+#endif
 #endif

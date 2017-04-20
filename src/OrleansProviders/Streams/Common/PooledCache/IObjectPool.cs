@@ -30,22 +30,15 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public abstract class PooledResource<T> : IDisposable
-        where T : class, IDisposable
+        where T : PooledResource<T>, IDisposable
     {
         private IObjectPool<T> pool;
 
         /// <summary>
-        /// Pooled resource that is from the provided pool
+        /// The pool to return this resource to upon disposal.
+        /// A pool must set this property upon resource allocation.
         /// </summary>
-        /// <param name="pool"></param>
-        protected PooledResource(IObjectPool<T> pool)
-        {
-            if (pool == null)
-            {
-                throw new ArgumentNullException("pool");
-            }
-            this.pool = pool;
-        }
+        public IObjectPool<T> Pool { set { pool = value; } }
 
         /// <summary>
         /// If this object is to be used in a fixed size object pool, this call should be
@@ -65,7 +58,7 @@ namespace Orleans.Providers.Streams.Common
             if (localPool != null)
             {
                 OnResetState();
-                localPool.Free(this as T);
+                localPool.Free((T)this);
             }
         }
 

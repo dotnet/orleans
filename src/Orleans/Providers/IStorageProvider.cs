@@ -2,8 +2,8 @@ using System;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.Providers;
+using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
@@ -52,7 +52,7 @@ namespace Orleans.Storage
         /// <param name="restStatus">REST status for the error</param>
         /// <param name="getExtendedErrors">Whether or not to extract REST error code</param>
         /// <returns></returns>
-        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false);
+        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false);
     }
 
     /// <summary>
@@ -62,16 +62,18 @@ namespace Orleans.Storage
     public class BadProviderConfigException : OrleansException
     {
         public BadProviderConfigException()
-        {}
+        { }
         public BadProviderConfigException(string msg)
             : base(msg)
         { }
         public BadProviderConfigException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -87,16 +89,21 @@ namespace Orleans.Storage
         public string CurrentEtag { get; private set; }
 
         public InconsistentStateException()
-        {}
+        { }
         public InconsistentStateException(string msg)
             : base(msg)
         { }
         public InconsistentStateException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
-        {}
+        {
+            this.StoredEtag = info.GetString("StoredEtag");
+            this.CurrentEtag = info.GetString("CurrentEtag");
+        }
+#endif
 
         public InconsistentStateException(
           string errorMsg,
@@ -126,5 +133,16 @@ namespace Orleans.Storage
             return String.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
                 Message, StoredEtag, CurrentEtag, InnerException);
         }
+
+#if !NETSTANDARD
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            if (info == null) throw new ArgumentNullException(nameof(info));
+
+            info.AddValue("StoredEtag", this.StoredEtag);
+            info.AddValue("CurrentEtag", this.CurrentEtag);
+            base.GetObjectData(info, context);
+        }
+#endif
     }
 }

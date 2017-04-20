@@ -11,14 +11,16 @@ namespace Orleans.CodeGeneration
     {
         /// <summary> InterfaceId for this Invoke request. </summary>
         public int InterfaceId { get; private set; }
+        public ushort InterfaceVersion { get; private set; }
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
         /// <summary> Arguments for this Invoke request. </summary>
         public object[] Arguments { get; private set; }
 
-        internal InvokeMethodRequest(int interfaceId, int methodId, object[] arguments)
+        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, object[] arguments)
         {
             InterfaceId = interfaceId;
+            InterfaceVersion = interfaceVersion;
             MethodId = methodId;
             Arguments = arguments;
         }
@@ -43,12 +45,24 @@ namespace Orleans.CodeGeneration
     [Flags]
     public enum InvokeMethodOptions
     {
+        /// <summary>No options defined.</summary>
         None = 0,
 
+        /// <summary>Invocation is one-way with no feedback on whether the call succeeds or fails.</summary>
         OneWay = 0x04,
+
+        /// <summary>Invocation is read-only and can interleave with other read-only invocations.</summary>
         ReadOnly = 0x08,
+
+        /// <summary>Invocation does not care about ordering and can consequently be optimized.</summary>
         Unordered = 0x10,
+
+
+        /// <summary>Obsolete field.</summary>
+        [Obsolete]
         DelayForConsistency = 0x20,
-        AlwaysInterleave = 0x100, // AlwaysInterleave is a requst type that can interleave with any other request type, including write request.
+
+        /// <summary>The invocation can interleave with any other request type, including write requests.</summary>
+        AlwaysInterleave = 0x100,
     }
 }

@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <TemplateData>
+    <Name>Orleans Grain Interface Collection</Name>
+    <Description>A project for defining a collection of grain communication interfaces and their payloads</Description>
+    <Icon>GrainInterfaceCSharp.ico</Icon>
+    <ProjectType>CSharp</ProjectType>
+    <TemplateID>Orleans.Templates.Project.GrainInterface</TemplateID>
+    <TemplateGroupID>Orleans</TemplateGroupID>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <CreateNewFolder>true</CreateNewFolder>
+    <ProvideDefaultName>true</ProvideDefaultName>
+    <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
+    <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
+    <DefaultName>GrainInterfaces</DefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
+      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" OpenInEditor="true">IGrain1.cs</ProjectItem>
+    </Project>
+  </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.Orleans.Core" version="1.4.0" />
+      <package id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="1.4.0" />
+    </packages>
+  </WizardData>
+</VSTemplate>

@@ -134,7 +134,7 @@ namespace OrleansSQLUtils.Storage
                     record.GetValue<string>("QueryText"));
             }
 
-            internal static ReminderEntry GetReminderEntry(IDataRecord record)
+            internal static ReminderEntry GetReminderEntry(IDataRecord record, IGrainReferenceConverter grainReferenceConverter)
             {
                 //Having non-null field, GrainId, means with the query filter options, an entry was found.
                 string grainId = record.GetValueOrDefault<string>(nameof(Columns.GrainId));
@@ -142,7 +142,7 @@ namespace OrleansSQLUtils.Storage
                 {
                     return new ReminderEntry
                     {
-                        GrainRef = GrainReference.FromKeyString(grainId),
+                        GrainRef = grainReferenceConverter.GetGrainFromKeyString(grainId),
                         ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
                         StartAt = record.GetValue<DateTime>(nameof(Columns.StartTime)),
                         Period = TimeSpan.FromMilliseconds(record.GetValue<int>(nameof(Columns.Period))),
@@ -192,14 +192,18 @@ namespace OrleansSQLUtils.Storage
             /// </summary>
             private static string TryGetSiloName(IDataRecord record)
             {
-                for (var i = 0; i < record.FieldCount; ++i)
+                int pos;
+                try
                 {
-                    if (record.GetName(i) == nameof(Columns.SiloName))
-                    {
-                        return (string) record.GetValue(i);
-                    }
+                    pos = record.GetOrdinal(nameof(Columns.SiloName));
                 }
-                return null;
+                catch (IndexOutOfRangeException)
+                {
+                    return null;
+                }
+
+                return (string)record.GetValue(pos);
+
             }
 
             internal static int GetVersion(IDataRecord record)

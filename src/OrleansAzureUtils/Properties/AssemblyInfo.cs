@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
 using Orleans.CodeGeneration;
+using Orleans.Providers.Streams.AzureQueue;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -22,4 +22,7 @@ using Orleans.CodeGeneration;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: SkipCodeGeneration]
+[assembly: InternalsVisibleTo("NonSilo.Tests")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: GenerateSerializer(typeof(AzureQueueBatchContainerV2))]
+

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
+using System.Threading;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -10,11 +10,13 @@ namespace Orleans.Runtime
     internal class SocketManager
     {
         private readonly LRU<IPEndPoint, Socket> cache;
+        private TimeSpan connectionTimeout;
 
         private const int MAX_SOCKETS = 200;
 
         internal SocketManager(IMessagingConfiguration config)
         {
+            connectionTimeout = config.OpenConnectionTimeout;
             cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
             cache.RaiseFlushEvent += FlushHandler;
         }
@@ -61,11 +63,11 @@ namespace Orleans.Runtime
             var s = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
             {
-                s.Connect(target);
+                Connect(s, target, connectionTimeout);
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                WriteConnectionPreemble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreamble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
                 var receiveAsyncEventArgs = new SocketAsyncEventArgs
                 {
@@ -95,7 +97,7 @@ namespace Orleans.Runtime
             return s;
         }
 
-        internal static void WriteConnectionPreemble(Socket socket, GrainId grainId)
+        internal static void WriteConnectionPreamble(Socket socket, GrainId grainId)
         {
             int size = 0;
             byte[] grainIdByteArray = null;
@@ -172,6 +174,28 @@ namespace Orleans.Runtime
             cache.Clear();
         }
 
+        /// <summary>
+        /// Connect the socket to the target endpoint
+        /// </summary>
+        /// <param name="s">The socket</param>
+        /// <param name="endPoint">The target endpoint</param>
+        /// <param name="connectionTimeout">The timeout value to use when opening the connection</param>
+        /// <exception cref="TimeoutException">When the connection could not be established in time</exception>
+        internal static void Connect(Socket s, IPEndPoint endPoint, TimeSpan connectionTimeout)
+        {
+            var signal = new AutoResetEvent(false);
+            var e = new SocketAsyncEventArgs();
+            e.RemoteEndPoint = endPoint;
+            e.Completed += (sender, eventArgs) => signal.Set();
+            s.ConnectAsync(e);
+
+            if (!signal.WaitOne(connectionTimeout))
+                throw new TimeoutException($"Connection to {endPoint} could not be established in {connectionTimeout}");
+
+            if (e.SocketError != SocketError.Success || !s.Connected)
+                throw new OrleansException($"Could not connect to {endPoint}: {e.SocketError}");
+        }
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal static void CloseSocket(Socket s)
         {
@@ -194,6 +218,7 @@ namespace Orleans.Runtime
                 // Ignore
             }
 
+#if !NETSTANDARD
             try
             {
                 s.Disconnect(false);
@@ -202,6 +227,7 @@ namespace Orleans.Runtime
             {
                 // Ignore
             }
+#endif
             try
             {
                 s.Dispose();

@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <Content Include="..\..\..\test\TesterInternal\TesterInternal.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TesterInternal\**\*.cs" Exclude="..\..\..\test\TesterInternal\obj\**\*.cs;..\..\..\test\TesterInternal\bin\**\*.cs;..\..\..\test\TesterInternal\Properties\*.cs;..\..\..\test\TesterInternal\CounterControlProgTests.cs;..\..\..\test\TesterInternal\GeoClusterTests\*.cs;..\..\..\test\TesterInternal\OrleansHostProgTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

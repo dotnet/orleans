@@ -4,42 +4,59 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    public class DeserializationContext
+    public interface IDeserializationContext : ISerializerContext
     {
-        [ThreadStatic]
-        private static DeserializationContext ctx;
+        /// <summary>
+        /// The stream reader.
+        /// </summary>
+        BinaryTokenStreamReader StreamReader { get; }
+        
+        /// <summary>
+        /// The offset of the current object in <see cref="StreamReader"/>.
+        /// </summary>
+        int CurrentObjectOffset { get; set; }
 
-        public static DeserializationContext Current
-        {
-            get { return ctx ?? (ctx = new DeserializationContext()); }
-        }
+        /// <summary>
+        /// Records deserialization of the provided object.
+        /// </summary>
+        /// <param name="obj"></param>
+        void RecordObject(object obj);
 
+        /// <summary>
+        /// Returns the object from the specified offset.
+        /// </summary>
+        /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
+        /// <returns>The object from the specified offset.</returns>
+        object FetchReferencedObject(int offset);
+    }
+
+    public class DeserializationContext : IDeserializationContext
+    {
         private readonly Dictionary<int, object> taggedObjects;
 
-        private DeserializationContext()
+        public DeserializationContext(SerializationManager serializationManager)
         {
-            taggedObjects = new Dictionary<int, object>();
+            this.SerializationManager = serializationManager;
+            this.taggedObjects = new Dictionary<int, object>();
         }
 
-        internal void Reset()
-        {
-            taggedObjects.Clear();
-            CurrentObjectOffset = 0;
-        }
+        /// <inheritdoc />
+        public SerializationManager SerializationManager { get; }
+        
+        /// <inheritdoc />
+        public BinaryTokenStreamReader StreamReader { get; set; }
 
-        internal int CurrentObjectOffset { get; set; }
+        /// <inheritdoc />
+        public int CurrentObjectOffset { get; set; }
 
-        internal void RecordObject(int offset, object obj)
-        {
-            taggedObjects[offset] = obj;
-        }
-
+        /// <inheritdoc />
         public void RecordObject(object obj)
         {
             taggedObjects[CurrentObjectOffset] = obj;
         }
 
-        internal object FetchReferencedObject(int offset)
+        /// <inheritdoc />
+        public object FetchReferencedObject(int offset)
         {
             object result;
             if (!taggedObjects.TryGetValue(offset, out result))
@@ -48,5 +65,15 @@ namespace Orleans.Serialization
             }
             return result;
         }
+
+        internal void Reset()
+        {
+            this.taggedObjects.Clear();
+            this.CurrentObjectOffset = 0;
+        }
+
+        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
+
+        public object AdditionalContext => this.SerializationManager.RuntimeClient;
     }
 }

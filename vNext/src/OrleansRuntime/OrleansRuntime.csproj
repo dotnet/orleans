@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
+    <Title>Microsoft Orleans Runtime</Title>
+    <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\..\src\OrleansRuntime\**\*.cs"
+      Exclude="
+        ..\..\..\src\OrleansRuntime\Properties\*.cs;
+        ..\..\..\src\OrleansRuntime\obj\**\*.cs;
+        ..\..\..\src\OrleansRuntime\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Core;
@@ -13,9 +13,34 @@ using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
+    internal static class TestRuntimeEnvironmentUtility
+    {
+        public static string CaptureRuntimeEnvironment()
+        {
+            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
+            return String.Format(
+                "   TaskScheduler={0}" + Environment.NewLine
+                + "   RuntimeContext={1}" + Environment.NewLine
+                + "   WorkerPoolThread={2}" + Environment.NewLine
+                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   StackTrace=" + Environment.NewLine
+                + "   {5}",
+                TaskScheduler.Current,
+                RuntimeContext.Current,
+                WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
+                WorkerPoolThread.CurrentWorkerThread == null
+                    ? "null"
+                    : WorkerPoolThread.CurrentWorkerThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture),
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                callStack);
+        }
+    }
+
     [Serializable]
     public class PersistenceTestGrainState
     {
@@ -47,19 +72,19 @@ namespace UnitTests.Grains
 
         public Task<bool> CheckStateInit()
         {
-            Assert.IsNotNull(State, "Null State");
-            Assert.AreEqual(0, State.Field1, "Field1 = {0}", State.Field1);
-            Assert.IsNull(State.Field2, "Field2 = {0}", State.Field2);
-            //Assert.IsNotNull(State.Field3, "Null Field3");
+            Assert.NotNull(State);
+            Assert.Equal(0, State.Field1);
+            Assert.Null(State.Field2);
+            //Assert.NotNull(State.Field3, "Null Field3");
             //Assert.AreEqual(0, State.Field3.Count, "Field3 = {0}", String.Join("'", State.Field3));
-            Assert.IsNotNull(State.SortedDict, "Null SortedDict");
+            Assert.NotNull(State.SortedDict);
             return Task.FromResult(true);
         }
 
         public Task<string> CheckProviderType()
         {
             var storageProvider = ((ActivationData) Data).StorageProvider;
-            Assert.IsNotNull(storageProvider, "Null storage provider");
+            Assert.NotNull(storageProvider);
             return Task.FromResult(storageProvider.GetType().FullName);
         }
 
@@ -127,8 +152,11 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceUserHandledErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceUserHandledErrorGrain
     {
+        private SerializationManager serializationManager;
+
         public override Task OnActivateAsync()
         {
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             return TaskDone.Done;
         }
 
@@ -139,7 +167,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = SerializationManager.DeepCopy(State);
+            var original = this.serializationManager.DeepCopy(State);
             try
             {
                 State.Field1 = val;
@@ -156,7 +184,7 @@ namespace UnitTests.Grains
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = SerializationManager.DeepCopy(State);
+            var original = this.serializationManager.DeepCopy(State);
             try
             {
                 await ReadStateAsync();
@@ -313,6 +341,109 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
     public class AzureStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IAzureStorageTestGrain_GuidExtendedKey, IAzureStorageTestGrain_LongExtendedKey
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task<string> GetExtendedKeyValue()
+        {
+            string extKey;
+            var pk = this.GetPrimaryKey(out extKey);
+            return Task.FromResult(extKey);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageTestGrain : Grain<PersistenceTestGrainState>,
+        IAWSStorageTestGrain, IAWSStorageTestGrain_LongKey
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+        IAWSStorageGenericGrain<T>
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<T> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(T val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<T> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+        IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
     {
         public override Task OnActivateAsync()
         {
@@ -642,41 +773,36 @@ namespace UnitTests.Grains
         {
             if (executing)
             {
-                var errorMsg = String.Format(
-                    "Found out that this grain is already in the middle of execution."
-                    + " Single threaded-ness violation!"
-                    + ".\n{0}",
-                    CaptureRuntimeEnvironment());
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                var errorMsg = "Found out that this grain is already in the middle of execution."
+                               + " Single threaded-ness violation!\n" +
+                               TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
 
             if (RuntimeContext.Current == null || RuntimeContext.Current.ActivationContext == null)
             {
-                var errorMsg = String.Format(
-                    "Found RuntimeContext.Current == null."
-                    + ".\n{0}",
-                    CaptureRuntimeEnvironment());
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
 
             var context = RuntimeContext.Current.ActivationContext;
             var scheduler = TaskScheduler.Current;
-            var callStack = new StackTrace();
 
             executing = true;
-            Assert.AreEqual(_scheduler, scheduler, "Wrong TaskScheduler {0} Caller:{1}", scheduler, callStack);
-            Assert.IsNotNull(context, "Null ActivationContext -- Expected: {0} Caller:{1}", _context, callStack);
-            Assert.AreEqual(_context, context, "Wrong ActivationContext {0} Caller:{1}", context, callStack);
+            Assert.Equal(_scheduler, scheduler);
+            Assert.Equal(_context, context);
+            Assert.NotNull(context);
             executing = false;
         }
     }
 
-    public class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
+    internal class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
     {
+        private readonly OrleansTaskScheduler scheduler;
         private const int Multiple = 100;
         private Logger logger;
         private bool executing;
@@ -697,15 +823,19 @@ namespace UnitTests.Grains
             new Tuple<string, Severity>("Scheduler", Severity.Info),
             new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Info)
         };
-
-        public NonReentrentStressGrainWithoutState()
+        
+        public NonReentrentStressGrainWithoutState(OrleansTaskScheduler scheduler)
         {
+            this.scheduler = scheduler;
         }
 
-        public NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
+        private NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
             : base(identity, runtime)
         {
         }
+
+        public static NonReentrentStressGrainWithoutState Create(IGrainIdentity identity, IGrainRuntime runtime)
+            => new NonReentrentStressGrainWithoutState(identity, runtime);
 
         public override Task OnActivateAsync()
         {
@@ -810,9 +940,11 @@ namespace UnitTests.Grains
                     "Found out that grain {0} is already in the middle of execution."
                     + "\n Single threaded-ness violation!"
                     + "\n {1} \n Call Stack={2}",
-                    _id, CaptureRuntimeEnvironment(), callStack);
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                OrleansTaskScheduler.Instance.DumpSchedulerStatus();
+                    this._id,
+                    TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
+                    callStack);
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.scheduler.DumpSchedulerStatus();
                 LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
@@ -908,9 +1040,11 @@ namespace UnitTests.Grains
         private readonly int _instanceFilterValue2 = _staticFilterValue2;
 
         private Logger logger;
+        private SerializationManager serializationManager;
 
         public override Task OnActivateAsync()
         {
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             logger = GetLogger("SerializationTestGrain-" + IdentityString);
             return base.OnActivateAsync();
         }
@@ -976,29 +1110,27 @@ namespace UnitTests.Grains
 
         private void TestSerializeFuncPtr(string what, Func<int, bool> func1)
         {
-            object obj2 = SerializationManager.RoundTripSerializationForTesting(func1);
+            object obj2 = this.serializationManager.RoundTripSerializationForTesting(func1);
             var func2 = (Func<int, bool>) obj2;
 
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
                 logger.Verbose("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(func1(val), func2(val), "{0} -- Wrong function after round-trip of {1} with value={2}",
-                    what, func1, val);
+                Assert.Equal(func1(val), func2(val));
             }
         }
 
         private void TestSerializePredicate(string what, Predicate<int> pred1)
         {
-            object obj2 = SerializationManager.RoundTripSerializationForTesting(pred1);
+            object obj2 = this.serializationManager.RoundTripSerializationForTesting(pred1);
             var pred2 = (Predicate<int>) obj2;
 
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
                 logger.Verbose("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(pred1(val), pred2(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}",
-                    what, pred1, val);
+                Assert.Equal(pred1(val), pred2(val));
             }
         }
 

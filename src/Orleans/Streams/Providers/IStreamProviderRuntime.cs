@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -15,23 +15,27 @@ namespace Orleans.Streams
     {
         /// <summary>
         /// Retrieves the opaque identity of currently executing grain or client object. 
-        /// Just for logging purposes.
         /// </summary>
-        /// <param name="handler"></param>
+        /// <remarks>Exposed for logging purposes.</remarks>
         string ExecutingEntityIdentity();
 
         SiloAddress ExecutingSiloAddress { get; }
 
+        /// <summary>
+        /// Returns the stream directory.
+        /// </summary>
+        /// <returns>The stream directory.</returns>
         StreamDirectory GetStreamDirectory();
 
         void RegisterSystemTarget(ISystemTarget target);
 
-        void UnRegisterSystemTarget(ISystemTarget target);
+        void UnregisterSystemTarget(ISystemTarget target);
 
         /// <summary>
         /// Binds an extension to an addressable object, if not already done.
         /// </summary>
         /// <typeparam name="TExtension">The type of the extension (e.g. StreamConsumerExtension).</typeparam>
+        /// <typeparam name="TExtensionInterface">The public interface type of the implementation.</typeparam>
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
         Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
@@ -44,21 +48,11 @@ namespace Orleans.Streams
         /// <returns></returns>
         IStreamPubSub PubSub(StreamPubSubType pubSubType);
 
-        /// <summary>
-        /// A consistent ring interface.
-        /// </summary>
+        /// <summary>A consistent ring interface.</summary>
+        /// <param name="mySubRangeIndex">Index of the silo in the ring.</param>
         /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
         /// <returns></returns>
         IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
-
-        /// <summary>
-        /// Return true if this runtime executes inside silo, false otherwise (on the client).
-        /// </summary>
-        /// <param name="pubSubType"></param>
-        /// <returns></returns>
-        bool InSilo { get; }
-
-        object GetCurrentSchedulingContext();
     }
 
         /// <summary>
@@ -66,17 +60,7 @@ namespace Orleans.Streams
     /// </summary>
     internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
     {
-        /// <summary>
-        /// Start the pulling agents for a given persistent stream provider.
-        /// </summary>
-        /// <param name="streamProviderName"></param>
-        /// <param name="balancerType"></param>
-        /// <param name="pubSubType"></param>
-        /// <param name="adapterFactory"></param>
-        /// <param name="queueAdapter"></param>
-        /// <param name="getQueueMsgsTimerPeriod"></param>
-        /// <param name="initQueueTimeout"></param>
-        /// <returns></returns>
+        /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
@@ -204,7 +188,7 @@ namespace Orleans.Streams
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
 
-        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
         GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
 

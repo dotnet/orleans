@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansZooKeeperUtils</PackageId>
+    <Title>Microsoft Orleans ZooKeeper Utilities</Title>
+    <Description>Library of utility types for ZooKeeper of Microsoft Orleans.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET ZooKeeper</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansZooKeeperUtils\**\*.cs" Exclude="..\..\..\src\OrleansZooKeeperUtils\Properties\*.cs;..\..\..\src\OrleansZooKeeperUtils\obj\**\*.cs;..\..\..\src\OrleansZooKeeperUtils\bin\**\*.cs;" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZooKeeperNetEx" Version="3.4.9.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

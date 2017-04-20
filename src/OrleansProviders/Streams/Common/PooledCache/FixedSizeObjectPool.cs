@@ -16,7 +16,12 @@ namespace Orleans.Providers.Streams.Common
     {
         private const int MinObjectCount = 3; // 1MB
 
-        // protected for test reasons
+        /// <summary>
+        /// Queue of objects that have been allocated and are currently in use.  
+        ///   Tracking these is necessary for keeping a fixed size.  These are used to reclaim allocated resources
+        ///   by signaling purges which should eventually return the resource to the pool.
+        /// Protected for test reasons
+        /// </summary>
         protected readonly Queue<T> usedObjects = new Queue<T>();
         private readonly object locker = new object();
         private readonly int maxObjectCount;
@@ -28,7 +33,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="poolSize"></param>
         /// <param name="factoryFunc"></param>
-        public FixedSizeObjectPool(int poolSize, Func<IObjectPool<T>,T> factoryFunc)
+        public FixedSizeObjectPool(int poolSize, Func<T> factoryFunc)
             : base(factoryFunc, poolSize)
         {
             if (poolSize < MinObjectCount)

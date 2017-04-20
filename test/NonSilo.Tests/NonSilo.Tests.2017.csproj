@@ -1,0 +1,132 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>NonSilo.Tests</RootNamespace>
+    <AssemblyName>NonSilo.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
+    <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.2017.csproj" />
+    <ProjectReference Include="..\Tester\Tester.2017.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.2017.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.2017.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.2017.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ClientConfig_NewAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_AdditionalAssemblies.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Azure_Default.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_BootstrapProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Different_Membership_Reminders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_NewAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_NonTimestampedLogFileNames.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_OldAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Azure1.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Azure2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Memory2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_SomeConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_TestSiloConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_TableGrain.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Custom_Membership_No_Reminders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DevTestClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DevTestServerConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\src\SDK\OrleansConfiguration.xml">
+      <Link>OrleansConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\src\SDK\ClientConfiguration.xml">
+      <Link>ClientConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SerializationTests\StreamTypeSerializationTests.cs" />
+    <Compile Remove="SerializationTests\StreamTypeSerializationTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

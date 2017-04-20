@@ -4,11 +4,11 @@
     <id>Microsoft.Orleans.Serialization.Bond</id>
     <version>$version$</version>
     <title>Microsoft Orleans Bond Serializer</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       An implementation of an external serializer that handles Bond types.
     </summary>
@@ -20,7 +20,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Bond.Runtime.CSharp" version="3.0.7" />
+      <dependency id="Bond.Runtime.CSharp" version="5.1.0" />
     </dependencies>
   </metadata>
   <files>

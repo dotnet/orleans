@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestGrains\**\*.cs" Exclude="..\..\..\test\TestGrains\GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;..\..\..\test\TestGrains\obj\**\*.cs;..\..\..\test\TestGrains\bin\**\*.cs;..\..\..\test\TestGrains\Properties\*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

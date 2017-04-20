@@ -1,0 +1,13 @@
+﻿{
+  "dependencies": {
+    "Microsoft.Extensions.Configuration": "1.0.0",
+    "Microsoft.Extensions.Configuration.Binder": "1.0.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

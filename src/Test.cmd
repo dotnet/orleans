@@ -1,5 +1,5 @@
-@setlocal
-@ECHO off
+@if not defined _echo @echo off
+setlocal
 
 SET CONFIGURATION=Release
 
@@ -12,15 +12,15 @@ pushd "%CMDHOME%"
 
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-set TESTS=%OutDir%\Tester.dll %OutDir%\TesterInternal.dll
-if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait "Category=BVT" -trait "Category=SlowBVT"
+set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\NonSilo.Tests.dll,%OutDir%\Tester.AzureUtils.dll,%OutDir%\Tester.SQLUtils.dll,%OutDir%\DefaultCluster.Tests.dll,%OutDir%\AWSUtils.Tests.dll,%OutDir%\BondUtils.Tests.dll,%OutDir%\GoogleUtils.Tests.dll,%OutDir%\PSUtils.Tests.dll,%OutDir%\ServiceBus.Tests.dll,%OutDir%\TestServiceFabric.dll,%OutDir%\Consul.Tests.dll,%OutDir%\Tester.ZooKeeperUtils.dll
+if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=SlowBVT'
 
 @Echo Test assemblies = %TESTS%
 @Echo Test filters = %TEST_FILTERS%
-@echo on
+@if not defined _echo @echo on
 call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
-packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTS% %TEST_FILTERS% -xml "%OutDir%/xUnit-Results.xml" -parallel none -noshadow
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%OutDir%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%

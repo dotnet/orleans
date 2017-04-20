@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <TemplateData>
+    <Name>Orleans Dev/Test Host</Name>
+    <Description>A project for creating a console application hosting an Orleans silo, intended for use during development and test</Description>
+    <Icon>SiloHostCSharp.ico</Icon>
+    <ProjectType>CSharp</ProjectType>
+    <TemplateID>Orleans.Templates.Project.SiloHost.DevTest</TemplateID>
+    <TemplateGroupID>Orleans</TemplateGroupID>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <CreateNewFolder>true</CreateNewFolder>
+    <ProvideDefaultName>true</ProvideDefaultName>
+    <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
+    <DefaultName>SiloHost</DefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
+      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="App.config">Template.App.config</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="OrleansHostWrapper.cs">OrleansHostWrapper.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" OpenInEditor="true">Program.cs</ProjectItem>
+    </Project>
+  </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.CodeAnalysis.Analyzers" version="1.1.0" targetFramework="net451" />
+      <package id="Microsoft.CodeAnalysis.Common" version="1.3.2" targetFramework="net451" />
+      <package id="Microsoft.CodeAnalysis.CSharp" version="1.3.2" targetFramework="net451" />
+      <package id="Microsoft.Extensions.DependencyInjection" version="1.0.0" targetFramework="net451" />
+      <package id="Microsoft.Extensions.DependencyInjection.Abstractions" version="1.0.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.Core" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.CounterControl" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.OrleansCodeGenerator" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.OrleansHost" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.OrleansProviders" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.OrleansRuntime" version="1.4.0" targetFramework="net451" />
+      <package id="Microsoft.Orleans.Server" version="1.4.0" targetFramework="net451" />
+      <package id="Newtonsoft.Json" version="9.0.1" targetFramework="net451" />
+      <package id="System.Collections" version="4.0.11" targetFramework="net451" />
+      <package id="System.Collections.Concurrent" version="4.0.12" targetFramework="net451" />
+      <package id="System.Collections.Immutable" version="1.1.37" targetFramework="net451" />
+      <package id="System.ComponentModel" version="4.0.1" targetFramework="net451" />
+      <package id="System.Diagnostics.Debug" version="4.0.11" targetFramework="net451" />
+      <package id="System.Globalization" version="4.0.11" targetFramework="net451" />
+      <package id="System.Linq" version="4.1.0" targetFramework="net451" />
+      <package id="System.Linq.Expressions" version="4.1.0" targetFramework="net451" />
+      <package id="System.Reflection" version="4.1.0" targetFramework="net451" />
+      <package id="System.Reflection.Metadata" version="1.2.0" targetFramework="net451" />
+      <package id="System.Resources.ResourceManager" version="4.0.1" targetFramework="net451" />
+      <package id="System.Runtime.Extensions" version="4.1.0" targetFramework="net451" />
+      <package id="System.Threading" version="4.0.11" targetFramework="net451" />
+      <package id="System.Threading.Tasks" version="4.0.11" targetFramework="net451" />
+    </packages>
+  </WizardData>
+</VSTemplate>

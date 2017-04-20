@@ -51,9 +51,15 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain
+    internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain
     {
-        private  Logger logger;
+        private readonly IInternalGrainFactory internalGrainFactory;
+        private Logger logger;
+
+        public EchoTaskGrain(IInternalGrainFactory internalGrainFactory)
+        {
+            this.internalGrainFactory = internalGrainFactory;
+        }
 
         public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); } 
         public Task<string> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
@@ -139,7 +145,7 @@ namespace UnitTests.Grains
             logger.Info("IEchoGrainAsync.PingOtherSilo");
             SiloAddress mySilo = Data.Address.Silo;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
@@ -154,13 +160,13 @@ namespace UnitTests.Grains
             logger.Info("IEchoGrainAsync.PingClusterMemberAsync");
             SiloAddress mySilo = Data.Address.Silo;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.Info("Sending Ping to remote silo {0}", siloAddress);
 
-            var oracle = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, siloAddress);
+            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, siloAddress);
 
             await oracle.Ping(1);
             logger.Info("Ping reply received for {0}", siloAddress);
@@ -168,7 +174,7 @@ namespace UnitTests.Grains
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
     }
 

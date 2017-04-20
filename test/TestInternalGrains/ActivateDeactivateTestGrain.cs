@@ -1,10 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
@@ -22,38 +22,38 @@ namespace UnitTests.Grains
             logger = GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
             await watcher.RecordActivateCall(Data.ActivationId.ToString());
-            Assert.IsTrue(doingActivate, "Activate method still running");
+            Assert.True(doingActivate, "Activate method still running");
             doingActivate = false;
         }
 
         public override async Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
             await watcher.RecordDeactivateCall(Data.ActivationId.ToString());
-            Assert.IsTrue(doingDeactivate, "Deactivate method still running");
+            Assert.True(doingDeactivate, "Deactivate method still running");
             doingDeactivate = false;
         }
 
         public Task<string> DoSomething()
         {
             logger.Info("DoSomething");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
         }
 
         public Task DoDeactivate()
         {
             logger.Info("DoDeactivate");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
             return TaskDone.Done;
         }
@@ -73,14 +73,14 @@ namespace UnitTests.Grains
             logger = GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
             return watcher.RecordActivateCall(Data.ActivationId.ToString())
                 .ContinueWith((Task t) =>
                 {
-                    Assert.IsFalse(t.IsFaulted, "RecordActivateCall failed");
-                    Assert.IsTrue(doingActivate, "Doing Activate");
+                    Assert.False(t.IsFaulted, "RecordActivateCall failed");
+                    Assert.True(doingActivate, "Doing Activate");
                     doingActivate = false;
                 });
         }
@@ -88,14 +88,14 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
             return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
                 .ContinueWith((Task t) =>
                 {
-                    Assert.IsFalse(t.IsFaulted, "RecordDeactivateCall failed");
-                    Assert.IsTrue(doingDeactivate, "Doing Deactivate");
+                    Assert.False(t.IsFaulted, "RecordDeactivateCall failed");
+                    Assert.True(doingDeactivate, "Doing Deactivate");
                     doingDeactivate = false;
                 });
         }
@@ -103,16 +103,16 @@ namespace UnitTests.Grains
         public Task<string> DoSomething()
         {
             logger.Info("DoSomething");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
         }
 
         public Task DoDeactivate()
         {
             logger.Info("DoDeactivate");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
             return TaskDone.Done;
         }
@@ -132,8 +132,8 @@ namespace UnitTests.Grains
             logger = GetLogger();
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
-            Assert.IsFalse(doingActivate, "Not doing Activate yet");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Not doing Activate yet");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
 
             logger.Info("OnActivateAsync");
@@ -142,9 +142,9 @@ namespace UnitTests.Grains
             var task = Task.Factory.StartNew(() =>
             {
                 logger.Info("Started-OnActivateAsync-SubTask");
-                Assert.IsTrue(TaskScheduler.Current == TaskScheduler.Default,
+                Assert.True(TaskScheduler.Current == TaskScheduler.Default,
                     "Running under default .NET Task scheduler");
-                Assert.IsTrue(doingActivate, "Still doing Activate in Sub-Task");
+                Assert.True(doingActivate, "Still doing Activate in Sub-Task");
                 logger.Info("Finished-OnActivateAsync-SubTask");
             }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
             await task;
@@ -152,11 +152,11 @@ namespace UnitTests.Grains
             logger.Info("Started-OnActivateAsync");
 
             await watcher.RecordActivateCall(Data.ActivationId.ToString());
-            Assert.IsTrue(doingActivate, "Doing Activate");
+            Assert.True(doingActivate, "Doing Activate");
 
             logger.Info("OnActivateAsync-Sleep");
             Thread.Sleep(TimeSpan.FromSeconds(1));
-            Assert.IsTrue(doingActivate, "Still doing Activate after Sleep");
+            Assert.True(doingActivate, "Still doing Activate after Sleep");
 
             logger.Info("Finished-OnActivateAsync");
             doingActivate = false;
@@ -166,14 +166,14 @@ namespace UnitTests.Grains
         {
             logger.Info("OnDeactivateAsync");
 
-            Assert.IsFalse(doingActivate, "Not doing Activate yet");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate yet");
+            Assert.False(doingActivate, "Not doing Activate yet");
+            Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
 
             logger.Info("Started-OnDeactivateAsync");
 
             await watcher.RecordDeactivateCall(Data.ActivationId.ToString());
-            Assert.IsTrue(doingDeactivate, "Doing Deactivate");
+            Assert.True(doingDeactivate, "Doing Deactivate");
 
             logger.Info("OnDeactivateAsync-Sleep");
             Thread.Sleep(TimeSpan.FromSeconds(1));
@@ -184,16 +184,16 @@ namespace UnitTests.Grains
         public Task<string> DoSomething()
         {
             logger.Info("DoSomething");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
         }
 
         public Task DoDeactivate()
         {
             logger.Info("DoDeactivate");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
             return TaskDone.Done;
         }
@@ -220,8 +220,8 @@ namespace UnitTests.Grains
 
                         watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
-                        Assert.IsFalse(doingActivate, "Not doing Activate");
-                        Assert.IsFalse(doingDeactivate, "Not doing Deactivate");
+                        Assert.False(doingActivate, "Not doing Activate");
+                        Assert.False(doingDeactivate, "Not doing Deactivate");
                         doingActivate = true;
                     });
             // we want to use Task.ContinueWith with an async lambda, an explicitly typed variable is required to avoid
@@ -231,8 +231,8 @@ namespace UnitTests.Grains
                 {
                     logger.Info("Started-OnActivateAsync");
 
-                    Assert.IsTrue(doingActivate, "Doing Activate");
-                    Assert.IsFalse(doingDeactivate, "Not doing Deactivate");
+                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     try
                     {
@@ -244,11 +244,11 @@ namespace UnitTests.Grains
                     {
                         var msg = "RecordActivateCall failed with error " + exc;
                         logger.Error(0, msg);
-                        Assert.Fail(msg);
+                        Assert.True(false, msg);
                     }
 
-                    Assert.IsTrue(doingActivate, "Doing Activate");
-                    Assert.IsFalse(doingDeactivate, "Not doing Deactivate");
+                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     await Task.Delay(TimeSpan.FromSeconds(1));
 
@@ -265,16 +265,16 @@ namespace UnitTests.Grains
         {
             Task.Factory.StartNew(() => logger.Info("OnDeactivateAsync"));
 
-            Assert.IsFalse(doingActivate, "Not doing Activate");
-            Assert.IsFalse(doingDeactivate, "Not doing Deactivate");
+            Assert.False(doingActivate, "Not doing Activate");
+            Assert.False(doingDeactivate, "Not doing Deactivate");
             doingDeactivate = true;
 
             logger.Info("Started-OnDeactivateAsync");
             return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
                 .ContinueWith((Task t) =>
                 {
-                    Assert.IsFalse(t.IsFaulted, "RecordDeactivateCall failed");
-                    Assert.IsTrue(doingDeactivate, "Doing Deactivate");
+                    Assert.False(t.IsFaulted, "RecordDeactivateCall failed");
+                    Assert.True(doingDeactivate, "Doing Deactivate");
                     Thread.Sleep(TimeSpan.FromSeconds(1));
                     doingDeactivate = false;
                 })
@@ -285,16 +285,16 @@ namespace UnitTests.Grains
         public Task<string> DoSomething()
         {
             logger.Info("DoSomething");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
         }
 
         public Task DoDeactivate()
         {
             logger.Info("DoDeactivate");
-            Assert.IsFalse(doingActivate, "Activate method should have finished");
-            Assert.IsFalse(doingDeactivate, "Deactivate method should not be running yet");
+            Assert.False(doingActivate, "Activate method should have finished");
+            Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
             return TaskDone.Done;
         }

@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansPSUtils</PackageId>
+    <Title>Microsoft Orleans PowerShell Utilities</Title>
+    <Description>
+      Library of utility types for PowerShell of Microsoft Orleans.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>OrleansPSUtils</AssemblyName>
+    <RootNamespace>OrleansPSUtils</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutDir)' != ''">
+    <OutDir>$(OutDir)\Orleans\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutDir)' == ''">
+    <OutDir>bin\$(Configuration)\$(TargetFramework)\Orleans\</OutDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Orleans.psd1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <Target Name="AfterBuildHack" AfterTargets="AfterBuild">
+    <ItemGroup>
+      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)Orleans.psd1'))"/>
+      <_VersionFileContent Include="$([System.IO.File]::ReadAllText('..\Build\Version.txt'))"/>
+    </ItemGroup>
+    <PropertyGroup>
+      <VersionToEmbed>@(_VersionFileContent)</VersionToEmbed>
+    </PropertyGroup>
+    <WriteLinesToFile
+        File="$(OutDir)Orleans.psd1"
+        Lines="@(_PSDFileContent->Replace('$version$', '$(VersionToEmbed)'))"
+        Overwrite="true"
+        ContinueOnError="true" />
+  </Target>
+</Project>

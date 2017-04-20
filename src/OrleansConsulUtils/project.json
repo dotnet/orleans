@@ -1,0 +1,12 @@
+﻿{
+  "dependencies": {
+    "Consul": "0.7.0.3"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

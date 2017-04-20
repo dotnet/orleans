@@ -21,27 +21,32 @@ namespace Orleans.Runtime.Scheduler
 
         internal readonly int MaxActiveThreads;
         internal readonly TimeSpan MaxWorkQueueWait;
-        internal readonly bool InjectMoreWorkerThreads;
+        internal readonly bool EnableWorkerThreadInjection;
+        private readonly ICorePerformanceMetrics performanceMetrics;
 
-        internal int BusyWorkerCount { get { return runningThreadCount; } }
-        
-        internal WorkerPool(OrleansTaskScheduler sched, int maxActiveThreads, bool injectMoreWorkerThreads)
+        internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
+
+        internal WorkerPool(OrleansTaskScheduler sched, ICorePerformanceMetrics performanceMetrics, int maxActiveThreads, bool enableWorkerThreadInjection)
         {
             scheduler = sched;
             MaxActiveThreads = maxActiveThreads;
-            InjectMoreWorkerThreads = injectMoreWorkerThreads;
+            EnableWorkerThreadInjection = enableWorkerThreadInjection;
             MaxWorkQueueWait = TimeSpan.FromMilliseconds(50);
-            threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
+            this.performanceMetrics = performanceMetrics;
+            if (EnableWorkerThreadInjection)
+            {
+                threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
+            }
             pool = new HashSet<WorkerPoolThread>();
             createThreadCount = 0;
             lockable = new object();
             for (createThreadCount = 0; createThreadCount < MaxActiveThreads; createThreadCount++)
             {
-                var t = new WorkerPoolThread(this, scheduler, createThreadCount);
+                var t = new WorkerPoolThread(this, scheduler, performanceMetrics, createThreadCount);
                 pool.Add(t);
             }
             createThreadCount++;
-            systemThread = new WorkerPoolThread(this, scheduler, createThreadCount, true);
+            systemThread = new WorkerPoolThread(this, scheduler, performanceMetrics, createThreadCount, true);
             running = false;
             runningThreadCount = 0;
             longTurnTimer = null;
@@ -54,7 +59,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (WorkerPoolThread t in pool)
                 t.Start();
             
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 longTurnTimer = new SafeTimer(obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
@@ -81,23 +86,28 @@ namespace Orleans.Runtime.Scheduler
 
         internal void TakeCpu()
         {
-            threadLimitingSemaphore.WaitOne();
+            // maintain the threadLimitingSemaphore ONLY if thread injection is enabled.
+            if (EnableWorkerThreadInjection)
+                threadLimitingSemaphore.WaitOne();
         }
 
         internal void PutCpu()
         {
-            threadLimitingSemaphore.Release();
+            if (EnableWorkerThreadInjection)
+                threadLimitingSemaphore.Release();
         }
 
         internal void RecordRunningThread()
         {
-            Interlocked.Increment(ref runningThreadCount);
+            // maintain the runningThreadCount ONLY if thread injection is enabled.
+            if (EnableWorkerThreadInjection)
+                Interlocked.Increment(ref runningThreadCount);
         }
 
         internal void RecordIdlingThread()
         {
-            if (Interlocked.Decrement(ref runningThreadCount) == 0)
-                scheduler.OnAllWorkerThreadsIdle();
+            if (EnableWorkerThreadInjection)
+                Interlocked.Decrement(ref runningThreadCount);
         }
 
         internal bool CanExit()
@@ -124,7 +134,7 @@ namespace Orleans.Runtime.Scheduler
                 if (!restart) return;
 
                 createThreadCount++;
-                var tnew = new WorkerPoolThread(this, scheduler, createThreadCount);
+                var tnew = new WorkerPoolThread(this, scheduler, this.performanceMetrics, createThreadCount);
                 tnew.Start();
             }
         }
@@ -134,7 +144,7 @@ namespace Orleans.Runtime.Scheduler
             lock (lockable)
             {
                 createThreadCount++;
-                var t = new WorkerPoolThread(this, scheduler, createThreadCount);
+                var t = new WorkerPoolThread(this, scheduler, this.performanceMetrics, createThreadCount);
                 pool.Add(t);
                 t.Start();
             }

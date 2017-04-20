@@ -6,7 +6,7 @@ Namespace $rootnamespace$
     ''' Orleans grain communication interface $safeitemname$
     ''' </summary>
     Public Interface $safeitemname$
-        Inherits Orleans.IGrainWithGuidKey
+        Inherits IGrainWithGuidKey
 
         ' TODO: add your interface methods.
         '
@@ -15,4 +15,3 @@ Namespace $rootnamespace$
     End Interface
 
 End Namespace
-

@@ -8,18 +8,21 @@ namespace Orleans.Runtime.Scheduler
         private static readonly Logger logger = LogManager.GetLogger("InvokeWorkItem", LoggerType.Runtime);
         private readonly ActivationData activation;
         private readonly Message message;
-        
-        public InvokeWorkItem(ActivationData activation, Message message, ISchedulingContext context)
+        private readonly Dispatcher dispatcher;
+
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher)
         {
-            this.activation = activation;
-            this.message = message;
-            SchedulingContext = context;
-            if (activation == null || activation.GrainInstance==null)
+            if (activation?.GrainInstance == null)
             {
-                var str = String.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);
+                var str = string.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);
                 logger.Warn(ErrorCode.SchedulerNullActivation, str);
                 throw new ArgumentException(str);
             }
+
+            this.activation = activation;
+            this.message = message;
+            this.dispatcher = dispatcher;
+            this.SchedulingContext = activation.SchedulingContext;
             activation.IncrementInFlightCount();
         }
 
@@ -39,13 +42,14 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                IAddressable grain = activation.GrainInstance;
-                Task task = InsideRuntimeClient.Current.Invoke(grain, activation, message);
+                var grain = activation.GrainInstance;
+                var runtimeClient = (ISiloRuntimeClient)grain.GrainReference.RuntimeClient;
+                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
                 task.ContinueWith(t =>
                 {
                     // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                     activation.DecrementInFlightCount();
-                    InsideRuntimeClient.Current.Dispatcher.OnActivationCompletedRequest(activation, message);
+                    this.dispatcher.OnActivationCompletedRequest(activation, message);
                 }).Ignore();
             }
             catch (Exception exc)
@@ -54,7 +58,7 @@ namespace Orleans.Runtime.Scheduler
                     String.Format("Exception trying to invoke request {0} on activation {1}.", message, activation), exc);
 
                 activation.DecrementInFlightCount();
-                InsideRuntimeClient.Current.Dispatcher.OnActivationCompletedRequest(activation, message);
+                this.dispatcher.OnActivationCompletedRequest(activation, message);
             }
         }
 

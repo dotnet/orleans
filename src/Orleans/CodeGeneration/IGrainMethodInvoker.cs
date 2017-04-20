@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -11,6 +10,8 @@ namespace Orleans.CodeGeneration
     {
         /// <summary> The interface id that this invoker supports. </summary>
         int InterfaceId { get; }
+
+        ushort InterfaceVersion { get; }
 
         /// <summary>
         /// Invoke a grain method.

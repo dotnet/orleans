@@ -1,8 +1,9 @@
-using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -17,7 +18,7 @@ namespace Orleans.Runtime.MembershipService
         {
             logger = LogManager.GetLogger("GrainBasedMembershipTable", LoggerType.Runtime);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
-            table = new InMemoryMembershipTable();
+            table = new InMemoryMembershipTable(this.ServiceProvider.GetRequiredService<SerializationManager>());
             return TaskDone.Done;
         }
 

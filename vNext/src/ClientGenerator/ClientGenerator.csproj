@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans.CodeGeneration</RootNamespace>
+    <AssemblyName>ClientGenerator</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\..\src\ClientGenerator\**\*.cs"
+      Exclude="
+        ..\..\..\src\ClientGenerator\obj\**\*.cs;
+        ..\..\..\src\ClientGenerator\bin\**\*.cs;
+        ..\..\..\src\ClientGenerator\Properties\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+  </ItemGroup>
+</Project>

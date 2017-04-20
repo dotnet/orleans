@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.ServiceFabric</PackageId>
+    <Title>Microsoft Orleans Service Fabric Support</Title>
+    <Description>
+      Support for hosting Microsoft Orleans on Service Fabric.
+    </Description>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net451</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
+    <AssemblyName>Microsoft.Orleans.ServiceFabric</AssemblyName>
+    <RootNamespace>Microsoft.Orleans.ServiceFabric</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ServiceFabric.Services" Version="2.4.145" />
+    <PackageReference Include="Newtonsoft.Json" version="9.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />
+  </ItemGroup>
+</Project>

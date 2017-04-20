@@ -1,10 +1,10 @@
-﻿using Consul;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Consul;
+using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Host
 {
@@ -67,11 +67,7 @@ namespace Orleans.Runtime.Host
             _connectionString = dataConnectionString;
 
             _consulClient =
-                new ConsulClient(
-                    new ConsulClientConfiguration
-                    {
-                        Address = new Uri(dataConnectionString)
-                    });
+                new ConsulClient( config => config.Address = new Uri(_connectionString));
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
@@ -87,7 +83,7 @@ namespace Orleans.Runtime.Host
             if (deploymentKVAddresses.Response == null)
             {
                 _logger.Verbose("Could not find any silo registrations for deployment {0}.", _deploymentId);
-                return new MembershipTableData(null);
+                return new MembershipTableData(_tableVersion);
             }
 
             var allSiloRegistrations =
