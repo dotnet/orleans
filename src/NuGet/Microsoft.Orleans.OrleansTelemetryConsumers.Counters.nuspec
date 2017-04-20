@@ -23,9 +23,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net451" />
-    <file src="OrleansTelemetryConsumers.Counters.pdb" target="lib\net451" />
-    <file src="OrleansTelemetryConsumers.Counters.xml" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net461" />
+    <file src="OrleansTelemetryConsumers.Counters.pdb" target="lib\net461" />
+    <file src="OrleansTelemetryConsumers.Counters.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansTelemetryConsumers.Counters\**\*.cs" target="src" />
   </files>
 </package>
