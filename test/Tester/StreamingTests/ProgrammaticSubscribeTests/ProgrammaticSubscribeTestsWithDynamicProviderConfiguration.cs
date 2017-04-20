@@ -6,7 +6,6 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
@@ -40,7 +39,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task Programmatic_Subscribe_UsingClientSideSubscriptionManager_UsingDynamicProviderConfig()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
@@ -77,7 +76,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task Programmatic_Subscribe_DynamicAddNewStreamProvider_WhenConsuming()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);

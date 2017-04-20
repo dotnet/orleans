@@ -79,7 +79,7 @@ namespace PSUtils.Tests
             _ps.Commands.Clear();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Tooling")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Tooling")]
         public void ScriptCallTest()
         {
             _ps.Commands.AddScript(File.ReadAllText(@".\PSClient\PSClientTests.ps1"));
@@ -115,7 +115,7 @@ namespace PSUtils.Tests
             Assert.False((bool)results[4].BaseObject);            
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Tooling")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Tooling")]
         public void GetGrainTest()
         {
             var startGrainClient = new Command("Start-GrainClient");
