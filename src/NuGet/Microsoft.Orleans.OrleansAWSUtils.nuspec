@@ -27,9 +27,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansAWSUtils.dll" target="lib\net451" />
-    <file src="OrleansAWSUtils.pdb" target="lib\net451" />
-    <file src="OrleansAWSUtils.xml" target="lib\net451" />
+    <file src="OrleansAWSUtils.dll" target="lib\net461" />
+    <file src="OrleansAWSUtils.pdb" target="lib\net461" />
+    <file src="OrleansAWSUtils.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansAWSUtils\**\*.cs" target="src" />
   </files>
 </package>

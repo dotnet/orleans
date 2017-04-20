@@ -23,11 +23,11 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansSqlUtils.dll" target="lib\net451" />
-    <file src="OrleansSqlUtils.pdb" target="lib\net451" />
-    <file src="OrleansSqlUtils.xml" target="lib\net451" />
-    <file src="CreateOrleansTables_SqlServer.sql" target="lib\net451\SQLServer" />
-    <file src="CreateOrleansTables_MySql.sql" target="lib\net451\MySql" />
-    <file src="CreateOrleansTables_PostgreSql.sql" target="lib\net451\PostgreSql" />
+    <file src="OrleansSqlUtils.dll" target="lib\net461" />
+    <file src="OrleansSqlUtils.pdb" target="lib\net461" />
+    <file src="OrleansSqlUtils.xml" target="lib\net461" />
+    <file src="CreateOrleansTables_SqlServer.sql" target="lib\net461\SQLServer" />
+    <file src="CreateOrleansTables_MySql.sql" target="lib\net461\MySql" />
+    <file src="CreateOrleansTables_PostgreSql.sql" target="lib\net461\PostgreSql" />
   </files>
 </package>

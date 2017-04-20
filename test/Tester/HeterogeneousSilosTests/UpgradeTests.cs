@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -13,7 +12,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests
 {
-    [TestCategory("ExcludeXAML")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML")]
     public class UpgradeTests : IDisposable
     {
 
