@@ -14,7 +14,6 @@ namespace Orleans.Providers.Streams.Common
         private const int DefaultPoolCapacity = 1 << 10; // 1k
         private readonly Stack<T> pool;
         private readonly Func<T> factoryFunc;
-
         /// <summary>
         /// Simple object pool
         /// </summary>

@@ -15,9 +15,15 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubCacheEvictionStrategy : IEvictionStrategy<CachedEventHubMessage>
     {
         //buffers which are still in use for current cache
-        private readonly Queue<FixedSizeBuffer> inUseBuffers;
+        /// <summary>
+        /// Buffers which are currently in use in the cache
+        /// </summary>
+        protected readonly Queue<FixedSizeBuffer> inUseBuffers;
         private readonly TimePurgePredicate timePurge;
-        private readonly Queue<FixedSizeBuffer> purgedBuffers;
+        /// <summary>
+        /// Buffers which are purged
+        /// </summary>
+        protected readonly Queue<FixedSizeBuffer> purgedBuffers;
         private readonly Logger logger;
 
         /// <summary>

@@ -1,4 +1,8 @@
-﻿using Microsoft.ServiceBus.Messaging;
+﻿#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
+using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,7 +15,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
+namespace ServiceBus.Tests.EvictionStrategyTests
 {
     public class EventHubQueueCacheForTesting : EventHubQueueCache
     {
@@ -21,6 +25,15 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             { }
         
         public int ItemCount { get { return this.cache.ItemCount; } }
+    }
+    public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy
+    {
+        public EHEvictionStrategyForTesting(Logger logger, TimePurgePredicate timePurage = null)
+            :base(logger, timePurage)
+        { }
+
+        public Queue<FixedSizeBuffer> InUseBuffers { get { return this.inUseBuffers; } }
+        public Queue<FixedSizeBuffer> PurgedBuffers { get { return this.purgedBuffers; } }
     }
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter

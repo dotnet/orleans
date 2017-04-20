@@ -1,5 +1,4 @@
-﻿using Microsoft.ServiceBus.Messaging;
-using Orleans;
+﻿using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -10,14 +9,20 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+#else
+using Microsoft.ServiceBus.Messaging;
+#endif
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 
-namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
+namespace ServiceBus.Tests.EvictionStrategyTests
 {
+    [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHPurgeLogicTests
     {
         private CachePressureInjectionMonitor cachePressureInjectionMonitor;
@@ -31,6 +36,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
         private TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private EventHubPartitionSettings ehSettings;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
+        private List<EHEvictionStrategyForTesting> evictionStrategyList;
         public EHPurgeLogicTests()
         {
             //an mock eh settings
@@ -43,8 +49,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             this.purgePredicate = new PurgeDecisionInjectionPredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30));
 
             //set up serialization env
-            var config = new ClientConfiguration();
-            var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            var environment = SerializationTestEnvironment.InitializeWithDefaults();
             this.serializationManager = environment.SerializationManager;
 
             //set up buffer pool
@@ -55,7 +60,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {
             InitForTesting();
@@ -81,7 +86,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
         {
             InitForTesting();
@@ -107,7 +112,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
         {
             InitForTesting();
@@ -133,7 +138,7 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_BufferPoolFull_WontCauseCacheMiss()
         {
             InitForTesting();
@@ -144,9 +149,8 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
 
-            //set cachePressureMonitor to be underPressure
+            //set up condition so that purge shouldn't be performed
             this.cachePressureInjectionMonitor.isUnderPressure = false;
-            //set purgePredicate to be ShouldPurge
             this.purgePredicate.ShouldPurge = false;
 
             //keep allocate buffer on buffer pool to make it full
@@ -157,14 +161,65 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
                 bufferToAllocate--;
             }
 
-            //Assert
+            //Assert, no item got purged
             int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
+        }
+
+        [Fact, TestCategory("BVT")]
+        public async Task EventhubQueueCache_EvictionStrategy_Behavior()
+        {
+            InitForTesting();
+            var tasks = new List<Task>();
+            //add items into cache
+            int itemAddToCache = 10;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+
+            //set up condition so that purge will be performed
+            this.cachePressureInjectionMonitor.isUnderPressure = false;
+            this.purgePredicate.ShouldPurge = true;
+
+            //Each cache should each have one buffer allocated
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
+
+            //perform purge
+            IList<IBatchContainer> ignore;
+            this.receiver1.TryPurgeFromCache(out ignore);
+            this.receiver2.TryPurgeFromCache(out ignore);
+
+            //Each cache should each have one buffer purged
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.InUseBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.PurgedBuffers.Count));
+
+            var purgedBuffers = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy =>
+            {
+                foreach (var buffer in strategy.PurgedBuffers)
+                {
+                    purgedBuffers.Add(buffer);
+                }
+            });
+
+            var newBuffersAllocated = new List<FixedSizeBuffer>();
+            //keep allocate buffer on buffer pool to make it full, so that buffer pool will request purged buffers to return
+            int bufferToAllocate = EventHubStreamProviderSettings.DefaultCacheSizeMb;
+            while (bufferToAllocate > 0)
+            {
+                newBuffersAllocated.Add(this.bufferPool.Allocate());
+                bufferToAllocate--;
+            }
+
+            //Purged buffers should be returned to the pool and used to allocate new buffer
+            purgedBuffers.ForEach(buffer => Assert.True(newBuffersAllocated.Contains(buffer)));
         }
 
         private void InitForTesting()
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
+            this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
             this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
                 new DefaultEventHubReceiverMonitor(ehSettings.Hub.Path, ehSettings.Partition, this.logger), this.GetNodeConfiguration);
             this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
@@ -187,7 +242,9 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
             while (count > 0) 
             { 
                 count--;
-                cache.Add(new EventData(), DateTime.UtcNow);
+                //just to make compiler happy
+                byte[] ignore = { 12, 23 };
+                cache.Add(new EventData(ignore), DateTime.UtcNow);
             }
             return TaskDone.Done;
         }
@@ -204,8 +261,10 @@ namespace ServiceBus.Tests.EventHubCacheEvictionStrategyTests
 
         private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
         {
+            var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, this.purgePredicate);
+            this.evictionStrategyList.Add(evictionStrategy);
             var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool), 
-                EventHubDataComparer.Instance, this.logger, new EventHubCacheEvictionStrategy(this.logger, this.purgePredicate));
+                EventHubDataComparer.Instance, this.logger, evictionStrategy);
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;
