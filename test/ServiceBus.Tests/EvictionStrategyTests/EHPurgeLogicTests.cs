@@ -59,7 +59,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
         }
-
+        //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
+#if !NETSTANDARD
         [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {
@@ -215,6 +216,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //Purged buffers should be returned to the pool and used to allocate new buffer
             purgedBuffers.ForEach(buffer => Assert.True(newBuffersAllocated.Contains(buffer)));
         }
+#endif
 
         private void InitForTesting()
         {
