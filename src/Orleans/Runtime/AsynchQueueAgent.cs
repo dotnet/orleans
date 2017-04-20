@@ -30,7 +30,10 @@ namespace Orleans.Runtime
                 queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
             }
 #endif
-            requestQueue.Add(request);
+            if (requestQueue != null)
+            {
+                requestQueue.Add(request);
+            }
         }
 
         protected abstract void Process(T request);
@@ -65,7 +68,7 @@ namespace Orleans.Runtime
         {            
             while (true)
             {
-                if (Cts.IsCancellationRequested)
+                if (Cts==null || Cts.IsCancellationRequested)
                 {
                     return;
                 }

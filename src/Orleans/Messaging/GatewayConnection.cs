@@ -189,7 +189,7 @@ namespace Orleans.Messaging
         protected override bool PrepareMessageForSend(Message msg)
         {
             // Check to make sure we're not stopped
-            if (Cts.IsCancellationRequested)
+            if (Cts!=null && Cts.IsCancellationRequested)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
                 MsgCenter.SendMessage(msg);
