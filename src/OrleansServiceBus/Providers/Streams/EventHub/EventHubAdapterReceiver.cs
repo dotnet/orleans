@@ -206,7 +206,7 @@ namespace Orleans.ServiceBus.Providers
 
         public bool IsUnderPressure()
         {
-            return this.GetMaxAddCount() < MaxMessagesPerRead;
+            return this.GetMaxAddCount() <= 0;
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
