@@ -24,9 +24,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansBondUtils.dll" target="lib\net451" />
-    <file src="OrleansBondUtils.pdb" target="lib\net451" />
-    <file src="OrleansBondUtils.xml" target="lib\net451" />
+    <file src="OrleansBondUtils.dll" target="lib\net461" />
+    <file src="OrleansBondUtils.pdb" target="lib\net461" />
+    <file src="OrleansBondUtils.xml" target="lib\net461" />
     <file src="BondSerializerInstall.ps1" target="tools\Install.ps1" />
     <file src="BondSerializerUninstall.ps1" target="tools\Uninstall.ps1" />
     <file src="$SRC_DIR$OrleansBondUtils\**\*.cs" target="src" />

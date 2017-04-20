@@ -23,6 +23,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTelemetryConsumers.NewRelic.dll" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.NewRelic.dll" target="lib\net461" />
   </files>
 </package>

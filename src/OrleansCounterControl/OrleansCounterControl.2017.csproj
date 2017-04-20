@@ -8,10 +8,11 @@
     </Description>
   </PropertyGroup>
   <PropertyGroup>
-    <TargetFramework>net451</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
     <OutputType>Exe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <NoWarn>1591</NoWarn>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.Counter.Control</RootNamespace>

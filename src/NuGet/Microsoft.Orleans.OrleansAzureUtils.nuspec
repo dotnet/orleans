@@ -26,9 +26,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansAzureUtils.dll" target="lib\net451" />
-    <file src="OrleansAzureUtils.pdb" target="lib\net451" />
-    <file src="OrleansAzureUtils.xml" target="lib\net451" />
+    <file src="OrleansAzureUtils.dll" target="lib\net461" />
+    <file src="OrleansAzureUtils.pdb" target="lib\net461" />
+    <file src="OrleansAzureUtils.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansAzureUtils\**\*.cs" target="src" />
   </files>
 </package>

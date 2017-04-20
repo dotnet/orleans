@@ -7,7 +7,7 @@
     "xunit": "2.1.0"
   },
   "frameworks": {
-    "net451": {}
+    "net461": {}
   },
   "runtimes": {
     "win-x64": {}

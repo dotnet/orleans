@@ -44,56 +44,11 @@
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\MembershipTests\DynamoDBMembershipTableTest.cs">
-      <Link>MembershipTests\DynamoDBMembershipTableTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\MembershipTests\SiloInstanceRecordTests.cs">
-      <Link>MembershipTests\SiloInstanceRecordTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\Reminder\DynamoDBRemindersTableTests.cs">
-      <Link>Reminder\DynamoDBRemindersTableTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\AWSTestConstants.cs">
-      <Link>StorageTests\AWSTestConstants.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\Base_PersistenceGrainTests_AWSStore.cs">
-      <Link>StorageTests\Base_PersistenceGrainTests_AWSStore.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\DynamoDBStorageProviderTests.cs">
-      <Link>StorageTests\DynamoDBStorageProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\DynamoDBStorageStressTests.cs">
-      <Link>StorageTests\DynamoDBStorageStressTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\DynamoDBStorageTestFixture.cs">
-      <Link>StorageTests\DynamoDBStorageTestFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\DynamoDBStorageTests.cs">
-      <Link>StorageTests\DynamoDBStorageTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\PersistenceGrainTests_AWSDynamoDBStore.cs">
-      <Link>StorageTests\PersistenceGrainTests_AWSDynamoDBStore.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\StorageTests\UnitTestDynamoDBStorage.cs">
-      <Link>StorageTests\UnitTestDynamoDBStorage.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\Streaming\SQSAdapterTests.cs">
-      <Link>Streaming\SQSAdapterTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\Streaming\SQSClientStreamTests.cs">
-      <Link>Streaming\SQSClientStreamTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\Streaming\SQSStreamTests.cs">
-      <Link>Streaming\SQSStreamTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\Streaming\SQSSubscriptionMultiplicityTests.cs">
-      <Link>Streaming\SQSSubscriptionMultiplicityTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\AWSUtils.Tests\CollectionFixtures.cs">
-      <Link>CollectionFixtures.cs</Link>
-    </Compile>
+    <Compile Include="..\..\..\test\AWSUtils.Tests\**\*.cs" Exclude="..\..\..\test\AWSUtils.Tests\obj\**\*.cs;..\..\..\test\AWSUtils.Tests\bin\**\*.cs;..\..\..\test\AWSUtils.Tests\Properties\*.cs" />
   </ItemGroup>
+  
   <ItemGroup>
     <None Include="App.config" />
     <None Include="AWSUtils.Tests.xunit.runner.json">

@@ -261,6 +261,13 @@ namespace Orleans.ServiceBus.Providers
             return receivers.GetOrAdd(queueId, q => MakeReceiver(queueId));
         }
 
+        /// <summary>
+        /// Create a IEventHubQueueCacheFactory. It will create a EventHubQueueCacheFactory by default. 
+        /// User can override this function to return their own implementation of IEventHubQueueCacheFactory, 
+        /// and other customization of IEventHubQueueCacheFactory if they may. 
+        /// </summary>
+        /// <param name="providerSettings"></param>
+        /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
         {
             return new EventHubQueueCacheFactory(providerSettings, SerializationManager);

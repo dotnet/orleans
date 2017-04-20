@@ -3,7 +3,7 @@
     "Google.Protobuf": "3.0.0"
   },
   "frameworks": {
-    "net451": {}
+    "net461": {}
   },
   "runtimes": {
     "win-anycpu": {},

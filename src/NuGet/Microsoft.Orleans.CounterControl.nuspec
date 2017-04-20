@@ -22,12 +22,12 @@
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" version="$version$" />
-      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.3.2" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" version="2.0.0" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansCounterControl.exe" target="lib\net451" />
-    <file src="OrleansCounterControl.pdb" target="lib\net451" />
+    <file src="OrleansCounterControl.exe" target="lib\net461" />
+    <file src="OrleansCounterControl.pdb" target="lib\net461" />
     <file src="OrleansCounterControl.exe.config" target="tools" />
     <file src="$SRC_DIR$OrleansCounterControl\**\*.cs" target="src" />
     <file src="Microsoft.Orleans.CounterControl.targets" target="build" />

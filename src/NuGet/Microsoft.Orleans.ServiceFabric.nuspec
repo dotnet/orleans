@@ -25,9 +25,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="Microsoft.Orleans.ServiceFabric.dll" target="lib\net451" />
-    <file src="Microsoft.Orleans.ServiceFabric.pdb" target="lib\net451" />
-    <file src="Microsoft.Orleans.ServiceFabric.xml" target="lib\net451" />
+    <file src="Microsoft.Orleans.ServiceFabric.dll" target="lib\net461" />
+    <file src="Microsoft.Orleans.ServiceFabric.pdb" target="lib\net461" />
+    <file src="Microsoft.Orleans.ServiceFabric.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansServiceFabricUtils\**\*.cs" exclude="*\obj\**\*" target="src" />
   </files>
 </package>
