@@ -115,7 +115,6 @@ namespace Orleans.Runtime
                 }
 
                 ActivityId.Value = (Guid)activityIdObj;
-
             }
             if (contextData != null && contextData.Count > 0)
             {
@@ -137,7 +136,6 @@ namespace Orleans.Runtime
 
             if (PropagateActivityId)
             {
-
                 var activityId = ActivityId.Value;
                 if (activityId != Guid.Empty)
                 {
@@ -155,7 +153,6 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-
             CallContextData.Value = null;
         }
     }
