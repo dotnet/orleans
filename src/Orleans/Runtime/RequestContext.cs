@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 #if !NETSTANDARD
 using System.Runtime.Remoting.Messaging;
 #else
@@ -39,10 +40,9 @@ namespace Orleans.Runtime
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-#if NETSTANDARD
         public static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
         private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
-#endif
+
 
         /// <summary>
         /// Retrieve a value from the RequestContext key-value bag.
@@ -52,7 +52,7 @@ namespace Orleans.Runtime
         /// otherwise returns <c>null</c> if no data is present for that key.</returns>
         public static object Get(string key)
         {
-            Dictionary<string, object> values = GetContextData();
+            var values = CallContextData.Value;
             object result;
             if ((values != null) && values.TryGetValue(key, out result))
             {
@@ -68,7 +68,7 @@ namespace Orleans.Runtime
         /// <param name="value">The value to be stored into RequestContext.</param>
         public static void Set(string key, object value)
         {
-            Dictionary<string, object> values = GetContextData();
+            var values = CallContextData.Value;
 
             if (values == null)
             {
@@ -82,7 +82,7 @@ namespace Orleans.Runtime
                 values = new Dictionary<string, object>(values);
             }
             values[key] = value;
-            SetContextData(values);
+            CallContextData.Value = values;
         }
 
         /// <summary>
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
         /// <returns>Boolean <c>True</c> if the value was previously in the RequestContext key-value bag and has now been removed, otherwise returns <c>False</c>.</returns>
         public static bool Remove(string key)
         {
-            Dictionary<string, object> values = GetContextData();
+            var values = CallContextData.Value;
 
             if (values == null || values.Count == 0 || !values.ContainsKey(key))
             {
@@ -100,7 +100,7 @@ namespace Orleans.Runtime
             }
             var newValues = new Dictionary<string, object>(values);
             bool retValue = newValues.Remove(key);
-            SetContextData(newValues);
+            CallContextData.Value = newValues;
             return retValue;
         }
 
@@ -114,17 +114,14 @@ namespace Orleans.Runtime
                     activityIdObj = Guid.Empty;
                 }
 
-#if NETSTANDARD
-                ActivityId.Value = (Guid) activityIdObj;
-#else
-                Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
-#endif
+                ActivityId.Value = (Guid)activityIdObj;
+
             }
             if (contextData != null && contextData.Count > 0)
             {
                 var values = contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 // We have some data, so store RC data into LogicalCallContext
-                SetContextData(values);
+                CallContextData.Value = values;
             }
             else
             {
@@ -136,21 +133,18 @@ namespace Orleans.Runtime
 
         public static Dictionary<string, object> Export(SerializationManager serializationManager)
         {
-            Dictionary<string, object> values = GetContextData();
+            var values = CallContextData.Value;
 
             if (PropagateActivityId)
             {
-#if !NETSTANDARD
-                var activityId = Trace.CorrelationManager.ActivityId;
-#else
+
                 var activityId = ActivityId.Value;
-#endif
                 if (activityId != Guid.Empty)
                 {
                     values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
                     values[E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
                     // We have some changed data, so write RC data back into LogicalCallContext
-                    SetContextData(values);
+                    CallContextData.Value = values;
                 }
             }
             if (values != null && values.Count != 0)
@@ -161,29 +155,8 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-#if !NETSTANDARD
-            CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
-#else
+
             CallContextData.Value = null;
-#endif
-        }
-
-        private static void SetContextData(Dictionary<string, object> values)
-        {
-#if !NETSTANDARD
-            CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
-#else
-            CallContextData.Value = values;
-#endif
-        }
-
-        private static Dictionary<string, object> GetContextData()
-        {
-#if !NETSTANDARD
-            return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
-#else
-            return CallContextData.Value;
-#endif
         }
     }
 }
