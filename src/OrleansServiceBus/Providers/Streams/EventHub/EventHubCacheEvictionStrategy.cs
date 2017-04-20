@@ -54,34 +54,36 @@ namespace Orleans.ServiceBus.Providers
         public void PerformPurge(DateTime nowUtc, IDisposable purgeRequest)
         {
             //if the cache is empty, then nothing to purge, return
-            if (this.PurgeObservable.ItemCount == 0)
+            if (this.PurgeObservable.IsEmpty)
                 return;
             var itemCountBeforePurge = this.PurgeObservable.ItemCount;
+            int itemsPurged = 0;
             CachedEventHubMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
             CachedEventHubMessage? lastMessagePurged = null;
-            while (this.PurgeObservable.ItemCount != 0)
+            while (!this.PurgeObservable.IsEmpty)
             {
                 var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
-                if (ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, nowUtc))
+                if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, nowUtc))
                 {
                     break;
                 }
                 lastMessagePurged = oldestMessageInCache;
+                itemsPurged++;
                 this.PurgeObservable.RemoveOldestMessage();
             }
-            var itemCountAfterPurge = this.PurgeObservable.ItemCount;
+            var itemCountAfterPurge = itemCountBeforePurge - itemsPurged;
 
             //purge finished, time to conduct follow up actions 
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
-            UpdatePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest, itemCountBeforePurge, itemCountAfterPurge);
+            UpdatePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest, itemsPurged > 0);
             ReportPurge(itemCountBeforePurge, itemCountAfterPurge);
         }
 
-        private void UpdatePurgedBuffers(CachedEventHubMessage? lastMessagePurged, CachedEventHubMessage? oldestMessageInCache, int itemCountBeforePurge, int itemCountAfterPurge)
+        private void UpdatePurgedBuffers(CachedEventHubMessage? lastMessagePurged, CachedEventHubMessage? oldestMessageInCache, bool itemsGotPurged)
         {
             //if nothing purged, then no buffer was purged
             //if items got purged, then potencially some buffer was purged
-            if (itemCountBeforePurge > itemCountAfterPurge)
+            if (itemsGotPurged)
             {
                 var IdOfLastPurgedBuffer = lastMessagePurged.Value.Segment.Array;
                 // IdOfLastBufferInCache will be null if cache is empty after purge

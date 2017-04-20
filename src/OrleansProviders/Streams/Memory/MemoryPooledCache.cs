@@ -70,7 +70,7 @@ namespace Orleans.Providers
                 while (this.PurgeObservable.ItemCount != 0)
                 {
                     var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
-                    if (ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
+                    if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
                     {
                         break;
                     }

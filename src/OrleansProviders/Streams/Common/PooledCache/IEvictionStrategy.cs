@@ -62,5 +62,10 @@ namespace Orleans.Providers.Streams.Common
         /// Message count
         /// </summary>
         int ItemCount { get; }
+
+        /// <summary>
+        /// Determine if the cache is empty
+        /// </summary>
+        bool IsEmpty { get; }
     }
 }
