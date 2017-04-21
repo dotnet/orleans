@@ -14,9 +14,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
         
         [Fact]
-        public Task AlwaysCreateActivationWithMinimumVersionTest()
+        public Task AlwaysCreateActivationWithMinimumVersion()
         {
-            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(1);
+            // Even after v2 silo is deployed, we should only activate v1 grains
+            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 1);
         }
     }
 
@@ -27,21 +28,26 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
 
         [Fact]
-        public Task AlwaysCreateActivationWithLatestVersionTest()
+        public Task AlwaysCreateActivationWithLatestVersion()
         {
-            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(2);
+            // After v2 is deployed, we should always activate v2 grains
+            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 2);
         }
 
         [Fact]
-        public Task UpgradeProxyCallNoPendingRequestTest()
+        public Task UpgradeProxyCallNoPendingRequest()
         {
-            return ProxyCallNoPendingRequest(2);
+            // v2 -> v1 call should provoke grain activation upgrade.
+            // The grain is inactive when receiving the message
+            return ProxyCallNoPendingRequest(expectedVersion: 2);
         }
 
         [Fact]
-        public Task UpgradeProxyCallWithPendingRequestTest()
+        public Task UpgradeProxyCallWithPendingRequest()
         {
-            return ProxyCallNoPendingRequest(2);
+            // v2 -> v1 call should provoke grain activation upgrade
+            // The grain is already processing a request when receiving the message
+            return ProxyCallWithPendingRequest(expectedVersion: 2);
         }
     }
 
@@ -52,14 +58,19 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]
-        public Task DoNotUpgradeProxyCallNoPendingRequestTest()
+        public Task DoNotUpgradeProxyCallNoPendingRequest()
         {
-            return ProxyCallNoPendingRequest(1);
+            // v2 -> v1 call should provoke grain activation upgrade because they are compatible
+            // The grain is inactive when receiving the message
+            return ProxyCallNoPendingRequest(expectedVersion: 1);
         }
+
         [Fact]
-        public Task DoNotUpgradeProxyCallWithPendingRequestTest()
+        public Task DoNotUpgradeProxyCallWithPendingRequest()
         {
-            return ProxyCallNoPendingRequest(1);
+            // v2 -> v1 call should provoke grain activation upgrade because they are compatible
+            // The grain is already processing a request when receiving the message
+            return ProxyCallWithPendingRequest(expectedVersion: 1);
         }
     }
 
@@ -70,7 +81,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]
-        public async Task CreateActivationWithBothVersionTest()
+        public async Task CreateActivationWithBothVersion()
         {
             const int numberOfGrains = 100;
 
@@ -78,6 +89,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             await StartSiloV2();
 
             var versionCounter = new int[2];
+
+            // We should create v1 and v2 activations
 
             for (var i = 0; i < numberOfGrains; i++)
             {
