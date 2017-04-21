@@ -52,9 +52,10 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var environment = SerializationTestEnvironment.InitializeWithDefaults();
             this.serializationManager = environment.SerializationManager;
 
-            //set up buffer pool
+            //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             this.bufferPoolSizeInMB = EventHubStreamProviderSettings.DefaultCacheSizeMb;
-            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(this.bufferPoolSizeInMB, () => new FixedSizeBuffer(1 << 20));
+            var oneKB = 1024;
+            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(this.bufferPoolSizeInMB, () => new FixedSizeBuffer(oneKB));
 
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
@@ -66,8 +67,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         {
             InitForTesting();
             var tasks = new List<Task>();
-            //add items into cache
-            int itemAddToCache = 10;
+            //add items into cache, make sure will allocate multiple buffers from the pool
+            int itemAddToCache = 100;
             foreach(var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -93,7 +94,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 10;
+            int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -119,7 +120,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 10;
+            int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -135,8 +136,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out ignore);
 
             //Assert
-            int expectedItemCountInCacheList = 0;
-            Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
+            int expectedItemCountInCaches = 0;
+            //items got purged
+            Assert.Equal(expectedItemCountInCaches, GetItemCountInAllCache(this.cacheList));
         }
 
         [Fact, TestCategory("BVT")]
@@ -173,7 +175,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 10;
+            int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -182,8 +184,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.cachePressureInjectionMonitor.isUnderPressure = false;
             this.purgePredicate.ShouldPurge = true;
 
-            //Each cache should each have one buffer allocated
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
+            //Each cache should each have buffers allocated
+            this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.InUseBuffers.Count > 0));
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
 
             //perform purge
@@ -191,17 +193,17 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 
-            //Each cache should each have one buffer purged
+            //Each cache should each have buffers purged
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.InUseBuffers.Count));
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.PurgedBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.PurgedBuffers.Count > 0));
 
             var purgedBuffers = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy =>
             {
-                foreach (var buffer in strategy.PurgedBuffers)
-                {
-                    purgedBuffers.Add(buffer);
-                }
+                var purgedBufferList = strategy.PurgedBuffers.ToArray<FixedSizeBuffer>();
+                //the last buffer in purgedBuffer queue is current buffer in use, won't be return to the pool
+                for (int i = 0; i < purgedBufferList.Length - 1; i++)
+                    purgedBuffers.Add(purgedBufferList[i]);
             });
 
             var newBuffersAllocated = new List<FixedSizeBuffer>();
@@ -216,7 +218,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //Purged buffers should be returned to the pool and used to allocate new buffer
             purgedBuffers.ForEach(buffer => Assert.True(newBuffersAllocated.Contains(buffer)));
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.InUseBuffers.Count));
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.PurgedBuffers.Count));
         }
 #endif
 

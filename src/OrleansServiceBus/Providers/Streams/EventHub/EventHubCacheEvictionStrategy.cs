@@ -24,6 +24,7 @@ namespace Orleans.ServiceBus.Providers
         /// Buffers which are purged
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> purgedBuffers;
+        private FixedSizeBuffer currentBuffer;
         private readonly Logger logger;
 
         /// <summary>
@@ -53,6 +54,7 @@ namespace Orleans.ServiceBus.Providers
         {
             var newBuffer = newBlock as FixedSizeBuffer;
             this.inUseBuffers.Enqueue(newBuffer);
+            this.currentBuffer = newBuffer;
             newBuffer.SetPurgeAction(this.OnFreeBlockRequest);
         }
 
@@ -62,7 +64,6 @@ namespace Orleans.ServiceBus.Providers
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.IsEmpty)
                 return;
-            var itemCountBeforePurge = this.PurgeObservable.ItemCount;
             int itemsPurged = 0;
             CachedEventHubMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
             CachedEventHubMessage? lastMessagePurged = null;
@@ -81,12 +82,15 @@ namespace Orleans.ServiceBus.Providers
             if (itemsPurged == 0)
                 return;
 
-            var itemCountAfterPurge = itemCountBeforePurge - itemsPurged;
-
             //purge finished, time to conduct follow up actions 
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             UpdatePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest, itemsPurged > 0);
-            ReportPurge(itemCountBeforePurge, itemCountAfterPurge);
+            if (this.logger.IsVerbose)
+            { 
+                var itemCountAfterPurge = this.PurgeObservable.ItemCount;
+                var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
+                ReportPurge(itemCountBeforePurge, itemCountAfterPurge);
+            }
         }
 
         private void UpdatePurgedBuffers(CachedEventHubMessage? lastMessagePurged, CachedEventHubMessage? oldestMessageInCache, bool itemsGotPurged)
@@ -125,18 +129,18 @@ namespace Orleans.ServiceBus.Providers
         private void OnFreeBlockRequest(IDisposable block)
         {
             var purgeCandidate = block as FixedSizeBuffer;
-            //free all blocks before purgeCandidate and purgeCandidate
+            //free all blocks before purgeCandidate,including purgeCandidate, expcept for current buffer in use
             if (this.purgedBuffers.Contains(purgeCandidate))
             {
                 while (true)
                 {
-                    var purgedBuffer = this.purgedBuffers.Dequeue();
-                    if (purgedBuffer == purgeCandidate)
-                    {
-                        purgedBuffer.Dispose();
+                    var purgedBuffer = this.purgedBuffers.Peek();
+                    if (purgedBuffer == this.currentBuffer)
                         break;
-                    }
+                    this.purgedBuffers.Dequeue();
                     purgedBuffer.Dispose();
+                    if (purgedBuffer == purgeCandidate)
+                        break;
                 }
             }
         }

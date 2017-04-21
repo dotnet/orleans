@@ -63,6 +63,11 @@ namespace Orleans.Providers.Streams.Generator
         private class ExplicitEvictionStrategy : IEvictionStrategy<CachedMessage>
         {
             private FixedSizeBuffer currentBuffer;
+            private Queue<FixedSizeBuffer> purgedBuffers;
+            public ExplicitEvictionStrategy()
+            {
+                this.purgedBuffers = new Queue<FixedSizeBuffer>();
+            }
             public IPurgeObservable<CachedMessage> PurgeObservable { set; private get; }
 
             public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
@@ -86,6 +91,19 @@ namespace Orleans.Providers.Streams.Generator
                     lastMessagePurged = oldestMessageInCache;
                     this.PurgeObservable.RemoveOldestMessage();
                 }
+
+                //return purged buffer to the pool. except for the current buffer.
+                //if purgeCandidate is current buffer, put it in purgedBuffers and free it in next circle
+                var purgeCandidate = purgeRequest as FixedSizeBuffer;
+                this.purgedBuffers.Enqueue(purgeCandidate);
+                while (this.purgedBuffers.Count > 0)
+                {
+                    if (this.purgedBuffers.Peek() != this.currentBuffer)
+                    {
+                        this.purgedBuffers.Dequeue().Dispose();
+                    }
+                    else { break; }
+                }  
             }
 
             public void OnBlockAllocated(IDisposable newBlock)
@@ -98,11 +116,6 @@ namespace Orleans.Providers.Streams.Generator
             private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest)
             {
                 var purgedResource = (FixedSizeBuffer)purgeRequest;
-                // if we're purging our current buffer, don't use it any more
-                if (this.currentBuffer != null && this.currentBuffer.Id == purgedResource.Id)
-                {
-                    currentBuffer = null;
-                }
                 return cachedMessage.Payload.Array == purgedResource.Id;
             }
 
