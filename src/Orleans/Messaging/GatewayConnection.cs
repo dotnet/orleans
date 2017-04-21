@@ -188,6 +188,11 @@ namespace Orleans.Messaging
 
         protected override bool PrepareMessageForSend(Message msg)
         {
+            if (Cts == null)
+            {
+                return false;
+            }
+
             // Check to make sure we're not stopped
             if (Cts.IsCancellationRequested)
             {
