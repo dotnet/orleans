@@ -11,8 +11,6 @@ namespace Orleans.Runtime.Versions
     internal class CachedVersionDirectorManager
     {
         private readonly GrainTypeManager grainTypeManager;
-        private ConcurrentDictionary<int, CachedVersionDirector> directors;
-        private readonly Func<int, CachedVersionDirector> getDirectorFunc;
         private readonly Func<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>> getSilosFunc;
         private ConcurrentDictionary<Tuple<int,int,ushort>, IReadOnlyList<SiloAddress>> suitableSilosCache;
 
@@ -25,8 +23,6 @@ namespace Orleans.Runtime.Versions
             this.grainTypeManager = grainTypeManager;
             this.VersionPlacementDirectorManager = versionPlacementDirectorManager;
             this.CompatibilityDirectorManager = compatibilityDirectorManager;
-            this.directors = new ConcurrentDictionary<int, CachedVersionDirector>();
-            this.getDirectorFunc = GetDirector;
             this.getSilosFunc = GetSuitableSilosImpl;
         }
 
@@ -38,7 +34,6 @@ namespace Orleans.Runtime.Versions
 
         public void ResetCache()
         {
-            this.directors = new ConcurrentDictionary<int, CachedVersionDirector>();
             this.suitableSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>>();
         }
 
@@ -47,18 +42,15 @@ namespace Orleans.Runtime.Versions
             var typeCode = key.Item1;
             var ifaceId = key.Item2;
             var requestedVersion = key.Item3;
-            var director = this.directors.GetOrAdd(ifaceId, getDirectorFunc);
-            var versions = director.GetSuitableVersion(requestedVersion);
+
+            var placementDirector = this.VersionPlacementDirectorManager.GetDirector(ifaceId);
+            var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(ifaceId);
+            var versions = placementDirector.GetSuitableVersion(
+                requestedVersion, 
+                this.grainTypeManager.GetAvailableVersions(ifaceId), 
+                compatibilityDirector);
+
             return this.grainTypeManager.GetSupportedSilos(typeCode, ifaceId, versions);
-        }
-
-        private CachedVersionDirector GetDirector(int ifaceId)
-        {
-            var version = this.VersionPlacementDirectorManager.GetDirector(ifaceId);
-            var compat = this.CompatibilityDirectorManager.GetDirector(ifaceId);
-            var availableVersions = this.grainTypeManager.GetAvailableVersions(ifaceId);
-
-            return new CachedVersionDirector(version, compat, availableVersions);
         }
     }
 }

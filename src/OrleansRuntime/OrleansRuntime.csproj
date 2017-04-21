@@ -206,7 +206,6 @@
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
     <Compile Include="Utilities\FactoryUtility.cs" />
-    <Compile Include="Versions\CachedVersionDirector.cs" />
     <Compile Include="Versions\CachedVersionDirectorManager.cs" />
     <Compile Include="Versions\Compatibility\AllVersionsCompatibilityDirector.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatilityDirector.cs" />
