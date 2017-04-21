@@ -71,7 +71,7 @@ namespace Orleans.Runtime
         {            
             while (true)
             {
-                if (Cts==null || Cts.IsCancellationRequested)
+                if (Cts == null || Cts.IsCancellationRequested)
                 {
                     return;
                 }
