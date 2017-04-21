@@ -215,6 +215,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //Purged buffers should be returned to the pool and used to allocate new buffer
             purgedBuffers.ForEach(buffer => Assert.True(newBuffersAllocated.Contains(buffer)));
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.InUseBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
         }
 #endif
 

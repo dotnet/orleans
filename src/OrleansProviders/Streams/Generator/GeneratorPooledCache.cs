@@ -71,12 +71,12 @@ namespace Orleans.Providers.Streams.Generator
             public void PerformPurge(DateTime utcNow, IDisposable purgeRequest)
             {
                 //if the cache is empty, then nothing to purge, return
-                if (this.PurgeObservable.ItemCount == 0)
+                if (this.PurgeObservable.IsEmpty)
                     return;
                 var itemCountBeforePurge = this.PurgeObservable.ItemCount;
                 CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
                 CachedMessage? lastMessagePurged = null;
-                while (this.PurgeObservable.ItemCount != 0)
+                while (!this.PurgeObservable.IsEmpty)
                 {
                     var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
                     if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))

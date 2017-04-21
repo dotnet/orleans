@@ -77,6 +77,10 @@ namespace Orleans.ServiceBus.Providers
                 itemsPurged++;
                 this.PurgeObservable.RemoveOldestMessage();
             }
+            //if nothing got purged, return
+            if (itemsPurged == 0)
+                return;
+
             var itemCountAfterPurge = itemCountBeforePurge - itemsPurged;
 
             //purge finished, time to conduct follow up actions 
@@ -124,9 +128,16 @@ namespace Orleans.ServiceBus.Providers
             //free all blocks before purgeCandidate and purgeCandidate
             if (this.purgedBuffers.Contains(purgeCandidate))
             {
-                while (this.purgedBuffers.Peek() != purgeCandidate)
-                    this.purgedBuffers.Dequeue().Dispose();
-                purgeCandidate.Dispose();
+                while (true)
+                {
+                    var purgedBuffer = this.purgedBuffers.Dequeue();
+                    if (purgedBuffer == purgeCandidate)
+                    {
+                        purgedBuffer.Dispose();
+                        break;
+                    }
+                    purgedBuffer.Dispose();
+                }
             }
         }
 
