@@ -142,7 +142,7 @@ namespace Orleans.Messaging
             }
             GatewayManager.Stop();
 
-            foreach (var gateway in gatewayConnections.Values)
+            foreach (var gateway in gatewayConnections.Values.ToArray())
             {
                 gateway.Stop();
             }
@@ -373,7 +373,7 @@ namespace Orleans.Messaging
         /// </summary>
         public void Disconnect()
         {
-            foreach (var connection in gatewayConnections.Values)
+            foreach (var connection in gatewayConnections.Values.ToArray())
             {
                 connection.Stop();
             }
