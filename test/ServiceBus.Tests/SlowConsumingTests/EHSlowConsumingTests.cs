@@ -1,7 +1,9 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
@@ -10,10 +12,6 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using ServiceBus.Tests.TestStreamProviders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
@@ -21,6 +19,7 @@ using Xunit;
 
 namespace ServiceBus.Tests.SlowConsumingTests
 {
+    [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHSlowConsumingTests : OrleansTestingBase, IClassFixture<EHSlowConsumingTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
@@ -105,7 +104,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             fixture.EnsurePreconditionsMet();
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+        [SkippableFact]
         public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
