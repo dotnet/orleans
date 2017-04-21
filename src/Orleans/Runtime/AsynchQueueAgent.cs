@@ -24,16 +24,19 @@ namespace Orleans.Runtime
 
         public void QueueRequest(T request)
         {
+            if (requestQueue==null)
+            {
+                return;
+            }
+
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
             {
                 queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
             }
 #endif
-            if (requestQueue != null)
-            {
-                requestQueue.Add(request);
-            }
+
+            requestQueue.Add(request);
         }
 
         protected abstract void Process(T request);
