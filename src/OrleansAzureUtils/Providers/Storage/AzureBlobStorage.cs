@@ -189,33 +189,30 @@ namespace Orleans.Storage
                 var blob = container.GetBlockBlobReference(blobName);
                 blob.Properties.ContentType = "application/json";
 
-                var containerNotFound = false;
                 try
                 {
-                    await blob.UploadTextAsync(
-                            json,
-                            Encoding.UTF8,
-                            AccessCondition.GenerateIfMatchCondition(grainState.ETag),
-                            null,
-                            null).ConfigureAwait(false);
+                    await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                        blobName, grainState.ETag).ConfigureAwait(false);
                 }
                 catch (StorageException exception)
                 {
+                    if (exception.IsPreconditionFailed())
+                    {
+                        throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blobName}, Container: {container.Name}, CurrentETag: {grainState.ETag}", "Unkown", grainState.ETag, exception);
+                    }
+
                     var errorCode = exception.RequestInformation.ExtendedErrorInformation?.ErrorCode;
-                    containerNotFound = errorCode == BlobErrorCodeStrings.ContainerNotFound;
-                }
-                if (containerNotFound)
-                {
+                    if (errorCode != BlobErrorCodeStrings.ContainerNotFound)
+                    {
+                        throw;
+                    }
+
                     // if the container does not exist, create it, and make another attempt
                     if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "Creating container: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
                     await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 
-                    await blob.UploadTextAsync(
-                        json,
-                        Encoding.UTF8,
-                        AccessCondition.GenerateIfMatchCondition(grainState.ETag),
-                        null,
-                        null).ConfigureAwait(false);
+                    await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                        blobName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = blob.Properties.ETag;
@@ -242,11 +239,9 @@ namespace Orleans.Storage
                 if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ClearingData, "Clearing: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
 
                 var blob = container.GetBlockBlobReference(blobName);
-                await blob.DeleteIfExistsAsync(
-                        DeleteSnapshotsOption.None,
-                        AccessCondition.GenerateIfMatchCondition(grainState.ETag),
-                        null,
-                        null).ConfigureAwait(false);
+
+                await DoConditionalUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                    blobName, grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = null;
 
@@ -259,6 +254,18 @@ namespace Orleans.Storage
                   ex);
 
                 throw;
+            }
+        }
+
+        private async Task DoConditionalUpdate(Func<Task> updateOperation, string blobName, string currentETag)
+        {
+            try
+            {
+                await updateOperation.Invoke().ConfigureAwait(false);
+            }
+            catch (StorageException ex) when (ex.IsPreconditionFailed())
+            {
+                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blobName}, Container: {container.Name}, CurrentETag: {currentETag}", "Unkown", currentETag, ex);
             }
         }
     }
