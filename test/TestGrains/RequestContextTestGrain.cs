@@ -35,11 +35,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-#if NETSTANDARD
             return Task.FromResult(RequestContext.ActivityId.Value);
-#else
-            return Task.FromResult(Trace.CorrelationManager.ActivityId);
-#endif
         }
 
 #endregion
@@ -134,11 +130,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-#if NETSTANDARD
             return Task.FromResult(RequestContext.ActivityId.Value);
-#else
-            return Task.FromResult(Trace.CorrelationManager.ActivityId);
-#endif
         }
 
         public async Task<Tuple<string, string>> TestRequestContext()
