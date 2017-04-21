@@ -327,9 +327,9 @@ namespace Orleans.Runtime
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
-                    if (exc1 is InconsistentStateException && target is Grain targetGrain)
+                    if (exc1 is InconsistentStateException && target is Grain)
                     {
-                        this.DeactivateOnIdle(targetGrain.Data.ActivationId);
+                        this.DeactivateOnIdle(((Grain)target).Data.ActivationId);
                     }
 
                     if (message.Direction != Message.Directions.OneWay)
