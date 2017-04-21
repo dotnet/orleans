@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Versions.Selector
         public IVersionSelector Default { get; }
 
         public VersionSelectorManager(IServiceProvider serviceProvider, GlobalConfiguration configuration)
-            : this(serviceProvider, configuration.DefaultVersionPlacementStrategy)
+            : this(serviceProvider, configuration.DefaultVersionSelectorStrategy)
         {
         }
 

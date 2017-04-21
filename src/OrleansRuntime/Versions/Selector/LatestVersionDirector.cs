@@ -7,11 +7,11 @@ namespace Orleans.Runtime.Versions.Selector
 {
     internal sealed class LatestVersionSelector : IVersionSelector<LatestVersion>
     {
-        public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, IVersionCompatibilityDirector versionCompatibilityDirector)
+        public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, ICompatibilityDirector compatibilityDirector)
         {
             return new[]
             {
-                availableVersions.Where(v => versionCompatibilityDirector.IsCompatible(requestedVersion, v)).Max()
+                availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).Max()
             };
         }
     }

@@ -2,17 +2,17 @@
 
 namespace Orleans.Versions.Compatibility
 {
-    public interface IVersionCompatibilityDirector
+    public interface ICompatibilityDirector
     {
         bool IsCompatible(ushort requestedVersion, ushort currentVersion);
     }
 
-    public interface IVersionCompatibilityDirector<TStrategy> : IVersionCompatibilityDirector where TStrategy : VersionCompatibilityStrategy
+    public interface ICompatibilityDirector<TStrategy> : ICompatibilityDirector where TStrategy : CompatibilityStrategy
     {
     }
 
     [Serializable]
-    public abstract class VersionCompatibilityStrategy
+    public abstract class CompatibilityStrategy
     {
     }
 }

@@ -2,7 +2,7 @@
 
 namespace Orleans.Runtime.Versions.Compatibility
 {
-    internal class AllVersionsCompatibilityDirector : IVersionCompatibilityDirector<AllVersionsCompatible>
+    internal class AllVersionsCompatibilityDirector : ICompatibilityDirector<AllVersionsCompatible>
     {
         public bool IsCompatible(ushort requestedVersion, ushort currentVersion)
         {

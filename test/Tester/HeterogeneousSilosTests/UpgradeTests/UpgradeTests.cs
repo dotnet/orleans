@@ -11,7 +11,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     public class MinimumVersionTests : UpgradeTestsBase
     {
         protected override VersionSelectorStrategy VersionSelectorStrategy => MinimumVersion.Singleton;
-        protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => BackwardCompatible.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
         
         [Fact]
         public Task AlwaysCreateActivationWithMinimumVersionTest()
@@ -24,7 +24,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     public class LatestVersionTests : UpgradeTestsBase
     {
         protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
-        protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => BackwardCompatible.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
 
         [Fact]
         public Task AlwaysCreateActivationWithLatestVersionTest()
@@ -49,7 +49,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     public class AllVersionsCompatibleTests : UpgradeTestsBase
     {
         protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
-        protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => AllVersionsCompatible.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]
         public Task DoNotUpgradeProxyCallNoPendingRequestTest()
@@ -67,7 +67,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     public class RandomCompatibleVersionTests : UpgradeTestsBase
     {
         protected override VersionSelectorStrategy VersionSelectorStrategy => AllCompatibleVersions.Singleton;
-        protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => AllVersionsCompatible.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]
         public async Task CreateActivationWithBothVersionTest()

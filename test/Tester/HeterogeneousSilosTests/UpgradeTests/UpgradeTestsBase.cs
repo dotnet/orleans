@@ -36,7 +36,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected abstract VersionSelectorStrategy VersionSelectorStrategy { get; }
 
-        protected abstract VersionCompatibilityStrategy VersionCompatibilityStrategy { get; }
+        protected abstract CompatibilityStrategy CompatibilityStrategy { get; }
 
         protected UpgradeTestsBase()
         {
@@ -153,8 +153,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             this.options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
-            options.ClusterConfiguration.Globals.DefaultVersionPlacementStrategy = VersionSelectorStrategy;
-            options.ClusterConfiguration.Globals.DefaultVersionCompatibilityStrategy = VersionCompatibilityStrategy;
+            options.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
+            options.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
             options.ClientConfiguration.Gateways.RemoveAt(1); // Only use primary gw
 
             waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);

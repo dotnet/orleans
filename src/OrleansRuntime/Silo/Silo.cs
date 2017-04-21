@@ -291,8 +291,8 @@ namespace Orleans.Runtime
             services.AddSingleton<IVersionSelector<LatestVersion>, LatestVersionSelector>();
             services.AddSingleton<IVersionSelector<AllCompatibleVersions>, AllCompatibleVersionsSelector>();
             services.AddSingleton<CompatibilityDirectorManager>();
-            services.AddSingleton<IVersionCompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
-            services.AddSingleton<IVersionCompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
+            services.AddSingleton<ICompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
+            services.AddSingleton<ICompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
             services.AddSingleton<CachedVersionSelectorManager>();
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());

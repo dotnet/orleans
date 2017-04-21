@@ -9,30 +9,30 @@ namespace Orleans.Runtime.Versions.Compatibility
     {
         private readonly IServiceProvider serviceProvider;
 
-        public IVersionCompatibilityDirector Default { get; }
+        public ICompatibilityDirector Default { get; }
 
         public CompatibilityDirectorManager(IServiceProvider serviceProvider, GlobalConfiguration configuration)
-            : this(serviceProvider, configuration.DefaultVersionCompatibilityStrategy)
+            : this(serviceProvider, configuration.DefaultCompatibilityStrategy)
         {
         }
 
-        public CompatibilityDirectorManager(IServiceProvider serviceProvider, VersionCompatibilityStrategy defaultVersionCompatibilityStrategy)
+        public CompatibilityDirectorManager(IServiceProvider serviceProvider, CompatibilityStrategy defaultCompatibilityStrategy)
         {
             this.serviceProvider = serviceProvider;
-            Default = ResolveVersionDirector(serviceProvider, defaultVersionCompatibilityStrategy);
+            Default = ResolveVersionDirector(serviceProvider, defaultCompatibilityStrategy);
         }
 
-        public IVersionCompatibilityDirector GetDirector(int ifaceId)
+        public ICompatibilityDirector GetDirector(int ifaceId)
         {
             return Default;
         }
 
-        private static IVersionCompatibilityDirector ResolveVersionDirector(IServiceProvider serviceProvider,
-            VersionCompatibilityStrategy versionStrategy)
+        private static ICompatibilityDirector ResolveVersionDirector(IServiceProvider serviceProvider,
+            CompatibilityStrategy compatibilityStrategy)
         {
-            var policyType = versionStrategy.GetType();
-            var directorType = typeof(IVersionCompatibilityDirector<>).MakeGenericType(policyType);
-            return (IVersionCompatibilityDirector) serviceProvider.GetRequiredService(directorType);
+            var strategyType = compatibilityStrategy.GetType();
+            var directorType = typeof(ICompatibilityDirector<>).MakeGenericType(strategyType);
+            return (ICompatibilityDirector) serviceProvider.GetRequiredService(directorType);
         }
     }
 }

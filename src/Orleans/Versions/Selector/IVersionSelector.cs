@@ -6,7 +6,7 @@ namespace Orleans.Versions.Selector
 {
     public interface IVersionSelector
     {
-        IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, IVersionCompatibilityDirector versionCompatibilityDirector);
+        IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, ICompatibilityDirector compatibilityDirector);
     }
 
     public interface IVersionSelector<TPolicy> : IVersionSelector where TPolicy : VersionSelectorStrategy
