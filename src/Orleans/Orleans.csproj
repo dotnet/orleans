@@ -192,10 +192,10 @@
     <Compile Include="Versions\Compatibility\AllVersionsCompatible.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatible.cs" />
     <Compile Include="Versions\Compatibility\ICompatibilityDirector.cs" />
-    <Compile Include="Versions\Placement\AllCompatibleVersions.cs" />
-    <Compile Include="Versions\Placement\LatestVersion.cs" />
-    <Compile Include="Versions\Placement\MinimumVersion.cs" />
-    <Compile Include="Versions\Placement\IPlacementVersionDirector.cs" />
+    <Compile Include="Versions\Selector\AllCompatibleVersions.cs" />
+    <Compile Include="Versions\Selector\LatestVersion.cs" />
+    <Compile Include="Versions\Selector\MinimumVersion.cs" />
+    <Compile Include="Versions\Selector\IVersionSelector.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />

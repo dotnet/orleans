@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private readonly ISiloStatusOracle statusOracle;
         private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly CachedVersionDirectorManager versionDirectorManager;
+        private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly OrleansTaskScheduler scheduler;
         private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
@@ -28,7 +28,7 @@ namespace Orleans.Runtime
             TimeSpan refreshClusterMapTimeout,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             IInternalGrainFactory grainFactory,
-            CachedVersionDirectorManager versionDirectorManager)
+            CachedVersionSelectorManager versionSelectorManager)
             : base(Constants.TypeManagerId, myAddr)
         {
             if (grainTypeManager == null)
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             this.statusOracle = oracle;
             this.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
             this.grainFactory = grainFactory;
-            this.versionDirectorManager = versionDirectorManager;
+            this.versionSelectorManager = versionSelectorManager;
             this.scheduler = scheduler;
             this.hasToRefreshClusterGrainInterfaceMap = true;
             this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
@@ -124,7 +124,7 @@ namespace Orleans.Runtime
             }
 
             grainTypeManager.SetInterfaceMapsBySilo(newSilosClusterGrainInterfaceMap);
-            versionDirectorManager.ResetCache();
+            versionSelectorManager.ResetCache();
         }
 
         private async Task<KeyValuePair<SiloAddress, GrainInterfaceMap>> GetTargetSiloGrainInterfaceMap(SiloAddress siloAddress)

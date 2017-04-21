@@ -2,26 +2,24 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans.Runtime.Versions.Compatibility;
-using Orleans.Runtime.Versions.Placement;
-using Orleans.Versions.Compatibility;
-using Orleans.Versions.Placement;
+using Orleans.Runtime.Versions.Selector;
 
 namespace Orleans.Runtime.Versions
 {
-    internal class CachedVersionDirectorManager
+    internal class CachedVersionSelectorManager
     {
         private readonly GrainTypeManager grainTypeManager;
         private readonly Func<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>> getSilosFunc;
         private ConcurrentDictionary<Tuple<int,int,ushort>, IReadOnlyList<SiloAddress>> suitableSilosCache;
 
-        public VersionPlacementDirectorManager VersionPlacementDirectorManager { get; }
+        public VersionSelectorManager VersionSelectorManager { get; }
 
         public CompatibilityDirectorManager CompatibilityDirectorManager { get; }
 
-        public CachedVersionDirectorManager(GrainTypeManager grainTypeManager, VersionPlacementDirectorManager versionPlacementDirectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
+        public CachedVersionSelectorManager(GrainTypeManager grainTypeManager, VersionSelectorManager versionSelectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
         {
             this.grainTypeManager = grainTypeManager;
-            this.VersionPlacementDirectorManager = versionPlacementDirectorManager;
+            this.VersionSelectorManager = versionSelectorManager;
             this.CompatibilityDirectorManager = compatibilityDirectorManager;
             this.getSilosFunc = GetSuitableSilosImpl;
         }
@@ -43,7 +41,7 @@ namespace Orleans.Runtime.Versions
             var ifaceId = key.Item2;
             var requestedVersion = key.Item3;
 
-            var placementDirector = this.VersionPlacementDirectorManager.GetDirector(ifaceId);
+            var placementDirector = this.VersionSelectorManager.GetSelector(ifaceId);
             var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(ifaceId);
             var versions = placementDirector.GetSuitableVersion(
                 requestedVersion, 

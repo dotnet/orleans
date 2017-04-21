@@ -12,7 +12,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.LogConsistency;
 using Orleans.Versions.Compatibility;
-using Orleans.Versions.Placement;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -453,7 +453,7 @@ namespace Orleans.Runtime.Configuration
 
         public VersionCompatibilityStrategy DefaultVersionCompatibilityStrategy { get; set; }
 
-        public VersionPlacementStrategy DefaultVersionPlacementStrategy { get; set; }
+        public VersionSelectorStrategy DefaultVersionPlacementStrategy { get; set; }
 
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; }
 

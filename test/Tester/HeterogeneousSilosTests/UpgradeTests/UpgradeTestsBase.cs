@@ -7,7 +7,7 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Versions.Compatibility;
-using Orleans.Versions.Placement;
+using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
 using Xunit;
 
@@ -34,7 +34,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private SiloHandle siloV2;
         private TestClusterOptions options;
 
-        protected abstract VersionPlacementStrategy VersionPlacementStrategy { get; }
+        protected abstract VersionSelectorStrategy VersionSelectorStrategy { get; }
 
         protected abstract VersionCompatibilityStrategy VersionCompatibilityStrategy { get; }
 
@@ -153,7 +153,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             this.options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
-            options.ClusterConfiguration.Globals.DefaultVersionPlacementStrategy = VersionPlacementStrategy;
+            options.ClusterConfiguration.Globals.DefaultVersionPlacementStrategy = VersionSelectorStrategy;
             options.ClusterConfiguration.Globals.DefaultVersionCompatibilityStrategy = VersionCompatibilityStrategy;
             options.ClientConfiguration.Gateways.RemoveAt(1); // Only use primary gw
 

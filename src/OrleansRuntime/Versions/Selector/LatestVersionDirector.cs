@@ -1,12 +1,11 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Linq;
-using Orleans.Versions.Placement;
-using System.Collections.Generic;
 using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
-namespace Orleans.Runtime.Versions.Placement
+namespace Orleans.Runtime.Versions.Selector
 {
-    internal sealed class LatestVersionPlacementDirector : IVersionPlacementDirector<LatestVersionPlacement>
+    internal sealed class LatestVersionSelector : IVersionSelector<LatestVersion>
     {
         public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, IVersionCompatibilityDirector versionCompatibilityDirector)
         {

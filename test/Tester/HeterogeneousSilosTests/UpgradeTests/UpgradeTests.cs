@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Versions.Compatibility;
-using Orleans.Versions.Placement;
+using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
 using Xunit;
 
@@ -10,7 +10,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class MinimumVersionTests : UpgradeTestsBase
     {
-        protected override VersionPlacementStrategy VersionPlacementStrategy => MinimumVersionPlacement.Singleton;
+        protected override VersionSelectorStrategy VersionSelectorStrategy => MinimumVersion.Singleton;
         protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => BackwardCompatible.Singleton;
         
         [Fact]
@@ -23,7 +23,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class LatestVersionTests : UpgradeTestsBase
     {
-        protected override VersionPlacementStrategy VersionPlacementStrategy => LatestVersionPlacement.Singleton;
+        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
         protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => BackwardCompatible.Singleton;
 
         [Fact]
@@ -48,7 +48,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class AllVersionsCompatibleTests : UpgradeTestsBase
     {
-        protected override VersionPlacementStrategy VersionPlacementStrategy => LatestVersionPlacement.Singleton;
+        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
         protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]
@@ -66,7 +66,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class RandomCompatibleVersionTests : UpgradeTestsBase
     {
-        protected override VersionPlacementStrategy VersionPlacementStrategy => AllCompatibleVersions.Singleton;
+        protected override VersionSelectorStrategy VersionSelectorStrategy => AllCompatibleVersions.Singleton;
         protected override VersionCompatibilityStrategy VersionCompatibilityStrategy => AllVersionsCompatible.Singleton;
 
         [Fact]

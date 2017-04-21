@@ -43,8 +43,8 @@ using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Streams.Core;
 using Orleans.Versions.Compatibility;
-using Orleans.Versions.Placement;
-using Orleans.Runtime.Versions.Placement;
+using Orleans.Runtime.Versions.Selector;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
@@ -286,14 +286,14 @@ namespace Orleans.Runtime
             services.AddSingleton<ClientObserversPlacementDirector>();
 
             // Versions
-            services.AddSingleton<VersionPlacementDirectorManager>();
-            services.AddSingleton<IVersionPlacementDirector<MinimumVersionPlacement>, MinimumVersionPlacementDirector>();
-            services.AddSingleton<IVersionPlacementDirector<LatestVersionPlacement>, LatestVersionPlacementDirector>();
-            services.AddSingleton<IVersionPlacementDirector<AllCompatibleVersions>, AllCompatibleVersionsPlacementDirector>();
+            services.AddSingleton<VersionSelectorManager>();
+            services.AddSingleton<IVersionSelector<MinimumVersion>, MinimumVersionSelector>();
+            services.AddSingleton<IVersionSelector<LatestVersion>, LatestVersionSelector>();
+            services.AddSingleton<IVersionSelector<AllCompatibleVersions>, AllCompatibleVersionsSelector>();
             services.AddSingleton<CompatibilityDirectorManager>();
             services.AddSingleton<IVersionCompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
             services.AddSingleton<IVersionCompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
-            services.AddSingleton<CachedVersionDirectorManager>();
+            services.AddSingleton<CachedVersionSelectorManager>();
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
             services.AddSingleton<GrainCreator>();
@@ -428,7 +428,7 @@ namespace Orleans.Runtime
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
             var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
-            var versionDirectorManager = this.Services.GetRequiredService<CachedVersionDirectorManager>();
+            var versionDirectorManager = this.Services.GetRequiredService<CachedVersionSelectorManager>();
             typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager);
             this.RegisterSystemTarget(typeManager);
 

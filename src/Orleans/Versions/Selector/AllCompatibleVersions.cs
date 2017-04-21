@@ -1,9 +1,9 @@
 using System;
 
-namespace Orleans.Versions.Placement
+namespace Orleans.Versions.Selector
 {
     [Serializable]
-    public class AllCompatibleVersions : VersionPlacementStrategy
+    public class AllCompatibleVersions : VersionSelectorStrategy
     {
         internal static AllCompatibleVersions Singleton { get; } = new AllCompatibleVersions();
 
