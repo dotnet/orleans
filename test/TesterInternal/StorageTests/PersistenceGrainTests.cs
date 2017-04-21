@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -674,13 +673,51 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue();
 
             int expectedVal = 62;
-            var originalActivationId = await grain.GetActivationId();
             await grain.DoWrite(expectedVal);
             var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
             SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
+            CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
+
+            // Stored value unchanged
+            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+
+            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            val = await grain.GetValue();
+            // Stored value unchanged
+            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+#if REREAD_STATE_AFTER_WRITE_FAILED
+            Assert.Equal(expectedVal, val); // Last value written successfully
+#else
+            Assert.Equal(attemptedVal3, val); // Last value attempted to be written is still in memory
+#endif
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_Provider_InconsistentStateException_DeactivatesGrain()
+        {
+            Guid id = Guid.NewGuid();
+            string providerName = ErrorInjectorProviderName;
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(id);
+
+            var val = await grain.GetValue();
+
+            int expectedVal = 62;
+            var originalActivationId = await grain.GetActivationId();
+            await grain.DoWrite(expectedVal);
+            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+
+            const int attemptedVal3 = 63;
+            SetErrorInjection(providerName, new ErrorInjectionBehavior
+            {
+                ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
+                ExceptionType = typeof(InconsistentStateException)
+            });
             CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
 
             // Stored value unchanged
@@ -693,7 +730,7 @@ namespace UnitTests.StorageTests
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
-            
+
             // The value should not have changed.
             Assert.Equal(expectedVal, val);
         }
@@ -1136,9 +1173,12 @@ namespace UnitTests.StorageTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            mgmtGrain.SendControlCommandToProvider(typeof(ErrorInjectionStorageProvider).FullName,
-                providerName, (int)MockStorageProvider.Commands.SetErrorInjection, errorInjectionPoint).Wait();
+            SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
+        }
+
+        private void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
+        {
+            ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
         }
 
         private void CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)

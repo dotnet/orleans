@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -11,7 +8,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using Xunit;
-using Tester;
 
 namespace UnitTests.StreamingTests
 {
@@ -124,9 +120,10 @@ namespace UnitTests.StreamingTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            mgmtGrain.SendControlCommandToProvider(typeof(ErrorInjectionStorageProvider).FullName,
-                providerName, (int)MockStorageProvider.Commands.SetErrorInjection, errorInjectionPoint).Wait();
+            ErrorInjectionStorageProvider.SetErrorInjection(
+                providerName,
+                new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint },
+                this.HostedCluster.GrainFactory);
         }
     }
 }

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Storage
 {
@@ -134,7 +134,7 @@ namespace Orleans.Storage
                 // else we have an etag mismatch
                 string error = $"Etag mismatch during {operation} for grain {grainStoreKey}: Expected = {currentETag ?? "null"} Received = {receivedEtag}";
                 logger.Warn(0, error);
-                throw new InconsistentStateException(error);
+                throw new WrappedException(new InconsistentStateException(error));
             }
 
             /// <summary>
