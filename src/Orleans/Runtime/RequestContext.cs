@@ -3,11 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-#if !NETSTANDARD
-using System.Runtime.Remoting.Messaging;
-#else
-using System.Threading;
-#endif
 using Orleans.Serialization;
 
 namespace Orleans.Runtime

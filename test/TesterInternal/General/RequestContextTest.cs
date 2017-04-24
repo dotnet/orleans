@@ -74,7 +74,7 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Trace.CorrelationManager.ActivityId = activityId;
-            Guid result = await grain.E2EActivityId();
+            Guid result = await grain.E2ELegacyActivityId();
             Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
         }
 #endif
