@@ -67,7 +67,7 @@ namespace UnitTests.General
         }
 
 #if !NETSTANDARD
-        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_LegacyActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
