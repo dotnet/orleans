@@ -37,6 +37,7 @@ namespace Orleans.Runtime
 
         internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
+        internal const string E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER = "#L_RC_AI";
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
@@ -115,6 +116,14 @@ namespace Orleans.Runtime
                 }
 
                 ActivityId.Value = (Guid)activityIdObj;
+
+                object legacyActivityIdObj;
+#if !NETSTANDARD
+                if ((Guid)activityIdObj == Guid.Empty && contextData.TryGetValue(E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER, out legacyActivityIdObj))
+                {
+                    Trace.CorrelationManager.ActivityId = (Guid)legacyActivityIdObj;
+                }
+#endif
             }
             if (contextData != null && contextData.Count > 0)
             {
@@ -137,13 +146,23 @@ namespace Orleans.Runtime
             if (PropagateActivityId)
             {
                 var activityId = ActivityId.Value;
+                var activityIdHeader = E2_E_TRACING_ACTIVITY_ID_HEADER;
+#if !NETSTANDARD
+                if (activityId == Guid.Empty)
+                {
+                    activityIdHeader = E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER;
+                    activityId = Trace.CorrelationManager.ActivityId;
+                }
+#endif
+                
                 if (activityId != Guid.Empty)
                 {
                     values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
-                    values[E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
+                    values[activityIdHeader] = activityId;
                     // We have some changed data, so write RC data back into LogicalCallContext
                     CallContextData.Value = values;
                 }
+               
             }
             if (values != null && values.Count != 0)
                 return (Dictionary<string, object>)serializationManager.DeepCopy(values);
