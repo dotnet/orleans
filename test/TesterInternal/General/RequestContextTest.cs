@@ -66,6 +66,19 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
+#if !NETSTANDARD
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
+        public async Task RequestContext_LegacyActivityId_Simple()
+        {
+            Guid activityId = Guid.NewGuid();
+            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+
+            Trace.CorrelationManager.ActivityId = activityId;
+            Guid result = await grain.E2EActivityId();
+            Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
+        }
+#endif
+
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
         {
