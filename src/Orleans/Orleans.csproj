@@ -124,7 +124,7 @@
     <Compile Include="Placement\IPlacementContext.cs" />
     <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
-    <Compile Include="Providers\WrappedException.cs" />
+    <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />

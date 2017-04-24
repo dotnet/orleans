@@ -137,9 +137,9 @@ namespace Orleans.Storage
             {
                 grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
             }
-            catch (WrappedException e)
+            catch (MemoryStorageEtagMismatchException e)
             {
-                throw e.InnerException;
+                throw e.AsInconsistentStateException();
             }
         }
 
@@ -156,9 +156,9 @@ namespace Orleans.Storage
                 await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
                 grainState.ETag = null;
             }
-            catch (WrappedException e)
+            catch (MemoryStorageEtagMismatchException e)
             {
-                throw e.InnerException;
+                throw e.AsInconsistentStateException();
             }
         }
 

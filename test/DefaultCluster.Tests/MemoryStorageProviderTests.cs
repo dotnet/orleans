@@ -69,24 +69,20 @@ namespace DefaultCluster.Tests.StorageTests
             Assert.NotNull(newEtag);
 
             // try to write new state with null etag;
-            var ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(null)));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            var ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(null)));
 
             // try to write new state with different etag;
-            ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(newEtag+"a")));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(newEtag+"a")));
 
             // Write new state with good etag;
             string latestEtag = await memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(newEtag));
             Assert.NotNull(latestEtag);
 
             // try delete state with null etag
-            ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", null));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", null));
 
             // try delete state with wrong etag
-            ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", latestEtag+"a"));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", latestEtag+"a"));
 
             // delete state
             await memoryStorageGrain.DeleteStateAsync("grain", "id", latestEtag);
@@ -96,12 +92,10 @@ namespace DefaultCluster.Tests.StorageTests
             Assert.Null(grainState);
 
             // try delete already deleted grain state
-            ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", latestEtag));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync("grain", "id", latestEtag));
 
             // try to write state to deleted state.
-            ex = await Assert.ThrowsAsync<WrappedException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(latestEtag)));
-            Assert.IsAssignableFrom<InconsistentStateException>(ex.InnerException);
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(latestEtag)));
 
             // Make sure we can write new state to a deleted state
             await memoryStorageGrain.WriteStateAsync("grain", "id", TestGrainState.CreateWithEtag(null));
