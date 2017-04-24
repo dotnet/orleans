@@ -113,17 +113,17 @@ namespace Orleans.Runtime
                 if (contextData == null || !contextData.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
                 {
                     activityIdObj = Guid.Empty;
+
+                    object legacyActivityIdObj;
+#if !NETSTANDARD
+                    if ((Guid)activityIdObj == Guid.Empty && contextData.TryGetValue(E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER, out legacyActivityIdObj))
+                    {
+                        Trace.CorrelationManager.ActivityId = (Guid)legacyActivityIdObj;
+                    }
+#endif
                 }
 
                 ActivityId.Value = (Guid)activityIdObj;
-
-                object legacyActivityIdObj;
-#if !NETSTANDARD
-                if ((Guid)activityIdObj == Guid.Empty && contextData.TryGetValue(E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER, out legacyActivityIdObj))
-                {
-                    Trace.CorrelationManager.ActivityId = (Guid)legacyActivityIdObj;
-                }
-#endif
             }
             if (contextData != null && contextData.Count > 0)
             {
