@@ -16,6 +16,8 @@ namespace Tester.ZooKeeperUtils
 
         public override TestCluster CreateTestCluster()
         {
+            ZookeeperTestUtils.EnsureZooKeeper();
+
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
@@ -24,31 +26,31 @@ namespace Tester.ZooKeeperUtils
             return new TestCluster(options);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);

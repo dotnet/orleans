@@ -37,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="ZookeeperTestUtils.cs" />
     <Compile Include="LivenessTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ZookeeperMembershipTableTests.cs" />
