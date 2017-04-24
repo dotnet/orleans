@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Storage;
+using Orleans.Storage.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Runtime.Internal;
 
 namespace DefaultCluster.Tests.StorageTests
 {

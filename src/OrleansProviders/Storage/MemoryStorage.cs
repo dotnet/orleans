@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Internal;
+using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {

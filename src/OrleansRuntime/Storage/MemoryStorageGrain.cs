@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Internal;
+using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {
