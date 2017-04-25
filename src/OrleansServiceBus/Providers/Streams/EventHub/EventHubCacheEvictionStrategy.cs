@@ -53,6 +53,12 @@ namespace Orleans.ServiceBus.Providers
         public void OnBlockAllocated(IDisposable newBlock)
         {
             var newBuffer = newBlock as FixedSizeBuffer;
+            if (this.PurgeObservable.IsEmpty && this.currentBuffer!=null 
+                && this.inUseBuffers.Contains(this.currentBuffer) && this.inUseBuffers.Count == 1)
+            {
+                this.purgedBuffers.Enqueue(this.inUseBuffers.Dequeue());
+            }
+               
             this.inUseBuffers.Enqueue(newBuffer);
             this.currentBuffer = newBuffer;
             newBuffer.SetPurgeAction(this.OnFreeBlockRequest);
@@ -105,12 +111,15 @@ namespace Orleans.ServiceBus.Providers
                 {
                     this.purgedBuffers.Enqueue(this.inUseBuffers.Dequeue());
                 }
-                // if last purged message does not share buffer with remaining messages in cache, or cache is empty after purge, 
+                // if last purged message does not share buffer with remaining messages in cache and cache is not empty
                 //then last purged buffer should be in purgedBuffers too
-                if (IdOfLastBufferInCache == null || IdOfLastPurgedBuffer != IdOfLastBufferInCache)
+                if (IdOfLastBufferInCache != null && IdOfLastPurgedBuffer != IdOfLastBufferInCache)
                 {
                    this.purgedBuffers.Enqueue(this.inUseBuffers.Dequeue());
                 }
+                //if cache is empty after purge, do nothing. In this case, inUseBuffers queue will only have currentBuffer left, and currentBuffer
+                //is not ready to be added to purgedBuffers yet. It will be ready to be added to purgedBuffers when a new buffer is allocated for the cache
+                //and the cache is empty at that time. Otherwise, wait for next purge circle. See OnBlockAllocated method
             }
         }
 
