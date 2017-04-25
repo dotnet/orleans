@@ -5,7 +5,7 @@ using Orleans.Runtime;
 namespace Orleans
 {
     /// <summary>
-    /// This class a convinent utiliity class to execute a certain asyncronous function with retires, 
+    /// This class a convinent utiliity class to execute a certain asyncronous function with retires,
     /// allowing to specify custom retry filters and policies.
     /// </summary>
     internal static class AsyncExecutorWithRetries
@@ -61,7 +61,7 @@ namespace Orleans
         /// Execute a given function a number of times, based on retry configuration parameters.
         /// </summary>
         /// <param name="function">Function to execute</param>
-        /// <param name="maxNumSuccessTries">Maximal number of successful execution attempts. 
+        /// <param name="maxNumSuccessTries">Maximal number of successful execution attempts.
         /// ExecuteWithRetries will try to re-execute the given function again if directed so by retryValueFilter.
         /// Set to -1 for unlimited number of success retries, until retryValueFilter is satisfied.
         /// Set to 0 for only one success attempt, which will cause retryValueFilter to be ignored and the given function executed only once until first success.</param>
@@ -116,18 +116,6 @@ namespace Orleans
 
             do
             {
-                retry = false;
-
-                if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
-                {
-                    DateTime now = DateTime.UtcNow;
-                    if (now - startExecutionTime > maxExecutionTime)
-                    {
-                        throw new TimeoutException(
-                            $"ExecuteWithRetries has exceeded its max execution time of {maxExecutionTime}. Now is {LogFormatter.PrintDate(now)}, started at {LogFormatter.PrintDate(startExecutionTime)}, passed {now - startExecutionTime}");
-                    }
-                }
-
                 int counter = callCounter;
 
                 try
@@ -135,53 +123,67 @@ namespace Orleans
                     callCounter++;
                     result = await function(counter);
 
-                    if (callCounter < maxNumSuccessTries || maxNumSuccessTries == INFINITE_RETRIES) // -1 for infinite retries
-                    {
-                        if (retryValueFilter != null)
-                            retry = retryValueFilter(result, counter);
-                    }
+                    retry = ShouldRetry(callCounter, maxNumSuccessTries, startExecutionTime, maxExecutionTime,
+                        result, retryValueFilter, true);
 
                     if (retry)
                     {
-                        TimeSpan? delay = onSuccessBackOff?.Next(counter);
-
-                        if (delay.HasValue)
-                        {
-                            await Task.Delay(delay.Value);
-                        }
+                        await DelayBeforeRetryAsync(onSuccessBackOff, counter);
                     }
                 }
-                catch (Exception exc)
+                catch (Exception exc) when (!(exc is TimeoutException) && ShouldRetry(callCounter, maxNumErrorTries, 
+                    startExecutionTime, maxExecutionTime, exc, retryExceptionFilter, false))
                 {
-                    retry = false;
+                    retry = true;
 
-                    if (callCounter < maxNumErrorTries || maxNumErrorTries == INFINITE_RETRIES)
-                    {
-                        if (retryExceptionFilter != null)
-                            retry = retryExceptionFilter(exc, counter);
-                    }
-
-                    if (!retry)
-                    {
-                        throw;
-                    }
-
-                    TimeSpan? delay = onErrorBackOff?.Next(counter);
-
-                    if (delay.HasValue)
-                    {
-                        await Task.Delay(delay.Value);
-                    }
+                    await DelayBeforeRetryAsync(onErrorBackOff, counter);
                 }
             } while (retry);
 
             return result;
         }
+
+        private static Task DelayBeforeRetryAsync(IBackoffProvider backoffProvider, int callCounter)
+        {
+            TimeSpan? delay = backoffProvider?.Next(callCounter);
+            return delay != null ? Task.Delay(delay.Value) : Task.CompletedTask;
+        }
+
+        private static bool ShouldRetry<T>(int callCounter, int maxRetryCount, DateTime startExecutionTime, 
+            TimeSpan maxExecutionTime, T filterValue, Func<T, int, bool> retryFilter, bool throwOnTimeout)
+        {
+            if (callCounter >= maxRetryCount && maxRetryCount != INFINITE_RETRIES)
+            {
+                return false;
+            }
+
+            if (retryFilter != null && !retryFilter(filterValue, callCounter))
+            {
+                return false;
+            }
+
+            if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
+            {
+                DateTime now = DateTime.UtcNow;
+                if (now - startExecutionTime > maxExecutionTime)
+                {
+                    if (throwOnTimeout)
+                    {
+                        throw new TimeoutException(
+                            $"{nameof(ExecuteWithRetries)} has exceeded its max execution time of {maxExecutionTime}. Now is {LogFormatter.PrintDate(now)}, started at {LogFormatter.PrintDate(startExecutionTime)}, passed {now - startExecutionTime}");
+                    }
+
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     // Allow multiple implementations of the backoff algorithm.
-    // For instance, ConstantBackoff variation that always waits for a fixed timespan, 
-    // or a RateLimitingBackoff that keeps makes sure that some minimum time period occurs between calls to some API 
+    // For instance, ConstantBackoff variation that always waits for a fixed timespan,
+    // or a RateLimitingBackoff that keeps makes sure that some minimum time period occurs between calls to some API
     // (especially useful if you use the same instance for multiple potentially simultaneous calls to ExecuteWithRetries).
     // Implementations should be imutable.
     // If mutable state is needed, extend the next function to pass the state from the caller.
