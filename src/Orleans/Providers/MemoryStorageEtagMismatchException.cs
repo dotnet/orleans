@@ -22,7 +22,19 @@ namespace Orleans.Storage.Internal
 #if !NETSTANDARD
         protected MemoryStorageEtagMismatchException(SerializationInfo info, StreamingContext context)
             : base(info, context)
-        { }
+        {
+            this.StoredEtag = info.GetString(nameof(StoredEtag));
+            this.ReceivedEtag = info.GetString(nameof(ReceivedEtag));
+        }
+
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            if (info == null) throw new ArgumentNullException(nameof(info));
+
+            info.AddValue(nameof(StoredEtag), this.StoredEtag);
+            info.AddValue(nameof(ReceivedEtag), this.ReceivedEtag);
+            base.GetObjectData(info, context);
+        }
 #endif
 
         public InconsistentStateException AsInconsistentStateException()
