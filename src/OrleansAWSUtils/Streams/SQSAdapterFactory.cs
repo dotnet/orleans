@@ -57,7 +57,7 @@ namespace OrleansAWSUtils.Streams
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
-                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
             }
         }
 

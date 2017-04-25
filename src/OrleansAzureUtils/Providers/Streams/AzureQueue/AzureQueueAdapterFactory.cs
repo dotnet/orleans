@@ -74,7 +74,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
-                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
             }
 
             this.SerializationManager = serviceProvider.GetRequiredService<SerializationManager>();
