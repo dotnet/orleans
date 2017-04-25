@@ -329,7 +329,9 @@ namespace Orleans.Runtime
 
                     if (exc1 is InconsistentStateException && target is Grain)
                     {
-                        this.DeactivateOnIdle(((Grain)target).Data.ActivationId);
+                        var activation = ((Grain)target).Data;
+                        invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                        this.DeactivateOnIdle(activation.ActivationId);
                     }
 
                     if (message.Direction != Message.Directions.OneWay)
