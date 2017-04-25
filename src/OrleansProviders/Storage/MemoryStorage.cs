@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {
@@ -132,7 +133,14 @@ namespace Orleans.Storage
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
+            try
+            {
+                grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
+            }
+            catch (MemoryStorageEtagMismatchException e)
+            {
+                throw e.AsInconsistentStateException();
+            }
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
@@ -143,8 +151,15 @@ namespace Orleans.Storage
             if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
-            grainState.ETag = null;
+            try
+            {
+                await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
+                grainState.ETag = null;
+            }
+            catch (MemoryStorageEtagMismatchException e)
+            {
+                throw e.AsInconsistentStateException();
+            }
         }
 
         #endregion

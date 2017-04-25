@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -325,6 +326,14 @@ namespace Orleans.Runtime
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
                     }
+
+                    if (exc1 is InconsistentStateException && target is Grain)
+                    {
+                        var activation = ((Grain)target).Data;
+                        invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                        this.DeactivateOnIdle(activation.ActivationId);
+                    }
+
                     if (message.Direction != Message.Directions.OneWay)
                     {
                         SafeSendExceptionResponse(message, exc1);

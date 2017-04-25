@@ -100,8 +100,8 @@ namespace Orleans.Storage
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.StoredEtag = info.GetString("StoredEtag");
-            this.CurrentEtag = info.GetString("CurrentEtag");
+            this.StoredEtag = info.GetString(nameof(StoredEtag));
+            this.CurrentEtag = info.GetString(nameof(CurrentEtag));
         }
 #endif
 
@@ -139,8 +139,8 @@ namespace Orleans.Storage
         {
             if (info == null) throw new ArgumentNullException(nameof(info));
 
-            info.AddValue("StoredEtag", this.StoredEtag);
-            info.AddValue("CurrentEtag", this.CurrentEtag);
+            info.AddValue(nameof(StoredEtag), this.StoredEtag);
+            info.AddValue(nameof(CurrentEtag), this.CurrentEtag);
             base.GetObjectData(info, context);
         }
 #endif

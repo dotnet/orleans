@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansTelemetryConsumers.Counters")]
 [assembly: InternalsVisibleTo("OrleansCodeGenerator")]
 [assembly: InternalsVisibleTo("OrleansRuntime")]
+[assembly: InternalsVisibleTo("OrleansProviders")]
 [assembly: InternalsVisibleTo("OrleansHost")]
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("OrleansAWSUtils")]
