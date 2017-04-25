@@ -121,7 +121,7 @@ namespace Orleans
                 try
                 {
                     callCounter++;
-                    result = await function(counter);
+                    result = await function(counter).WithTimeout(GetTimeout(startExecutionTime, maxExecutionTime));
 
                     retry = ShouldRetry(callCounter, maxNumSuccessTries, startExecutionTime, maxExecutionTime,
                         result, retryValueFilter, true);
@@ -143,6 +143,17 @@ namespace Orleans
             return result;
         }
 
+        private static TimeSpan GetTimeout(DateTime startExecutionTime, TimeSpan maxExecutionTime)
+        {
+            if (!IsMaxExecutionTimeDefined(maxExecutionTime))
+            {
+                return TimeSpan.FromMilliseconds(-1);
+            }
+
+            TimeSpan result = startExecutionTime.Add(maxExecutionTime).Subtract(DateTime.UtcNow);
+            return result.Ticks < 0 ? TimeSpan.Zero : result;
+        }
+
         private static Task DelayBeforeRetryAsync(IBackoffProvider backoffProvider, int callCounter)
         {
             TimeSpan? delay = backoffProvider?.Next(callCounter);
@@ -162,7 +173,7 @@ namespace Orleans
                 return false;
             }
 
-            if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
+            if (IsMaxExecutionTimeDefined(maxExecutionTime))
             {
                 DateTime now = DateTime.UtcNow;
                 if (now - startExecutionTime > maxExecutionTime)
@@ -178,6 +189,11 @@ namespace Orleans
             }
 
             return true;
+        }
+
+        private static bool IsMaxExecutionTimeDefined(TimeSpan maxExecutionTime)
+        {
+            return maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan);
         }
     }
 
