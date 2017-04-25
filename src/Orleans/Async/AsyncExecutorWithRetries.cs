@@ -123,7 +123,7 @@ namespace Orleans
                     callCounter++;
                     result = await function(counter).WithTimeout(GetTimeout(startExecutionTime, maxExecutionTime));
 
-                    retry = ShouldRetry(callCounter, maxNumSuccessTries, startExecutionTime, maxExecutionTime,
+                    retry = ShouldRetry(counter, maxNumSuccessTries, startExecutionTime, maxExecutionTime,
                         result, retryValueFilter, true);
 
                     if (retry)
@@ -131,7 +131,7 @@ namespace Orleans
                         await DelayBeforeRetryAsync(onSuccessBackOff, counter);
                     }
                 }
-                catch (Exception exc) when (!(exc is TimeoutException) && ShouldRetry(callCounter, maxNumErrorTries, 
+                catch (Exception exc) when (!(exc is TimeoutException) && ShouldRetry(counter, maxNumErrorTries, 
                     startExecutionTime, maxExecutionTime, exc, retryExceptionFilter, false))
                 {
                     retry = true;
@@ -163,15 +163,12 @@ namespace Orleans
         private static bool ShouldRetry<T>(int callCounter, int maxRetryCount, DateTime startExecutionTime, 
             TimeSpan maxExecutionTime, T filterValue, Func<T, int, bool> retryFilter, bool throwOnTimeout)
         {
-            if (callCounter >= maxRetryCount && maxRetryCount != INFINITE_RETRIES)
+            if (callCounter >= maxRetryCount - 1 && maxRetryCount != INFINITE_RETRIES)
             {
                 return false;
             }
 
-            if (retryFilter != null && !retryFilter(filterValue, callCounter))
-            {
-                return false;
-            }
+            
 
             if (IsMaxExecutionTimeDefined(maxExecutionTime))
             {
@@ -188,7 +185,7 @@ namespace Orleans
                 }
             }
 
-            return true;
+            return retryFilter != null && retryFilter(filterValue, callCounter);
         }
 
         private static bool IsMaxExecutionTimeDefined(TimeSpan maxExecutionTime)
