@@ -6,7 +6,7 @@ namespace Orleans.Streams
     public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
     {
         public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+            : this(false)
         {
         }
 
@@ -15,7 +15,7 @@ namespace Orleans.Streams
             ShouldFaultSubsriptionOnError = faultOnError;
         }
 
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
+        public bool ShouldFaultSubsriptionOnError { get; }
 
         /// <summary>
         /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.

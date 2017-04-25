@@ -54,7 +54,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
         }
     }
 }
