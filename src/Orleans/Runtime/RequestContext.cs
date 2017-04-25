@@ -107,8 +107,13 @@ namespace Orleans.Runtime
                 object activityIdObj = Guid.Empty;
                 if (contextData?.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) != true)
                 {
-                    object legacyActivityIdObj = null;
+                    if (ActivityId.Value != Guid.Empty)
+                    {
+                        ActivityId.Value = Guid.Empty;
+                    }
+
 #if !NETSTANDARD
+                    object legacyActivityIdObj = null;
                     if (contextData?.TryGetValue(E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER, out legacyActivityIdObj) == true)
                     {
                         Trace.CorrelationManager.ActivityId = (Guid) legacyActivityIdObj;
