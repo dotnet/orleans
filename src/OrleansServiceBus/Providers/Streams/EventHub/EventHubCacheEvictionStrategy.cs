@@ -82,9 +82,9 @@ namespace Orleans.ServiceBus.Providers
             if (itemsPurged == 0)
                 return;
 
-            //purge finished, time to conduct follow up actions 
+            //items got purged, time to conduct follow up actions 
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
-            UpdatePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest, itemsPurged > 0);
+            UpdatePurgedBuffers(lastMessagePurged.Value, this.PurgeObservable.Oldest);
             if (this.logger.IsVerbose)
             { 
                 var itemCountAfterPurge = this.PurgeObservable.ItemCount;
@@ -93,13 +93,11 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private void UpdatePurgedBuffers(CachedEventHubMessage? lastMessagePurged, CachedEventHubMessage? oldestMessageInCache, bool itemsGotPurged)
+        private void UpdatePurgedBuffers(CachedEventHubMessage lastMessagePurged, CachedEventHubMessage? oldestMessageInCache)
         {
-            //if nothing purged, then no buffer was purged
-            //if items got purged, then potencially some buffer was purged
-            if (itemsGotPurged)
+            if (this.inUseBuffers.Count > 0)
             {
-                var IdOfLastPurgedBuffer = lastMessagePurged.Value.Segment.Array;
+                var IdOfLastPurgedBuffer = lastMessagePurged.Segment.Array;
                 // IdOfLastBufferInCache will be null if cache is empty after purge
                 var IdOfLastBufferInCache = oldestMessageInCache.HasValue ? oldestMessageInCache.Value.Segment.Array : null;
                 //all buffer older than LastPurgedBuffer should be purged 
