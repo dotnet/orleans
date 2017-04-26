@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -130,6 +131,25 @@ namespace Orleans.Utilities
         {
             ((IDictionary<TKey, TValue>) this.dictionary).Add(key, value);
             this.InvalidateCache();
+        }
+
+        /// <summary>
+        /// dds a key/value pair to the <see cref="CachedReadConcurrentDictionary{TKey,TValue}"/> if the key does not exist.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="valueFactory">The function used to generate a value for the key</param>
+        /// <returns>The value for the key. This will be either the existing value for the key if the key is already in the dictionary, or the new value if the key was not in the dictionary.</returns>
+        public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
+        {
+            TValue value;
+
+            if (this.GetReadDictionary().TryGetValue(key, out value))
+                return value;
+
+            value = valueFactory(key);
+            Add(key, value);
+
+            return value;
         }
 
         /// <summary>

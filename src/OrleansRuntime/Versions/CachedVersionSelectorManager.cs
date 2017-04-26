@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime.Versions
 {
@@ -10,7 +11,7 @@ namespace Orleans.Runtime.Versions
     {
         private readonly GrainTypeManager grainTypeManager;
         private readonly Func<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>> getSilosFunc;
-        private ConcurrentDictionary<Tuple<int,int,ushort>, IReadOnlyList<SiloAddress>> suitableSilosCache;
+        private readonly CachedReadConcurrentDictionary<Tuple<int,int,ushort>, IReadOnlyList<SiloAddress>> suitableSilosCache;
 
         public VersionSelectorManager VersionSelectorManager { get; }
 
@@ -22,6 +23,7 @@ namespace Orleans.Runtime.Versions
             this.VersionSelectorManager = versionSelectorManager;
             this.CompatibilityDirectorManager = compatibilityDirectorManager;
             this.getSilosFunc = GetSuitableSilosImpl;
+            this.suitableSilosCache = new CachedReadConcurrentDictionary<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>>();
         }
 
         public IReadOnlyList<SiloAddress> GetSuitableSilos(int typeCode, int ifaceId, ushort requestedVersion)
@@ -32,7 +34,7 @@ namespace Orleans.Runtime.Versions
 
         public void ResetCache()
         {
-            this.suitableSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>>();
+            this.suitableSilosCache.Clear();
         }
 
         private IReadOnlyList<SiloAddress> GetSuitableSilosImpl(Tuple<int, int, ushort> key)
