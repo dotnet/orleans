@@ -21,6 +21,7 @@ namespace Tester.CustomPlacementTests
         private const short nSilos = 3;
         private readonly Fixture fixture;
         private string[] silos;
+        private SiloAddress[] siloAddresses;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -38,6 +39,7 @@ namespace Tester.CustomPlacementTests
 
             // sort silo IDs into an array
             this.silos = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress.ToString()).OrderBy(s => s).ToArray();
+            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s.ToString()).ToArray();
         }
 
         [Fact]
@@ -91,14 +93,14 @@ namespace Tester.CustomPlacementTests
         {
             const int nGrains = 100;
 
-            Task<string>[] tasks = new Task<string>[nGrains];
+            Task<SiloAddress>[] tasks = new Task<SiloAddress>[nGrains];
             List<IGrainIdentity> grains = new List<IGrainIdentity>();
             for (int i = 0; i < nGrains; i++)
             {
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
-                    "UnitTests.Grains.HashBasedPlacementGrain");
+                var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
+                    "UnitTests.Grains.HashBasedBasedPlacementGrain");
                 grains.Add(g.GetGrainIdentity());
-                tasks[i] = g.GetRuntimeInstanceId();
+                tasks[i] = g.GetSiloAddress();
             }
 
             await Task.WhenAll(tasks);
@@ -106,7 +108,7 @@ namespace Tester.CustomPlacementTests
             for (int i = 0; i < nGrains; i++)
             {
                 var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
-                Assert.Equal(silos[hash % silos.Length], tasks[i].Result);
+                Assert.Equal(siloAddresses[hash % silos.Length], tasks[i].Result);
             }
         }
     }

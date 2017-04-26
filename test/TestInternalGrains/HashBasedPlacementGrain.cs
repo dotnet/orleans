@@ -1,9 +1,18 @@
-﻿using Orleans.Placement;
+﻿using System.Threading.Tasks;
+using Orleans;
+using Orleans.Placement;
+using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [HashBasedPlacement(true)]
-    public class HashBasedPlacementGrain : CustomPlacementBaseGrain
+    [HashBasedPlacement(false)]
+    public class HashBasedBasedPlacementGrain : Grain, IHashBasedPlacementGrain
     {
+
+        public Task<SiloAddress> GetSiloAddress()
+        {
+            return Task.FromResult(this.Runtime.SiloAddress);
+        }
     }
 }
