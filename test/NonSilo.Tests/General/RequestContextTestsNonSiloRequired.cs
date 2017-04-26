@@ -43,7 +43,7 @@ namespace UnitTests.General
 
         private void TestCleanup()
         {
-            RequestContextTestUtils.SetActivityId(Guid.Empty);
+            RequestContextTestUtils.ClearActivityId();
             RequestContext.Clear();
             headers.Clear();
             this.fixture.RuntimeClient.ClientInvokeCallback = null;

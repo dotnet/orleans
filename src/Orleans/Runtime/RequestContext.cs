@@ -32,13 +32,26 @@ namespace Orleans.Runtime
 
         internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
-        internal const string E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER = "#L_RC_AI";
-        internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-        public static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
         private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
 
+        /// <summary>Gets or sets an activity ID that can be used for correlation.</summary>
+        public static Guid ActivityId
+        {
+            get { return (Guid)(Get(E2_E_TRACING_ACTIVITY_ID_HEADER) ?? Guid.Empty); }
+            set
+            {
+                if (value == Guid.Empty)
+                {
+                    Remove(E2_E_TRACING_ACTIVITY_ID_HEADER);
+                }
+                else
+                { 
+                    Set(E2_E_TRACING_ACTIVITY_ID_HEADER, value);
+                }
+            }
+        }
 
         /// <summary>
         /// Retrieve a value from the RequestContext key-value bag.
@@ -102,38 +115,30 @@ namespace Orleans.Runtime
 
         public static void Import(Dictionary<string, object> contextData)
         {
+#if !NETSTANDARD
             if (PropagateActivityId)
             {
                 object activityIdObj = Guid.Empty;
-                if (contextData?.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) != true)
+                if (contextData?.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) == true)
                 {
-                    if (ActivityId.Value != Guid.Empty)
-                    {
-                        ActivityId.Value = Guid.Empty;
-                    }
-
-#if !NETSTANDARD
-                    object legacyActivityIdObj = null;
-                    if (contextData?.TryGetValue(E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER, out legacyActivityIdObj) == true)
-                    {
-                        Trace.CorrelationManager.ActivityId = (Guid) legacyActivityIdObj;
-                    }
-#endif
+                    Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
                 }
                 else
                 {
-                    ActivityId.Value = (Guid)activityIdObj;
+                    Trace.CorrelationManager.ActivityId = Guid.Empty;
                 }
             }
+#endif
+
             if (contextData != null && contextData.Count > 0)
             {
                 var values = contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                // We have some data, so store RC data into LogicalCallContext
+                // We have some data, so store RC data into the async local field.
                 CallContextData.Value = values;
             }
             else
             {
-                // Clear any previous RC data from LogicalCallContext.
+                // Clear any previous RC data from the async local field.
                 // MUST CLEAR the LLC, so that previous request LLC does not leak into this one.
                 Clear();
             }
@@ -143,36 +148,37 @@ namespace Orleans.Runtime
         {
             var values = CallContextData.Value;
 
+#if !NETSTANDARD
             if (PropagateActivityId)
             {
-                var activityId = ActivityId.Value;
-                var activityIdHeader = E2_E_TRACING_ACTIVITY_ID_HEADER;
-#if !NETSTANDARD
-                if (activityId == Guid.Empty)
+                var activityIdOverride = Trace.CorrelationManager.ActivityId;
+                if (activityIdOverride != Guid.Empty)
                 {
-                    activityIdHeader = E2_E_TRACING_LEGACY_ACTIVITY_ID_HEADER;
-                    activityId = Trace.CorrelationManager.ActivityId;
+                    object existingActivityId;
+                    if (values == null 
+                        || !values.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out existingActivityId)
+                        || activityIdOverride != (Guid)existingActivityId)
+                    {
+                        // Create new copy before mutating data
+                        values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values);
+                        values[E2_E_TRACING_ACTIVITY_ID_HEADER] = activityIdOverride;
+                    }
                 }
-#endif
-                
-                if (activityId != Guid.Empty)
-                {
-                    values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
-                    values[activityIdHeader] = activityId;
-                    // We have some changed data, so write RC data back into LogicalCallContext
-                    CallContextData.Value = values;
-                }
-               
             }
-            if (values != null && values.Count != 0)
-                return (Dictionary<string, object>)serializationManager.DeepCopy(values);
-            return null;
+#endif
+
+            return (values != null && values.Count > 0)
+                ? (Dictionary<string, object>)serializationManager.DeepCopy(values)
+                : null;
         }
 
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-            CallContextData.Value = null;
+            if (CallContextData.Value != null)
+            {
+                CallContextData.Value = null;
+            }
         }
     }
 }
