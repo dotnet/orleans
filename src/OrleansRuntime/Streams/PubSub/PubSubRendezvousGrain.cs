@@ -281,7 +281,8 @@ namespace Orleans.Streams
         {
             counterConsumersRemoved.Increment();
             if (State.Consumers.Any(c => c.IsFaulted && c.Equals(subscriptionId)))
-                throw new FaultedSubscriptionException(subscriptionId, streamId);
+                logger.Warn(ErrorCode.Stream_RemoveFaultedSubscription,
+                    "The subscription about to remove is a faulted subscription, subscriptionId={0}, streamId={1}", subscriptionId, streamId);
 
             try
             {
