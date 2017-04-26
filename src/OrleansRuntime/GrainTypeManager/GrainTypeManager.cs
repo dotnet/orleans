@@ -155,7 +155,7 @@ namespace Orleans.Runtime
             foreach (var version in versions)
             {
                 var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
-                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode).ToList();
+                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode);
                 result.AddRange(silosWithCorrectVersion);
             }
             // We need to sort this so the list of silos returned will
