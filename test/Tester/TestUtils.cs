@@ -114,12 +114,20 @@ namespace Tester
     {
         public static void SetActivityId(Guid id)
         {
-            RequestContext.ActivityId.Value = id;
+            RequestContext.ActivityId = id;
         }
 
         public static Guid GetActivityId()
         {
-            return RequestContext.ActivityId.Value;
+            return RequestContext.ActivityId;
+        }
+
+        public static void ClearActivityId()
+        {
+#if !NETSTANDARD
+            Trace.CorrelationManager.ActivityId = Guid.Empty;
+#endif
+            RequestContext.ActivityId = Guid.Empty;
         }
     }
 }

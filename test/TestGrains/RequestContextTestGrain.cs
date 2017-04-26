@@ -35,7 +35,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-            return Task.FromResult(RequestContext.ActivityId.Value);
+            return Task.FromResult(RequestContext.ActivityId);
         }
 
         public Task<Guid> E2ELegacyActivityId()
@@ -139,7 +139,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-            return Task.FromResult(RequestContext.ActivityId.Value);
+            return Task.FromResult(RequestContext.ActivityId);
         }
 
         public async Task<Tuple<string, string>> TestRequestContext()
