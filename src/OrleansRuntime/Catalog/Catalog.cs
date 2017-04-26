@@ -175,7 +175,7 @@ namespace Orleans.Runtime
             IStreamProviderRuntime providerRuntime,
             IStreamProviderManager providerManager,
             IServiceProvider serviceProvider,
-			CachedVersionSelectorManager versionSelectorManager)
+            CachedVersionSelectorManager versionSelectorManager)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = localSiloDetails.SiloAddress;
