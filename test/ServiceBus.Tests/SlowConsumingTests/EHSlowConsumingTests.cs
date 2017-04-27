@@ -116,11 +116,10 @@ namespace ServiceBus.Tests.SlowConsumingTests
             int healthyConsumerCount = 30;
             var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
-            //set up producer and start producing
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
-            await producer.BecomeProducer(streamId.Guid, StreamNamespace, StreamProviderName);
-            await producer.StartPeriodicProducing(TimeSpan.FromMilliseconds(100));
-
+            //configure data generator for stream and start producing
+            var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
+                (int)EventHubGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, streamId);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
 
@@ -132,8 +131,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(false, lastTry), timeout);
 
             //clean up test
-            await producer.StopPeriodicProducing();
             await StopHealthyConsumerGrainComing(healthyConsumers);
+            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
+                (int)EventHubGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
         }
 
         private async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)

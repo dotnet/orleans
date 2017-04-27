@@ -35,11 +35,11 @@ namespace Orleans.ServiceBus.Providers
         private readonly IEventHubReceiverMonitor monitor;
 
         private IEventHubQueueCache cache;
-#if NETSTANDARD
-        private PartitionReceiver receiver;
-#else
-        private EventHubReceiver receiver;
-#endif
+
+        private IEventHubReceiver receiver;
+
+        private Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory;
+
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
 
@@ -60,7 +60,8 @@ namespace Orleans.ServiceBus.Providers
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
             IEventHubReceiverMonitor monitor,
-            Func<NodeConfiguration> getNodeConfig)
+            Func<NodeConfiguration> getNodeConfig,
+            Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
@@ -74,6 +75,8 @@ namespace Orleans.ServiceBus.Providers
             this.logger = baseLogger.GetSubLogger("receiver", "-");
             this.monitor = monitor;
             this.getNodeConfig = getNodeConfig;
+
+            this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -84,7 +87,6 @@ namespace Orleans.ServiceBus.Providers
                 ? Task.CompletedTask
                 : Initialize();
         }
-
         /// <summary>
         /// Initialization of EventHub receiver is performed at adapter reciever initialization, but if it fails,
         ///  it will be retried when messages are requested
@@ -98,7 +100,7 @@ namespace Orleans.ServiceBus.Providers
                 cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
-                receiver = await CreateReceiver(settings, offset, logger);
+                receiver = await this.eventHubReceiverFactory(settings, offset, logger);
                 monitor.TrackInitialization(true);
             }
             catch (Exception)
@@ -252,12 +254,7 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-#if NETSTANDARD
-        private static async Task<PartitionReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
-#else
-
-        private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
-#endif
+        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
         {
             bool offsetInclusive = true;
 #if NETSTANDARD
@@ -300,11 +297,27 @@ namespace Orleans.ServiceBus.Providers
             if (partitionSettings.Hub.PrefetchCount.HasValue)
                 receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
 
-            return receiver;
+            return new EventHubReceiverProxy(receiver);
 #else
-            return await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive);
+            return new EventHubReceiverProxy(await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive));
 #endif
         }
+
+#region EventHubGeneratorStreamProvider related region
+        /// <summary>
+        /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
+        /// </summary>
+        /// <param name="streamId"></param>
+        internal void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
+        {
+            (this.receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
+        }
+
+        internal void StopProducingOnStream(IStreamIdentity streamId)
+        {
+            (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
+        }
+#endregion
 
         private class StreamActivityNotificationBatch : IBatchContainer
         {

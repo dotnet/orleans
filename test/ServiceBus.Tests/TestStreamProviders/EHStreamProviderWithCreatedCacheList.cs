@@ -11,7 +11,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     internal class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
     {
-        public class AdapterFactory : EventHubAdapterFactory, IControllable
+        public class AdapterFactory : EventHubGeneratorStreamProvider.AdapterFactory
         {
             private readonly List<IEventHubQueueCache> createdCaches;
 
@@ -47,7 +47,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 }
             }
 
-            public static int IsCacheBackPressureTriggeredCommand = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 3;
+            public const int IsCacheBackPressureTriggeredCommand = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 3;
 
             /// <summary>
             /// Only command expecting: determine whether back pressure algorithm on any of the created caches
@@ -56,14 +56,20 @@ namespace ServiceBus.Tests.TestStreamProviders
             /// <param name="command"></param>
             /// <param name="arg"></param>
             /// <returns></returns>
-            public Task<object> ExecuteCommand(int command, object arg)
+            public override Task<object> ExecuteCommand(int command, object arg)
             {
-                foreach (var cache in this.createdCaches)
+                switch (command)
                 {
-                    if (cache.GetMaxAddCount() == 0)
-                        return Task.FromResult<object>(true);
+                    case IsCacheBackPressureTriggeredCommand:
+                        foreach (var cache in this.createdCaches)
+                        {
+                            if (cache.GetMaxAddCount() == 0)
+                                return Task.FromResult<object>(true);
+                        }
+                        return Task.FromResult<object>(false);
+                    default: return base.ExecuteCommand(command, arg);
                 }
-                return Task.FromResult<object>(false);
+
             }
         }
     }
