@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.Blob.Protocol;
 using Newtonsoft.Json;
 using Orleans.Providers;
 using Orleans.Providers.Azure;
@@ -132,21 +131,15 @@ namespace Orleans.Storage
                 {
                     json = await blob.DownloadTextAsync().ConfigureAwait(false);
                 }
-                catch (StorageException exception)
+                catch (StorageException exception) when (exception.IsBlobNotFound())
                 {
-                    var errorCode = exception.RequestInformation.ExtendedErrorInformation?.ErrorCode;
-                    if (errorCode == BlobErrorCodeStrings.BlobNotFound)
-                    {
-                        if (this.Log.IsVerbose2) this.Log.Verbose2((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound, "BlobNotFound reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
-                        return;
-                    }
-                    if (errorCode == BlobErrorCodeStrings.ContainerNotFound)
-                    {
-                        if (this.Log.IsVerbose2) this.Log.Verbose2((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "ContainerNotFound reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
-                        return;
-                    }
-
-                    throw;
+                    if (this.Log.IsVerbose2) this.Log.Verbose2((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound, "BlobNotFound reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+                    return;
+                }
+                catch (StorageException exception) when (exception.IsContainerNotFound())
+                {
+                    if (this.Log.IsVerbose2) this.Log.Verbose2((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "ContainerNotFound reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+                    return;
                 }
 
                 if (string.IsNullOrWhiteSpace(json))
@@ -189,33 +182,7 @@ namespace Orleans.Storage
                 var blob = container.GetBlockBlobReference(blobName);
                 blob.Properties.ContentType = "application/json";
 
-                try
-                {
-                    await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
-                        blobName, grainState.ETag).ConfigureAwait(false);
-                }
-                catch (StorageException exception)
-                {
-                    if (exception.IsPreconditionFailed())
-                    {
-                        throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blobName}, Container: {container.Name}, CurrentETag: {grainState.ETag}", "Unkown", grainState.ETag, exception);
-                    }
-
-                    var errorCode = exception.RequestInformation.ExtendedErrorInformation?.ErrorCode;
-                    if (errorCode != BlobErrorCodeStrings.ContainerNotFound)
-                    {
-                        throw;
-                    }
-
-                    // if the container does not exist, create it, and make another attempt
-                    if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "Creating container: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
-                    await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-
-                    await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
-                        blobName, grainState.ETag).ConfigureAwait(false);
-                }
-
-                grainState.ETag = blob.Properties.ETag;
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, json, blob);
 
                 if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Written: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -255,6 +222,25 @@ namespace Orleans.Storage
 
                 throw;
             }
+        }
+
+        private async Task WriteStateAndCreateContainerIfNotExists(string grainType, GrainReference grainId, IGrainState grainState, string json, CloudBlockBlob blob)
+        {
+            try
+            {
+                await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                    blob.Name, grainState.ETag).ConfigureAwait(false);
+            }
+            catch (StorageException exception) when (exception.IsContainerNotFound())
+            {
+                // if the container does not exist, create it, and make another attempt
+                if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "Creating container: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blob.Name, container.Name);
+                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, json, blob).ConfigureAwait(false);
+            }
+
+            grainState.ETag = blob.Properties.ETag;
         }
 
         private async Task DoConditionalUpdate(Func<Task> updateOperation, string blobName, string currentETag)
