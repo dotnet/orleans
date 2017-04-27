@@ -35,10 +35,15 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-#if NETSTANDARD
-            return Task.FromResult(RequestContext.ActivityId.Value);
-#else
+            return Task.FromResult(RequestContext.ActivityId);
+        }
+
+        public Task<Guid> E2ELegacyActivityId()
+        {
+#if !NETSTANDARD
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
+#else
+            return Task.FromResult(Guid.Empty);
 #endif
         }
 
@@ -134,11 +139,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2EActivityId()
         {
-#if NETSTANDARD
-            return Task.FromResult(RequestContext.ActivityId.Value);
-#else
-            return Task.FromResult(Trace.CorrelationManager.ActivityId);
-#endif
+            return Task.FromResult(RequestContext.ActivityId);
         }
 
         public async Task<Tuple<string, string>> TestRequestContext()
