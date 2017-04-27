@@ -4,10 +4,35 @@ All notable end-user facing changes are documented in this file.
 ### [vNext]
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
-- Add streaming support for types that are serialized using IExternalSerializers
-- Replace CallContext.LogicalSetData with AsyncLocal #2200
-- Providers are now constructed using Dependency Injection. The result is that all providers must have a single public constructor with either no arguments or arguments which can all be injected. The default container is used if no container is configured. [#2721](https://github.com/dotnet/orleans/pull/2721)
-- Bug fixes:
+
+### [1.5.0-beta1]
+- Breaking changes
+  - Upgraded minimum framework dependency to .NET 4.6.1 #2945
+  - Support for non-static client via ClientBuilder (although static GrainClient still works but will be removed in a future version). You can now start many clients in the same process, even if you are inside a Silo #2822.
+    There are a few differences though:
+    - Several changes to SerializationManager, mainly to make it non-static #2592
+      - When deserializing a GrainReference from storage, you might need to re-bind it to the runtime by calling `grain.BindGrainReference(grainFactory)` on it or you would get `GrainReferenceNotBoundException` when attempting to use it #2738
+      - Removed `RegisterSerializerAttribute` (and corresponding static Register method for registering a custom serializer). If you were using that, please read https://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Serialization.html#writing-custom-serializers for alternative ways to register your custom serializer #2941
+  - Better serialization of `Type` values (but can cause compatibility issues if these were persisted by using the Serialziation Manager) #2952
+  - Automatically deactivate a grain if it bubbles up `InconsistentStateException` (thrown when there is an optimistic concurrency conflict when writing to storage) #2959
+  - Providers are now constructed using Dependency Injection. The result is that custom providers must have a single public constructor with either no arguments or arguments which can all be injected, or they need to be explicitly registered in the ServiceCollection. #2721 #2980
+  - Change default stream subscription faulting to false in EventHub and Memory stream providers, as is in other providers #2974
+  - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
+- Non-breaking improvements
+  - Grain interface versioning to enable no-downtime upgrades #2837 2837
+  - Programmable stream subscribe API #2741 #2796 #2909
+  - Support for custom placement strategies and directors #2932
+  - Improvements to GrainServices API #2839
+  - Replace `CallContext.LogicalSetData` with AsyncLocal #2200 #2961
+  - Ability to configure `FabricClient` when deploying to Service Fabric #2954
+  - Added extension points to EventHubAdapterFactory #2930
+  - Added SlowConsumingPressureMonitor for EventHub streams #2873
+  - Dispose all registered services in the container when shutting down #2876
+  - Try to prevent port collisions when starting in-memory `TestCluster` #2779
+  - Deprecated `TestingSiloHost` in favor of `TestCluster` (although the former is still available for this version) #2919
+- Non-breaking bug fixes
+  - Change how message expiration is handled to account for server clock skew #2922
+  - Several minor bug fixes and perf improvements, as well as reliability in our test code
 
 ### [v1.4.1]
 - Improvements
@@ -17,7 +42,7 @@ The idea is to track end-user facing changes as they occur.*
   - Support for string grain id in OrleansManager.exe #2815
   - Avoid reconnection to gateway no longer in the list returned by IGatewayListProvider #2824
   - Handle absolute path in IntermediateOutputPath to address issue 2864 #2865, #2871
-  - Rename codegen file to be excluded from analyzers #2872
+  - Rename codegen file to be excluded from code analyzers #2872
   - ProviderTypeLoader: do not enumerate types in ReflectionOnly assembly. #2869
   - Do not throw when calling Stop on AsynchQueueAgent after it was disposed.
 - Bug fixes
