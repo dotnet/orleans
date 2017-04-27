@@ -11,6 +11,8 @@ using Orleans.Providers;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.LogConsistency;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -449,6 +451,10 @@ namespace Orleans.Runtime.Configuration
 
         public string DefaultPlacementStrategy { get; set; }
 
+        public CompatibilityStrategy DefaultCompatibilityStrategy { get; set; }
+
+        public VersionSelectorStrategy DefaultVersionSelectorStrategy { get; set; }
+
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; }
 
         public int ActivationCountBasedPlacementChooseOutOf { get; set; }
@@ -593,6 +599,8 @@ namespace Orleans.Runtime.Configuration
 
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
             GrainServiceConfigurations = new GrainServiceConfigurations();
+            DefaultCompatibilityStrategy = BackwardCompatible.Singleton;
+            DefaultVersionSelectorStrategy = AllCompatibleVersions.Singleton;
         }
 
         public override string ToString()

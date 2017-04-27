@@ -1,0 +1,105 @@
+using System;
+using System.Threading.Tasks;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
+using TestVersionGrainInterfaces;
+using Xunit;
+
+namespace Tester.HeterogeneousSilosTests.UpgradeTests
+{
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    public class MinimumVersionTests : UpgradeTestsBase
+    {
+        protected override VersionSelectorStrategy VersionSelectorStrategy => MinimumVersion.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
+        
+        [Fact]
+        public Task AlwaysCreateActivationWithMinimumVersion()
+        {
+            // Even after v2 silo is deployed, we should only activate v1 grains
+            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 1);
+        }
+    }
+
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    public class LatestVersionTests : UpgradeTestsBase
+    {
+        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
+
+        [Fact]
+        public Task AlwaysCreateActivationWithLatestVersion()
+        {
+            // After v2 is deployed, we should always activate v2 grains
+            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 2);
+        }
+
+        [Fact]
+        public Task UpgradeProxyCallNoPendingRequest()
+        {
+            // v2 -> v1 call should provoke grain activation upgrade.
+            // The grain is inactive when receiving the message
+            return ProxyCallNoPendingRequest(expectedVersion: 2);
+        }
+
+        [Fact]
+        public Task UpgradeProxyCallWithPendingRequest()
+        {
+            // v2 -> v1 call should provoke grain activation upgrade
+            // The grain is already processing a request when receiving the message
+            return ProxyCallWithPendingRequest(expectedVersion: 2);
+        }
+    }
+
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    public class AllVersionsCompatibleTests : UpgradeTestsBase
+    {
+        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
+
+        [Fact]
+        public Task DoNotUpgradeProxyCallNoPendingRequest()
+        {
+            // v2 -> v1 call should provoke grain activation upgrade because they are compatible
+            // The grain is inactive when receiving the message
+            return ProxyCallNoPendingRequest(expectedVersion: 1);
+        }
+
+        [Fact]
+        public Task DoNotUpgradeProxyCallWithPendingRequest()
+        {
+            // v2 -> v1 call should provoke grain activation upgrade because they are compatible
+            // The grain is already processing a request when receiving the message
+            return ProxyCallWithPendingRequest(expectedVersion: 1);
+        }
+    }
+
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    public class RandomCompatibleVersionTests : UpgradeTestsBase
+    {
+        protected override VersionSelectorStrategy VersionSelectorStrategy => AllCompatibleVersions.Singleton;
+        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
+
+        [Fact]
+        public async Task CreateActivationWithBothVersion()
+        {
+            const int numberOfGrains = 100;
+
+            await DeployCluster();
+            await StartSiloV2();
+
+            var versionCounter = new int[2];
+
+            // We should create v1 and v2 activations
+
+            for (var i = 0; i < numberOfGrains; i++)
+            {
+                var v = await Client.GetGrain<IVersionUpgradeTestGrain>(i).GetVersion();
+                versionCounter[v - 1]++;
+            }
+
+            Assert.InRange(versionCounter[0], 40, 60);
+            Assert.InRange(versionCounter[1], 40, 60);
+        }
+    }
+}

@@ -206,6 +206,14 @@
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
     <Compile Include="Utilities\FactoryUtility.cs" />
+    <Compile Include="Versions\CachedVersionSelectorManager.cs" />
+    <Compile Include="Versions\Compatibility\AllVersionsCompatibilityDirector.cs" />
+    <Compile Include="Versions\Compatibility\BackwardCompatilityDirector.cs" />
+    <Compile Include="Versions\Compatibility\CompatibilityDirectorManager.cs" />
+    <Compile Include="Versions\Selector\AllCompatibleVersionsSelector.cs" />
+    <Compile Include="Versions\Selector\LatestVersionDirector.cs" />
+    <Compile Include="Versions\Selector\MinimumVersionSelector.cs" />
+    <Compile Include="Versions\Selector\VersionDirectorManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

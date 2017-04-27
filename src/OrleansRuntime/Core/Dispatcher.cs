@@ -9,7 +9,9 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
+using Orleans.Versions.Compatibility;
 
 
 namespace Orleans.Runtime
@@ -26,6 +28,7 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MessageFactory messagefactory;
         private readonly SerializationManager serializationManager;
+        private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -39,7 +42,8 @@ namespace Orleans.Runtime
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
             MessageFactory messagefactory,
-            SerializationManager serializationManager)
+            SerializationManager serializationManager,
+            CompatibilityDirectorManager compatibilityDirectorManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -49,6 +53,7 @@ namespace Orleans.Runtime
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
             this.serializationManager = serializationManager;
+            this.compatibilityDirectorManager = compatibilityDirectorManager;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -378,8 +383,9 @@ namespace Orleans.Runtime
                 if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
                     var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
-                    var supportedVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
-                    if (supportedVersion < request.InterfaceVersion)
+                    var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
+                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
                         catalog.DeactivateActivationOnIdle(targetActivation);
                 }
 
