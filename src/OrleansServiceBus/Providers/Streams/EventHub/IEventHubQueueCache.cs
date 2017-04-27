@@ -42,5 +42,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="monitor"></param>
         void AddCachePressureMonitor(ICachePressureMonitor monitor);
+
+        /// <summary>
+        /// Send purge signal to the cache, the cache will perform a time based purge on its cached messages
+        /// </summary>
+        void SignalPurge();
     }
 }

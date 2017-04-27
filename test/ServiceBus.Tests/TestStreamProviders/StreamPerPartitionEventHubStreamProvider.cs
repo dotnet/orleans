@@ -38,8 +38,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate, this.serializationManager);
-                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate));
             }
         }
 
@@ -55,8 +55,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             private readonly Guid partitionStreamGuid;
 
-            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
-                : base(serializationManager, bufferPool, timePurge)
+            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager)
+                : base(serializationManager, bufferPool)
             {
                 partitionStreamGuid = GetPartitionGuid(partitionKey);
             }

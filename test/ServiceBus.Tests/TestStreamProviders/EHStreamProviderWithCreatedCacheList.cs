@@ -40,8 +40,8 @@ namespace ServiceBus.Tests.TestStreamProviders
                     IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
                 {
                     //set defaultMaxAddCount to 2 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
-                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool, timePurge), 
-                        EventHubDataComparer.Instance, cacheLogger);
+                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), 
+                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge));
                     _caches.Add(cache);
                     return cache;
                 }

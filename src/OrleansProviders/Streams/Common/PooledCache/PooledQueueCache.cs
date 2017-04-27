@@ -24,18 +24,16 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <typeparam name="TQueueMessage">Queue specific data</typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed cached structure.  Should only contain value types.</typeparam>
-    public class PooledQueueCache<TQueueMessage, TCachedMessage>
+    public class PooledQueueCache<TQueueMessage, TCachedMessage>: IPurgeObservable<TCachedMessage>
         where TCachedMessage : struct
     {
         // linked list of message bocks.  First is newest.
         private readonly LinkedList<CachedMessageBlock<TCachedMessage>> messageBlocks;
-        private readonly ConcurrentQueue<IDisposable> purgeQueue;
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
         private readonly Logger logger;
-        private int itemCount;
-
+        
         /// <summary>
         /// Cached message most recently added
         /// </summary>
@@ -63,11 +61,18 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Called with the newest item in the cache and last item purged after a cache purge has run.
-        /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
-        ///   of every set of events that get purged.
+        /// Cached message count
         /// </summary>
-        public Action<TCachedMessage?,TCachedMessage?> OnPurged { get; set; }
+        public int ItemCount { get
+            {
+                int count = 0;
+                foreach (var block in this.messageBlocks)
+                {
+                    count += block.ItemCount;
+                }
+                return count;
+            }
+        }
 
         /// <summary>
         /// Pooled queue cache is a cache of message that obtains resource from a pool
@@ -93,7 +98,6 @@ namespace Orleans.Providers.Streams.Common
             this.comparer = comparer;
             this.logger = logger.GetSubLogger("messagecache", "-");
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
-            purgeQueue = new ConcurrentQueue<IDisposable>();
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
         }
 
@@ -288,8 +292,6 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentNullException("message");
             }
 
-            PerformPendingPurges(dequeueTimeUtc);
-
             StreamPosition streamPosition;
             // allocate message from pool
             CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message, dequeueTimeUtc, out streamPosition);
@@ -297,72 +299,23 @@ namespace Orleans.Providers.Streams.Common
             // If new block, add message block to linked list
             if (block != messageBlocks.FirstOrDefault())
                 messageBlocks.AddFirst(block.Node);
-            itemCount++;
-
-            PerformPendingPurges(dequeueTimeUtc);
 
             return streamPosition;
         }
 
         /// <summary>
-        /// Record that we need to purge all messages associated with purge request in the next purge cycle
+        /// Remove oldest message in the cache, remove oldest block too if the block is empty
         /// </summary>
-        /// <param name="purgeRequest"></param>
-        public void Purge(IDisposable purgeRequest)
+        public void RemoveOldestMessage()
         {
-            purgeQueue.Enqueue(purgeRequest);
-        }
-
-        private void PerformPendingPurges(DateTime nowUtc)
-        {
-            IDisposable purgeRequest;
-            if (purgeQueue.IsEmpty) return;
-            while (purgeQueue.TryDequeue(out purgeRequest))
+            this.messageBlocks.Last.Value.Remove();
+            CachedMessageBlock<TCachedMessage> lastCachedMessageBlock = this.messageBlocks.Last.Value;
+            // if block is currently empty, but all capacity has been exausted, remove
+            if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
             {
-                int currentItemCount = itemCount;
-                PerformBlockPurge(purgeRequest, nowUtc);
-                ReportBlockPurge(currentItemCount);
+                lastCachedMessageBlock.Dispose();
+                this.messageBlocks.RemoveLast();
             }
-        }
-
-        private void PerformBlockPurge(IDisposable purgeRequest, DateTime nowUtc)
-        {
-            TCachedMessage neweswtMessageInCache = messageBlocks.First.Value.NewestMessage;
-            TCachedMessage? lastMessagePurged = null;
-            while (!IsEmpty)
-            {
-                var oldestMessageInCache = messageBlocks.Last.Value.OldestMessage;
-                if (!cacheDataAdapter.ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest, nowUtc))
-                {
-                    break;
-                }
-                lastMessagePurged = oldestMessageInCache;
-                messageBlocks.Last.Value.Remove();
-                itemCount--;
-                CachedMessageBlock<TCachedMessage> lastCachedMessageBlock = messageBlocks.Last.Value;
-                // if block is currently empty, but all capacity has been exausted, remove
-                if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
-                {
-                    lastCachedMessageBlock.Dispose();
-                    messageBlocks.RemoveLast();
-                }
-            }
-
-            if (lastMessagePurged.HasValue)
-            {
-                OnPurged?.Invoke(lastMessagePurged, Newest);
-            }
-
-            purgeRequest.Dispose();
-        }
-
-        private void ReportBlockPurge(int startingItemCount)
-        {
-            if (IsEmpty)
-            {
-                logger.Verbose("BlockPurged: cache empty");
-            }
-            logger.Verbose($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
         }
 
         private enum CursorStates

@@ -34,7 +34,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="timeInCache">amount of time message has been in this cache</param>
         /// <param name="relativeAge">Age of message relative to the most recent events read</param>
         /// <returns></returns>
-        public bool ShouldPurgFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
+        public virtual bool ShouldPurgFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
         {
             // if time in cache exceeds the minimum and age of data is greater than max allowed, purge
             return timeInCache > minTimeInCache && relativeAge > maxRelativeMessageAge;

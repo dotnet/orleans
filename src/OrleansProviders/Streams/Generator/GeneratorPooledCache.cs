@@ -27,7 +27,9 @@ namespace Orleans.Providers.Streams.Generator
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
-            dataAdapter.PurgeAction = cache.Purge;
+            var evictionStrategy = new ExplicitEvictionStrategy();
+            evictionStrategy.PurgeObservable = cache;
+            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
         }
 
         // For fast GC this struct should contain only value types.  I included streamNamespace because I'm lasy and this is test code, but it should not be in here.
@@ -58,13 +60,78 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
+        private class ExplicitEvictionStrategy : IEvictionStrategy<CachedMessage>
+        {
+            private FixedSizeBuffer currentBuffer;
+            private Queue<FixedSizeBuffer> purgedBuffers;
+            public ExplicitEvictionStrategy()
+            {
+                this.purgedBuffers = new Queue<FixedSizeBuffer>();
+            }
+            public IPurgeObservable<CachedMessage> PurgeObservable { set; private get; }
+
+            public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
+
+            //Explicitly purge all messages in purgeRequestBlock
+            public void PerformPurge(DateTime utcNow, IDisposable purgeRequest)
+            {
+                //if the cache is empty, then nothing to purge, return
+                if (this.PurgeObservable.IsEmpty)
+                    return;
+                var itemCountBeforePurge = this.PurgeObservable.ItemCount;
+                CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+                CachedMessage? lastMessagePurged = null;
+                while (!this.PurgeObservable.IsEmpty)
+                {
+                    var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
+                    if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
+                    {
+                        break;
+                    }
+                    lastMessagePurged = oldestMessageInCache;
+                    this.PurgeObservable.RemoveOldestMessage();
+                }
+
+                //return purged buffer to the pool. except for the current buffer.
+                //if purgeCandidate is current buffer, put it in purgedBuffers and free it in next circle
+                var purgeCandidate = purgeRequest as FixedSizeBuffer;
+                this.purgedBuffers.Enqueue(purgeCandidate);
+                while (this.purgedBuffers.Count > 0)
+                {
+                    if (this.purgedBuffers.Peek() != this.currentBuffer)
+                    {
+                        this.purgedBuffers.Dequeue().Dispose();
+                    }
+                    else { break; }
+                }  
+            }
+
+            public void OnBlockAllocated(IDisposable newBlock)
+            {
+                var newBuffer = newBlock as FixedSizeBuffer;
+                this.currentBuffer = newBuffer;
+                this.currentBuffer.SetPurgeAction(this.PerformPurge);
+            }
+
+            private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest)
+            {
+                var purgedResource = (FixedSizeBuffer)purgeRequest;
+                return cachedMessage.Payload.Array == purgedResource.Id;
+            }
+
+            private void PerformPurge(IDisposable purgeRequest)
+            {
+                this.PerformPurge(DateTime.UtcNow, purgeRequest);
+            }
+        }
+
         private class CacheDataAdapter : ICacheDataAdapter<GeneratedBatchContainer, CachedMessage>
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
             private readonly SerializationManager serializationManager;
             private FixedSizeBuffer currentBuffer;
 
-            public Action<IDisposable> PurgeAction { private get; set; }
+            public Action<IDisposable> OnBlockAllocated { private get; set; }
 
             public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager)
             {
@@ -99,7 +166,10 @@ namespace Orleans.Providers.Streams.Generator
                 {
                     // no block or block full, get new block and try again
                     currentBuffer = bufferPool.Allocate();
-                    currentBuffer.SetPurgeAction(PurgeAction);
+                    if (this.OnBlockAllocated == null)
+                        throw new OrleansException("Eviction strategy's OnBlockAllocated is not set for current data adapter, this will affect cache purging");
+                    //call EvictionStrategy's OnBlockAllocated method
+                    this.OnBlockAllocated.Invoke(currentBuffer);
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
@@ -129,17 +199,6 @@ namespace Orleans.Providers.Streams.Generator
             public StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
             {
                 return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
-            }
-
-            public bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
-            {
-                var purgedResource = (FixedSizeBuffer) purgeRequest;
-                // if we're purging our current buffer, don't use it any more
-                if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
-                {
-                    currentBuffer = null;
-                }
-                return cachedMessage.Payload.Array == purgedResource.Id;
             }
         }
 

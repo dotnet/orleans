@@ -11,6 +11,8 @@ using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
+using System.Collections.Concurrent;
+using Orleans.Runtime;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -164,21 +166,17 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly SerializationManager serializationManager;
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-        private readonly TimePurgePredicate timePurage;
         private FixedSizeBuffer currentBuffer;
 
-        /// <summary>
-        /// Assignable purge action.  This is called when a purge request is triggered.
-        /// </summary>
-        public Action<IDisposable> PurgeAction { private get; set; }
+        /// <inheritdoc />
+        public Action<IDisposable> OnBlockAllocated { set; private get; }
 
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
         /// </summary>
         /// <param name="serializationManager"></param>
         /// <param name="bufferPool"></param>
-        /// <param name="timePurage"></param>
-        public EventHubDataAdapter(SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurage = null)
+        public EventHubDataAdapter(SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool)
         {
             if (bufferPool == null)
             {
@@ -186,7 +184,6 @@ namespace Orleans.ServiceBus.Providers
             }
             this.serializationManager = serializationManager;
             this.bufferPool = bufferPool;
-            this.timePurage = timePurage ?? TimePurgePredicate.Default;
         }
 
         /// <summary>
@@ -267,36 +264,6 @@ namespace Orleans.ServiceBus.Providers
             return new StreamPosition(stremIdentity, token);
         }
 
-        /// <summary>
-        /// Given a purge request, indicates if a cached message should be purged from the cache
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <param name="newestCachedMessage"></param>
-        /// <param name="purgeRequest"></param>
-        /// <param name="nowUtc"></param>
-        /// <returns></returns>
-        public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, ref CachedEventHubMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
-        {
-            // if we're purging our current buffer, don't use it any more
-            var purgedResource = (FixedSizeBuffer)purgeRequest;
-            if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
-            {
-                currentBuffer = null;
-            }
-
-            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
-            // age of message relative to the most recent event in the cache.
-            TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
-
-            return ShouldPurgeFromResource(ref cachedMessage, purgedResource) || timePurage.ShouldPurgFromTime(timeInCache, relativeAge);
-        }
-
-        private static bool ShouldPurgeFromResource(ref CachedEventHubMessage cachedMessage, FixedSizeBuffer purgedResource)
-        {
-            // if message is from this resource, purge
-            return cachedMessage.Segment.Array == purgedResource.Id;
-        }
-
         private ArraySegment<byte> GetSegment(int size)
         {
             // get segment from current block
@@ -305,7 +272,10 @@ namespace Orleans.ServiceBus.Providers
             {
                 // no block or block full, get new block and try again
                 currentBuffer = bufferPool.Allocate();
-                currentBuffer.SetPurgeAction(PurgeAction);
+                if (this.OnBlockAllocated == null)
+                    throw new OrleansException("Eviction strategy's OnBlockAllocated is not set for current data adapter, this will affect cache purging");
+                //call EvictionStrategy's OnBlockAllocated method
+                this.OnBlockAllocated.Invoke(currentBuffer);
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {
@@ -356,5 +326,6 @@ namespace Orleans.ServiceBus.Providers
 
             return segment;
         }
+       
     }
 }

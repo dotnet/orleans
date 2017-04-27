@@ -69,7 +69,10 @@ namespace Orleans.ServiceBus.Providers
         /// CacheSizeMb setting name.
         /// </summary>
         public const string CacheSizeMbName = "CacheSizeMb";
-        private const int DefaultCacheSizeMb = 128; // default to 128mb cache.
+        /// <summary>
+        /// Default cache size in MB
+        /// </summary>
+        public const int DefaultCacheSizeMb = 128; // default to 128mb cache.
         private int? cacheSizeMb;
         /// <summary>
         /// Cache size in megabytes.
@@ -84,7 +87,10 @@ namespace Orleans.ServiceBus.Providers
         /// DataMinTimeInCache setting name.
         /// </summary>
         public const string DataMinTimeInCacheName = "DataMinTimeInCache";
-        private static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
+        /// <summary>
+        /// Drfault DataMinTimeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
         private TimeSpan? dataMinTimeInCache;
         /// <summary>
         /// Minimum time message will stay in cache before it is available for time based purge.
@@ -99,7 +105,10 @@ namespace Orleans.ServiceBus.Providers
         /// DataMaxAgeInCache setting name.
         /// </summary>
         public const string DataMaxAgeInCacheName = "DataMaxAgeInCache";
-        private static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
+        /// <summary>
+        /// Default DataMaxAgeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
         private TimeSpan? dataMaxAgeInCache;
         /// <summary>
         /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
