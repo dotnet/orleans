@@ -178,18 +178,8 @@ namespace Orleans.Storage
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
             {
-                await tableDataManager.Write(record);
+                await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = record.ETag;
-            }
-            catch (StorageException exc)
-            {
-                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
-                    $"Error Writing: GrainType={grainType} Grainid={grainReference} ETag={grainState.ETag} to Table={tableName} Exception={exc.Message}", exc);
-                if (exc.IsUpdateConditionNotSatisfiedError())
-                {
-                    throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", grainState.ETag, exc);
-                }
-                throw;
             }
             catch (Exception exc)
             {
@@ -220,11 +210,11 @@ namespace Orleans.Storage
                 if (isDeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await tableDataManager.Delete(record).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await tableDataManager.Write(record).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = record.ETag; // Update in-memory data to the new ETag
@@ -234,6 +224,18 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
                     operation, grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
                 throw;
+            }
+        }
+
+        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainReference grainReference, string tableName, string currentETag)
+        {
+            try
+            {
+                await updateOperation.Invoke().ConfigureAwait(false);
+            }
+            catch (StorageException ex) when (ex.IsPreconditionFailed())
+            {
+                throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", currentETag, ex);
             }
         }
 
