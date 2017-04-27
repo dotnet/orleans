@@ -207,8 +207,8 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlockBlobReference(blobName);
 
-                await DoConditionalUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
-                    blobName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                    blob, grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = null;
 
@@ -228,8 +228,10 @@ namespace Orleans.Storage
         {
             try
             {
-                await DoConditionalUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
-                    blob.Name, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => blob.UploadTextAsync(json, Encoding.UTF8, AccessCondition.GenerateIfMatchCondition(grainState.ETag), null, null),
+                    blob, grainState.ETag).ConfigureAwait(false);
+
+                grainState.ETag = blob.Properties.ETag;
             }
             catch (StorageException exception) when (exception.IsContainerNotFound())
             {
@@ -239,11 +241,9 @@ namespace Orleans.Storage
 
                 await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, json, blob).ConfigureAwait(false);
             }
-
-            grainState.ETag = blob.Properties.ETag;
         }
 
-        private async Task DoConditionalUpdate(Func<Task> updateOperation, string blobName, string currentETag)
+        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, CloudBlob blob, string currentETag)
         {
             try
             {
@@ -251,7 +251,7 @@ namespace Orleans.Storage
             }
             catch (StorageException ex) when (ex.IsPreconditionFailed())
             {
-                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blobName}, Container: {container.Name}, CurrentETag: {currentETag}", "Unkown", currentETag, ex);
+                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blob.Name}, Container: {blob.Container?.Name}, CurrentETag: {currentETag}", "Unkown", currentETag, ex);
             }
         }
     }

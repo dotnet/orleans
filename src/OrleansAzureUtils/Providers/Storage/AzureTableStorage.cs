@@ -178,7 +178,7 @@ namespace Orleans.Storage
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
             {
-                await DoConditionalUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = record.ETag;
             }
             catch (Exception exc)
@@ -210,11 +210,11 @@ namespace Orleans.Storage
                 if (isDeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoConditionalUpdate(() => tableDataManager.Delete(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoConditionalUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, tableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = record.ETag; // Update in-memory data to the new ETag
@@ -227,7 +227,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task DoConditionalUpdate(Func<Task> updateOperation, string grainType, GrainReference grainReference, string tableName, string currentETag)
+        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainReference grainReference, string tableName, string currentETag)
         {
             try
             {
