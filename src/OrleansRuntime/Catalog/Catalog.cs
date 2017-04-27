@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -154,6 +155,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
+        private ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>> compatibleSilosCache;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -216,6 +218,7 @@ namespace Orleans.Runtime
             });
             maxWarningRequestProcessingTime = this.config.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.config.MaxRequestProcessingTime;
+            this.compatibleSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
         }
 
         /// <summary>
@@ -225,28 +228,39 @@ namespace Orleans.Runtime
 
         public IList<SiloAddress> GetCompatibleSilos(PlacementTarget target)
         {
-            // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
-            // with the current silo
-            if (this.config.AssumeHomogenousSilosForTesting)
-                return AllActiveSilos;
+            var key = Tuple.Create(target.GrainIdentity.TypeCode, target.InterfaceId, target.InterfaceVersion);
 
-            var typeCode = target.GrainIdentity.TypeCode;
-            IReadOnlyList<SiloAddress> silos;
-            if (target.InterfaceVersion > 0)
+            return this.compatibleSilosCache.GetOrAdd(key, tuple =>
             {
-                var version = GrainTypeManager.GetAvailableVersions(target.InterfaceId).Max();
-                silos = GrainTypeManager.GetSupportedSilos(typeCode, target.InterfaceId, version);
-            }
-            else
-            {
-                silos = GrainTypeManager.GetSupportedSilos(typeCode);
-            }
+                // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
+                // with the current silo
+                if (this.config.AssumeHomogenousSilosForTesting)
+                    return AllActiveSilos;
 
-            var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
-            if (compatibleSilos.Count == 0)
-                throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+                var typeCode = tuple.Item1;
+                var ifaceId = tuple.Item2;
+                var reqIfaceVersion = tuple.Item3;
+                IReadOnlyList<SiloAddress> silos;
+                if (reqIfaceVersion > 0)
+                {
+                    var version = GrainTypeManager.GetAvailableVersions(ifaceId).Max();
+                    silos = GrainTypeManager.GetSupportedSilos(typeCode, ifaceId, version);
+                }
+                else
+                {
+                    silos = GrainTypeManager.GetSupportedSilos(typeCode);
+                }
 
-            return compatibleSilos;
+                var compatibleSilos = silos
+                    .Intersect(AllActiveSilos)
+                    .OrderBy(s => s.ToString())
+                    .ToList();
+
+                if (compatibleSilos.Count == 0)
+                    throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+
+                return compatibleSilos;
+            });
         }
 
         internal void SetStorageManager(IStorageProviderManager storageManager)
@@ -1530,6 +1544,8 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
+            this.compatibleSilosCache = new ConcurrentDictionary<Tuple<int, int, ushort>, List<SiloAddress>>();
+
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
 
