@@ -1042,7 +1042,6 @@ namespace Orleans
         Stream_RegisterConsumerFailed               = StreamProviderManagerBase + 12,
         Stream_UnregisterConsumerFailed             = StreamProviderManagerBase + 13,
         Stream_SetSubscriptionToFaultedFailed       = StreamProviderManagerBase + 14,
-        Stream_RemoveFaultedSubscription            = StreamProviderManagerBase + 15,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,

@@ -280,9 +280,6 @@ namespace Orleans.Streams
         public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
             counterConsumersRemoved.Increment();
-            if (State.Consumers.Any(c => c.IsFaulted && c.Equals(subscriptionId)))
-                logger.Warn(ErrorCode.Stream_RemoveFaultedSubscription,
-                    "The subscription about to remove is a faulted subscription, subscriptionId={0}, streamId={1}", subscriptionId, streamId);
 
             try
             {
