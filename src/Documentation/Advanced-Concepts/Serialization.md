@@ -64,13 +64,15 @@ In both cases, multiple providers can be configured. The collection is ordered, 
 
 In addition to automatic serialization generation, application code can provide custom serialization for types it chooses. Orleans recommends using the automatic serialization generation for the majority of your application types and only write custom serializers in rare cases when you believe it is possible to get improved performance by hand-coding serializers. This note describes how to do so, and identifies some specific cases when it might be helpful.
 
-There are 2 ways how application can customize serialization:
+There are 3 ways in which applications can customize serialization:
 
-1) Add 3 serialization methods to your type and mark them with appropriate attributes (`CopierMethod`, `SerializerMethod`, `DeserializerMethod`). This method is preferable for types that your application owns, that is, the types that you can add new methods to.
+1. Add serialization methods to your type and mark them with appropriate attributes (`CopierMethod`, `SerializerMethod`, `DeserializerMethod`). This method is preferable for types that your application owns, that is, the types that you can add new methods to.
 
-2) Write a separate class annotated with an attribute `RegisterSerializerAttribute` with the 3 serialization methods in it. This method is useful for types that the application does not own, for example, types defined in other libraries your application has no control over.
+2. Implement `IExternalSerializer` and register it during configuration time. This method is useful for integrating an external serialization library.
 
-In both way the custom serialization code has to include three routines: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
+3. Write a separate static class annotated with an `[Serializer(typeof(YourType))]` with the 3 serialization methods in it and the same attributes as above. This method is useful for types that the application does not own, for example, types defined in other libraries your application has no control over.
+
+Each of these methods are detailed in the sections below.
 
 ## Introduction
 Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
