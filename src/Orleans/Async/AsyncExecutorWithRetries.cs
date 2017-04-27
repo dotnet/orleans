@@ -1,11 +1,12 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans
 {
     /// <summary>
-    /// This class a convinent utiliity class to execute a certain asyncronous function with retires, 
+    /// This class a convinent utiliity class to execute a certain asyncronous function with retires,
     /// allowing to specify custom retry filters and policies.
     /// </summary>
     internal static class AsyncExecutorWithRetries
@@ -61,7 +62,7 @@ namespace Orleans
         /// Execute a given function a number of times, based on retry configuration parameters.
         /// </summary>
         /// <param name="function">Function to execute</param>
-        /// <param name="maxNumSuccessTries">Maximal number of successful execution attempts. 
+        /// <param name="maxNumSuccessTries">Maximal number of successful execution attempts.
         /// ExecuteWithRetries will try to re-execute the given function again if directed so by retryValueFilter.
         /// Set to -1 for unlimited number of success retries, until retryValueFilter is satisfied.
         /// Set to 0 for only one success attempt, which will cause retryValueFilter to be ignored and the given function executed only once until first success.</param>
@@ -112,6 +113,7 @@ namespace Orleans
             IBackoffProvider onErrorBackOff = null)
         {
             T result = default(T);
+            ExceptionDispatchInfo lastExceptionInfo = null;
             bool retry;
 
             do
@@ -123,8 +125,13 @@ namespace Orleans
                     DateTime now = DateTime.UtcNow;
                     if (now - startExecutionTime > maxExecutionTime)
                     {
-                        throw new TimeoutException(
-                            $"ExecuteWithRetries has exceeded its max execution time of {maxExecutionTime}. Now is {LogFormatter.PrintDate(now)}, started at {LogFormatter.PrintDate(startExecutionTime)}, passed {now - startExecutionTime}");
+                        if (lastExceptionInfo == null)
+                        {
+                            throw new TimeoutException(
+                                $"ExecuteWithRetries has exceeded its max execution time of {maxExecutionTime}. Now is {LogFormatter.PrintDate(now)}, started at {LogFormatter.PrintDate(startExecutionTime)}, passed {now - startExecutionTime}");
+                        }
+
+                        lastExceptionInfo.Throw();
                     }
                 }
 
@@ -134,6 +141,7 @@ namespace Orleans
                 {
                     callCounter++;
                     result = await function(counter);
+                    lastExceptionInfo = null;
 
                     if (callCounter < maxNumSuccessTries || maxNumSuccessTries == INFINITE_RETRIES) // -1 for infinite retries
                     {
@@ -166,6 +174,8 @@ namespace Orleans
                         throw;
                     }
 
+                    lastExceptionInfo = ExceptionDispatchInfo.Capture(exc);
+
                     TimeSpan? delay = onErrorBackOff?.Next(counter);
 
                     if (delay.HasValue)
@@ -180,8 +190,8 @@ namespace Orleans
     }
 
     // Allow multiple implementations of the backoff algorithm.
-    // For instance, ConstantBackoff variation that always waits for a fixed timespan, 
-    // or a RateLimitingBackoff that keeps makes sure that some minimum time period occurs between calls to some API 
+    // For instance, ConstantBackoff variation that always waits for a fixed timespan,
+    // or a RateLimitingBackoff that keeps makes sure that some minimum time period occurs between calls to some API
     // (especially useful if you use the same instance for multiple potentially simultaneous calls to ExecuteWithRetries).
     // Implementations should be imutable.
     // If mutable state is needed, extend the next function to pass the state from the caller.
