@@ -97,7 +97,7 @@ namespace Orleans.Runtime
                     return null;
                 }
 
-                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
+                return (T)ActivatorUtilities.GetServiceOrCreateInstance(serviceProvider, foundType);
             }
             catch (FileNotFoundException)
             {
@@ -118,7 +118,7 @@ namespace Orleans.Runtime
                 var assembly = Assembly.Load(new AssemblyName(assemblyName));
                 var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
 
-                return (T)ActivatorUtilities.CreateInstance(serviceProvider, foundType);
+                return (T)ActivatorUtilities.GetServiceOrCreateInstance(serviceProvider, foundType);
             }
             catch (Exception exc)
             {
