@@ -146,8 +146,8 @@ namespace Orleans.Utilities
             if (this.GetReadDictionary().TryGetValue(key, out value))
                 return value;
 
-            value = valueFactory(key);
-            Add(key, value);
+            value = this.dictionary.GetOrAdd(key, valueFactory);
+            InvalidateCache();
 
             return value;
         }
