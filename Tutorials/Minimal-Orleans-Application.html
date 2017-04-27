@@ -75,15 +75,15 @@
               
 <p>This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.</p>
 <ul>
-<li>It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.</li>
-<li>Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.</li>
+<li>It does not need the SDK or Extension to be installed, and relies on Nuget packages only.</li>
+<li>Has been tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.</li>
 <li>Has no reliance on SQL or Azure</li>
 </ul>
-<p>Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
+<p>Keep in mind that this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the readers get a real hands-on with regards to different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
 <p>You can find the final source code in <code>Samples\Tutorial.Minimal</code> folder (<a href="https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal">see latest version online</a>).</p>
 <h2 id="project-setup">Project Setup</h2>
-<p>For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.</p>
-<p>The Solution will eventually look like this.  (Missing files will be added in sections below)</p>
+<p>For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document <a href="My-First-Orleans-Application.html">Getting Started with Orleans</a>.</p>
+<p>The Solution will eventually look like this.  (Missing files will be added in the sections below)</p>
 <p><img src="../Images/MinimalOrleansApplication1.png" alt=""></p>
 <h4 id="within-visual-studio">Within Visual Studio</h4>
 <ol>
@@ -92,7 +92,7 @@
 <li>Create a New class library called GrainInterfaces</li>
 <li>Create a New class library called GrainCollection</li>
 </ol>
-<p>We use just the default project types in c#.</p>
+<p>We just use the default project types in c#.</p>
 <h4 id="delete-the-extras">Delete the Extras</h4>
 <ol>
 <li>Delete Class1.cs from GrainCollection</li>
@@ -105,7 +105,7 @@
 <li>Host references GrainCollection</li>
 </ol>
 <h2 id="adding-orleans">Adding Orleans</h2>
-<p>Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide the autocode generation for us our Grains and Interfaces, and the Runtime which is used for hosting.</p>
+<p>Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide autocode generation for our grains and interfaces, and the Runtime which is used for hosting.</p>
 <h4 id="with-nuget">With Nuget</h4>
 <ol>
 <li>Add Microsoft.Orleans.OrleansCodeGenerator.Build  to GrainInterfaces</li>
@@ -130,10 +130,10 @@ class HelloGrain : Orleans.Grain, IHello
     }
 }
 </code></pre><h2 id="host">Host</h2>
-<p>The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).</p>
+<p>The host requires the most amount of attention to get Orleans up and running. Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the extension provides a template that simplifies this).</p>
 <p>However this small implementation should demonstrate the basics of getting started.</p>
 <h4 id="host--appconfig">Host – App.Config</h4>
-<p>Change App.config enable the recommended server style garbage collection</p>
+<p>Change App.config to enable the recommended server garbage collection</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;configuration&gt;
   &lt;runtime&gt;
@@ -142,8 +142,8 @@ class HelloGrain : Orleans.Grain, IHello
   &lt;/runtime&gt;
 &lt;/configuration&gt;
 </code></pre><h4 id="host--orleansconfigurationxml">Host – OrleansConfiguration.xml</h4>
-<p>Within the Host project, add an XML file that will be used for cluster configuration called OrleansConfiguration.xml</p>
-<p>Make sure it is set to Copy to Output directory:</p>
+<p>Within the Host project, add an XML file named OrleansConfiguration.xml. This will be used for cluster configuration. </p>
+<p>Make sure to set the <em>Copy to Output directory</em> file property to <em>Copy if newer</em>:</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
@@ -154,16 +154,16 @@ class HelloGrain : Orleans.Grain, IHello
     &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre><p>It is possible to configure this within the code, but it is fairly temperamental.</p>
+</code></pre><p>It is possible to configure this within the code, but it is fairly difficult to do so.</p>
 <h4 id="host--programcs">Host – Program.cs</h4>
-<p>Program.cs is our most length code block. We are attempting to accomplish a number of objectives</p>
+<p>Program.cs is our lengthiest code block. We attempt to accomplish a number of objectives here</p>
 <ol>
 <li>Initialize Orleans in its own AppDomain</li>
-<li>Run a trivial example (DoSomeClientWork)</li>
+<li>Run a trivial task (DoSomeClientWork)</li>
 <li>Wait for the user to press enter</li>
 <li>Shutdown gracefully</li>
 </ol>
-<p>The Orleans samples come with a very nice class called HostWrapper, which abstracts some of the boiler plate within this example.  We&#39;re going to do this by hand, but for a more robust implementation, it is worth exploring.</p>
+<p>The Orleans samples come with a very nice class called HostWrapper, which abstracts some of the boiler plate within this example and is worth exploring for a more robust implementation. We&#39;re going to do this by hand in this tutorial.</p>
 <pre><code class="lang-csharp">using Orleans.Runtime.Host;
 using Orleans;
 using System.Net;
@@ -232,14 +232,14 @@ class Program
 
 }
 </code></pre><h2 id="running-the-application">Running the application</h2>
-<p>At this point we should be able to run Host. A console should appear with a large amount of logging text, at the end it should look like this</p>
+<p>At this point we should be able to run the Host project. A console should appear with a large amount of logging text, and at the end it should look like this</p>
 <p><img src="../Images/MinimalOrleansApplication2.png" alt=""></p>
 <p>Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <ul>
 <li>System.SystemException: &#39;Failed to start Orleans silo &#39;YOUR-HOST-NAME&#39; as a Secondary node&#39;:<ul>
 <li>Problem: The silo is trying to start but does not find a the specified file to get the configuration.</li>
-<li>Solution: Set the property &quot;Copy to Output Directory&quot; to &quot;Copy if newer&quot;, to set it, right click on the configuration file, then click on properites.
+<li>Solution: Set the property &quot;Copy to Output Directory&quot; to &quot;Copy if newer&quot;, to set it, right click on the configuration file, then click on properties.
 ```</li>
 </ul>
 </li>
@@ -249,7 +249,7 @@ class Program
 <li><a href="http://dotnet.github.io/orleans/NuGets">List of Orleans Packages</a></li>
 <li><a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide</a></li>
 <li><a href="http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf">Orleans Best Practices</a></li>
-<li><a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo">Running in a Stand Alone Silo</a></li>
+<li><a href="Running-in-a-Stand-alone-Silo.html">Running in a Stand Alone Silo</a></li>
 <li><a href="http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample">Azure Web Sample</a></li>
 </ul>
 
