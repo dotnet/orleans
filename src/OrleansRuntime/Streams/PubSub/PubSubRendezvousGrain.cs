@@ -280,8 +280,6 @@ namespace Orleans.Streams
         public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
             counterConsumersRemoved.Increment();
-            if (State.Consumers.Any(c => c.IsFaulted && c.Equals(subscriptionId)))
-                throw new FaultedSubscriptionException(subscriptionId, streamId);
 
             try
             {
