@@ -36,10 +36,35 @@
     <file src="OrleansCodeGenerator.pdb" target="tools" />
     <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
     <file src="Microsoft.CodeAnalysis.dll" target="tools" />
-    <file src="Microsoft.Extensions.DependencyInjection.dll" target="tools" />
     <file src="Microsoft.Extensions.DependencyInjection.Abstractions.dll" target="tools" />
+    <file src="Microsoft.Extensions.DependencyInjection.dll" target="tools" />
+    <file src="Microsoft.Win32.Primitives.dll" target="tools" />
     <file src="Newtonsoft.Json.dll" target="tools" />
-    <file src="System.Reflection.Metadata.dll" target="tools" />
+    <file src="System.AppContext.dll" target="tools" />
     <file src="System.Collections.Immutable.dll" target="tools" />
+    <file src="System.Console.dll" target="tools" />
+    <file src="System.Diagnostics.DiagnosticSource.dll" target="tools" />
+    <file src="System.Diagnostics.FileVersionInfo.dll" target="tools" />
+    <file src="System.Diagnostics.StackTrace.dll" target="tools" />
+    <file src="System.Globalization.Calendars.dll" target="tools" />
+    <file src="System.IO.Compression.dll" target="tools" />
+    <file src="System.IO.Compression.ZipFile.dll" target="tools" />
+    <file src="System.IO.FileSystem.dll" target="tools" />
+    <file src="System.IO.FileSystem.Primitives.dll" target="tools" />
+    <file src="System.Net.Http.dll" target="tools" />
+    <file src="System.Net.Sockets.dll" target="tools" />
+    <file src="System.Reflection.Metadata.dll" target="tools" />
+    <file src="System.Runtime.InteropServices.RuntimeInformation.dll" target="tools" />
+    <file src="System.Security.Cryptography.Algorithms.dll" target="tools" />
+    <file src="System.Security.Cryptography.Encoding.dll" target="tools" />
+    <file src="System.Security.Cryptography.Primitives.dll" target="tools" />
+    <file src="System.Security.Cryptography.X509Certificates.dll" target="tools" />
+    <file src="System.Text.Encoding.CodePages.dll" target="tools" />
+    <file src="System.Threading.Thread.dll" target="tools" />
+    <file src="System.ValueTuple.dll" target="tools" />
+    <file src="System.Xml.ReaderWriter.dll" target="tools" />
+    <file src="System.Xml.XmlDocument.dll" target="tools" />
+    <file src="System.Xml.XPath.dll" target="tools" />
+    <file src="System.Xml.XPath.XDocument.dll" target="tools" />
   </files>
 </package>
