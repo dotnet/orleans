@@ -83,7 +83,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         [Fact]
         public async Task CreateActivationWithBothVersion()
         {
-            const int numberOfGrains = 100;
+            const float numberOfGrains = 300;
 
             await DeployCluster();
             await StartSiloV2();
@@ -98,8 +98,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 versionCounter[v - 1]++;
             }
 
-            Assert.InRange(versionCounter[0], 30, 70);
-            Assert.InRange(versionCounter[1], 30, 70);
+            // 99.95% chance of success
+            Assert.InRange(versionCounter[0]/numberOfGrains, 0.35, 0.65);
+            Assert.InRange(versionCounter[1]/numberOfGrains, 0.35, 0.65);
         }
     }
 }
