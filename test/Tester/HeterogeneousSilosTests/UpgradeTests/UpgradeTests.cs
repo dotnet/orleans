@@ -98,8 +98,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 versionCounter[v - 1]++;
             }
 
-            Assert.InRange(versionCounter[0], 40, 60);
-            Assert.InRange(versionCounter[1], 40, 60);
+            Assert.InRange(versionCounter[0], 30, 70);
+            Assert.InRange(versionCounter[1], 30, 70);
         }
     }
 }
