@@ -27,8 +27,8 @@ namespace Orleans.Providers.Streams.Generator
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
-            var evictionStrategy = new ExplicitEvictionStrategy();
-            evictionStrategy.PurgeObservable = cache;
+            TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
+            var evictionStrategy = new ExplicitEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
         }
 
@@ -38,6 +38,8 @@ namespace Orleans.Providers.Streams.Generator
             public Guid StreamGuid;
             public string StreamNamespace;
             public long SequenceNumber;
+            public DateTime EnqueueTimeUtc;
+            public DateTime DequeueTimeUtc;
             public ArraySegment<byte> Payload;
         }
 
@@ -60,68 +62,26 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private class ExplicitEvictionStrategy : IEvictionStrategy<CachedMessage>
+        private class ExplicitEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
         {
-            private FixedSizeBuffer currentBuffer;
-            private Queue<FixedSizeBuffer> purgedBuffers;
-            public ExplicitEvictionStrategy()
-            {
-                this.purgedBuffers = new Queue<FixedSizeBuffer>();
-            }
-            public IPurgeObservable<CachedMessage> PurgeObservable { set; private get; }
-
-            public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
-
-            //Explicitly purge all messages in purgeRequestBlock
-            public void PerformPurge(DateTime utcNow, IDisposable purgeRequest)
-            {
-                //if the cache is empty, then nothing to purge, return
-                if (this.PurgeObservable.IsEmpty)
-                    return;
-                var itemCountBeforePurge = this.PurgeObservable.ItemCount;
-                CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
-                CachedMessage? lastMessagePurged = null;
-                while (!this.PurgeObservable.IsEmpty)
-                {
-                    var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
-                    if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
-                    {
-                        break;
-                    }
-                    lastMessagePurged = oldestMessageInCache;
-                    this.PurgeObservable.RemoveOldestMessage();
-                }
-
-                //return purged buffer to the pool. except for the current buffer.
-                //if purgeCandidate is current buffer, put it in purgedBuffers and free it in next circle
-                var purgeCandidate = purgeRequest as FixedSizeBuffer;
-                this.purgedBuffers.Enqueue(purgeCandidate);
-                while (this.purgedBuffers.Count > 0)
-                {
-                    if (this.purgedBuffers.Peek() != this.currentBuffer)
-                    {
-                        this.purgedBuffers.Dequeue().Dispose();
-                    }
-                    else { break; }
-                }  
+            public ExplicitEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate)
+                : base(logger, purgePredicate)
+            {            
             }
 
-            public void OnBlockAllocated(IDisposable newBlock)
+            protected override object GetBlockId(CachedMessage? cachedMessage)
             {
-                var newBuffer = newBlock as FixedSizeBuffer;
-                this.currentBuffer = newBuffer;
-                this.currentBuffer.SetPurgeAction(this.PerformPurge);
+                return cachedMessage?.Payload.Array;
             }
 
-            private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest)
+            protected override DateTime GetDequeueTimeUtc(ref CachedMessage cachedMessage)
             {
-                var purgedResource = (FixedSizeBuffer)purgeRequest;
-                return cachedMessage.Payload.Array == purgedResource.Id;
+                return cachedMessage.DequeueTimeUtc;
             }
 
-            private void PerformPurge(IDisposable purgeRequest)
+            protected override DateTime GetEnqueueTimeUtc(ref CachedMessage cachedMessage)
             {
-                this.PerformPurge(DateTime.UtcNow, purgeRequest);
+                return cachedMessage.EnqueueTimeUtc;
             }
         }
 
@@ -131,7 +91,7 @@ namespace Orleans.Providers.Streams.Generator
             private readonly SerializationManager serializationManager;
             private FixedSizeBuffer currentBuffer;
 
-            public Action<IDisposable> OnBlockAllocated { private get; set; }
+            public Action<FixedSizeBuffer> OnBlockAllocated { private get; set; }
 
             public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager)
             {
@@ -159,6 +119,8 @@ namespace Orleans.Providers.Streams.Generator
                 cachedMessage.StreamGuid = setreamPosition.StreamIdentity.Guid;
                 cachedMessage.StreamNamespace = setreamPosition.StreamIdentity.Namespace;
                 cachedMessage.SequenceNumber = queueMessage.RealToken.SequenceNumber;
+                cachedMessage.EnqueueTimeUtc = queueMessage.EnqueueTimeUtc;
+                cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
                 return setreamPosition;
             }

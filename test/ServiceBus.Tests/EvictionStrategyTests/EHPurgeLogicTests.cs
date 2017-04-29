@@ -30,7 +30,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private SerializationManager serializationManager;
         private EventHubAdapterReceiver receiver1;
         private EventHubAdapterReceiver receiver2;
-        private FixedSizeObjectPool<FixedSizeBuffer> bufferPool;
+        private ObjectPool<FixedSizeBuffer> bufferPool;
         private int bufferPoolSizeInMB;
         private Logger logger;
         private TimeSpan timeOut = TimeSpan.FromSeconds(30);
@@ -55,7 +55,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             this.bufferPoolSizeInMB = EventHubStreamProviderSettings.DefaultCacheSizeMb;
             var oneKB = 1024;
-            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB), this.bufferPoolSizeInMB);
+            this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB), this.bufferPoolSizeInMB);
 
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
@@ -186,7 +186,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //Each cache should each have buffers allocated
             this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.InUseBuffers.Count > 0));
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
 
             //perform purge
             IList<IBatchContainer> ignore;
@@ -195,29 +194,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //Each cache should each have buffers purged, while current buffer stay in inUseBuffers
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
-            this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.PurgedBuffers.Count > 0));
-
-            var purgedBuffers = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy =>
-            {
-                var purgedBufferList = strategy.PurgedBuffers.ToArray<FixedSizeBuffer>();
-                foreach(var purgedBuffer in purgedBufferList)
-                    purgedBuffers.Add(purgedBuffer);
-            });
-
-            var newBuffersAllocated = new List<FixedSizeBuffer>();
-            //keep allocate buffer on buffer pool to make it full, so that buffer pool will request purged buffers to return
-            int bufferToAllocate = EventHubStreamProviderSettings.DefaultCacheSizeMb;
-            while (bufferToAllocate > 0)
-            {
-                newBuffersAllocated.Add(this.bufferPool.Allocate());
-                bufferToAllocate--;
-            }
 
             //Purged buffers should be returned to the pool and used to allocate new buffer
-            purgedBuffers.ForEach(buffer => Assert.True(newBuffersAllocated.Contains(buffer)));
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(0, strategy.PurgedBuffers.Count));
         }
 #endif
 

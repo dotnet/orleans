@@ -29,6 +29,7 @@ namespace Orleans.Providers
         private Logger logger;
         private String providerName;
         private IGrainFactory grainFactory;
+        private TimePurgePredicate purgePredicate;
 
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
@@ -66,12 +67,13 @@ namespace Orleans.Providers
             providerName = name;
             queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             adapterConfig = new MemoryAdapterConfig(providerName);
+            purgePredicate = new TimePurgePredicate(adapterConfig.DataMinTimeInCache, adapterConfig.DataMaxAgeInCache);
             grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
             // 10 meg buffer pool.  10 1 meg blocks
-            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), adapterConfig.CacheSizeMb);
+            bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), adapterConfig.CacheSizeMb);
 
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }
@@ -147,7 +149,7 @@ namespace Orleans.Providers
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new MemoryPooledCache<TSerializer>(bufferPool, logger.GetSubLogger("messagecache", "-"), this.serializer);
+            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger.GetSubLogger("messagecache", "-"), this.serializer);
         }
 
         /// <summary>

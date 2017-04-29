@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -27,13 +23,13 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="utcNow"></param>
         /// <param name="purgeRequest"></param>
-        void PerformPurge(DateTime utcNow, IDisposable purgeRequest = null);
+        void PerformPurge(DateTime utcNow, FixedSizeBuffer purgeRequest = null);
 
         /// <summary>
         /// Method which should be called when data adapter allocated a new block
         /// </summary>
         /// <param name="newBlock"></param>
-        void OnBlockAllocated(IDisposable newBlock);
+        void OnBlockAllocated(FixedSizeBuffer newBlock);
     }
 
     /// <summary>

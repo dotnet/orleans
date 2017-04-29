@@ -30,6 +30,43 @@ namespace Orleans.Providers
         /// </summary>
         public int TotalQueueCount { get; set; }
 
+        //TODO - below time purge configuration is duplicated in eventhub adatper settings - consider adding common time purge configuration - jbragg
+        /// <summary>
+        /// DataMinTimeInCache setting name.
+        /// </summary>
+        public const string DataMinTimeInCacheName = "DataMinTimeInCache";
+        /// <summary>
+        /// Drfault DataMinTimeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(3);
+        private TimeSpan? dataMinTimeInCache;
+        /// <summary>
+        /// Minimum time message will stay in cache before it is available for time based purge.
+        /// </summary>
+        public TimeSpan DataMinTimeInCache
+        {
+            get { return dataMinTimeInCache ?? DefaultDataMinTimeInCache; }
+            set { dataMinTimeInCache = value; }
+        }
+
+        /// <summary>
+        /// DataMaxAgeInCache setting name.
+        /// </summary>
+        public const string DataMaxAgeInCacheName = "DataMaxAgeInCache";
+        /// <summary>
+        /// Default DataMaxAgeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(10);
+        private TimeSpan? dataMaxAgeInCache;
+        /// <summary>
+        /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
+        /// </summary>
+        public TimeSpan DataMaxAgeInCache
+        {
+            get { return dataMaxAgeInCache ?? DefaultDataMaxAgeInCache; }
+            set { dataMaxAgeInCache = value; }
+        }
+
         /// <summary>
         /// Cache size of FixedSizeObjectPool measured in Mb
         /// </summary>

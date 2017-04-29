@@ -5,14 +5,11 @@ using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
@@ -24,7 +21,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy)
             { }
         
-        public int ItemCount { get { return this.cache.ItemCount; } }
+        public int ItemCount => this.cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy
     {
@@ -32,8 +29,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base(logger, cacheMonitor, monitorWriteInterval, timePurage)
         { }
 
-        public Queue<FixedSizeBuffer> InUseBuffers { get { return this.inUseBuffers; } }
-        public Queue<FixedSizeBuffer> PurgedBuffers { get { return this.purgedBuffers; } }
+        public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
     }
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter

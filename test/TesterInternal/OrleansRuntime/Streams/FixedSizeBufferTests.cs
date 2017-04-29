@@ -68,18 +68,6 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(0, segment.Count);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void PurgeTestBvt()
-        {
-            var myTestPool = new MyTestPooled();
-            IObjectPool<FixedSizeBuffer> pool = myTestPool;
-            FixedSizeBuffer buffer = pool.Allocate();
-            buffer.SetPurgeAction(request => MyTestPurge(request, buffer));
-            buffer.SignalPurge();
-            Assert.Equal(1, myTestPool.Allocated);
-            Assert.Equal(1, myTestPool.Freed);
-        }
-
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)
         {
             Assert.Equal<object>(resource, actualBuffer);
