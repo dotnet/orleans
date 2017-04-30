@@ -61,6 +61,10 @@ namespace UnitTests
             str = "5"; // Default unit is seconds
             ts = TimeSpan.FromSeconds(5);
             Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
+
+            str = "922337203685477.5807ms";
+            ts = TimeSpan.MaxValue;
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -314,11 +318,11 @@ namespace UnitTests
             var cfg = new ClientConfiguration();
             cfg.TraceFilePattern = string.Empty;
             output.WriteLine(cfg.ToString());
-           Assert.Null(cfg.TraceFileName);
+            Assert.Null(cfg.TraceFileName);
 
             cfg.TraceFilePattern = null;
             output.WriteLine(cfg.ToString());
-           Assert.Null(cfg.TraceFileName);
+            Assert.Null(cfg.TraceFileName);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -338,11 +342,11 @@ namespace UnitTests
             var cfg = new NodeConfiguration();
             cfg.TraceFilePattern = string.Empty;
             output.WriteLine(cfg.ToString());
-           Assert.Null(cfg.TraceFileName); // TraceFileName should be null
+            Assert.Null(cfg.TraceFileName); // TraceFileName should be null
 
             cfg.TraceFilePattern = null;
             output.WriteLine(cfg.ToString());
-           Assert.Null(cfg.TraceFileName); // TraceFileName should be null
+            Assert.Null(cfg.TraceFileName); // TraceFileName should be null
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
@@ -361,7 +365,6 @@ namespace UnitTests
 
             Assert.Equal(1, LogManager.TelemetryConsumers.Count);
             Assert.Equal(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName); // TelemetryConsumers consumer type #1
-
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
@@ -424,7 +427,6 @@ namespace UnitTests
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
             Assert.True(hasNodeConfig); // Node Primary has config
 
-
             string limitName;
             LimitValue limit;
             //Assert.True(config.LimitManager.LimitValues.Count >= 3, "Number of LimitValues: " + string.Join(",", config.LimitValues));
@@ -485,7 +487,6 @@ namespace UnitTests
             NodeConfiguration config;
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
             Assert.True(hasNodeConfig, "Node Primary has config");
-
 
             string limitName;
             LimitValue limit;
@@ -656,7 +657,6 @@ namespace UnitTests
             var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Storage"];
             ValidateProviderConfigs(providerConfigs, numProviders);
 
-
             ProviderConfiguration pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[0];
             Assert.Equal("orleanstest1", pCfg.Name); // Provider name #1
             Assert.Equal("AzureTable", pCfg.Type); // Provider type #1
@@ -682,7 +682,7 @@ namespace UnitTests
                 Assert.Equal(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type); // Provider type #" + i
             }
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
         public void Config_StorageProvider_SomeConfig()
         {
@@ -736,7 +736,6 @@ namespace UnitTests
 
             Assert.NotNull(orleansConfig.Defaults.AdditionalAssemblyDirectories); // Additional Assembly Dictionary
             Assert.Equal(numPaths, orleansConfig.Defaults.AdditionalAssemblyDirectories.Count); // Additional Assembly count
-
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
