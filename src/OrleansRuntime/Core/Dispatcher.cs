@@ -641,7 +641,10 @@ namespace Orleans.Runtime
 
 		private bool TryAddressMessageFast(Message message)
 		{
-            AddressesAndTag addressesAndTag;
+			var targetAddress = message.TargetAddress;
+			if (targetAddress.IsComplete) return true;
+
+			AddressesAndTag addressesAndTag;
 
 			if (catalog.FastLookup(message.TargetGrain, out addressesAndTag))
 			{
