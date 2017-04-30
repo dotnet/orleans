@@ -10,7 +10,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
-
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -630,42 +630,26 @@ namespace Orleans.Runtime
 		// Task returned by AsyncSendMessage()
 		internal void SendMessage(Message message, ActivationData sendingActivation = null)
 		{
-			if (TrySendMessageToLocalActivation(message))
+			if (TryAddressMessageFast(message))
 			{
+				TransportMessage(message);
 				return;
 			}
 
 			AsyncSendMessage(message, sendingActivation).Ignore();
 		}
 
-		private bool TrySendMessageToLocalActivation(Message message)
+		private bool TryAddressMessageFast(Message message)
 		{
-			List<ActivationData> localActivation;
+            AddressesAndTag addressesAndTag;
 
-			if (message.TargetGrain.IsClient || message.SendingGrain.IsClient)
+			if (catalog.FastLookup(message.TargetGrain, out addressesAndTag))
 			{
-				return false;
-			}
-
-			if (catalog.LocalLookup(message.TargetGrain, out localActivation))
-			{
-				// todo: consolidate with placement directors (e.g. use FastLookup) and incoming message queue
-				for (var i = 0; i < localActivation.Count; i++)
+				// todo: consolidate with placement directors
+				if (addressesAndTag.Addresses.Count > 0)
 				{
-					var targetActivation = localActivation[i];
-					if (targetActivation.IsStatelessWorker && localActivation.Count > 1)
-					{
-						//var rand = new FastRandom(message.TargetGrain.GetHashCode());
-						// should use placement director, for now using dirty 
-						// targetActivation = localActivation[rand.Next(localActivation.Count - 1)];
-					}
-
-					if (targetActivation.GrainInstance != null && targetActivation.State == ActivationState.Valid)
-					{
-						message.TargetAddress = targetActivation.Address;
-						HandleIncomingRequest(message, targetActivation);
-						return true;
-					}
+					message.TargetAddress = addressesAndTag.Addresses[0];
+					return true;
 				}
 			}
 			return false;
