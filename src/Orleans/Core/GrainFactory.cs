@@ -50,19 +50,13 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Casts an <see cref="IAddressable"/> to a concrete <see cref="GrainReference"/> implementaion.
+        /// Casts an <see cref="IAddressable"/> to a concrete <see cref="GrainReference"/> implementation.
         /// </summary>
         /// <param name="existingReference">The existing <see cref="IAddressable"/> reference.</param>
         /// <returns>The concrete <see cref="GrainReference"/> implementation.</returns>
         internal delegate object GrainReferenceCaster(IAddressable existingReference);
 
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
         {
             Type interfaceType = typeof(TGrainInterface);
@@ -71,13 +65,7 @@ namespace Orleans
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
         {
             Type interfaceType = typeof(TGrainInterface);
@@ -86,13 +74,7 @@ namespace Orleans
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
@@ -102,14 +84,8 @@ namespace Orleans
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="keyExtension">The key extention of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
+
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
@@ -121,14 +97,7 @@ namespace Orleans
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="keyExtension">The key extention of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
@@ -152,28 +121,14 @@ namespace Orleans
         /// <inheritdoc />
         public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key, this.runtimeClient);
 
-        /// <summary>
-        /// Creates a reference to the provided <paramref name="obj"/>.
-        /// </summary>
-        /// <typeparam name="TGrainObserverInterface">
-        /// The specific <see cref="IGrainObserver"/> type of <paramref name="obj"/>.
-        /// </typeparam>
-        /// <param name="obj">The object to create a reference to.</param>
-        /// <returns>The reference to <paramref name="obj"/>.</returns>
+        /// <inheritdoc />
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
             return Task.FromResult(this.CreateObjectReferenceImpl<TGrainObserverInterface>(obj));
         }
 
-        /// <summary>
-        /// Deletes the provided object reference.
-        /// </summary>
-        /// <typeparam name="TGrainObserverInterface">
-        /// The specific <see cref="IGrainObserver"/> type of <paramref name="obj"/>.
-        /// </typeparam>
-        /// <param name="obj">The reference being deleted.</param>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        /// <inheritdoc />
         public Task DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
