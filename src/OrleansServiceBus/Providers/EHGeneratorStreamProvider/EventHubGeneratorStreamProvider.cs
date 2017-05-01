@@ -50,7 +50,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// DrainEventCountName
+        /// StreamDataGeneratorTypeName
         /// </summary>
         public static string StreamDataGeneratorTypeName = nameof(StreamDataGeneratorType);
         /// <summary>
@@ -74,6 +74,16 @@ namespace Orleans.ServiceBus.Providers
         {
             this.drainEventCount = providerConfiguration.GetIntProperty(DrainEventCountName, DefaultDrainEventCount);
             this.streamDataGeneratorType = providerConfiguration.GetTypeProperty(StreamDataGeneratorTypeName, DefaultStreamDataGeneratorType);
+        }
+
+        /// <summary>
+        /// Write data generating config to a property bag
+        /// </summary>
+        /// <param name="properties"></param>
+        public void WriteDataGeneratingConfig(Dictionary<string, string> properties)
+        {
+            properties.Add(DrainEventCountName, this.DrainEventCount.ToString());
+            properties.Add(StreamDataGeneratorTypeName, this.StreamDataGeneratorType.AssemblyQualifiedName);
         }
     }
     /// <summary>

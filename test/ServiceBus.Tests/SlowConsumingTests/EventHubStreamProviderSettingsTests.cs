@@ -1,4 +1,5 @@
-﻿using Orleans.Providers;
+﻿using Microsoft.Azure.EventHubs;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using System;
@@ -8,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace NonSilo.Tests.StreamingTests
+namespace ServiceBus.Tests.SlowConsumingTests
 {
 
     /// <summary>

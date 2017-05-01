@@ -1,5 +1,6 @@
 ﻿#if NETSTANDARD
 using Microsoft.Azure.EventHubs;
+using static Microsoft.Azure.EventHubs.EventData;
 #else
 using Microsoft.ServiceBus.Messaging;
 #endif
@@ -35,55 +36,124 @@ namespace Orleans.ServiceBus.Providers
         }
 #endif
     }
-
+#if NETSTANDARD
     internal class EventDataMethodCache
     {
         public static EventDataMethodCache Instance = new EventDataMethodCache();
-        private PropertyInfo offSetProperty;
-        private PropertyInfo sequenceNumberProperty;
-        private PropertyInfo enqueueTimeUtcProperty;
-#if NETSTANDARD
-        private PropertyInfo partitionKeyProperty;
-#endif
+        private Action<object, object> systemPropertiesSetter; 
         public EventDataMethodCache()
         {
-            var sampleData = new EventData(new byte[1]);
-#if NETSTANDARD
-            var offSetPropertyName = nameof(sampleData.SystemProperties.Offset);
-            var sequenceNumberPropertyName = nameof(sampleData.SystemProperties.SequenceNumber);
-            var enqueueTimeUtcPropertyName = nameof(sampleData.SystemProperties.EnqueuedTimeUtc);
-            var partitionKeyPropertyName = nameof(sampleData.SystemProperties.PartitionKey);
-
-            this.partitionKeyProperty = typeof(EventData).GetProperty(partitionKeyPropertyName);
-#else
-            var offSetPropertyName = nameof(sampleData.Offset);
-            var sequenceNumberPropertyName = nameof(sampleData.SequenceNumber);
-            var enqueueTimeUtcPropertyName = nameof(sampleData.EnqueuedTimeUtc);
-#endif
-            this.offSetProperty = typeof(EventData).GetProperty(offSetPropertyName);
-            this.sequenceNumberProperty = typeof(EventData).GetProperty(sequenceNumberPropertyName);
-            this.enqueueTimeUtcProperty = typeof(EventData).GetProperty(enqueueTimeUtcPropertyName);
-
+            var ignore = new EventData(new byte[1]);
+            var systemPropertiesName = nameof(ignore.SystemProperties);
+            this.systemPropertiesSetter = typeof(EventData).GetProperty(systemPropertiesName).SetValue;
         }
-
+        private void SetEmptySystemPropertiesIfNull(EventData eventData)
+        {
+            if (eventData.SystemProperties == null)
+            {
+                var emptySystemProperties = SystemPropertiesCollectionMethodCache.Instance.Create();
+                this.systemPropertiesSetter(eventData, emptySystemProperties);
+            }
+        }
         public void SetOffset(EventData eventData, string offSet)
         {
-            this.offSetProperty.SetValue(eventData, offSet);
+            SetEmptySystemPropertiesIfNull(eventData);
+            SystemPropertiesCollectionMethodCache.Instance.SetOffset(eventData.SystemProperties, offSet);
         }
 
         public void SetSequenceNumber(EventData eventData, long sequenceNumber)
         {
-            this.sequenceNumberProperty.SetValue(eventData, sequenceNumber);
+            SetEmptySystemPropertiesIfNull(eventData);
+            SystemPropertiesCollectionMethodCache.Instance.SetSequenceNumber(eventData.SystemProperties, sequenceNumber);
         }
         public void SetEnqueuedTimeUtc(EventData eventData, DateTime enqueueTime)
         {
-            this.enqueueTimeUtcProperty.SetValue(eventData, enqueueTime);
+            SetEmptySystemPropertiesIfNull(eventData);
+            SystemPropertiesCollectionMethodCache.Instance.SetEnqueuedTimeUtc(eventData.SystemProperties, enqueueTime);
         }
-#if NETSTANDARD
+
         public void SetPartitionKey(EventData eventData, string partitionKey)
         {
-            this.partitionKeyProperty.SetValue(eventData, partitionKey);
+            SetEmptySystemPropertiesIfNull(eventData);
+            SystemPropertiesCollectionMethodCache.Instance.SetPartitionKey(eventData.SystemProperties, partitionKey);
         }
-#endif
     }
+    internal class SystemPropertiesCollectionMethodCache
+    {
+        public static SystemPropertiesCollectionMethodCache Instance = new SystemPropertiesCollectionMethodCache();
+        private Action<object, object> offSetPropertySetter;
+        private Action<object, object> sequenceNumberPropertySetter;
+        private Action<object, object> enqueueTimeUtcPropertySetter;
+        private Action<object, object> paritionKeyPropertySetter;
+        private ConstructorInfo zeroArgConstructorInfo;
+        public SystemPropertiesCollectionMethodCache()
+        {
+            EventData ignore = new EventData(new byte[1]);
+            var offSetPropertyName = nameof(ignore.SystemProperties.Offset);
+            var sequenceNumberPropertyName = nameof(ignore.SystemProperties.SequenceNumber);
+            var enqueueTimeUtcPropertyName = nameof(ignore.SystemProperties.EnqueuedTimeUtc);
+            var partitionKeyPropertyName = nameof(ignore.SystemProperties.PartitionKey);
+            this.offSetPropertySetter = typeof(SystemPropertiesCollection).GetProperty(offSetPropertyName).SetValue;
+            this.sequenceNumberPropertySetter = typeof(SystemPropertiesCollection).GetProperty(sequenceNumberPropertyName).SetValue;
+            this.enqueueTimeUtcPropertySetter = typeof(SystemPropertiesCollection).GetProperty(enqueueTimeUtcPropertyName).SetValue;
+            this.paritionKeyPropertySetter = typeof(SystemPropertiesCollection).GetProperty(partitionKeyPropertyName).SetValue;
+            this.zeroArgConstructorInfo =
+                typeof(SystemPropertiesCollection).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)[0];
+        }
+        public void SetOffset(SystemPropertiesCollection systemProperties, string offSet)
+        {
+            this.offSetPropertySetter(systemProperties, offSet);
+        }
+
+        public void SetSequenceNumber(SystemPropertiesCollection systemProperties, long sequenceNumber)
+        {
+            this.sequenceNumberPropertySetter(systemProperties, sequenceNumber);
+        }
+        public void SetEnqueuedTimeUtc(SystemPropertiesCollection systemProperties, DateTime enqueueTime)
+        {
+            this.enqueueTimeUtcPropertySetter(systemProperties, enqueueTime);
+        }
+        public void SetPartitionKey(SystemPropertiesCollection systemProperties, string paritionKey)
+        {
+            this.paritionKeyPropertySetter(systemProperties, paritionKey);
+        }
+        public SystemPropertiesCollection Create()
+        {
+            return (SystemPropertiesCollection)this.zeroArgConstructorInfo.Invoke(null);
+        }
+    }
+#else
+    internal class EventDataMethodCache
+    {
+        public static EventDataMethodCache Instance = new EventDataMethodCache();
+        private Action<object, object> offSetPropertySetter;
+        private Action<object, object> sequenceNumberPropertySetter;
+        private Action<object, object> enqueueTimeUtcPropertySetter;
+
+        public EventDataMethodCache()
+        {
+            var ignore = new EventData(new byte[1]);
+            var offSetPropertyName = nameof(ignore.Offset);
+            var sequenceNumberPropertyName = nameof(ignore.SequenceNumber);
+            var enqueueTimeUtcPropertyName = nameof(ignore.EnqueuedTimeUtc);
+            this.offSetPropertySetter = typeof(EventData).GetProperty(offSetPropertyName).SetValue;
+            this.sequenceNumberPropertySetter = typeof(EventData).GetProperty(sequenceNumberPropertyName).SetValue;
+            this.enqueueTimeUtcPropertySetter = typeof(EventData).GetProperty(enqueueTimeUtcPropertyName).SetValue;
+        }
+
+        public void SetOffset(EventData eventData, string offSet)
+        {
+            this.offSetPropertySetter(eventData, offSet);
+        }
+
+        public void SetSequenceNumber(EventData eventData, long sequenceNumber)
+        {
+            this.sequenceNumberPropertySetter(eventData, sequenceNumber);
+        }
+        public void SetEnqueuedTimeUtc(EventData eventData, DateTime enqueueTime)
+        {
+            this.enqueueTimeUtcPropertySetter(eventData, enqueueTime);
+        }
+    }
+#endif
 }

@@ -31,8 +31,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private const double flowControlThredhold = 0.6;
-        public static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
+        public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
+            new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
         private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
             new EventHubSettings(
@@ -54,6 +54,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
                 ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                 ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
+                ProviderSettings.DrainEventCount = 3;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }
@@ -86,6 +87,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
                 ProviderSettings.WriteProperties(settings);
+                ProviderSettings.WriteDataGeneratingConfig(settings);
                 EventHubConfig.Value.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 
@@ -104,7 +106,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             fixture.EnsurePreconditionsMet();
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
