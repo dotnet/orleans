@@ -350,7 +350,7 @@ namespace Orleans
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public sealed class ImplicitStreamSubscriptionAttribute : Attribute
+    public class ImplicitStreamSubscriptionAttribute : Attribute
     {
         public IStreamNamespacePredicate Predicate { get; }
 
@@ -367,6 +367,11 @@ namespace Orleans
         public ImplicitStreamSubscriptionAttribute(Type predicateType)
         {
             Predicate = (IStreamNamespacePredicate)Activator.CreateInstance(predicateType);
+        }
+
+        public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate)
+        {
+            Predicate = predicate;
         }
     }
 }
