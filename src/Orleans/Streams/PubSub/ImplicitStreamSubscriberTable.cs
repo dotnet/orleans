@@ -64,7 +64,7 @@ namespace Orleans.Streams
                 throw new ArgumentException("The stream ID doesn't have an associated namespace.", nameof(streamId));
             }
 
-            HashSet<int> entry = GetOrAddImplicitSubscribersSet(streamId.Namespace);
+            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamId.Namespace);
 
             var result = new Dictionary<Guid, IStreamConsumerExtension>();
             foreach (var i in entry)
@@ -81,9 +81,9 @@ namespace Orleans.Streams
             return result;
         }
 
-        private HashSet<int> GetOrAddImplicitSubscribersSet(string streamNamespace)
+        private HashSet<int> GetOrAddImplicitSubscriberTypeCodes(string streamNamespace)
         {
-            return table.GetOrAdd(streamNamespace, FindImplicitSubscribers);
+            return table.GetOrAdd(streamNamespace, FindImplicitSubscriberTypeCodes);
         }
 
         /// <summary>
@@ -173,7 +173,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            HashSet<int> entry = GetOrAddImplicitSubscribersSet(streamNamespace);
+            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamNamespace);
             return entry.Contains(grainIdTypeCode);
         }
 
@@ -182,7 +182,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamNamespace">The stream namespace to find subscribers too.</param>
         /// <returns></returns>
-        private HashSet<int> FindImplicitSubscribers(string streamNamespace)
+        private HashSet<int> FindImplicitSubscriberTypeCodes(string streamNamespace)
         {
             HashSet<int> result = new HashSet<int>();
             foreach (Tuple<IStreamNamespacePredicate, int> predicate in predicates)
