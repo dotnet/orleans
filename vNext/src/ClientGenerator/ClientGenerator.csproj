@@ -1,6 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
+    <Title>Microsoft Orleans Build-time Code Generation</Title>
+    <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+    <IsTool>true</IsTool>
+    <IncludeReferencedProjects>true</IncludeReferencedProjects>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
@@ -18,21 +24,38 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\..\src\ClientGenerator\**\*.cs"
-      Exclude="
-        ..\..\..\src\ClientGenerator\obj\**\*.cs;
-        ..\..\..\src\ClientGenerator\bin\**\*.cs;
-        ..\..\..\src\ClientGenerator\Properties\**\*.cs" />
+    <Compile Include="..\..\..\src\ClientGenerator\**\*.cs" Exclude="..\..\..\src\ClientGenerator\obj\**\*.cs;..\..\..\src\ClientGenerator\bin\**\*.cs;..\..\..\src\ClientGenerator\Properties\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Runtime" Version="4.3.0" />
+    <PackageReference Include="System.Runtime" Version="4.3.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\Orleans\Orleans.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Orleans.SDK.targets">
+      <Pack>true</Pack>
+      <PackagePath>build\$(PackageId).targets</PackagePath>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.PlatformServices.dll;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+  
 </Project>

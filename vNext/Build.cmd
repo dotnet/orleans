@@ -21,7 +21,6 @@ SET BINARIES_PATH=%CMDHOME%\Binaries
 SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 
 SET SOLUTION=%CMDHOME%\Orleans.vNext.sln
-SET CodeGenProject=%CMDHOME%\src\OrleansCodeGeneratorBuildMetaPackage\OrleansCodeGeneratorBuildMetaPackage.csproj
 
 if "%1" == "Pack" GOTO :Package
 
@@ -40,14 +39,6 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configurat
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
-call %_dotnet% restore "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo RESTORE ok for %CONFIGURATION% %CodeGenProject%
-
-call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
-
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
@@ -56,15 +47,6 @@ SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo BUILD ok for %CONFIGURATION% %SOLUTION%
-
-call %_dotnet% restore "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo RESTORE ok for %CONFIGURATION% %CodeGenProject%
-
-call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %CodeGenProject%
-
 
 :Package
 @echo Package Debug ============================
@@ -78,10 +60,6 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo PACKAGE ok for %CONFIGURATION% %CodeGenProject%
-
 @echo Package Release ============================
 
 SET CONFIGURATION=Release
@@ -90,10 +68,6 @@ SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CONFIGURATION% %SOLUTION%
-
-call %_dotnet% pack %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%CodeGenProject%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo PACKAGE ok for %CONFIGURATION% %CodeGenProject%
 
 
 :BuildFinished
