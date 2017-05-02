@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -9,12 +10,12 @@ namespace Orleans.Streams
     [Serializable]
     internal class ImplicitStreamSubscriberTable
     {
-        private readonly Dictionary<string, HashSet<int>> table;
+        private readonly ConcurrentDictionary<string, HashSet<int>> table;
         private readonly List<Tuple<IStreamNamespacePredicate, int>> predicates;
 
         public ImplicitStreamSubscriberTable()
         {
-            table = new Dictionary<string, HashSet<int>>();
+            table = new ConcurrentDictionary<string, HashSet<int>>();
             predicates = new List<Tuple<IStreamNamespacePredicate, int>>();
         }
 
@@ -82,13 +83,7 @@ namespace Orleans.Streams
 
         private HashSet<int> GetOrAddImplicitSubscribersSet(string streamNamespace)
         {
-            HashSet<int> entry;
-            if (!table.TryGetValue(streamNamespace, out entry))
-            {
-                entry = FindImplicitSubscribers(streamNamespace);
-                table[streamNamespace] = entry;
-            }
-            return entry;
+            return table.GetOrAdd(streamNamespace, FindImplicitSubscribers);
         }
 
         /// <summary>
