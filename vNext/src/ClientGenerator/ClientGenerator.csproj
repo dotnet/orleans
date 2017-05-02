@@ -51,37 +51,7 @@
       <PackagePath>build\$(PackageId).targets</PackagePath>
       <Visible>false</Visible>
     </None>
-    <None Include="$(OutDir)/ClientGenerator.exe.config">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Orleans.PlatformServices.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Orleans.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/OrleansCodeGenerator.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Microsoft.CodeAnalysis.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/System*.dll">
+    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.PlatformServices.dll;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>
