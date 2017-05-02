@@ -11,7 +11,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     internal class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
     {
-        public class AdapterFactory : EventHubGeneratorStreamProvider.AdapterFactory
+        public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
             private readonly List<IEventHubQueueCache> createdCaches;
 

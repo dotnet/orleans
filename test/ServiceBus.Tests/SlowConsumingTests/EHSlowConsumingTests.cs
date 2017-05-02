@@ -121,7 +121,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventHubGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, streamId);
+                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, streamId);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
 
@@ -135,7 +135,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             //clean up test
             await StopHealthyConsumerGrainComing(healthyConsumers);
             await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventHubGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
+                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
         }
 
         private async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)

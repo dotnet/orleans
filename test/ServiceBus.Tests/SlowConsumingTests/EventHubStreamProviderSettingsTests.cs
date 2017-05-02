@@ -1,5 +1,4 @@
-﻿using Microsoft.Azure.EventHubs;
-using Orleans.Providers;
+﻿using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using System;

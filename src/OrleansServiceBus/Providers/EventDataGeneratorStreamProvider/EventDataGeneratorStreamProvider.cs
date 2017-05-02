@@ -90,7 +90,7 @@ namespace Orleans.ServiceBus.Providers
     /// This is a persistent stream provider that generates it's own events rather than reading them from Eventhub.
     /// This is primarily for test purposes.
     ///  </summary>
-    public class EventHubGeneratorStreamProvider : PersistentStreamProvider<EventHubGeneratorStreamProvider.AdapterFactory>
+    public class EventDataGeneratorStreamProvider : PersistentStreamProvider<EventDataGeneratorStreamProvider.AdapterFactory>
     {
         /// <summary>
         /// EHGeneratorStreamProvider.AdpaterFactory
