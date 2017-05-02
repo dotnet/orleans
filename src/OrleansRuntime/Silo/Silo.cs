@@ -282,6 +282,7 @@ namespace Orleans.Runtime
             services.AddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
             services.AddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
             services.AddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
+            services.AddSingleton<IPlacementDirector<HashBasedPlacement>, HashBasedPlacementDirector>();
             services.AddSingleton<DefaultPlacementStrategy>();
             services.AddSingleton<ClientObserversPlacementDirector>();
 

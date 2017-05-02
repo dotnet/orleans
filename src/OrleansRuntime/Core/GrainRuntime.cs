@@ -21,7 +21,8 @@ namespace Orleans.Runtime
         {
             this.runtimeClient = runtimeClient;
             ServiceId = globalConfig.ServiceId;
-            SiloIdentity = localSiloDetails.SiloAddress.ToLongString();
+            SiloAddress = localSiloDetails.SiloAddress;
+            SiloIdentity = SiloAddress.ToLongString();
             GrainFactory = grainFactory;
             TimerRegistry = timerRegistry;
             ReminderRegistry = reminderRegistry;
@@ -32,6 +33,8 @@ namespace Orleans.Runtime
         public Guid ServiceId { get; }
 
         public string SiloIdentity { get; }
+
+        public SiloAddress SiloAddress { get; }
 
         public IGrainFactory GrainFactory { get; }
         

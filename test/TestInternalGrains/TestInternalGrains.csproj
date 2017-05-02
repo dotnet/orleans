@@ -57,6 +57,7 @@
     <Compile Include="EchoTaskGrain.cs" />
     <Compile Include="ErrorGrain.cs" />
     <Compile Include="ExtensionTestGrain.cs" />
+    <Compile Include="HashBasedPlacementGrain.cs" />
     <Compile Include="InterlockedFlag.cs" />
     <Compile Include="MultifacetFactoryTestGrain.cs" />
     <Compile Include="MultifacetTestGrain.cs" />

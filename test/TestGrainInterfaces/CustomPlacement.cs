@@ -15,6 +15,11 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceId();
     }
 
+    public interface IHashBasedPlacementGrain : IGrainWithGuidKey
+    {
+        Task<SiloAddress> GetSiloAddress();
+    }
+
 
     public enum CustomPlacementScenario
     {

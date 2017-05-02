@@ -23,6 +23,8 @@ namespace Orleans.Runtime
         /// </summary>
         string SiloIdentity { get; }
 
+        SiloAddress SiloAddress { get; }
+
         IGrainFactory GrainFactory { get; }
 
         ITimerRegistry TimerRegistry { get; }
