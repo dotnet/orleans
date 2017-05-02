@@ -61,17 +61,12 @@
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>
     </None>
-    <None Include="$(OutDir)/Orleans.pdb">
+    <None Include="$(OutDir)/Orleans.dll">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>
     </None>
     <None Include="$(OutDir)/OrleansCodeGenerator.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/OrleansCodeGenerator.pdb">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>
