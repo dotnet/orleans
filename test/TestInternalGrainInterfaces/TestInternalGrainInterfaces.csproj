@@ -61,6 +61,7 @@
     <Compile Include="IPlacementTestGrain.cs" />
     <Compile Include="IStressTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StructWithPublicStaticReadonlyNullableVariable.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
