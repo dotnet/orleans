@@ -6,7 +6,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [HashBasedPlacement(false)]
+    [HashBasedPlacement]
     public class HashBasedBasedPlacementGrain : Grain, IHashBasedPlacementGrain
     {
 

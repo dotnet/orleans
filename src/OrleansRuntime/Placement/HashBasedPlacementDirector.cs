@@ -10,12 +10,6 @@ namespace Orleans.Runtime.Placement
         {
             var allSilos = context.GetCompatibleSilos(target);
 
-            // for testing
-            if (((HashBasedPlacement) strategy).SortSiloList)
-            {
-                allSilos = allSilos.OrderBy(s => s.ToString()).ToList();
-            }
-
             int hash = (int) (target.GrainIdentity.GetUniformHashCode() & 0x7fffffff); // reset highest order bit to avoid negative ints
 
             return Task.FromResult(allSilos[hash % allSilos.Count]);

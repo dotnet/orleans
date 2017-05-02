@@ -29,7 +29,9 @@ namespace Tester.CustomPlacementTests
             {
                 var options = new TestClusterOptions(nSilos);
                 options.ClusterConfiguration.UseStartupType<TestStartup>();
-                return new TestCluster(options);
+				options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+				options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
+				return new TestCluster(options);
             }
         }
 

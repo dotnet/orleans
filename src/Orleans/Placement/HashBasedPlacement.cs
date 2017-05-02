@@ -5,17 +5,11 @@ namespace Orleans.Runtime
     [Serializable]
     public  class HashBasedPlacement : PlacementStrategy
     {
-        internal bool SortSiloList { get; }
 
         internal static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();
 
-        internal HashBasedPlacement(bool sortSiloList)
-        {
-            this.SortSiloList = sortSiloList;
-        }
 
         public HashBasedPlacement()
-            : this(false)
         {
         }
 

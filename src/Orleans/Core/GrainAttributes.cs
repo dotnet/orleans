@@ -191,19 +191,9 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
         public sealed class HashBasedPlacementAttribute : PlacementAttribute
         {
-            // for testing
-            internal bool SortSiloList { get; }
-
-            public HashBasedPlacementAttribute() :
+			public HashBasedPlacementAttribute() :
                 base(HashBasedPlacement.Singleton)
             {}
-
-            // for testing
-            internal HashBasedPlacementAttribute(bool sortSiloList = false)
-                : base(sortSiloList ? new HashBasedPlacement(true) : HashBasedPlacement.Singleton)
-            {
-                this.SortSiloList = sortSiloList;
-            }
         }
 
         /// <summary>
