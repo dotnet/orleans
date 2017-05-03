@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using Orleans.GrainDirectory;
 using Orleans.Streams;
 
@@ -372,6 +373,15 @@ namespace Orleans
         public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate)
         {
             Predicate = predicate;
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public sealed class RegexImplicitStreamSubscriptionAttribute : ImplicitStreamSubscriptionAttribute
+    {
+        public RegexImplicitStreamSubscriptionAttribute(string pattern) 
+            : base(new RegexStreamNamespacePredicate(new Regex(pattern)))
+        {
         }
     }
 }

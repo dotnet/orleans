@@ -187,6 +187,7 @@
     <Compile Include="Streams\Internal\StreamSubscriptionChangeHandler.cs" />
     <Compile Include="Streams\Predicates\AllStreamNamespacesPredicate.cs" />
     <Compile Include="Streams\Predicates\ExactMatchStreamNamespacePredicate.cs" />
+    <Compile Include="Streams\Predicates\RegexStreamNamespacePredicate.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Streams\Predicates\IStreamNamespacePredicate.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
