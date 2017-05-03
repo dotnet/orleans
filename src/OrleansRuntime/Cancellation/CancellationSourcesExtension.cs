@@ -32,7 +32,7 @@ namespace Orleans.Runtime
             if (!_cancellationTokens.TryFind(token.Id, out gct))
             {
                 _logger.Value.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {token.Id} was not found");
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             return gct.Cancel();

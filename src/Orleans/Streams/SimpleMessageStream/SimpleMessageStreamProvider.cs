@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
-            if (!stateManager.PresetState(ProviderState.Initialized)) return TaskDone.Done;
+            if (!stateManager.PresetState(ProviderState.Initialized)) return Task.CompletedTask;
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
             this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
@@ -51,19 +51,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
             stateManager.CommitState();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Start()
         {
             if (stateManager.PresetState(ProviderState.Started)) stateManager.CommitState();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Close()
         {
             if (stateManager.PresetState(ProviderState.Closed)) stateManager.CommitState();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()

@@ -30,7 +30,7 @@ namespace UnitTests.Grains
                 {
                     logger.Info("Received a red event {0}", e);
                     redCounter++;
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 });
 
             await blueStream.SubscribeAsync(
@@ -38,7 +38,7 @@ namespace UnitTests.Grains
                 {
                     logger.Info("Received a blue event {0}", e);
                     blueCounter++;
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 });
         }
 

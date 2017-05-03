@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Scheduler
             return scheduler.RunOrQueueTask(() =>
             {
                 action();
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }, targetContext);
         }
 

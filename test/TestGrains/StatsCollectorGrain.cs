@@ -13,13 +13,13 @@ namespace UnitTests.Stats
         public Task ReportMetricsCalled()
         {
             numStatsCalls++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ReportStatsCalled()
         {
             numMetricsCalls++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<long> GetReportMetricsCallCount()

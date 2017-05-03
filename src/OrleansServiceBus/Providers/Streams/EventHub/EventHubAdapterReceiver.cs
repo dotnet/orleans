@@ -81,7 +81,7 @@ namespace Orleans.ServiceBus.Providers
             logger.Info("Initializing EventHub partition {0}-{1}.", settings.Hub.Path, settings.Partition);
             // if receiver was already running, do nothing
             return ReceiverRunning == Interlocked.Exchange(ref recieverState, ReceiverRunning)
-                ? TaskDone.Done
+                ? Task.CompletedTask
                 : Initialize();
         }
 
@@ -211,7 +211,7 @@ namespace Orleans.ServiceBus.Providers
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Shutdown(TimeSpan timeout)
@@ -232,7 +232,7 @@ namespace Orleans.ServiceBus.Providers
                 var localReceiver = Interlocked.Exchange(ref receiver, null);
 
                 // start closing receiver
-                Task closeTask = TaskDone.Done;
+                Task closeTask = Task.CompletedTask;
                 if (localReceiver != null)
                 {
                     closeTask = localReceiver.CloseAsync();

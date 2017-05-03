@@ -151,7 +151,7 @@ namespace Orleans.EventSourcing.Common
         protected virtual Task OnConfigurationChange(MultiClusterConfiguration next)
         {
             Configuration = next;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -217,7 +217,7 @@ namespace Orleans.EventSourcing.Common
 
             Services.Log(Severity.Verbose2, "PostActivation Complete");
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>

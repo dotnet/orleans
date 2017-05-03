@@ -39,7 +39,7 @@ namespace Orleans.Streams
 
         public Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
@@ -48,7 +48,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
@@ -57,7 +57,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)

@@ -22,7 +22,7 @@ namespace UnitTests.Grains
         {
             myGrainString = str;
             //RaiseStateUpdateEvent();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<bool> StringIsNullOrEmpty()
@@ -42,7 +42,7 @@ namespace UnitTests.Grains
             myGrainString = x.stringVar;
             myCode = x.code;
             //RaiseStateUpdateEvent();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

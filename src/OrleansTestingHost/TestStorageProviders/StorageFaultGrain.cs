@@ -41,7 +41,7 @@ namespace Orleans.TestingHost
         {
             readFaults.Add(grainReference, exception);
             logger.Info($"Added ReadState fault for {grainReference}.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace Orleans.TestingHost
         {
             writeFaults.Add(grainReference, exception);
             logger.Info($"Added WriteState fault for {grainReference}.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace Orleans.TestingHost
         {
             clearfaults.Add(grainReference, exception);
             logger.Info($"Added ClearState fault for {grainReference}.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace Orleans.TestingHost
                 readFaults.Remove(grainReference);
                 throw exception;
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace Orleans.TestingHost
                 writeFaults.Remove(grainReference);
                 throw exception;
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace Orleans.TestingHost
                 clearfaults.Remove(grainReference);
                 throw exception;
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

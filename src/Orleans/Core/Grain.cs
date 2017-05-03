@@ -225,7 +225,7 @@ namespace Orleans
         /// </summary>
         public virtual Task OnActivateAsync()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -233,7 +233,7 @@ namespace Orleans
         /// </summary>
         public virtual Task OnDeactivateAsync()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>

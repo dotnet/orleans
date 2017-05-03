@@ -38,7 +38,7 @@ namespace UnitTests.Grains
 
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task StartLocalGrains(List<Guid> keys)

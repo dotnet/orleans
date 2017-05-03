@@ -33,7 +33,7 @@ namespace TestGrains
             }
             logger.Info("ReportResult. StreamProvider: {0}, StreamNamespace: {1}, StreamGuid: {2}, Count: {3}", streamProvider, streamNamespace, streamGuid, count);
             counts[streamGuid] = count;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
@@ -50,7 +50,7 @@ namespace TestGrains
         public Task Reset()
         {
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)

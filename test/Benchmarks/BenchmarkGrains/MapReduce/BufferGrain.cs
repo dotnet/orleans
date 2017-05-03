@@ -18,7 +18,7 @@ namespace BenchmarkGrains.MapReduce
         public Task SendAsync(T t)
         {
             this._items.Add(t);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SendAsync(T t, GrainCancellationToken gct)

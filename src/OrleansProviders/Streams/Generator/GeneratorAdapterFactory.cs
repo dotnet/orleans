@@ -138,7 +138,7 @@ namespace Orleans.Providers.Streams.Generator
         public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -188,7 +188,7 @@ namespace Orleans.Providers.Streams.Generator
 
             public Task Initialize(TimeSpan timeout)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
@@ -204,12 +204,12 @@ namespace Orleans.Providers.Streams.Generator
 
             public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public Task Shutdown(TimeSpan timeout)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
         }
 

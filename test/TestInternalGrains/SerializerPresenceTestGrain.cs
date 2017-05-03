@@ -17,7 +17,7 @@ namespace UnitTests.Grains
         public Task TakeSerializedData(object data)
         {
             // nothing to do
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

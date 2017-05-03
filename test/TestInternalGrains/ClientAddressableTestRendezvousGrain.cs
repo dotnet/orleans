@@ -17,7 +17,7 @@ namespace UnitTests.Grains
         public Task SetProducer(IClientAddressableTestProducer producer)
         {
             this.producer = producer;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

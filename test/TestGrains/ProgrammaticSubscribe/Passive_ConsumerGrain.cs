@@ -22,7 +22,7 @@ namespace UnitTests.Grains
             onAddCalledCount = 0;
             consumerObservers = new List<ICounterObserver>();
             consumerHandles = new List<IExternalStreamSubscriptionHandle>();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetCountOfOnAddFuncCalled()
@@ -56,7 +56,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task OnSubscribed(StreamSubscriptionHandle<int> handle)
@@ -88,7 +88,7 @@ namespace UnitTests.Grains
         {
             logger = base.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
             logger.Info("OnActivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
@@ -117,19 +117,19 @@ namespace UnitTests.Grains
         {
             this.NumConsumed++;
             this.logger.Info($"Consumer {this.GetHashCode()} OnNextAsync() with NumConsumed {this.NumConsumed}");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
             this.logger.Info($"Consumer {this.GetHashCode()} OnCompletedAsync()");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
             this.logger.Info($"Consumer {this.GetHashCode()} OnErrorAsync({ex})");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

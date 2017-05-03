@@ -93,7 +93,7 @@ namespace Orleans.Streams
 
             queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
             managerState = PersistentStreamProviderState.Initialized;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Stop()
@@ -142,7 +142,7 @@ namespace Orleans.Streams
 
             if (managerState == PersistentStreamProviderState.AgentsStopped)
             {
-                return TaskDone.Done; // if agents not running, no need to rebalance the queues among them.
+                return Task.CompletedTask; // if agents not running, no need to rebalance the queues among them.
             }
 
             return nonReentrancyGuarantor.AddNext(() =>
@@ -154,11 +154,11 @@ namespace Orleans.Streams
                         "Skipping execution of QueueChangeNotification number {0} from the queue allocator since already received a later notification " +
                         "(already have notification number {1}).",
                         notificationSeqNumber, latestRingNotificationSequenceNumber);
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 }
                 if (managerState == PersistentStreamProviderState.AgentsStopped)
                 {
-                    return TaskDone.Done; // if agents not running, no need to rebalance the queues among them.
+                    return Task.CompletedTask; // if agents not running, no need to rebalance the queues among them.
                 }
                 return QueueDistributionChangeNotification(notificationSeqNumber);
             });
@@ -361,7 +361,7 @@ namespace Orleans.Streams
                     Log(ErrorCode.PersistentStreamPullingManager_15,
                         "Skipping execution of command number {0} since already received a later command (already have command number {1}).",
                         commandSeqNumber, latestCommandNumber);
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 }
                 switch (command)
                 {
@@ -386,7 +386,7 @@ namespace Orleans.Streams
             Log(ErrorCode.PersistentStreamPullingManager_PeriodicPrint, 
                         "I am responsible for a total of {0} queues on stream provider {1}: {2}.", 
                         NumberRunningAgents, streamProviderName, PrintQueues(queuesToAgentsMap.Keys));
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void Log(ErrorCode logCode, string format, params object[] args)

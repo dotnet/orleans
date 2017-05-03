@@ -125,7 +125,7 @@ namespace Orleans.CodeGeneration
         private static MethodInfo GetTaskConversionMethod(Type taskType)
         {
             if (taskType == typeof(Task)) return TypeUtils.Method((Task task) => task.Box());
-            if (taskType == typeof(void)) return TypeUtils.Property(() => TaskDone.Done).GetMethod;
+            if (taskType == typeof(void)) return TypeUtils.Property(() => Task.CompletedTask).GetMethod;
 
             if (taskType.GetGenericTypeDefinition() != typeof(Task<>))
                 throw new ArgumentException($"Unsupported return type {taskType}.");

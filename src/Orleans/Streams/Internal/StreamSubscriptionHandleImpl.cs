@@ -129,22 +129,22 @@ namespace Orleans.Streams
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (observer == null || !IsValid)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             return observer.OnNextAsync(typedItem, token);
         }
 
         public Task CompleteStream()
         {
-            return observer == null ? TaskDone.Done : observer.OnCompletedAsync();
+            return observer == null ? Task.CompletedTask : observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return observer == null ? TaskDone.Done : observer.OnErrorAsync(ex);
+            return observer == null ? Task.CompletedTask : observer.OnErrorAsync(ex);
         }
 
         internal bool SameStreamId(StreamId streamId)

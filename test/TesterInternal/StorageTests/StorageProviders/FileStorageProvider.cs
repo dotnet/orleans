@@ -93,7 +93,7 @@ namespace Samples.StorageProviders
             if (fileInfo.Exists)
                 fileInfo.Delete();
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>

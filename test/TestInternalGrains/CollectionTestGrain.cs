@@ -27,13 +27,13 @@ namespace UnitTests.Grains
             logger.Info("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             Logger().Info("OnDeactivateAsync.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task<int> IncrCounter()
@@ -55,14 +55,14 @@ namespace UnitTests.Grains
         {
             Logger().Info("DeactivateSelf.");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetOther(ICollectionTestGrain other)
         {
             Logger().Info("SetOther.");
             this.other = other;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<TimeSpan> GetOtherAge()
@@ -85,7 +85,7 @@ namespace UnitTests.Grains
         public Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
         {
             RegisterTimer(TimerCallback, delayPeriod, TimeSpan.Zero, timerPeriod);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private async Task TimerCallback(object state)
@@ -119,13 +119,13 @@ namespace UnitTests.Grains
             logger = GetLogger(String.Format("ReentrantCollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             Logger().Info("OnDeactivateAsync.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override async Task<int> IncrCounter()

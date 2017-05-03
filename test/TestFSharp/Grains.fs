@@ -8,7 +8,7 @@ type Generic1ArgumentGrain<'T>() =
     inherit Grain()
 
     interface INonGenericBase with 
-        member x.Ping() = TaskDone.Done
+        member x.Ping() = Task.CompletedTask
 
     interface IGeneric1Argument<'T> with 
         member x.Ping(t:'T) = Task.FromResult(t);

@@ -209,7 +209,7 @@ namespace UnitTests.StorageTests.SQLAdapter
                 }
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

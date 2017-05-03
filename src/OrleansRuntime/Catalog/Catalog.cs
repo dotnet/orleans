@@ -493,7 +493,7 @@ namespace Orleans.Runtime
             out Task activatedPromise)
         {
             ActivationData result;
-            activatedPromise = TaskDone.Done;
+            activatedPromise = Task.CompletedTask;
             PlacementStrategy placement;
 
             lock (activations)
@@ -1500,7 +1500,7 @@ namespace Orleans.Runtime
             ActivationAddress target = ActivationAddress.NewActivationAddress(LocalSilo, grainId);
             Task activatedPromise;
             GetOrCreateActivation(target, true, grainType, null, null, out activatedPromise);
-            return activatedPromise ?? TaskDone.Done;
+            return activatedPromise ?? Task.CompletedTask;
         }
 
 

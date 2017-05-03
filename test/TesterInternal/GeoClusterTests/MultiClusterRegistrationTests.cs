@@ -152,7 +152,7 @@ namespace UnitTests.GeoClusterTests
             stopwatch.Stop();
             WriteLog("Multicluster is ready (elapsed = {0}).", stopwatch.Elapsed);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 
@@ -253,7 +253,7 @@ namespace UnitTests.GeoClusterTests
             public Task OnNextAsync(int item, StreamSequenceToken token = null)
             {
                 GotHello(item);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public Task OnCompletedAsync()

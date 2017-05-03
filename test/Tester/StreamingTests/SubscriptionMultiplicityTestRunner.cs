@@ -316,7 +316,7 @@ namespace UnitTests.StreamingTests
             var handle = await stream.SubscribeAsync((e,t) =>
             {
                 eventCount++;
-                return TaskDone.Done;
+                return Task.CompletedTask;
             });
 
             // produce some messages

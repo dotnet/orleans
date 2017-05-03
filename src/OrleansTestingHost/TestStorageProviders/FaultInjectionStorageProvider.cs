@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
             if (delayMilliseconds > 0)
                 return Task.Delay(delayMilliseconds);
             else
-                return TaskDone.Done;
+                return Task.CompletedTask;
         }
            
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>

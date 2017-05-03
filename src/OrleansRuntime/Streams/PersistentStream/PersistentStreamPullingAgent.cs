@@ -224,7 +224,7 @@ namespace Orleans.Streams
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
                     $"Failed to add subscription for stream {streamId}.")
                 .Ignore();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream.
@@ -313,7 +313,7 @@ namespace Orleans.Streams
         public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
         {
             RemoveSubscriber_Impl(subscriptionId, streamId);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)

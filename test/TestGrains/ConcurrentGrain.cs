@@ -83,7 +83,7 @@ namespace UnitTests.Grains
             index = ind;
             logger = GetLogger("ConcurrentGrain-" + index);
             logger.Info("Initialize(" + index + ")");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         // start a long tail call on the 1st grain by calling into the 2nd grain 
@@ -121,7 +121,7 @@ namespace UnitTests.Grains
             index = ind;
             logger = GetLogger("ConcurrentReentrantGrain-" + index);
             logger.Info("Initialize(" + index + ")");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> TailCall_Called()

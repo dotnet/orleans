@@ -139,7 +139,7 @@ namespace TestGrains
         private Task OnErrorAsync(Exception ex)
         {
             logger.Info("Received an error on stream. StreamGuid: {0}, StreamNamespace: {1}, Exception: {2}.", State.StreamGuid, State.StreamNamespace, ex);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void InjectFault()

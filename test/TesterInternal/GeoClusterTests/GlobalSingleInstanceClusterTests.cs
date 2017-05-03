@@ -185,7 +185,7 @@ namespace Tests.GeoClusterTests
             Assert.Equal(requested0, base_requested0);
             Assert.Equal(requested1, base_requested1);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         #endregion
@@ -280,7 +280,7 @@ namespace Tests.GeoClusterTests
 
             ValidateClusterRaceResults(results, grains);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private volatile int threadsDone;

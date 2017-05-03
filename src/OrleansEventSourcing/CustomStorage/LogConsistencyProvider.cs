@@ -65,13 +65,13 @@ namespace Orleans.EventSourcing.CustomStorage
             Log.Info("Init (Severity={0}) PrimaryCluster={1}", Log.SeverityLevel, 
                 string.IsNullOrEmpty(PrimaryCluster) ? "(none specified)" : PrimaryCluster);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>

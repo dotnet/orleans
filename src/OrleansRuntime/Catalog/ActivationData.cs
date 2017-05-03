@@ -766,7 +766,7 @@ namespace Orleans.Runtime
             { 
                 if (timers == null)
                 {
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 }
                 var tasks = new List<Task>();
                 var timerCopy = timers.ToList(); // need to copy since OnTimerDisposed will change the timers set.

@@ -12,7 +12,7 @@ namespace UnitTests.Grains
         public Task SetTarget(IClientAddressableTestClientObject target)
         {
             this.target = target;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> HappyPath(string message)

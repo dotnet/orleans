@@ -82,19 +82,19 @@ namespace UnitTests.Grains
             {
                 _logger.Verbose(str);
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {            
             _logger.Info("ConsumerObserver.OnCompletedAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {            
             _logger.Info("ConsumerObserver.OnErrorAsync: ex={0}", ex);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
@@ -306,7 +306,7 @@ namespace UnitTests.Grains
             _timers.Add(timer.Handle, timer);
             _expectedItemsProduced += count;
             timer.StartTimer();
-            return TaskDone.Done;        
+            return Task.CompletedTask;        
         }
 
         private void RemoveTimer(IDisposable handle)
@@ -360,7 +360,7 @@ namespace UnitTests.Grains
         {
             _logger.Info("StopBeingProducer");
             if (!_cleanedUpFlag.TrySet())
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             if (_timers != null)
             {
@@ -378,7 +378,7 @@ namespace UnitTests.Grains
                 _timers = null;
             }
             _observer = null; // Disposing
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task VerifyFinished()
@@ -477,13 +477,13 @@ namespace UnitTests.Grains
             _logger.Info("OnActivateAsync");
              _producers = new List<IProducerObserver>();
             _cleanedUpFlag = new InterlockedFlag();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             _logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
@@ -493,7 +493,7 @@ namespace UnitTests.Grains
             ProducerObserver producer = ProducerObserver.NewObserver(_logger, GrainFactory);
             producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
             _producers.Add(producer);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual async Task ProduceSequentialSeries(int count)
@@ -573,7 +573,7 @@ namespace UnitTests.Grains
         {
             _logger.Info("DeactivateProducerOnIdle");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -655,13 +655,13 @@ namespace UnitTests.Grains
             _logger = GetLogger("Test.Streaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");    
             _observers = new List<IConsumerObserver>();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             _logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async virtual Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
@@ -699,7 +699,7 @@ namespace UnitTests.Grains
 
             Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -785,19 +785,19 @@ namespace UnitTests.Grains
         {
             _logger = GetLogger("Test.Streaming_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
             _logger.Info("OnActivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         public override Task OnDeactivateAsync()
         {
             _logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _producer = ProducerObserver.NewObserver(MyLogger(), GrainFactory);
             _producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ProduceSequentialSeries(int count)
@@ -875,14 +875,14 @@ namespace UnitTests.Grains
         public Task DeactivateConsumerOnIdle()
         {
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task DeactivateProducerOnIdle()
         {
             _logger.Info("DeactivateProducerOnIdle");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -905,7 +905,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             _logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task BecomeConsumer(Guid streamGuid, string providerToUse, string streamNamespace)
@@ -963,7 +963,7 @@ namespace UnitTests.Grains
 
             Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
     

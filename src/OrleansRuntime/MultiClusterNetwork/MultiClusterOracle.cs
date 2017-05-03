@@ -365,7 +365,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             logger.Verbose("--- Publish: done");
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         // called by remote nodes' full background gossip

@@ -26,7 +26,7 @@ namespace UnitTests.Grains
             activationGuid = Guid.NewGuid();
             logger = GetLogger(String.Format("{0}", activationGuid));
             logger.Info("Activate.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task LongCall()
@@ -56,7 +56,7 @@ namespace UnitTests.Grains
         private static Task TimerCallback(object state)
         {
             ((TaskCompletionSource<bool>)state).SetResult(true);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 

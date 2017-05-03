@@ -135,7 +135,7 @@ namespace Orleans.Storage
         public Task Close()
         {
             tableDataManager = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>

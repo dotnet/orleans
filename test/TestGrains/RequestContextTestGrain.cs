@@ -29,7 +29,7 @@ namespace UnitTests.Grains
 
         public async Task<string> TraceIdDelayedEcho2()
         {
-            await TaskDone.Done;
+            await Task.CompletedTask;
             return RequestContext.Get("TraceId") as string;
         }
 
@@ -57,7 +57,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = base.GetLogger();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 #region Implementation of IRequestContextTaskGrain
@@ -97,7 +97,7 @@ namespace UnitTests.Grains
             string traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
 
-            return TaskDone.Done.ContinueWith(task =>
+            return Task.CompletedTask.ContinueWith(task =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);
@@ -112,7 +112,7 @@ namespace UnitTests.Grains
             string traceIdOutside = RequestContext.Get("TraceId") as string;
             logger.Info(0, "{0}: Outside TraceId={1}", method, traceIdOutside);
 
-            string traceId = await TaskDone.Done.ContinueWith(task =>
+            string traceId = await Task.CompletedTask.ContinueWith(task =>
             {
                 string traceIdInside = RequestContext.Get("TraceId") as string;
                 logger.Info(0, "{0}: Inside TraceId={1}", method, traceIdInside);

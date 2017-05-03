@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Host
 
             Init(config.DeploymentId, config.DataConnectionString, logger);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Host
         {
             Init(config.DeploymentId, config.DataConnectionString, logger);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void Init(String deploymentId, String dataConnectionString, Logger logger)

@@ -188,7 +188,7 @@ namespace UnitTests.SchedulerTests
                 Task task4 = task3.ContinueWith((_) => { SubProcess1(14); result1.SetResult(true); });
                 task4.Ignore();
 
-                Task task21 = TaskDone.Done.ContinueWith((_) => SubProcess2(21));
+                Task task21 = Task.CompletedTask.ContinueWith((_) => SubProcess2(21));
                 Task task22 = task21.ContinueWith((_) => { SubProcess2(22); result2.SetResult(true); });
                 task22.Ignore();
 

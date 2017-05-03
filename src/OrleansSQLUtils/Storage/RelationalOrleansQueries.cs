@@ -148,7 +148,7 @@ namespace Orleans.SqlUtils
                 counters.Where(i => !"0".Equals(i.IsValueDelta ? i.GetDeltaString() : i.GetValueString())).ToList();
             if (counters.Count == 0)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             //Note that the following is almost the same as RelationalStorageExtensions.ExecuteMultipleInsertIntoAsync

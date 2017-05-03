@@ -17,13 +17,13 @@ namespace TestGrains
         public Task SetA(int a)
         {
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetA()
@@ -49,13 +49,13 @@ namespace TestGrains
         public Task SetA(int a)
         {
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetA()
@@ -82,13 +82,13 @@ namespace TestGrains
         public Task SetA(int a)
         {
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetA()
@@ -99,13 +99,13 @@ namespace TestGrains
         public Task SetB(int b)
         {
             B = b;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementB()
         {
             B++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetB()
@@ -127,13 +127,13 @@ namespace TestGrains
         public Task SetA(int a)
         {
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetA()
@@ -173,13 +173,13 @@ namespace TestGrains
         public Task SetA(int a)
         {
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetA()
@@ -190,13 +190,13 @@ namespace TestGrains
         public Task SetB(int b)
         {
             B = b;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementB()
         {
             B++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetB()
@@ -207,13 +207,13 @@ namespace TestGrains
         public Task SetC(int c)
         {
             C = c;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementC()
         {
             C++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetC()

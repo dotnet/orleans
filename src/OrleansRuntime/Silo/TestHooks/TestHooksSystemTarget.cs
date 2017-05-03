@@ -82,7 +82,7 @@ namespace Orleans.Runtime.TestHooks
         public Task AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly)
         {
             CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.TestHooks
             this.silo.Metrics.LatchIsOverload(overloaded);
             
             Task.Delay(latchPeriod).ContinueWith(t => UnlatchIsOverloaded()).Ignore();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void UnlatchIsOverloaded()

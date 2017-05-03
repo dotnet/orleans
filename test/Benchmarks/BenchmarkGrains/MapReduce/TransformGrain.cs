@@ -28,7 +28,7 @@ namespace BenchmarkGrains.MapReduce
         {
             if (processor == null) throw new ArgumentNullException(nameof(processor));
             this._processor = processor;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<TOutput> ConsumeMessage()
@@ -39,7 +39,7 @@ namespace BenchmarkGrains.MapReduce
         public Task LinkTo(ITargetGrain<TOutput> t)
         {
             this._target = t;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<GrainDataflowMessageStatus> OfferMessage(TInput messageValue, bool consumeToAccept)
@@ -51,7 +51,7 @@ namespace BenchmarkGrains.MapReduce
         {
             this._input.Enqueue(t);
             NotifyOfPendingWork();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SendAsync(TInput t, GrainCancellationToken gct)

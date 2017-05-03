@@ -23,13 +23,13 @@ namespace Orleans.Streams
         public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
             StreamSequenceToken sequenceToken)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
             StreamSequenceToken sequenceToken)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

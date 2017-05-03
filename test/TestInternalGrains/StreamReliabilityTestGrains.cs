@@ -131,7 +131,7 @@ namespace UnitTests.Grains
         public Task Ping()
         {
             logger.Info("Ping");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 #if USE_GENERICS
@@ -318,20 +318,20 @@ namespace UnitTests.Grains
     //        NumItems++;
     //        if (logger.IsVerbose)
     //            logger.Verbose("Received OnNextAsync - Item={0} - Total Items={1} Errors={2}", item, NumItems, NumErrors);
-    //        return TaskDone.Done;
+    //        return Task.CompletedTask;
     //    }
 
     //    public Task OnCompletedAsync()
     //    {
     //        logger.Info("Receive OnCompletedAsync - Total Items={0} Errors={1}", NumItems, NumErrors);
-    //        return TaskDone.Done;
+    //        return Task.CompletedTask;
     //    }
 
     //    public Task OnErrorAsync(Exception ex)
     //    {
     //        NumErrors++;
     //        logger.Warn(1, "Received OnErrorAsync - Exception={0} - Total Items={1} Errors={2}", ex, NumItems, NumErrors);
-    //        return TaskDone.Done;
+    //        return Task.CompletedTask;
     //    }
     //}
 
@@ -349,7 +349,7 @@ namespace UnitTests.Grains
             logger = GetLogger("StreamUnsubscribeTestGrain-" + this.IdentityString);
             logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Subscribe(Guid streamId, string providerName)

@@ -124,7 +124,7 @@ namespace UnitTests.Grains
         public Task PingAsync()
         {
             logger.Info("IEchoGrainAsync.Ping");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task PingLocalSiloAsync()

@@ -124,7 +124,7 @@ namespace Orleans.Storage
         /// <see cref="IProvider.Close"/>
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>

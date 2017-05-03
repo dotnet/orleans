@@ -194,12 +194,12 @@ namespace UnitTests.StreamingTests
             public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer,
                 IStreamFilterPredicateWrapper filter)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public override bool Equals(object obj)

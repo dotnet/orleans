@@ -8,7 +8,7 @@ namespace UnitTests.Grains
         public override Task Transform()
         {
             Value = Value * 2.0;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

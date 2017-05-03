@@ -72,7 +72,7 @@ namespace UnitTests.StreamingTests
 
         public Task DeactivateConsumerOnIdle()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -97,7 +97,7 @@ namespace UnitTests.StreamingTests
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
             this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ProduceSequentialSeries(int count)
@@ -160,7 +160,7 @@ namespace UnitTests.StreamingTests
 
         public Task DeactivateProducerOnIdle()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

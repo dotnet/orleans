@@ -82,13 +82,13 @@ namespace UnitTests.Grains
         public Task Subscribe(ISimpleGrainObserver observer)
         {
             State.Observers.Subscribe(observer);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Unsubscribe(ISimpleGrainObserver observer)
         {
             State.Observers.Unsubscribe(observer);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         protected void RaiseStateUpdateEvent()

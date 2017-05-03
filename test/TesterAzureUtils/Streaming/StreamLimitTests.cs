@@ -430,7 +430,7 @@ namespace UnitTests.StreamingTests
             double rps = totalSubscriptions / elapsed.TotalSeconds;
             output.WriteLine("Subscriptions-per-second = {0} during period {1}", rps, elapsed);
             Assert.NotEqual(0.0,  rps);  // "RPS greater than zero"
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private Task Test_Stream_Churn_NumStreams(
@@ -486,7 +486,7 @@ namespace UnitTests.StreamingTests
             double rps = totalSubscriptions / elapsed.TotalSeconds;
             output.WriteLine("Subscriptions-per-second = {0} during period {1}", rps, elapsed);
             Assert.NotEqual(0.0,  rps);  // "RPS greater than zero"
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         //private async Task Test_Stream_Churn_TimePeriod(

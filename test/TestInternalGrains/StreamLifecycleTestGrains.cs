@@ -99,7 +99,7 @@ namespace UnitTests.Grains
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             return watcher.RecordActivateCall(IdentityString);
 #else
-            return TaskDone.Done;
+            return Task.CompletedTask;
 #endif
         }
 
@@ -108,7 +108,7 @@ namespace UnitTests.Grains
 #if COUNT_ACTIVATE_DEACTIVATE
             return watcher.RecordDeactivateCall(IdentityString);
 #else
-            return TaskDone.Done;
+            return Task.CompletedTask;
 #endif
         }
 
@@ -212,7 +212,7 @@ namespace UnitTests.Grains
         public Task Ping()
         {
             logger.Info("Ping");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
@@ -410,7 +410,7 @@ namespace UnitTests.Grains
         public Task Ping()
         {
             logger.Info("Ping");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task SendItem(int item)
@@ -496,7 +496,7 @@ namespace UnitTests.Grains
                 logger.Verbose("Received OnNextAsync - Item={0} - Total Items={1} Errors={2}", item, NumItems, NumErrors);
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
@@ -505,7 +505,7 @@ namespace UnitTests.Grains
             {
                 logger.Info("Receive OnCompletedAsync - Total Items={0} Errors={1}", NumItems, NumErrors);
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
@@ -517,7 +517,7 @@ namespace UnitTests.Grains
                 logger.Warn(1, "Received OnErrorAsync - Exception={0} - Total Items={1} Errors={2}", ex, NumItems, NumErrors);
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

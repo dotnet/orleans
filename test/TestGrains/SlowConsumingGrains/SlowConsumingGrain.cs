@@ -23,7 +23,7 @@ namespace UnitTests.Grains
             logger = base.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             ConsumerHandle = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetNumberConsumed()
@@ -78,13 +78,13 @@ namespace UnitTests.Grains
         public Task OnCompletedAsync()
         {
             this.logger.Info($"Consumer {this.GetHashCode()} OnCompletedAsync()");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
             this.logger.Info($"Consumer {this.GetHashCode()} OnErrorAsync({ex})");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

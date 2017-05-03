@@ -69,7 +69,7 @@ namespace TestGrains
         public override Task OnActivateAsync()
         {
             // on activation, we load lazily (do not wait until the current state is loaded).
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Add(string key, int amount, bool wait_for_confirmation)

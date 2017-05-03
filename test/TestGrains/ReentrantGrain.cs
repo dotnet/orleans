@@ -29,7 +29,7 @@ namespace UnitTests.Grains
         public Task SetSelf(IReentrantGrain self)
         {
             Self = self;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -67,7 +67,7 @@ namespace UnitTests.Grains
         {
             logger.Info("SetSelf {0}", self);
             Self = self;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -130,7 +130,7 @@ namespace UnitTests.Grains
             {
                 var logger = GetLogger();
                 logger.Info("Received stream item:" + item);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             });
         }
 
@@ -145,7 +145,7 @@ namespace UnitTests.Grains
         public Task SetSelf(IMayInterleavePredicateGrain self)
         {
             Self = self;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -166,7 +166,7 @@ namespace UnitTests.Grains
         public Task SetSelf(IUnorderedNonReentrantGrain self)
         {
             Self = self;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
     [Reentrant]
@@ -178,7 +178,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetCounter()
@@ -189,7 +189,7 @@ namespace UnitTests.Grains
         public Task SetDestination(long id)
         {
             destination = id;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Ping(int seconds)
@@ -221,7 +221,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetCounter()
@@ -232,7 +232,7 @@ namespace UnitTests.Grains
         public Task SetDestination(long id)
         {
             destination = id;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Ping(int seconds)
@@ -265,7 +265,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task FanOutReentrant(int offset, int num)
@@ -381,7 +381,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task FanOutACReentrant(int offset, int num)
@@ -495,13 +495,13 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetDestination(long id)
         {
             otherId = id;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Ping(TimeSpan wait)
@@ -529,13 +529,13 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetDestination(long id)
         {
             otherId = id;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Ping(TimeSpan wait)

@@ -28,13 +28,13 @@ namespace UnitTests.Grains
             eventsFailedCount = 0;
             consumerHandle = null;
             failPeriodTimer = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
@@ -49,7 +49,7 @@ namespace UnitTests.Grains
         {
             failPeriod = failurePeriod;
             failPeriodTimer = Stopwatch.StartNew();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task StopConsuming()
@@ -95,20 +95,20 @@ namespace UnitTests.Grains
                 throw new AggregateException("GO WAY!");
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
             logger.Info("OnCompletedAsync()");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
             logger.Info("OnErrorAsync({0})", ex);
             errorsCount++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

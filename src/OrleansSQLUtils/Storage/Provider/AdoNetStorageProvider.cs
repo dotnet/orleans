@@ -212,7 +212,7 @@ namespace Orleans.Storage
         /// </summary>
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 

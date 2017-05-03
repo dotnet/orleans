@@ -58,13 +58,13 @@ namespace UnitTests.Grains
         public Task SetNext(IChainedGrain next)
         {
             State.Next = next;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetNextNested(ChainGrainHolder next)
         {
             State.Next = next.Next;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Validate(bool nextIsSet)
@@ -72,7 +72,7 @@ namespace UnitTests.Grains
             if ((nextIsSet && State.Next != null) || (!nextIsSet && State.Next == null))
             {
                 // logger.Verbose("Id={0} validated successfully: Next={1}", State.Id, State.Next);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             string msg = String.Format("ChainGrain Id={0} is in an invalid state. Next={1}", State.Id, State.Next);

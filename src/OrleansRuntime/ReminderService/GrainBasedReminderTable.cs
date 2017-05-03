@@ -20,18 +20,18 @@ namespace Orleans.Runtime.ReminderService
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
             remTable = new InMemoryRemindersTable();
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Init(GlobalConfiguration config, Logger logger)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("GrainBasedReminderTable {0} OnDeactivateAsync. Full identity: {1}", Identity, Data.Address.ToFullString());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)
@@ -79,7 +79,7 @@ namespace Orleans.Runtime.ReminderService
         {
             logger.Info("TestOnlyClearTable");
             remTable.Reset();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

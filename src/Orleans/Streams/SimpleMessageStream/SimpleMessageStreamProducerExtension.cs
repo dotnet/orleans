@@ -86,7 +86,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // We got an item when we don't think we're the subscriber. This is a normal race condition.
                 // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         internal Task CompleteStream(StreamId streamId)
@@ -101,7 +101,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // We got an item when we don't think we're the subscriber. This is a normal race condition.
                 // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         internal Task ErrorInStream(StreamId streamId, Exception exc)
@@ -116,7 +116,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // We got an item when we don't think we're the subscriber. This is a normal race condition.
                 // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 
@@ -138,7 +138,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // We got an item when we don't think we're the subscriber. This is a normal race condition.
                 // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
@@ -153,7 +153,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 consumers.RemoveRemoteSubscriber(subscriptionId);
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 
@@ -207,7 +207,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     else tasks.Add(task);
                 }
                 // If there's no subscriber, presumably we just drop the item on the floor
-                return fireAndForgetDelivery ? TaskDone.Done : Task.WhenAll(tasks);
+                return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
 
             private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, object item, bool optimizeForImmutableData)
@@ -243,7 +243,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     else tasks.Add(task);
                 }
                 // If there's no subscriber, presumably we just drop the item on the floor
-                return fireAndForgetDelivery ? TaskDone.Done : Task.WhenAll(tasks);
+                return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
 
             internal Task ErrorInStream(StreamId streamId, Exception exc, bool fireAndForgetDelivery)
@@ -258,7 +258,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     else tasks.Add(task);
                 }
                 // If there's no subscriber, presumably we just drop the item on the floor
-                return fireAndForgetDelivery ? TaskDone.Done : Task.WhenAll(tasks);
+                return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
         }
     }
