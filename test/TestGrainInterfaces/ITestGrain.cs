@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Concurrency;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -45,5 +46,16 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceId();
 
         Task<string> GetActivationId();
+    }
+
+    public interface IOneWayGrain : IGrainWithGuidKey
+    {
+        [OneWay]
+        Task Notify(ISimpleGrainObserver observer);
+
+        [OneWay]
+        Task ThrowsOneWay();
+
+        Task<int> GetCount();
     }
 }
