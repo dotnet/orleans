@@ -17,6 +17,12 @@ namespace Orleans.ServiceBus.Providers
         bool TryReadEvents(int maxCount, TimeSpan waitTime, out IEnumerable<T> events);
     }
 
+    internal interface IStreamDataGeneratingController
+    {
+        void AddDataGeneratorForStream(IStreamIdentity streamId);
+        void StopProducingOnStream(IStreamIdentity streamId);
+    }
+
     internal interface IStreamDataGenerator<T>: IDataGenerator<T>
     {
         IntCounter SequenceNumberCounter { set; }
@@ -109,7 +115,7 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// EHPartitionDataGenerator generate data for a EH partition, which can include data from different streams
     /// </summary>
-    internal class EventHubPartitionDataGenerator : IDataGenerator<EventData>
+    internal class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
     {
         //differnt stream in the same partition should use the same sequenceNumberCounter
         private IntCounter sequenceNumberCounter = new IntCounter();

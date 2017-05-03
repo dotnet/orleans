@@ -15,8 +15,8 @@ namespace Orleans.ServiceBus.Providers
 {
     internal class EventHubPartitionGeneratorReceiver : IEventHubReceiver
     {
-        private EventHubPartitionDataGenerator generator;
-        public EventHubPartitionGeneratorReceiver(EventHubPartitionDataGenerator generator)
+        private IDataGenerator<EventData> generator;
+        public EventHubPartitionGeneratorReceiver(IDataGenerator<EventData> generator)
         {
             this.generator = generator;
         }
@@ -32,12 +32,12 @@ namespace Orleans.ServiceBus.Providers
 
         public void StopProducingOnStream(IStreamIdentity streamId)
         {
-            this.generator.StopProducingOnStream(streamId);
+            (this.generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
         }
 
         public void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
         {
-            this.generator.AddDataGeneratorForStream(streamId);
+            (this.generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
         }
 
         public Task CloseAsync()

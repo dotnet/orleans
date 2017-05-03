@@ -97,7 +97,6 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public class AdapterFactory : EventHubAdapterFactory, IControllable
         {
-            private Random seed;
             private EventHubGeneratorStreamProviderSettings ehGeneratorSettings;
             /// <summary>
             /// Init method
@@ -111,7 +110,6 @@ namespace Orleans.ServiceBus.Providers
                 this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
                 this.ehGeneratorSettings = new EventHubGeneratorStreamProviderSettings(providerName);
                 this.ehGeneratorSettings.PopulateDataGeneratingConfigFromProviderConfig(providerCfg);
-                this.seed = new Random();
                 base.Init(providerCfg, providerName, log, svcProvider);
             }
 
@@ -122,13 +120,18 @@ namespace Orleans.ServiceBus.Providers
                 return Task.FromResult<IEventHubReceiver>(generatorReceiver);
             }
 
-            private void RandomlyPlaceStreamToQueue(IStreamIdentity streamId)
+            private void RandomlyPlaceStreamToQueue(StreamRandomPlacementArg args)
             {
+                if (args == null)
+                    return;
+                int randomNumber = args.RandomNumber;
+                IStreamIdentity streamId = args.StreamId;
                 var allQueueInTheCluster = (this.EventHubQueueMapper as EventHubQueueMapper)?.GetAllQueues();
 
                 if (allQueueInTheCluster != null)
                 {
-                    int randomQueue = this.seed.Next(allQueueInTheCluster.Count());
+                    //every agent receive the same random number, do a mod on queue count, get the same random queue to assign stream to.
+                    int randomQueue = randomNumber % allQueueInTheCluster.Count();
                     var queueToAssign = allQueueInTheCluster.ToList()[randomQueue];
                     EventHubAdapterReceiver receiverToAssign;
                     if (this.EventHubReceivers.TryGetValue(queueToAssign, out receiverToAssign))
@@ -168,6 +171,34 @@ namespace Orleans.ServiceBus.Providers
             }
 
             /// <summary>
+            /// Args for RandomlyPlaceStreamToQueue method
+            /// </summary>
+            [Serializable]
+            public class StreamRandomPlacementArg
+            {
+                /// <summary>
+                /// StreamId
+                /// </summary>
+                public IStreamIdentity StreamId { get; set; }
+
+                /// <summary>
+                /// A random number
+                /// </summary>
+                public int RandomNumber { get; set; }
+
+                /// <summary>
+                /// Constructor
+                /// </summary>
+                /// <param name="streamId"></param>
+                /// <param name="randomNumber"></param>
+                public StreamRandomPlacementArg(IStreamIdentity streamId, int randomNumber)
+                {
+                    this.StreamId = streamId;
+                    this.RandomNumber = randomNumber;
+                }
+            }
+
+            /// <summary>
             /// Execute Command 
             /// </summary>
             /// <param name="command"></param>
@@ -178,7 +209,7 @@ namespace Orleans.ServiceBus.Providers
                 switch (command)
                 {
                     case (int)Commands.Randomly_Place_Stream_To_Queue:
-                        this.RandomlyPlaceStreamToQueue(arg as IStreamIdentity);
+                        this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
                         break;
                     case (int)Commands.Stop_Producing_On_Stream:
                         this.StopProducingOnStream(arg as IStreamIdentity);

@@ -41,7 +41,7 @@ namespace Orleans.ServiceBus.Providers
     {
         public static EventDataMethodCache Instance = new EventDataMethodCache();
         private Action<object, object> systemPropertiesSetter; 
-        public EventDataMethodCache()
+        private EventDataMethodCache()
         {
             var ignore = new EventData(new byte[1]);
             var systemPropertiesName = nameof(ignore.SystemProperties);
@@ -86,7 +86,7 @@ namespace Orleans.ServiceBus.Providers
         private Action<object, object> enqueueTimeUtcPropertySetter;
         private Action<object, object> paritionKeyPropertySetter;
         private ConstructorInfo zeroArgConstructorInfo;
-        public SystemPropertiesCollectionMethodCache()
+        private SystemPropertiesCollectionMethodCache()
         {
             EventData ignore = new EventData(new byte[1]);
             var offSetPropertyName = nameof(ignore.SystemProperties.Offset);
@@ -130,7 +130,7 @@ namespace Orleans.ServiceBus.Providers
         private Action<object, object> sequenceNumberPropertySetter;
         private Action<object, object> enqueueTimeUtcPropertySetter;
 
-        public EventDataMethodCache()
+        private EventDataMethodCache()
         {
             var ignore = new EventData(new byte[1]);
             var offSetPropertyName = nameof(ignore.Offset);

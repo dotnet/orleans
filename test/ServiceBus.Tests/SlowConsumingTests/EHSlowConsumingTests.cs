@@ -100,10 +100,13 @@ namespace ServiceBus.Tests.SlowConsumingTests
             }
         }
 
+        private readonly Random seed;
+
         public EHSlowConsumingTests(Fixture fixture)
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
+            seed = new Random();
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -120,8 +123,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var randomStreamPlacementArg = new EventDataGeneratorStreamProvider.AdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
             await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, streamId);
+                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
 
