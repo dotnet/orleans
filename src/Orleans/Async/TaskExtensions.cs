@@ -297,47 +297,6 @@ namespace Orleans
             }
         }
 
-        internal static Task<T> ConvertTaskViaTcs<T>(Task<T> task)
-        {
-            if (task == null) return Task.FromResult(default(T));
-
-            var resolver = new TaskCompletionSource<T>();
-
-            if (task.Status == TaskStatus.RanToCompletion)
-            {
-                resolver.TrySetResult(task.Result);
-            }
-            else if (task.IsFaulted)
-            {
-                resolver.TrySetException(task.Exception.InnerExceptions);
-            }
-            else if (task.IsCanceled)
-            {
-                resolver.TrySetException(new TaskCanceledException(task));
-            }
-            else
-            {
-                if (task.Status == TaskStatus.Created) task.Start();
-
-                task.ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                    {
-                        resolver.TrySetException(t.Exception.InnerExceptions);
-                    }
-                    else if (t.IsCanceled)
-                    {
-                        resolver.TrySetException(new TaskCanceledException(t));
-                    }
-                    else
-                    {
-                        resolver.TrySetResult(t.GetResult());
-                    }
-                });
-            }
-            return resolver.Task;
-        }
-
         //The rationale for GetAwaiter().GetResult() instead of .Result
         //is presented at https://github.com/aspnet/Security/issues/59.      
         internal static T GetResult<T>(this Task<T> task)
