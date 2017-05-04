@@ -28,6 +28,8 @@
   href: Configuring-SQL-Tables.md
 - name: External Tasks and Grains
   href: External-Tasks-and-Grains.md
+- name: Docker Deployment
+  href: Docker-Deployment.md
 - name: Deployment and Versioning of Dependencies
   href: Deployment-and-Versioning-of-Dependencies.md
 - name: Troubleshooting Deployments
