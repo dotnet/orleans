@@ -21,15 +21,11 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategyManager registrationManager;
 
         public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager)
-            : this(nodeConfig.AdditionalAssemblyDirectories, registrationManager, nodeConfig.ExcludedGrainTypes)
         {
-        }
-
-        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories, MultiClusterRegistrationStrategyManager registrationManager, IEnumerable<string> excludedGrains = null)
-        {
+            IDictionary<string, SearchOption> additionalDirectories = nodeConfig.AdditionalAssemblyDirectories;
             this.registrationManager = registrationManager;
-            this.excludedGrains = excludedGrains != null
-                ? new List<string>(excludedGrains)
+            this.excludedGrains = nodeConfig.ExcludedGrainTypes != null
+                ? new List<string>(nodeConfig.ExcludedGrainTypes)
                 : new List<string>();
             var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
