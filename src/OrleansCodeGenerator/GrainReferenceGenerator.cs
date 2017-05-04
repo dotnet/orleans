@@ -208,14 +208,14 @@ namespace Orleans.CodeGenerator
 
                     if (isOneWayTask)
                     {
-                        if (!method.ReturnType.IsInstanceOfType(TaskDone.Done))
+                        if (method.ReturnType != typeof(Task))
                         {
                             throw new CodeGenerationException(
                                 $"Method {grainType.GetParseableName()}.{method.Name} is marked with [{nameof(OneWayAttribute)}], " +
-                                $"but has a return type which is not assignable from {TaskDone.Done.GetType()}");
+                                $"but has a return type which is not assignable from {typeof(Task)}");
                         }
 
-                        var done = typeof(TaskDone).GetNameSyntax(true).Member((object _) => TaskDone.Done);
+                        var done = typeof(Task).GetNameSyntax(true).Member((object _) => Task.CompletedTask);
                         body.Add(SF.ReturnStatement(done));
                     }
                 }
