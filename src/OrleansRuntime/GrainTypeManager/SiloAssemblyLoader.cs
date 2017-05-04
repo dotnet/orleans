@@ -21,14 +21,10 @@ namespace Orleans.Runtime
         private Dictionary<string, SearchOption> directories;
 
         public SiloAssemblyLoader(NodeConfiguration nodeConfig)
-            : this(nodeConfig.AdditionalAssemblyDirectories, nodeConfig.ExcludedGrainTypes)
         {
-        }
-
-        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories, IEnumerable<string> excludedGrains = null)
-        {
-            this.excludedGrains = excludedGrains != null
-                ? new List<string>(excludedGrains)
+            IDictionary<string, SearchOption> additionalDirectories = nodeConfig.AdditionalAssemblyDirectories;
+            this.excludedGrains = nodeConfig.ExcludedGrainTypes != null
+                ? new List<string>(nodeConfig.ExcludedGrainTypes)
                 : new List<string>();
             var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
