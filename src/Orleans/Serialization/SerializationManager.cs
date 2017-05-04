@@ -1491,7 +1491,7 @@ namespace Orleans.Serialization
             var sm = context.SerializationManager;
             var previousOffset = context.CurrentObjectOffset;
             var reader = context.StreamReader;
-            context.CurrentObjectOffset = context.StreamReader.CurrentPosition;
+            context.CurrentObjectOffset = context.CurrentPosition;
 
             try
             {
