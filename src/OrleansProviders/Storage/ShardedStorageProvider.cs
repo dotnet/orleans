@@ -96,7 +96,7 @@ namespace Orleans.Storage
             }
             storageProviders = providers.ToArray();
             // Storage providers will already have been initialized by the provider manager, so we don't need to orchestrate that
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>

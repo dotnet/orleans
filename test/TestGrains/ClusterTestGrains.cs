@@ -79,7 +79,7 @@ namespace UnitTests.Grains
         public Task Deactivate()
         {
             this.DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private List<IClusterTestListener> observers = new List<IClusterTestListener>();
@@ -88,7 +88,7 @@ namespace UnitTests.Grains
         {
             observers.Add(listener);
             logger.Info("AddedSubscription {0}", observers.Count);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         IAsyncStream<int> stream;
@@ -98,7 +98,7 @@ namespace UnitTests.Grains
             IStreamProvider streamProvider = this.GetStreamProvider("SMSProvider");
             Guid guid = new Guid((int) this.GetPrimaryKeyLong(), 0, 0, new byte[8]);
             stream = streamProvider.GetStream<int>(guid, "notificationtest");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         
     }
@@ -118,27 +118,27 @@ namespace UnitTests.Grains
             string id = this.GetPrimaryKeyLong().ToString();
             logger = GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("Deactivate.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetA(int a)
         {
             logger.Info("SetA={0}", a);
             this.A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetB(int b)
         {
             logger.Info("SetB={0}", b);
             this.B = b;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetAxB()

@@ -146,7 +146,7 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ErrorInStream(GuidId subscriptionId, Exception exc)
@@ -161,7 +161,7 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId)

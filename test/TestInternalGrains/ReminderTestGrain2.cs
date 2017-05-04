@@ -53,7 +53,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
@@ -105,7 +105,7 @@ namespace UnitTests.Grains
             if (sequenceNumber < sequence[reminderName])
             {
                 logger.Info("ReceiveReminder: {0} Incorrect tick {1} vs. {2} with status {3}.", reminderName, sequence[reminderName], sequenceNumber, status);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             sequence[reminderName] = sequenceNumber;
@@ -115,7 +115,7 @@ namespace UnitTests.Grains
             string counterValue = sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task StopReminder(string reminderName)
@@ -259,7 +259,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
@@ -320,7 +320,7 @@ namespace UnitTests.Grains
             if (sequenceNumber < sequence[reminderName])
             {
                 logger.Info("{0} Incorrect tick {1} vs. {2} with status {3}.", reminderName, sequence[reminderName], sequenceNumber, status);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             sequence[reminderName] = sequenceNumber;
@@ -328,7 +328,7 @@ namespace UnitTests.Grains
 
             File.WriteAllText(GetFileName(reminderName), sequence[reminderName].ToString());
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task StopReminder(string reminderName)
@@ -406,7 +406,7 @@ namespace UnitTests.Grains
         {
             logger = GetLogger(String.Format("WrongReminderGrain_{0}", Identity));
             logger.Info("OnActivateAsync.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<bool> StartReminder(string reminderName)

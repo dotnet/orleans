@@ -24,7 +24,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger = base.GetLogger(this.GetType() + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
@@ -32,7 +32,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger.Info("BecomeProducer");
             IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
             producer = streamProvider.GetStream<T>(streamId, streamNamespace);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task StartPeriodicProducing(TimeSpan? firePeriod = null)
@@ -40,7 +40,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger.Info("StartPeriodicProducing");
             var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
             producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, period.Value);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task StopPeriodicProducing()
@@ -48,7 +48,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger.Info("StopPeriodicProducing");
             producerTimer.Dispose();
             producerTimer = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetNumberProduced()
@@ -60,7 +60,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task ClearNumberProduced()
         {
             numProducedItems = 0;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Produce()
@@ -70,7 +70,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         private Task TimerCallback(object state)
         {
-            return producerTimer != null ? Fire() : TaskDone.Done;
+            return producerTimer != null ? Fire() : Task.CompletedTask;
         }
 
         protected virtual Task ProducerOnNextAsync(IAsyncStream<T> theProducer)
@@ -88,7 +88,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
     public class TypedProducerGrainProducingInt : TypedProducerGrain<int>, ITypedProducerGrainProducingInt

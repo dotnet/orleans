@@ -12,7 +12,7 @@ namespace UnitTests.Grains
     {
         internal static Task CallNext(IGrainFactory grainFactory, List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            if (currCallIndex >= callChain.Count) return TaskDone.Done;
+            if (currCallIndex >= callChain.Count) return Task.CompletedTask;
             Tuple<long, bool> next = callChain[currCallIndex];
             bool call_1 = (currCallIndex % 2) == 1; // odd (1) call 1, even (zero) - call 2.
             if (next.Item2)

@@ -22,26 +22,26 @@ namespace UnitTests.Grains
         {
             logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetA(int a)
         {
             logger.Info("SetA={0}", a);
             A = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetB(int b)
         {
             this.B = b;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task IncrementA()
         {
             A = A + 1;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetAxB()
@@ -62,7 +62,7 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

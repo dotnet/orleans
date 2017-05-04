@@ -69,19 +69,19 @@ namespace TestGrains
         public Task Post(Guid guid, string user, string text)
         {
             RaiseEvent(new PostedEvent() { Guid = guid, User = user, Text = text, Timestamp = DateTime.UtcNow });
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Delete(Guid guid)
         {
             RaiseEvent(new DeletedEvent() { Guid = guid });
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Edit(Guid guid, string text)
         {
             RaiseEvent(new EditedEvent() { Guid = guid, Text = text});
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

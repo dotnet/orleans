@@ -22,7 +22,7 @@ namespace UnitTests.StreamingTests
             public Task Increment()
             {
                 Value++;
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public void Clear()

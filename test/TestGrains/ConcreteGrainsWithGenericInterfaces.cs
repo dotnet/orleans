@@ -12,7 +12,7 @@ namespace UnitTests.Grains
         public Task SetT(int t)
         {
             T = t;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<float> MapT2U()
@@ -28,7 +28,7 @@ namespace UnitTests.Grains
         public Task SetT(float t)
         {
             T = t;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> MapT2U()
@@ -46,7 +46,7 @@ namespace UnitTests.Grains
         public Task SetT(int t)
         {
             T = t;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> MapT2U()
@@ -64,7 +64,7 @@ namespace UnitTests.Grains
         public Task Transform()
         {
             T = T * 10;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> Get()

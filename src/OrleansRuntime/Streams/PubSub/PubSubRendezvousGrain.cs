@@ -63,7 +63,7 @@ namespace Orleans.Streams
         public override Task OnDeactivateAsync()
         {
             LogPubSubCounts("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private int RemoveDeadProducers()

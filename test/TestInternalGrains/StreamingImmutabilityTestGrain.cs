@@ -35,7 +35,7 @@ namespace UnitTests.Grains
                 _myObject = new StreamImmutabilityTestObject();
 
             _myObject.MyString = value;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> GetTestObjectStringProperty()
@@ -51,7 +51,7 @@ namespace UnitTests.Grains
         private Task OnNextAsync(StreamImmutabilityTestObject myObject, StreamSequenceToken streamSequenceToken)
         {
             _myObject = myObject;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

@@ -97,13 +97,13 @@ namespace Orleans.Runtime.GrainDirectory
         public Task AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy)
         {
             router.HandoffManager.AcceptHandoffPartition(source, partition, isFullCopy);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RemoveHandoffPartition(SiloAddress source)
         {
             router.HandoffManager.RemoveHandoffPartition(source);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

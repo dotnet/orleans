@@ -11,7 +11,7 @@ namespace UnitTests.Grains
     {
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -19,7 +19,7 @@ namespace UnitTests.Grains
     {
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -35,7 +35,7 @@ namespace UnitTests.Grains
 
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Delay(TimeSpan dt)
@@ -57,7 +57,7 @@ namespace UnitTests.Grains
 
             burstCount = count;
             this.catalog.ActivationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void OnCollectActivation(GrainId grainId)
@@ -79,7 +79,7 @@ namespace UnitTests.Grains
     {
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -88,7 +88,7 @@ namespace UnitTests.Grains
     {
         public Task Nop()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Delay(TimeSpan dt)

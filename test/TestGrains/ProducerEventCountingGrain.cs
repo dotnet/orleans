@@ -43,7 +43,7 @@ namespace UnitTests.Grains
             IStreamProvider streamProvider = GetStreamProvider(providerToUse);
             IAsyncStream<int> stream = streamProvider.GetStream<int>(streamId, ConsumerEventCountingGrain.StreamNamespace);
             _producer = stream;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetNumberProduced()

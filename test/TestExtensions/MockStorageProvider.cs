@@ -151,7 +151,7 @@ namespace UnitTests.StorageTests
             StateStore = new HierarchicalKeyStore(numKeys);
             
             Log.Info(0, "Finished Init Name={0} Config={1}", name, config);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task Close()
@@ -159,7 +159,7 @@ namespace UnitTests.StorageTests
             Log.Info(0, "Close");
             Interlocked.Increment(ref closeCount);
             StateStore.Clear();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
@@ -171,7 +171,7 @@ namespace UnitTests.StorageTests
                 var storedState = GetLastState(grainType, grainReference, grainState);
                 grainState.State = this.serializationManager.DeepCopy(storedState); // Read current state data
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
@@ -187,7 +187,7 @@ namespace UnitTests.StorageTests
                 LastId = GetId(grainReference);
                 LastState = storedState;
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
@@ -201,7 +201,7 @@ namespace UnitTests.StorageTests
                 LastId = GetId(grainReference);
                 LastState = null;
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 #endregion
 

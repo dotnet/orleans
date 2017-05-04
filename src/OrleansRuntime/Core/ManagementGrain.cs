@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Management
         public override Task OnActivateAsync()
         {
             logger = LogManager.GetLogger("ManagementGrain", LoggerType.Runtime);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)

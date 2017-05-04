@@ -35,7 +35,7 @@ namespace UnitTests.Grains
                 (value, token) =>
                 {
                     this.lastStreamValue = value;
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 });
             await base.OnActivateAsync();
         }

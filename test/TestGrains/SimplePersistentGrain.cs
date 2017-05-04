@@ -83,7 +83,7 @@ namespace UnitTests.Grains
         public Task SetRequestContext(int data)
         {
             RequestContext.Set("GrainInfo", data);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

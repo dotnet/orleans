@@ -332,7 +332,7 @@ namespace Orleans.Runtime.MembershipService
         public Task Ping(int pingNumber)
         {
             // do not do anything here -- simply returning back will indirectly notify the prober that this silo is alive
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         #endregion

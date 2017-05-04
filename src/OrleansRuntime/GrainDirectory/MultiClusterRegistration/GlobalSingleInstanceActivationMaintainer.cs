@@ -152,7 +152,7 @@ namespace Orleans.Runtime.GrainDirectory
                 TrackDoubtfulGrain(entry.Item1);
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private async Task RunBatchedActivationRequests(List<string> remoteClusters, List<GrainId> grains)

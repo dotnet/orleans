@@ -54,7 +54,7 @@ namespace UnitTests.Stats
         {
             Trace.TraceInformation("{0} Init called", GetType().Name);
             Name = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Init(ClientConfiguration config, IPAddress address, string clientId)
@@ -66,24 +66,24 @@ namespace UnitTests.Stats
         {
             Trace.TraceInformation("{0} ReportMetrics called", GetType().Name);
             Interlocked.Increment(ref numMetricsCalls);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         public Task ReportStats(List<ICounter> statsCounters)
         {
             Trace.TraceInformation("{0} ReportStats called", GetType().Name);
             Interlocked.Increment(ref numStatsCalls);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
             string hostName)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -106,7 +106,7 @@ namespace UnitTests.Stats
             this.taskScheduler = providerRuntime.ServiceProvider.GetRequiredService<OrleansTaskScheduler>();
             this.schedulingContext = providerRuntime.ServiceProvider.GetRequiredService<Silo>().testHook.SchedulingContext;
             logger.Info("{0} Init called", GetType().Name);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName,
@@ -119,24 +119,24 @@ namespace UnitTests.Stats
         {
             logger.Info("{0} ReportMetrics called", GetType().Name);
             taskScheduler.QueueTask(() => grain.ReportMetricsCalled(), schedulingContext).Ignore();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         public Task ReportStats(List<ICounter> statsCounters)
         {
             logger.Info("{0} ReportStats called", GetType().Name);
             taskScheduler.QueueTask(() => grain.ReportStatsCalled(), schedulingContext).Ignore();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
             string hostName)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

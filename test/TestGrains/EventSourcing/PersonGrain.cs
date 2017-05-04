@@ -22,7 +22,7 @@ namespace TestGrains
                 return ConfirmEvents();
             }
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Marry(IPersonGrain spouse)
@@ -53,7 +53,7 @@ namespace TestGrains
             // we are not confirming this event here!
             // therefore, the tentative state and the confirmed state can differ for some time
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ConfirmChanges()

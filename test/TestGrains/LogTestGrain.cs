@@ -66,7 +66,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync()
         {
-            return TaskDone.Done; // do not wait for initial load
+            return Task.CompletedTask; // do not wait for initial load
         }
 
         public async Task SetAGlobal(int x)
@@ -85,7 +85,7 @@ namespace TestGrains
         public Task SetALocal(int x)
         {
             RaiseEvent(new UpdateA() { Val = x });
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         public async Task SetBGlobal(int x)
         {
@@ -96,7 +96,7 @@ namespace TestGrains
         public Task SetBLocal(int x)
         {
             RaiseEvent(new UpdateB() { Val = x });
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task IncrementAGlobal()
@@ -108,7 +108,7 @@ namespace TestGrains
         public Task IncrementALocal()
         {
             RaiseEvent(new IncrementA());
-            return TaskDone.Done;
+            return Task.CompletedTask;
 
         }
 
@@ -137,13 +137,13 @@ namespace TestGrains
         public Task AddReservationLocal(int val)
         {
             RaiseEvent(new AddReservation() { Val = val });
-            return TaskDone.Done;
+            return Task.CompletedTask;
 
         }
         public Task RemoveReservationLocal(int val)
         {
             RaiseEvent(new RemoveReservation() { Val = val });
-            return TaskDone.Done;
+            return Task.CompletedTask;
 
         }
         public async Task<int[]> GetReservationsGlobal()
@@ -184,7 +184,7 @@ namespace TestGrains
         public Task Deactivate()
         {
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<IReadOnlyList<object>> GetEventLog() {

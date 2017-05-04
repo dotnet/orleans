@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Storage
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);

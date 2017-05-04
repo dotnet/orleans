@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Host
         {
             InitConfig(logger,config.DataConnectionString, config.DeploymentId);
             maxStaleness = config.GatewayListRefreshPeriod;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -388,7 +388,7 @@ namespace Orleans.Runtime.Host
                 {
                     logger.Verbose(@event.ToString());
                 }
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
         }
     }

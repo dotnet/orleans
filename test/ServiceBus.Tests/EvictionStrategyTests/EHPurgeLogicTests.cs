@@ -251,7 +251,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 byte[] ignore = { 12, 23 };
                 cache.Add(new EventData(ignore), DateTime.UtcNow);
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private NodeConfiguration GetNodeConfiguration()

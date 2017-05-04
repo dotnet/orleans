@@ -49,7 +49,7 @@ namespace Orleans.Streams
 
         public Task Cleanup()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

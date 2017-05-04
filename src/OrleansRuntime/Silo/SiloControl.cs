@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         public Task Ping(string message)
         {
             logger.Info("Ping");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetSystemLogLevel(int traceLevel)
@@ -47,7 +47,7 @@ namespace Orleans.Runtime
             logger.Info("SetSystemLogLevel={0}", newTraceLevel);
             LogManager.SetRuntimeLogLevel(newTraceLevel);
             silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetAppLogLevel(int traceLevel)
@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetAppLogLevel={0}", newTraceLevel);
             LogManager.SetAppLogLevel(newTraceLevel);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetLogLevel(string logName, int traceLevel)
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
             if (log == null) throw new ArgumentException(string.Format("Logger {0} not found", logName));
             
             log.SetSeverityLevel(newTraceLevel);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
         {
             logger.Info("ForceGarbageCollection");
             GC.Collect();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
@@ -126,7 +126,7 @@ namespace Orleans.Runtime
             logger.Info("UpdateConfiguration with {0}", configuration);
             silo.OrleansConfig.Update(configuration);
             logger.Info(ErrorCode.Runtime_Error_100318, "UpdateConfiguration - new config is now {0}", silo.OrleansConfig.ToString(silo.Name));
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)

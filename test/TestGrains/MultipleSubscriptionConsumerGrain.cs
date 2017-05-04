@@ -39,7 +39,7 @@ namespace UnitTests.Grains
         {
             logger = base.GetLogger("MultipleSubscriptionConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
@@ -134,19 +134,19 @@ namespace UnitTests.Grains
                 counters.Item1.Clear();
                 counters.Item2.Clear();
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Deactivate()
         {
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private Task OnNext(int e, StreamSequenceToken token, int countCapture, Counter count)
@@ -158,14 +158,14 @@ namespace UnitTests.Grains
                 throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
             }
             count.Increment();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private Task OnError(Exception e, int countCapture, Counter error)
         {
             logger.Info("Got exception {0} on handle {1}", e.ToString(), countCapture);
             error.Increment();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

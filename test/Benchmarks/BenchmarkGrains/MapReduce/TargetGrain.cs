@@ -12,7 +12,7 @@ namespace BenchmarkGrains.MapReduce
         public Task Init(ITargetProcessor<TInput> processor)
         {
             this._processor = processor;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<GrainDataflowMessageStatus> OfferMessage(TInput messageValue, bool consumeToAccept)

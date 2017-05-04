@@ -492,7 +492,7 @@ namespace Orleans
                 object resultObject)
         {
             if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Respond))
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             object deepCopy = null;
             try
@@ -506,12 +506,12 @@ namespace Orleans
                 logger.Warn(
                     ErrorCode.ProxyClient_OGC_SendResponseFailed,
                     "Exception trying to send a response.", exc2);
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             // the deep-copy succeeded.
             SendResponse(message, new Response(deepCopy));
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]

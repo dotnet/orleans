@@ -60,7 +60,7 @@ namespace Orleans.Providers.SqlServer
         /// <returns>Resolved task</returns>
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace Orleans.Providers.SqlServer
 
         Task ISiloMetricsDataPublisher.Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -155,7 +155,7 @@ namespace Orleans.Providers.SqlServer
 
         Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>

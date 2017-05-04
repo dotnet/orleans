@@ -15,13 +15,13 @@ namespace DefaultCluster.Tests
         public Task SetA(int a)
         {
             m_a = a;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetB(int b)
         {
             m_b = b;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<Int32> GetAxB()
@@ -31,20 +31,20 @@ namespace DefaultCluster.Tests
 
         public async Task<Int32> GetAxBError()
         {
-            await TaskDone.Done;
+            await Task.CompletedTask;
             throw new Exception("GetAxBError-Exception");
         }
 
         public Task LongMethod(int waitTime)
         {
             Thread.Sleep(waitTime);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task LongMethodWithError(int waitTime)
         {
             Thread.Sleep(waitTime);
-            await TaskDone.Done;
+            await Task.CompletedTask;
             throw new Exception("LongMethodWithError(" + waitTime + ")");
         }
     }

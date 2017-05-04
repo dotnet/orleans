@@ -76,7 +76,7 @@ namespace Tester
         protected override Task StartInBackground()
         {
             startedInBackground = true;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<bool> HasStarted()

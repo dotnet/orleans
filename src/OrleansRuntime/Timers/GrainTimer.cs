@@ -57,7 +57,7 @@ namespace Orleans.Runtime
                 {
                     if (callback != null)
                         callback(ob);
-                    return TaskDone.Done;
+                    return Task.CompletedTask;
                 },
                 state,
                 dueTime,
@@ -149,7 +149,7 @@ namespace Orleans.Runtime
 
         public Task GetCurrentlyExecutingTickTask()
         {
-            return currentlyExecutingTickTask ?? TaskDone.Done;
+            return currentlyExecutingTickTask ?? Task.CompletedTask;
         }
 
         private string GetFullName()

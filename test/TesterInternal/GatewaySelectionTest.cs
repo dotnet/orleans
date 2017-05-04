@@ -143,7 +143,7 @@ namespace UnitTests.MessageCenterTests
             }
             public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
 #endregion

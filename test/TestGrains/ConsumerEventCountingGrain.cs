@@ -32,12 +32,12 @@ namespace UnitTests.Grains
 
             public Task OnCompletedAsync()
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
 
             public Task OnErrorAsync(Exception ex)
             {
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
         }
 
@@ -80,7 +80,7 @@ namespace UnitTests.Grains
         {
             _numConsumedItems++;
             _logger.Info("Consumer.EventArrived. NumConsumed so far: " + _numConsumedItems);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task StopConsuming()

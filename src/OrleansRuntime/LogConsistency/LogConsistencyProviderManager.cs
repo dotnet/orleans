@@ -31,7 +31,7 @@ namespace Orleans.Runtime.LogConsistency
             providerLoader = new ProviderLoader<ILogConsistencyProvider>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME))
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             providerLoader.LoadProviders(configs[ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME].Providers, this);
             return providerLoader.InitProviders(this);

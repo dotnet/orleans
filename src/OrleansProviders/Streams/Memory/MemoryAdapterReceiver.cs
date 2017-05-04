@@ -26,7 +26,7 @@ namespace Orleans.Providers
 
         public Task Initialize(TimeSpan timeout)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
@@ -54,7 +54,7 @@ namespace Orleans.Providers
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Shutdown(TimeSpan timeout)

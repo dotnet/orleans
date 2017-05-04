@@ -54,7 +54,7 @@ namespace UnitTests.Grains
         public Task NonBlockingCall()
         {
             counters[this.GetPrimaryKey()] = counters[this.GetPrimaryKey()] + 1;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetNonBlockingCallCounter()
@@ -97,7 +97,7 @@ namespace UnitTests.Grains
         public Task Release(Guid key)
         {
             StuckGrain.Release(key);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<bool> IsActivated(Guid key)

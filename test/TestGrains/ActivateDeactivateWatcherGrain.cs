@@ -27,20 +27,20 @@ namespace UnitTests.Grains
             if (logger.IsVerbose) logger.Verbose("Clear");
             activationCalls.Clear();
             deactivationCalls.Clear();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         public Task RecordActivateCall(string activation)
         {
             if (logger.IsVerbose) logger.Verbose("RecordActivateCall: " + activation);
             activationCalls.Add(activation);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RecordDeactivateCall(string activation)
         {
             if (logger.IsVerbose) logger.Verbose("RecordDeactivateCall: " + activation);
             deactivationCalls.Add(activation);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

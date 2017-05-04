@@ -133,7 +133,7 @@ namespace Orleans
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
             this.runtimeClient.DeleteObjectReference(obj);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc />

@@ -95,7 +95,7 @@ namespace TestGrains
         {
             logger.Info("Received an error on stream. StreamGuid: {0}, StreamNamespace: {1}, Exception: {2}.", State.StreamGuid, State.StreamNamespace, ex);
             Faults.FaultCleared = true;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void InjectFault()

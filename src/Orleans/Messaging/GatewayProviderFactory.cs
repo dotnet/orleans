@@ -69,7 +69,7 @@ namespace Orleans.Messaging
         {
             config = cfg;
             knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<IList<Uri>> GetGateways()

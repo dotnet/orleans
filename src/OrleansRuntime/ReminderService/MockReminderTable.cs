@@ -16,7 +16,7 @@ namespace Orleans.Runtime.ReminderService
 
         public Task Init(GlobalConfiguration config, Logger logger)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<ReminderTableData> ReadRows(GrainReference key)

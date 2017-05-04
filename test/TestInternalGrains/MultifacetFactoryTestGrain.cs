@@ -38,13 +38,13 @@ namespace UnitTests.Grains
         public Task SetReader(IMultifacetReader reader)
         {
             State.Reader = reader;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task SetWriter(IMultifacetWriter writer)
         {
             State.Writer = writer;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

@@ -91,16 +91,16 @@ namespace Orleans.Runtime
         {
             if (logger.IsVerbose) logger.Verbose("UpdateRuntimeStatistics from {0}", siloAddress);
             if (this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             SiloRuntimeStatistics old;
             // Take only if newer.
             if (periodicStats.TryGetValue(siloAddress, out old) && old.DateTime > siloStats.DateTime)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()

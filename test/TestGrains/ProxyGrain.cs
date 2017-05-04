@@ -11,7 +11,7 @@ namespace TestInternalGrains
         public Task CreateProxy(long key)
         {
             proxy = GrainFactory.GetGrain<ITestGrain>(key);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> GetRuntimeInstanceId()

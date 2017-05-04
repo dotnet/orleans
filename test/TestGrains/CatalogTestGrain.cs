@@ -16,7 +16,7 @@ namespace UnitTests.Grains
 
         public Task Initialize()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task BlastCallNewGrains(int nGrains, long startingKey, int nCallsToEach)

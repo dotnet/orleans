@@ -378,7 +378,7 @@ namespace OrleansAWSUtils.Storage
             if (toDelete == null) throw new ArgumentNullException("collection");
 
             if (toDelete.Count == 0)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             try
             {
@@ -539,7 +539,7 @@ namespace OrleansAWSUtils.Storage
             if (toCreate == null) throw new ArgumentNullException("collection");
 
             if (toCreate.Count == 0)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             try
             {

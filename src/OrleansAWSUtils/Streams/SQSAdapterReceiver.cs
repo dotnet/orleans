@@ -52,7 +52,7 @@ namespace OrleansAWSUtils.Streams
             {
                 return queue.InitQueueAsync();
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task Shutdown(TimeSpan timeout)

@@ -22,14 +22,14 @@ namespace Orleans.Storage
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for MemoryStorageGrain virtually indefinitely.
             logger = GetLogger(GetType().Name);
             logger.Info("OnActivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
             grainStore = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<IGrainState> ReadStateAsync(string stateStore, string grainStoreKey)
@@ -53,7 +53,7 @@ namespace Orleans.Storage
         {
             GrainStateStore storage = GetStoreForGrain(grainType);
             storage.DeleteGrainState(grainId, etag);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private GrainStateStore GetStoreForGrain(string grainType)

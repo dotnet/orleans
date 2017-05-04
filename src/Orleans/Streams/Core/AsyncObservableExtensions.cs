@@ -5,8 +5,8 @@ namespace Orleans.Streams
 {
     public static class AsyncObservableExtensions
     {
-        private static readonly Func<Exception, Task> DefaultOnError = _ => TaskDone.Done;
-        private static readonly Func<Task> DefaultOnCompleted = () => TaskDone.Done;
+        private static readonly Func<Exception, Task> DefaultOnError = _ => Task.CompletedTask;
+        private static readonly Func<Task> DefaultOnCompleted = () => Task.CompletedTask;
 
         /// <summary>
         /// Subscribe a consumer to this observable using delegates.

@@ -36,14 +36,14 @@ namespace UnitTests.Grains
                 }
             }
             ExtensionProperty = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RemoveExtension()
         {
             runtimeClient.RemoveExtension(extender);
             extender = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -76,14 +76,14 @@ namespace UnitTests.Grains
                 }
             }
             ExtensionProperty = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RemoveExtension()
         {
             runtimeClient.RemoveExtension(extender);
             extender = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -98,7 +98,7 @@ namespace UnitTests.Grains
         }
         
         public Task DoSomething() {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
         
         public override Task OnActivateAsync()

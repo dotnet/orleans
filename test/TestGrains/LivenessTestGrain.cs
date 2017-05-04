@@ -43,7 +43,7 @@ namespace UnitTests.Grains
         {
             this.label = label;
             logger.Info("SetLabel {0} received", label);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task StartTimer()
@@ -51,13 +51,13 @@ namespace UnitTests.Grains
             logger.Info("StartTimer.");
             timer = base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
             
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private Task TimerTick(object data)
         {
             logger.Info("TimerTick.");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> GetRuntimeInstanceId()

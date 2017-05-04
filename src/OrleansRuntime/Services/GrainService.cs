@@ -60,7 +60,7 @@ namespace Orleans.Runtime
         /// <summary>Invoked upon initialization of the service</summary>
         public virtual Task Init(IServiceProvider serviceProvider)
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private void OnStatusChange(GrainServiceStatus oldStatus, GrainServiceStatus newStatus)
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
 
             StartInBackground().Ignore();
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>Deferred part of initialization that executes after the service is already started (to speed up startup)</summary>
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
             Logger.Info(ErrorCode.RS_ServiceStopping, $"Stopping {this.typeName} grain service");
             Status = GrainServiceStatus.Stopped;
             
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 
@@ -113,7 +113,7 @@ namespace Orleans.Runtime
             RingRange = newRange;
             RangeSerialNumber++;
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>Possible statuses of a grain service</summary>

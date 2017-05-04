@@ -55,7 +55,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -114,7 +114,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -195,7 +195,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -296,7 +296,7 @@ namespace UnitTests.Grains
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 
@@ -369,13 +369,13 @@ namespace UnitTests.Grains
             logger = GetLogger();
             logger.Info("OnActivateAsync");
             this.DeactivateOnIdle();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> DoSomething()
@@ -398,7 +398,7 @@ namespace UnitTests.Grains
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             logger.Info("OnActivateAsync");
             grain = GrainFactory.GetGrain<ITestGrain>(1);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<string> DoSomething()

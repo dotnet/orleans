@@ -9,7 +9,7 @@ namespace UnitTests.Grains
     {
         public Task Ping()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<JObject> EchoJson(JObject data)

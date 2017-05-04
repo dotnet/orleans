@@ -47,13 +47,13 @@ namespace UnitTests.General
             logger = providerRuntime.GetLogger(GetType().Name);
             logger.Info("Init Name={0}", Name);
             Interlocked.Increment(ref initCount);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Close()
         {
             logger.Info("Close Name={0}", Name);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public virtual Task<object> ExecuteCommand(int command, object arg)
@@ -134,7 +134,7 @@ namespace UnitTests.General
         public Task Close()
         {
             logger.Info("Close Name={0}", Name);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 

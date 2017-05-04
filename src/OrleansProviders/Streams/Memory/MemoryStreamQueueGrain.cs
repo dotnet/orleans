@@ -32,7 +32,7 @@ namespace Orleans.Providers
             }
             data.SequenceNumber = sequenceNumber++;
             eventQueue.Enqueue(data);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>

@@ -65,7 +65,7 @@ namespace Samples.StorageProviders
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Log = providerRuntime.GetLogger(this.GetType().FullName);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace Samples.StorageProviders
             if (DataManager != null)
                 DataManager.Dispose();
             DataManager = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -123,7 +123,7 @@ namespace Samples.StorageProviders
         {
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
             DataManager.Delete(grainState.GetType().Name, grainReference.ToKeyString());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>

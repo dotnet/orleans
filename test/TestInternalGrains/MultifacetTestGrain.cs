@@ -26,7 +26,7 @@ namespace UnitTests.Grains
         public Task SetValue(int x)
         {
             State.Value = x;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         #endregion

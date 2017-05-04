@@ -202,10 +202,10 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             if (formerActivationsInThisCluster == null)
-                return TaskDone.Done;
+                return Task.CompletedTask;
 
             if (!this.hasMultiClusterNetwork)
-                return TaskDone.Done; // single cluster - no broadcast required
+                return Task.CompletedTask; // single cluster - no broadcast required
 
             // we must also remove cached references to former activations in this cluster
             // from remote clusters; thus, we broadcast the unregistration
@@ -254,7 +254,7 @@ namespace Orleans.Runtime.GrainDirectory
             directoryPartition.RemoveGrain(gid);
 
             if (!this.hasMultiClusterNetwork)
-                return TaskDone.Done; // single cluster - no broadcast required
+                return Task.CompletedTask; // single cluster - no broadcast required
 
             // broadcast deletion to all other clusters
             var myClusterId = this.clusterId;

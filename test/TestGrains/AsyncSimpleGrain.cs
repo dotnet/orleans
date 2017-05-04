@@ -54,7 +54,7 @@ namespace UnitTests.Grains
         public Task SetX(int x)
         {
             resolver.SetResult(x);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

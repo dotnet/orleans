@@ -13,7 +13,7 @@ namespace UnitTests.Grains
         public Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
         {
             base.GetLogger().Verbose("GetAbstractModel: Success");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<EnumClass> GetEnumModel()

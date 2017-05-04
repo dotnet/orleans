@@ -21,7 +21,7 @@ namespace UnitTests.Grains
         public Task Subscribe(ISimpleGrainObserver observer)
         {
             this.Observer = observer;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         #endregion
