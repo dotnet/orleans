@@ -289,7 +289,7 @@ namespace Orleans
             try
             {
                 action();
-                return TaskDone.Done;
+                return Task.CompletedTask;
             }
             catch (Exception exc)
             {
