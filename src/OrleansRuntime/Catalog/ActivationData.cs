@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
@@ -17,7 +18,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IActivationData, IInvokable
+    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable
     {
         // This class is used for activations that have extension invokers. It keeps a dictionary of 
         // invoker objects to use with the activation, and extend the default invoker
@@ -193,6 +194,12 @@ namespace Orleans.Runtime
             GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
         }
 
+        public Type GrainType => GrainTypeData.Type;
+
+        public IGrainIdentity GrainIdentity => this.Identity;
+
+        public IServiceProvider ActivationServices { get; private set; }
+
         #region Method invocation
 
         private ExtensionInvoker extensionInvoker;
@@ -255,17 +262,23 @@ namespace Orleans.Runtime
             }
         }
 
-        internal Type GrainInstanceType { get; private set; }
+        internal Type GrainInstanceType => GrainTypeData?.Type;
 
         internal void SetGrainInstance(Grain grainInstance)
         {
             GrainInstance = grainInstance;
-            if (grainInstance != null)
+        }
+
+        internal void SetupContext(GrainTypeData typeData, IServiceProvider grainServices)
+        {
+            this.GrainTypeData = typeData;
+            this.ActivationServices = grainServices;
+            if (typeData != null)
             {
-                GrainInstanceType = grainInstance.GetType();
+                var grainType = typeData.Type;
 
                 // Don't ever collect system grains or reminder table grain or memory store grains.
-                bool doNotCollect = typeof(IReminderTableGrain).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
+                bool doNotCollect = typeof(IReminderTableGrain).IsAssignableFrom(grainType) || typeof(IMemoryStorageGrain).IsAssignableFrom(grainType);
                 if (doNotCollect)
                 {
                     this.collector = null;
@@ -310,6 +323,8 @@ namespace Orleans.Runtime
         {
             get { return Grain; }
         }
+
+        public GrainTypeData GrainTypeData { get; private set; }
 
         public Grain GrainInstance { get; private set; }
 

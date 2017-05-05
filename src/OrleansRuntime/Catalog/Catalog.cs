@@ -132,6 +132,7 @@ namespace Orleans.Runtime
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
+        private IServiceProvider serviceProvider;
         private readonly Logger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
@@ -158,7 +159,8 @@ namespace Orleans.Runtime
             GrainCreator grainCreator,
             NodeConfiguration nodeConfig,
             ISiloMessageCenter messageCenter,
-            PlacementDirectorsManager placementDirectorsManager)
+            PlacementDirectorsManager placementDirectorsManager,
+            IServiceProvider serviceProvider)
             : base(Constants.CatalogId, messageCenter.MyAddress)
         {
             LocalSilo = siloInitializationParameters.SiloAddress;
@@ -171,6 +173,7 @@ namespace Orleans.Runtime
             destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
             this.nodeConfig = nodeConfig;
+            this.serviceProvider = serviceProvider;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
@@ -706,30 +709,34 @@ namespace Orleans.Runtime
             
             lock (data)
             {
+                data.SetupContext(grainTypeData, this.serviceProvider);
+
                 Grain grain;
 
-                //Create a new instance of the given grain type
-                grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-
-                //for stateful grains, install storage bridge
-                if (grain is IStatefulGrain)
+                if (typeof(IStatefulGrain).IsAssignableFrom(grainType))
                 {
+                    //for stateful grains, install storage bridge
                     SetupStorageProvider(grainType, data);
 
                     var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
 
-                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, storage);
+                    grain = grainCreator.CreateGrainInstance(data, stateObjectType, storage);
 
                     storage.SetGrain(grain);
                 }
-
-                //for log-view grains, install log-view adaptor
-                else if (grain is ILogConsistentGrain)
+                else
                 {
-                    var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);                  
-                    grainCreator.InstallLogViewAdaptor(grain, grainType, 
-                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy,
-                        consistencyProvider, data.StorageProvider);
+                    // Create a new instance of the given grain type
+                    grain = grainCreator.CreateGrainInstance(data);
+
+                    //for log-view grains, install log-view adaptor
+                    if (grain is ILogConsistentGrain)
+                    {
+                        var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);
+                        grainCreator.InstallLogViewAdaptor(grain, grainType,
+                            grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy,
+                            consistencyProvider, data.StorageProvider);
+                    }
                 }
              
                 grain.Data = data;
