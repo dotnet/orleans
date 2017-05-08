@@ -112,12 +112,17 @@ namespace Orleans.Serialization
 
             var typeKey = TypeSerializer.ReadTypeKey(outerReader);
             
-            // Read the serialized payload.
+            // Read the length of the serialized payload.
             var length = outerReader.ReadInt();
-            var initialOffset = outerContext.CurrentPosition;
-            var innerBytes = outerReader.ReadBytes(length);
 
-            var innerContext = outerContext.CreateNestedContext(initialOffset, new BinaryTokenStreamReader(innerBytes));
+            // The nested data was serialized beginning at the current offset (after the length property).
+            // Record the current offset for use when creating the nested deserialization context.
+            var position = outerContext.CurrentPosition;
+
+            // Read the nested payload.
+            var innerBytes = outerReader.ReadBytes(length);
+            
+            var innerContext = outerContext.CreateNestedContext(position: position, reader: new BinaryTokenStreamReader(innerBytes));
             object result;
 
             // If the concrete type is available and the exception is valid for reconstruction,

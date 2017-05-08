@@ -45,18 +45,18 @@ namespace Orleans.Serialization
     public static class DeserializationContextExtensions
     {
         /// <summary>
-        /// Returns a new nested context which begins at the specified offset into the stream.
+        /// Returns a new nested context which begins at the specified position.
         /// </summary>
         /// <param name="context"></param>
-        /// <param name="offset"></param>
+        /// <param name="position"></param>
         /// <param name="reader"></param>
         /// <returns></returns>
         public static IDeserializationContext CreateNestedContext(
             this IDeserializationContext context,
-            int offset,
+            int position,
             BinaryTokenStreamReader reader)
         {
-            return new DeserializationContext.NestedDeserializationContext(context, offset, reader);
+            return new DeserializationContext.NestedDeserializationContext(context, position, reader);
         }
     }
 
@@ -117,17 +117,17 @@ namespace Orleans.Serialization
         internal class NestedDeserializationContext : IDeserializationContext
         {
             private readonly IDeserializationContext parent;
-            private readonly int initialOffset;
+            private readonly int position;
 
             /// <summary>
             /// Initializes a new <see cref="NestedDeserializationContext"/> instance.
             /// </summary>
             /// <param name="parent"></param>
-            /// <param name="initialOffset">The offset relative to the parent at which this context begins.</param>
+            /// <param name="position">The position, relative to the outer-most context, at which this context begins.</param>
             /// <param name="reader"></param>
-            public NestedDeserializationContext(IDeserializationContext parent, int initialOffset, BinaryTokenStreamReader reader)
+            public NestedDeserializationContext(IDeserializationContext parent, int position, BinaryTokenStreamReader reader)
             {
-                this.initialOffset = initialOffset;
+                this.position = position;
                 this.parent = parent;
                 this.StreamReader = reader;
             }
@@ -137,7 +137,7 @@ namespace Orleans.Serialization
             public object AdditionalContext => this.parent.AdditionalContext;
             public BinaryTokenStreamReader StreamReader { get; }
             public int CurrentObjectOffset { get; set; }
-            public int CurrentPosition => this.initialOffset + this.StreamReader.CurrentPosition;
+            public int CurrentPosition => this.position + this.StreamReader.CurrentPosition;
             public void RecordObject(object obj, int offset) => this.parent.RecordObject(obj, offset);
             public void RecordObject(object obj) => this.RecordObject(obj, this.CurrentObjectOffset);
             public object FetchReferencedObject(int offset) => this.parent.FetchReferencedObject(offset);
