@@ -95,7 +95,7 @@ namespace Orleans.Serialization
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
-            var innerContext = outerContext.CreateNestedContext(offsetFromCurrent: sizeof(int), writer: new BinaryTokenStreamWriter());
+            var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: new BinaryTokenStreamWriter());
 
             // Serialize the exception itself.
             var methods = this.GetSerializerMethods(actualType);

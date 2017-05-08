@@ -63,10 +63,10 @@ namespace Orleans.Serialization
 
         public static ISerializationContext CreateNestedContext(
             this ISerializationContext context,
-            int offsetFromCurrent,
+            int position,
             BinaryTokenStreamWriter writer)
         {
-            return new SerializationContext.NestedSerializationContext(context, context.CurrentOffset + offsetFromCurrent, writer);
+            return new SerializationContext.NestedSerializationContext(context, position, writer);
         }
     }
 
