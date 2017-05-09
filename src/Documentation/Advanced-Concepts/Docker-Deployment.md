@@ -527,7 +527,7 @@ To run this article in a `Swarm` cluster, you don't have any extra work. When yo
 
 # Google Kubernetes (K8s)
 
-Comming soon...
+Coming soon...
 
 
 # [Bonus topic] Debugging Orleans inside Containers
