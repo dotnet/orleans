@@ -37,11 +37,37 @@ namespace Orleans.Serialization
 
     public interface ISerializationContext : ISerializerContext
     {
+        /// <summary>
+        /// Gets the stream writer.
+        /// </summary>
         BinaryTokenStreamWriter StreamWriter { get; }
-
-        void RecordObject(object original);
+        
+        /// <summary>
+        /// Records the provided object at the specified offset into <see cref="StreamWriter"/>.
+        /// </summary>
+        /// <param name="original"></param>
+        /// <param name="offset"></param>
+        void RecordObject(object original, int offset);
 
         int CheckObjectWhileSerializing(object raw);
+
+        int CurrentOffset { get; }
+    }
+
+    public static class SerializationContextExtensions
+    {
+        public static void RecordObject(this ISerializationContext context, object original)
+        {
+            context.RecordObject(original, context.CurrentOffset);
+        }
+
+        public static ISerializationContext CreateNestedContext(
+            this ISerializationContext context,
+            int position,
+            BinaryTokenStreamWriter writer)
+        {
+            return new SerializationContext.NestedSerializationContext(context, position, writer);
+        }
     }
 
     /// <summary>
@@ -107,11 +133,11 @@ namespace Orleans.Serialization
             }
         }
 
-        public void RecordObject(object original)
+        public void RecordObject(object original, int offset)
         {
-            processedObjects[original] = new Record(this.StreamWriter.CurrentOffset);
+            processedObjects[original] = new Record(offset);
         }
-        
+
         // Returns an object suitable for insertion if this is a back-reference, or null if it's new
         public object CheckObjectWhileCopying(object raw)
         {
@@ -138,8 +164,37 @@ namespace Orleans.Serialization
             return -1;
         }
 
+        public int CurrentOffset => this.StreamWriter.CurrentOffset;
+
         public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
 
         public object AdditionalContext => this.SerializationManager.RuntimeClient;
+
+        internal class NestedSerializationContext : ISerializationContext
+        {
+            private readonly int initialOffset;
+            private readonly ISerializationContext parentContext;
+
+            /// <summary>
+            /// Creates a new instance of the <see cref="NestedSerializationContext"/> class.
+            /// </summary>
+            /// <param name="parent">The parent context.</param>
+            /// <param name="offset">The absolute offset at which this stream begins.</param>
+            /// <param name="writer">The writer.</param>
+            public NestedSerializationContext(ISerializationContext parent, int offset, BinaryTokenStreamWriter writer)
+            {
+                this.parentContext = parent;
+                this.initialOffset = offset;
+                this.StreamWriter = writer;
+            }
+
+            public SerializationManager SerializationManager => this.parentContext.SerializationManager;
+            public IServiceProvider ServiceProvider => this.parentContext.ServiceProvider;
+            public object AdditionalContext => this.parentContext.ServiceProvider;
+            public BinaryTokenStreamWriter StreamWriter { get; }
+            public int CurrentOffset => this.initialOffset + this.StreamWriter.CurrentOffset;
+            public void RecordObject(object original, int offset) => this.parentContext.RecordObject(original, offset);
+            public int CheckObjectWhileSerializing(object raw) => this.parentContext.CheckObjectWhileSerializing(raw);
+        }
     }
 }

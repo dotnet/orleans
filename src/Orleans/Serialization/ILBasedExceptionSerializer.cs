@@ -1,9 +1,9 @@
 ﻿using System.Runtime.Serialization;
+using Orleans.Utilities;
 
 namespace Orleans.Serialization
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Reflection;
 
@@ -17,8 +17,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// The collection of serializers.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, SerializationManager.SerializerMethods> serializers =
-            new ConcurrentDictionary<Type, SerializationManager.SerializerMethods>();
+        private readonly CachedReadConcurrentDictionary<Type, SerializationManager.SerializerMethods> serializers =
+            new CachedReadConcurrentDictionary<Type, SerializationManager.SerializerMethods>();
 
         /// <summary>
         /// The field filter used for generating serializers for subclasses of <see cref="Exception"/>.
@@ -93,10 +93,9 @@ namespace Orleans.Serialization
             // Write the concrete type directly.
             this.typeSerializer.WriteNamedType(actualType, outerWriter);
 
-            var innerContext = new SerializationContext(outerContext.SerializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
+            // Create a nested context which will be written to the outer context at an int-length offset from the current position.
+            // This is because the inner context will be copied with a length prefix to the outer context.
+            var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: new BinaryTokenStreamWriter());
 
             // Serialize the exception itself.
             var methods = this.GetSerializerMethods(actualType);
@@ -113,15 +112,17 @@ namespace Orleans.Serialization
 
             var typeKey = TypeSerializer.ReadTypeKey(outerReader);
             
-            // Read the serialized payload.
+            // Read the length of the serialized payload.
             var length = outerReader.ReadInt();
+
+            // The nested data was serialized beginning at the current offset (after the length property).
+            // Record the current offset for use when creating the nested deserialization context.
+            var position = outerContext.CurrentPosition;
+
+            // Read the nested payload.
             var innerBytes = outerReader.ReadBytes(length);
             
-            var innerContext = new DeserializationContext(outerContext.SerializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(innerBytes)
-            };
-            
+            var innerContext = outerContext.CreateNestedContext(position: position, reader: new BinaryTokenStreamReader(innerBytes));
             object result;
 
             // If the concrete type is available and the exception is valid for reconstruction,
@@ -181,12 +182,12 @@ namespace Orleans.Serialization
             // Write the type name directly.
             var key = new TypeSerializer.TypeKey(fallbackException.OriginalTypeName);
             TypeSerializer.WriteTypeKey(key, outerWriter);
-            
+
+            // Create a nested context which will be written to the outer context at an int-length offset from the current position.
+            // This is because the inner context will be copied with a length prefix to the outer context.
+            var innerContext = outerContext.CreateNestedContext(sizeof(int), new BinaryTokenStreamWriter());
+
             // Serialize the only accepted fields from the base Exception class.
-            var innerContext = new SerializationContext(outerContext.SerializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
             this.fallbackBaseExceptionSerializer.Serialize(fallbackException, innerContext, null);
 
             // Write the length of the serialized exception, then write the serialized bytes.
@@ -227,15 +228,15 @@ namespace Orleans.Serialization
 
             public int Compare(FieldInfo left, FieldInfo right)
             {
-                var l = left.DeclaringType == ExceptionType ? 1 : 0;
-                var r = right.DeclaringType == ExceptionType ? 1 : 0;
+                var l = left?.DeclaringType == ExceptionType ? 1 : 0;
+                var r = right?.DeclaringType == ExceptionType ? 1 : 0;
 
                 // First compare based on whether or not the field is from the Exception base class.
                 var compareBaseClass = r - l;
                 if (compareBaseClass != 0) return compareBaseClass;
 
                 // Secondarily compare the field names.
-                return string.Compare(left.Name, right.Name, StringComparison.Ordinal);
+                return string.Compare(left?.Name, right?.Name, StringComparison.Ordinal);
             }
         }
     }

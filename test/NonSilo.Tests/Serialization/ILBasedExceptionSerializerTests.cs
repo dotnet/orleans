@@ -31,14 +31,21 @@ namespace UnitTests.Serialization
         {
             // Throw an exception so that is has a stack trace.
             var expected = GetNewException();
+            this.TestExceptionSerialization(expected);
+        }
 
+        private ILExceptionSerializerTestException TestExceptionSerialization(ILExceptionSerializerTestException expected)
+        {
             var writer = new SerializationContext(this.environment.SerializationManager)
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
 
             // Deep copies should be reference-equal.
-            Assert.Equal(expected, SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.SerializationManager)), ReferenceEqualsComparer.Instance);
+            Assert.Equal(
+                expected,
+                SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.SerializationManager)),
+                ReferenceEqualsComparer.Instance);
 
             this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
             var reader = new DeserializationContext(this.environment.SerializationManager)
@@ -46,13 +53,70 @@ namespace UnitTests.Serialization
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
 
-            var actual = (ILExceptionSerializerTestException)this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
+            var actual = (ILExceptionSerializerTestException) this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
             Assert.Equal(expected.BaseField.Value, actual.BaseField.Value, StringComparer.Ordinal);
             Assert.Equal(expected.SubClassField, actual.SubClassField, StringComparer.Ordinal);
             Assert.Equal(expected.OtherField.Value, actual.OtherField.Value, StringComparer.Ordinal);
 
             // Check for referential equality in the two fields which happened to be reference-equals.
             Assert.Equal(actual.BaseField, actual.OtherField, ReferenceEqualsComparer.Instance);
+
+            return actual;
+        }
+
+        /// <summary>
+        /// Tests that <see cref="ILBasedExceptionSerializer"/> supports reference cycles.
+        /// </summary>
+        [Fact]
+        public void ExceptionSerializer_ReferenceCycle()
+        {
+            // Throw an exception so that is has a stack trace.
+            var expected = GetNewException();
+
+            // Create a reference cycle at the top level.
+            expected.SomeObject = expected;
+
+            var actual = this.TestExceptionSerialization(expected);
+            Assert.Equal(actual, actual.SomeObject);
+        }
+
+        /// <summary>
+        /// Tests that <see cref="ILBasedExceptionSerializer"/> supports reference cycles.
+        /// </summary>
+        [Fact]
+        public void ExceptionSerializer_NestedReferenceCycle()
+        {
+            // Throw an exception so that is has a stack trace.
+            var exception = GetNewException();
+            var expected = new Outer
+            {
+                SomeFunObject = exception.OtherField,
+                Object = exception,
+            };
+
+            // Create a reference cycle.
+            exception.SomeObject = expected;
+
+            var writer = new SerializationContext(this.environment.SerializationManager)
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            
+            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            var reader = new DeserializationContext(this.environment.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
+
+            var actual = (Outer)this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
+            Assert.Equal(expected.Object.BaseField.Value, actual.Object.BaseField.Value, StringComparer.Ordinal);
+            Assert.Equal(expected.Object.SubClassField, actual.Object.SubClassField, StringComparer.Ordinal);
+            Assert.Equal(expected.Object.OtherField.Value, actual.Object.OtherField.Value, StringComparer.Ordinal);
+
+            // Check for referential equality in the fields which happened to be reference-equals.
+            Assert.Equal(actual.Object.BaseField, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
+            Assert.Equal(actual.Object, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
+            Assert.Equal(actual.SomeFunObject, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
         }
 
         private static ILExceptionSerializerTestException GetNewException()
@@ -141,6 +205,12 @@ namespace UnitTests.Serialization
             Assert.Equal(actual.BaseField, actual.OtherField, ReferenceEqualsComparer.Instance);
         }
 
+        private class Outer
+        {
+            public SomeFunObject SomeFunObject { get; set; }
+            public ILExceptionSerializerTestException Object { get; set; }
+        }
+
         private class SomeFunObject
         {
             public string Value { get; set; }
@@ -155,6 +225,7 @@ namespace UnitTests.Serialization
         {
             public string SubClassField { get; set; }
             public SomeFunObject OtherField { get; set; }
+            public object SomeObject { get; set; }
         }
 
         private class TestTypeSerializer : TypeSerializer
