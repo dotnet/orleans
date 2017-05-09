@@ -18,7 +18,7 @@ A typical grain encapsulates state and behavior of a single entity (e.g. a speci
 
 ### Turns: Units of Execution
 
-The idea behind the single-threaded execution model for actors is that the invokers (remote) take turns "calling" its methods. Thus, a message coming to actor B from actor A will placed in a queue and the associated handler is invoked only when all prior messages have been serviced.
+The idea behind the single-threaded execution model for actors is that the invokers (remote) take turns "calling" its methods. Thus, a message coming to actor B from actor A will be placed in a queue and the associated handler is invoked only when all prior messages have been serviced.
 
 This allows us to avoid all use of locks to protect actor state, as it is inherently protected against data races. However, it may also lead to problems when messages pass back and forth and the message graph forms cycles. If A sends a message to B from one of its methods and awaits its completion, and B sends a message to A, also awaiting its completion, the application will quickly lock up.
 
