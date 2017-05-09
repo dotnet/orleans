@@ -280,7 +280,8 @@ namespace OrleansClient
             var config = new ClientConfiguration();
             config.DeploymentId = "Orleans-Docker";
             config.PropagateActivityId = true;
-            var ip = Dns.GetHostEntryAsync("orleans-silo").Result.AddressList[0];
+            var hostEntry = await Dns.GetHostEntryAsync("orleans-silo");
+            var ip = hostEntry.AddressList[0];
             config.Gateways.Add(new IPEndPoint(ip, 10400));
 
             Console.WriteLine("Initializing...");
@@ -313,7 +314,8 @@ You may have noticed that we are not using the membership provider in our client
 The way we found to workaround this *limitation*, is to manually add a gateway yourself to the client configuration like this:
 
 ```csharp
-var ip = Dns.GetHostEntryAsync("orleans-silo").Result.AddressList[0];
+var hostEntry = await Dns.GetHostEntryAsync("orleans-silo");
+var ip = hostEntry.AddressList[0];
 config.Gateways.Add(new IPEndPoint(ip, 10400));
 ```
 
