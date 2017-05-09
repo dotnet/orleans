@@ -7,6 +7,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,14 +21,18 @@ namespace Orleans.ServiceBus.Providers
         {
             this.generator = generator;
         }
-        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             IEnumerable<EventData> events;
-            if (generator.TryReadEvents(maxCount, waitTime, out events))
+            //mimic real life response time
+            await Task.Delay(TimeSpan.FromMilliseconds(30));
+            if (generator.TryReadEvents(maxCount, out events))
             {
-                return Task.FromResult(events);
+                return events;
             }
-            return Task.FromResult(new List<EventData>().AsEnumerable());
+            //if no events generated, wait for waitTime to pass
+            await Task.Delay(waitTime);
+            return new List<EventData>().AsEnumerable();
         }
 
         public void StopProducingOnStream(IStreamIdentity streamId)

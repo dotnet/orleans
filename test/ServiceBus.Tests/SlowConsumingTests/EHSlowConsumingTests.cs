@@ -54,7 +54,6 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
                 ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                 ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
-                ProviderSettings.DrainEventCount = 3;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }

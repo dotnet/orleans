@@ -32,24 +32,6 @@ namespace Orleans.ServiceBus.Providers
         { }
 
         /// <summary>
-        /// DrainEventCountName
-        /// </summary>
-        public const string DrainEventCountName = nameof(DrainEventCount);
-        /// <summary>
-        /// DefaultDrainEventCount
-        /// </summary>
-        public const int DefaultDrainEventCount = 2; 
-        private int? drainEventCount;
-        /// <summary>
-        /// Initial events counts in drain scenerio 
-        /// </summary>
-        public int DrainEventCount
-        {
-            get { return drainEventCount ?? DefaultDrainEventCount; }
-            set { drainEventCount = value; }
-        }
-
-        /// <summary>
         /// StreamDataGeneratorTypeName
         /// </summary>
         public static string StreamDataGeneratorTypeName = nameof(StreamDataGeneratorType);
@@ -72,7 +54,6 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="providerConfiguration"></param>
         public void PopulateDataGeneratingConfigFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
-            this.drainEventCount = providerConfiguration.GetIntProperty(DrainEventCountName, DefaultDrainEventCount);
             this.streamDataGeneratorType = providerConfiguration.GetTypeProperty(StreamDataGeneratorTypeName, DefaultStreamDataGeneratorType);
         }
 
@@ -82,7 +63,6 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="properties"></param>
         public void WriteDataGeneratingConfig(Dictionary<string, string> properties)
         {
-            properties.Add(DrainEventCountName, this.DrainEventCount.ToString());
             properties.Add(StreamDataGeneratorTypeName, this.StreamDataGeneratorType.AssemblyQualifiedName);
         }
     }
@@ -137,8 +117,8 @@ namespace Orleans.ServiceBus.Providers
                     if (this.EventHubReceivers.TryGetValue(queueToAssign, out receiverToAssign))
                     {
                         receiverToAssign.ConfigureDataGeneratorForStream(streamId);
+                        logger.Info($"Stream {streamId.Namespace}-{streamId.Guid.ToString()} is assigned to queue {queueToAssign.ToString()}");
                     }
-                    logger.Info($"Stream {streamId.Namespace}-{streamId.Guid.ToString()} is assigned to queue {queueToAssign.ToString()}");
                 } else
                 {
                     logger.Info("Cannot get queues in the cluster, current streamQueueMapper is not EventHubQueueMapper");

@@ -35,11 +35,11 @@ namespace ServiceBus.Tests.TestStreamProviders
                 {
                     _caches = caches;
                 }
-                private const int defaultMaxAddCount = 2;
+                private const int defaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
                     IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
                 {
-                    //set defaultMaxAddCount to 2 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
+                    //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), 
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge));
                     _caches.Add(cache);
