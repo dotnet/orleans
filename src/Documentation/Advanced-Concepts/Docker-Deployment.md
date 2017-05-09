@@ -525,6 +525,8 @@ Docker clustering stack is called **Swarm** and you can find more by reading its
 
 To run this article in a `Swarm` cluster, you don't have any extra work. When you run `docker-compose up -d` in a `Swarm` node, it will schedule containers based on the configured rules. The same applies to other Swarm-based services like [Docker Datacenter](https://www.docker.com/enterprise-edition), [Azure ACS](https://azure.microsoft.com/en-us/services/container-service/) (in Swarm mode), [AWS ECS Container Service](https://aws.amazon.com/ecs/) and so on. All you need to do is to deploy your `Swarm` cluster before deploy your **dockerized** Orleans application.
 
+> **Note**: If you are using a Docker engine with the Swarm mode that already have support to `stack`, `deploy` and `compose` v3, a better approach to deploy your solution would be `docker stack deploy -c docker-compose.yml <name>`. Just keep in mind that it requires v3 compose file support at your Docker engine and the majority of hosted services like Azure and AWS still use v2 and older engines.
+
 # Google Kubernetes (K8s)
 
 Coming soon...
