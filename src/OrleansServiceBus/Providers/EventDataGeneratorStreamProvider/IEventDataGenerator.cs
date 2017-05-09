@@ -41,7 +41,6 @@ namespace Orleans.ServiceBus.Providers
         public bool ShouldProduce { private get; set; }
         private SerializationManager serializationManager;
         private int drainEventCount;
-        private Random seed;
         public SimpleStreamEventDataGenerator(IStreamIdentity streamId, EventHubGeneratorStreamProviderSettings settings, 
             Logger logger, SerializationManager serializationManager)
         {
@@ -50,17 +49,16 @@ namespace Orleans.ServiceBus.Providers
             this.ShouldProduce = true;
             this.serializationManager = serializationManager;
             this.drainEventCount = settings.DrainEventCount;
-            this.seed = new Random();
         }
 
-        public bool TryReadEvents(int maxCount, TimeSpan waitTime, out IEnumerable<EventData> events)
+        public bool TryReadEvents(int eventCount, TimeSpan waitTime, out IEnumerable<EventData> events)
         {
             if (!this.ShouldProduce)
             {
                 events = null;
                 return false;
             }
-            int count = GetEventGeneratingCount(maxCount);
+            int count = GetEventGeneratingCount(eventCount);
             List<EventData> eventDataList = new List<EventData>();
             while (count-- > 0)
             {
@@ -90,17 +88,17 @@ namespace Orleans.ServiceBus.Providers
         }
 
 
-        private int GetEventGeneratingCount(int maxCount)
+        private int GetEventGeneratingCount(int eventCount)
         {
             if (this.drainEventCount > 0)
             {
                 //finish producing drain events first
-                return this.drainEventCount > maxCount ? maxCount : this.drainEventCount;
+                return this.drainEventCount > eventCount ? eventCount : this.drainEventCount;
             }
             else
             {
-                //after producing drain events, mimic real events producing pattern : random count
-                return this.seed.Next(maxCount + 1);
+                //after producing drain events, producing asked event count
+                return eventCount;
             }
         }
 
@@ -123,12 +121,14 @@ namespace Orleans.ServiceBus.Providers
         private List<IStreamDataGenerator<EventData>> generators;
         private SerializationManager serializationManager;
         private EventHubGeneratorStreamProviderSettings settings;
+        private Random seed;
         public EventHubPartitionDataGenerator(Logger logger, SerializationManager serializationManager, EventHubGeneratorStreamProviderSettings settings)
         {
             this.logger = logger.GetSubLogger(this.GetType().Name);
             this.generators = new List<IStreamDataGenerator<EventData>>();
             this.serializationManager = serializationManager;
             this.settings = settings;
+            this.seed = new Random();
         }
         public void AddDataGeneratorForStream(IStreamIdentity streamId)
         {
@@ -151,9 +151,12 @@ namespace Orleans.ServiceBus.Providers
         public bool TryReadEvents(int maxCount, TimeSpan waitTime, out IEnumerable<EventData> events)
         {
             var eventDataList = new List<EventData>();
+            int remainingMaxCount = maxCount;
             this.generators.ForEach(generator => {
                 IEnumerable<EventData> eventData;
-                if (generator.TryReadEvents(maxCount, waitTime, out eventData))
+                int count = this.seed.Next(remainingMaxCount + 1);
+                remainingMaxCount -= count;
+                if (generator.TryReadEvents(count, waitTime, out eventData))
                 {
                     foreach (var data in eventData)
                     {

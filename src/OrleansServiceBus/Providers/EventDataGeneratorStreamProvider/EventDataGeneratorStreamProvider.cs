@@ -126,7 +126,7 @@ namespace Orleans.ServiceBus.Providers
                     return;
                 int randomNumber = args.RandomNumber;
                 IStreamIdentity streamId = args.StreamId;
-                var allQueueInTheCluster = (this.EventHubQueueMapper as EventHubQueueMapper)?.GetAllQueues();
+                var allQueueInTheCluster = (this.EventHubQueueMapper as EventHubQueueMapper)?.GetAllQueues().OrderBy(queueId => queueId.ToString());
 
                 if (allQueueInTheCluster != null)
                 {
