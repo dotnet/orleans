@@ -27,7 +27,8 @@ namespace OrleansClient
             var config = new ClientConfiguration();
             config.DeploymentId = "Orleans-Docker";
             config.PropagateActivityId = true;
-            var ip = Dns.GetHostEntryAsync("orleans-silo").Result.AddressList[0];
+            var hostEntry = await Dns.GetHostEntryAsync("orleans-silo");
+            var ip = hostEntry.AddressList[0];
             config.Gateways.Add(new IPEndPoint(ip, 10400));
 
             Console.WriteLine("Initializing...");
