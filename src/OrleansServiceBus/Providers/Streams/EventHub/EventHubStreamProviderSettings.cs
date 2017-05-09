@@ -17,6 +17,21 @@ namespace Orleans.ServiceBus.Providers
         public string StreamProviderName { get; }
 
         /// <summary>
+        /// Name of StatisticMonitorWriteInterval
+        /// </summary>
+        public const string StatisticMonitorWriteIntervalName = nameof(StatisticMonitorWriteInterval);
+
+        /// <summary>
+        /// Default statistic monitor write interval
+        /// </summary>
+        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Statistic monitor write interval
+        /// </summary>
+        public TimeSpan StatisticMonitorWriteInterval = DefaultStatisticMonitorWriteInterval;
+
+        /// <summary>
         /// SlowConsumingMonitorFlowControlThresholdName
         /// </summary>
         public const string SlowConsumingMonitorFlowControlThresholdName = nameof(SlowConsumingMonitorFlowControlThreshold);
@@ -138,6 +153,7 @@ namespace Orleans.ServiceBus.Providers
                 properties.Add(EventHubConfigTypeName, EventHubSettingsType.AssemblyQualifiedName);
             if (CheckpointerSettingsType != null)
                 properties.Add(CheckpointerSettingsTypeName, CheckpointerSettingsType.AssemblyQualifiedName);
+            properties.Add(StatisticMonitorWriteIntervalName, StatisticMonitorWriteInterval.ToString());
             if (cacheSizeMb.HasValue)
             {
                 properties.Add(CacheSizeMbName, CacheSizeMb.ToString(CultureInfo.InvariantCulture));
@@ -183,6 +199,8 @@ namespace Orleans.ServiceBus.Providers
             CacheSizeMb = providerConfiguration.GetIntProperty(CacheSizeMbName, DefaultCacheSizeMb);
             DataMinTimeInCache = providerConfiguration.GetTimeSpanProperty(DataMinTimeInCacheName, DefaultDataMinTimeInCache);
             DataMaxAgeInCache = providerConfiguration.GetTimeSpanProperty(DataMaxAgeInCacheName, DefaultDataMaxAgeInCache);
+            StatisticMonitorWriteInterval = providerConfiguration.GetTimeSpanProperty(StatisticMonitorWriteIntervalName,
+                DefaultStatisticMonitorWriteInterval);
             double flowControlThreshold = 0;
             if (providerConfiguration.TryGetDoubleProperty(SlowConsumingMonitorFlowControlThresholdName, out flowControlThreshold))
             {

@@ -49,6 +49,13 @@ namespace Orleans.Providers.Streams.Common
         /// Should be set to OnBlockAllocated method of the cache's EvicationStrategy
         /// </summary>
         Action<IDisposable> OnBlockAllocated { set; }
+
+        /// <summary>
+        /// Get cached message enqueueTime
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>Return message's enqueue time, return null if message didn't keep a enqueue time</returns>
+        DateTime? GetMessageEnqueueTime(ref TCachedMessage message);
     }
 
     /// <summary>

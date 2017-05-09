@@ -55,7 +55,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             this.bufferPoolSizeInMB = EventHubStreamProviderSettings.DefaultCacheSizeMb;
             var oneKB = 1024;
-            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(this.bufferPoolSizeInMB, () => new FixedSizeBuffer(oneKB));
+            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB), Guid.NewGuid().ToString(), this.bufferPoolSizeInMB);
 
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
@@ -225,10 +225,16 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
+            var monitorDimentions = new EventHubReceiverMonitorDimentions();
+            monitorDimentions.EventHubPartition = ehSettings.Partition;
+            monitorDimentions.EventHubPath = ehSettings.Hub.Path;
+            monitorDimentions.GlobalConfig = null;
+            monitorDimentions.NodeConfig = null;
+
             this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(ehSettings.Hub.Path, ehSettings.Partition, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimentions, this.logger), this.GetNodeConfiguration);
             this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(ehSettings.Hub.Path, ehSettings.Partition, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimentions, this.logger), this.GetNodeConfiguration);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
@@ -266,7 +272,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
         {
-            var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, this.purgePredicate);
+            var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
             var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool), 
                 EventHubDataComparer.Instance, this.logger, evictionStrategy);

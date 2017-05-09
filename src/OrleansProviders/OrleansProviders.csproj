@@ -49,6 +49,8 @@
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
     <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
+    <Compile Include="Streams\Common\Monitors\IObjectPoolMonitor.cs" />
+    <Compile Include="Streams\Common\Monitors\ICacheMonitor.cs" />
     <Compile Include="Streams\Common\PooledCache\IEvictionStrategy.cs" />
     <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterConfig.cs" />

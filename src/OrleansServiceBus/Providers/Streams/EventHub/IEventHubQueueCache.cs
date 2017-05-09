@@ -47,5 +47,10 @@ namespace Orleans.ServiceBus.Providers
         /// Send purge signal to the cache, the cache will perform a time based purge on its cached messages
         /// </summary>
         void SignalPurge();
+
+        /// <summary>
+        /// Cache monitor for current cache
+        /// </summary>
+        ICacheMonitor CacheMonitor { get; }
     }
 }

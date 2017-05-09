@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
@@ -23,6 +24,11 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="resource"></param>
         void Free(T resource);
+
+        /// <summary>
+        /// Unique id of current blockId
+        /// </summary>
+        string Id { get; }
     }
 
     /// <summary>
@@ -39,6 +45,11 @@ namespace Orleans.Providers.Streams.Common
         /// A pool must set this property upon resource allocation.
         /// </summary>
         public IObjectPool<T> Pool { set { pool = value; } }
+
+        /// <summary>
+        /// Pooled resource size
+        /// </summary>
+        public virtual int SizeInByte { get {return Marshal.SizeOf(this);} }
 
         /// <summary>
         /// If this object is to be used in a fixed size object pool, this call should be

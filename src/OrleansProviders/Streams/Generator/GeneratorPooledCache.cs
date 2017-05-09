@@ -143,6 +143,11 @@ namespace Orleans.Providers.Streams.Generator
                 this.serializationManager = serializationManager;
             }
 
+            public DateTime? GetMessageEnqueueTime(ref CachedMessage message)
+            {
+                return null;
+            }
+
             public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition setreamPosition = GetStreamPosition(queueMessage);

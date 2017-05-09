@@ -28,8 +28,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     }
     public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy
     {
-        public EHEvictionStrategyForTesting(Logger logger, TimePurgePredicate timePurage = null)
-            :base(logger, timePurage)
+        public EHEvictionStrategyForTesting(Logger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
+            :base(logger, cacheMonitor, monitorWriteInterval, timePurage)
         { }
 
         public Queue<FixedSizeBuffer> InUseBuffers { get { return this.inUseBuffers; } }

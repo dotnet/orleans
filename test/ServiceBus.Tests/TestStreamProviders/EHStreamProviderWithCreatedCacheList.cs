@@ -1,4 +1,5 @@
-﻿using Orleans.Providers;
+﻿using System;
+using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -7,6 +8,8 @@ using Orleans.Streams;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.ServiceBus.Providers.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Configuration;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
@@ -23,27 +26,36 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches);
+                var globalConfig = this.serviceProvider
+                    .GetRequiredService<Func<GlobalConfiguration>>().Invoke();
+                var nodeConfig = this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>()
+                    .Invoke();
+                var eventHubPath = hubSettings.Path;
+                var sharedDimentions = new EventHubMonitorAggregationDimentions(globalConfig, nodeConfig, eventHubPath);
+                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches, sharedDimentions);
             }
 
             private class CacheFactoryForTesting : EventHubQueueCacheFactory
             {
-                private readonly List<IEventHubQueueCache> _caches;
+                private readonly List<IEventHubQueueCache> caches;
 
                 public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
-                    SerializationManager serializationManager, List<IEventHubQueueCache> caches)
-                    : base(providerSettings, serializationManager)
+                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimentions sharedDimentions)
+                    : base(providerSettings, serializationManager, sharedDimentions)
                 {
-                    _caches = caches;
+                    this.caches = caches;
                 }
                 private const int defaultMaxAddCount = 10;
-                protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
-                    IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
+                protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
+                    Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge,
+                    SerializationManager serializationManager, EventHubMonitorAggregationDimentions sharedDimentions)
                 {
-                    //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
+                    var cacheMonitorDimentions = new EventHubCacheMonitorDimentions(sharedDimentions, partition, bufferPool.Id);
+                    var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimentions, cacheLogger);
+                    //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), 
-                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge));
-                    _caches.Add(cache);
+                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, cacheMonitor, providerSettings.StatisticMonitorWriteInterval, timePurge));
+                    this.caches.Add(cache);
                     return cache;
                 }
             }

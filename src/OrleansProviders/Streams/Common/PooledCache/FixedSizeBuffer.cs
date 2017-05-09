@@ -20,17 +20,24 @@ namespace Orleans.Providers.Streams.Common
         public object Id => buffer;
 
         /// <summary>
+        /// Size of the FixedSizeBuffer
+        /// </summary>
+        public override int SizeInByte {
+            get { return this.blockSize; }
+        }
+
+        /// <summary>
         /// Manages access to a fixed size byte buffer.
         /// </summary>
-        /// <param name="blockSize"></param>
-        public FixedSizeBuffer(int blockSize)
+        /// <param name="blockSizeInByte"></param>
+        public FixedSizeBuffer(int blockSizeInByte)
         {
             if (blockSize < 0)
             {
                 throw new ArgumentOutOfRangeException("blockSize", "blockSize must be positive value.");
             }
             count = 0;
-            this.blockSize = blockSize;
+            this.blockSize = blockSizeInByte;
             buffer = new byte[blockSize];
         }
 

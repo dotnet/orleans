@@ -104,6 +104,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         private async Task Initialize()
         {
+            var watch = Stopwatch.StartNew();
             try
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
@@ -111,11 +112,13 @@ namespace Orleans.ServiceBus.Providers
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
                 receiver = await this.eventHubReceiverFactory(settings, offset, logger);
-                monitor.TrackInitialization(true);
+                watch.Stop();
+                monitor.TrackInitialization(true, watch.Elapsed, null);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                monitor.TrackInitialization(false);
+                watch.Stop();
+                monitor.TrackInitialization(false, watch.Elapsed, ex);
                 throw;
             }
         }
@@ -139,20 +142,20 @@ namespace Orleans.ServiceBus.Providers
                     return new List<IBatchContainer>();
                 }
             }
-
+            var watch = Stopwatch.StartNew();
             List<EventData> messages;
             try
             {
-                var watch = Stopwatch.StartNew();
+
                 messages = (await receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
                 watch.Stop();
 
-                monitor.TrackRead(true);
-                monitor.TrackMessagesRecieved(messages?.Count ?? 0, watch.Elapsed);
+                monitor.TrackRead(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
-                monitor.TrackRead(false);
+                watch.Stop();
+                monitor.TrackRead(false, watch.Elapsed, ex);
                 logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
                     "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", settings.Hub.Path,
                     settings.Partition, ex);
@@ -162,6 +165,7 @@ namespace Orleans.ServiceBus.Providers
             var batches = new List<IBatchContainer>();
             if (messages == null || messages.Count == 0)
             {
+                monitor.TrackMessagesRecieved(0, null, null);
                 return batches;
             }
 
@@ -174,7 +178,7 @@ namespace Orleans.ServiceBus.Providers
             TimeSpan oldest = dequeueTimeUtc - messages[0].EnqueuedTimeUtc;
             TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].EnqueuedTimeUtc;
 #endif
-            monitor.TrackAgeOfMessagesRead(oldest, newest);
+            monitor.TrackMessagesRecieved(messages.Count, oldest, newest);
 
             foreach (EventData message in messages)
             {
@@ -182,7 +186,7 @@ namespace Orleans.ServiceBus.Providers
                 batches.Add(new StreamActivityNotificationBatch(streamPosition.StreamIdentity.Guid,
                     streamPosition.StreamIdentity.Namespace, streamPosition.SequenceToken));
             }
-
+            cache.CacheMonitor?.TrackMessageAdded(messages.Count);
             if (!checkpointer.CheckpointExists)
             {
                 checkpointer.Update(
@@ -228,6 +232,7 @@ namespace Orleans.ServiceBus.Providers
 
         public async Task Shutdown(TimeSpan timeout)
         {
+            var watch = Stopwatch.StartNew();
             try
             {
                 // if receiver was already shutdown, do nothing
@@ -254,12 +259,13 @@ namespace Orleans.ServiceBus.Providers
 
                 // finish return receiver closing task
                 await closeTask;
-
-                monitor.TrackShutdown(true);
+                watch.Stop();
+                monitor.TrackShutdown(true, watch.Elapsed, null);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                monitor.TrackShutdown(false);
+                watch.Stop();
+                monitor.TrackShutdown(false, watch.Elapsed, ex);
                 throw;
             }
         }

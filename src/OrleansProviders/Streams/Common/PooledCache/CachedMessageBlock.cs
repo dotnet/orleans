@@ -22,6 +22,10 @@ namespace Orleans.Providers.Streams.Common
         private int writeIndex;
         private int readIndex;
 
+        /// <inheritdoc cref="PooledQueueCache{TQueueMessage,TCachedMessage}"/>>
+        public override int SizeInByte {
+            get { return this.blockSize; }
+        }
 
         /// <summary>
         /// Linked list node, so this message block can be kept in a linked list

@@ -71,7 +71,7 @@ namespace Orleans.Providers
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
             // 10 meg buffer pool.  10 1 meg blocks
-            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), Guid.NewGuid().ToString(), adapterConfig.CacheSizeMb);
 
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }
