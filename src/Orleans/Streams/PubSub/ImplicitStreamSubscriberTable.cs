@@ -10,7 +10,9 @@ namespace Orleans.Streams
     [Serializable]
     internal class ImplicitStreamSubscriberTable
     {
+        [NonSerialized]
         private readonly ConcurrentDictionary<string, HashSet<int>> table;
+
         private readonly List<Tuple<IStreamNamespacePredicate, int>> predicates;
 
         public ImplicitStreamSubscriberTable()
