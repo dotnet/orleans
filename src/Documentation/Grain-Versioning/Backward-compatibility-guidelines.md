@@ -25,7 +25,7 @@ public interface IMyGrain : IGrainWithIntegerKey
   Task MyMethod(int arg);
 
   // New method added in V2
-  Task MyNewMethodMethod(int arg, obj o);
+  Task MyNewMethod(int arg, obj o);
 }
 ```
 
@@ -76,7 +76,7 @@ public interface MyGrain : IMyGrain
   }
 
   // New method added in V2
-  Task MyNewMethodMethod(int arg)
+  Task MyNewMethod(int arg)
   {
     SomeSubRoutine(arg);
     NewRoutineAdded(arg);
@@ -107,11 +107,11 @@ If you want to remove methods, this should be done in 2 steps:
     Task MyMethod(int arg);
 
     // New method added in V2
-    Task MyNewMethodMethod(int arg, obj o);
+    Task MyNewMethod(int arg, obj o);
   }
   ```
 
-2. When you are __sure__ that no V1 calls are made, deploy V3 with V1 method removed
+2. When you are sure that no V1 calls are made (effectively V1 is no longer deployed in the running cluster), deploy V3 with V1 method removed
   ``` cs
   [Version(3)]
   public interface IMyGrain : IGrainWithIntegerKey
