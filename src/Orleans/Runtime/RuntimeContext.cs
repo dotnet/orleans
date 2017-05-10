@@ -5,7 +5,7 @@ namespace Orleans.Runtime
 {
     internal class RuntimeContext
     {
-        public TaskScheduler Scheduler { get; private set; }
+        public TaskScheduler Scheduler { get; set; }
         public ISchedulingContext ActivationContext { get; private set; }
 
         [ThreadStatic]
@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         public static RuntimeContext Current 
         { 
             get { return context; } 
+            set { context = value; }
         }
 
         internal static ISchedulingContext CurrentActivationContext
@@ -37,7 +38,7 @@ namespace Orleans.Runtime
             context = new RuntimeContext {Scheduler = null};
         }
 
-        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
+        public static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
         {
             if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
             context.ActivationContext = shedContext;
