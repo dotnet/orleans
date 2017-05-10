@@ -1,13 +1,11 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -88,6 +86,37 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(nRedEvents, counters.Item1);
             Assert.Equal(nBlueEvents, counters.Item2);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task FilteredImplicitSubscriptionGrainTest()
+        {
+            this.logger.Info($"************************ {nameof(FilteredImplicitSubscriptionGrainTest)} *********************************");
+
+            var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
+            var events = new[] { 3, 5, 2, 4 };
+            var testData = streamNamespaces.Zip(events, (s, e) => new
+            {
+                Namespace = s,
+                Events = e,
+                StreamId = Guid.NewGuid()
+            }).ToList();
+
+            var provider = fixture.HostedCluster.StreamProviderManager.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            foreach (var item in testData)
+            {
+                var stream = provider.GetStream<int>(item.StreamId, item.Namespace);
+                for (int i = 0; i < item.Events; i++)
+                    await stream.OnNextAsync(i);
+            }
+
+            foreach (var item in testData)
+            {
+                var grain = this.fixture.GrainFactory.GetGrain<IFilteredImplicitSubscriptionGrain>(item.StreamId);
+                var actual = await grain.GetCounter(item.Namespace);
+                var expected = item.Namespace.StartsWith("red") ? item.Events : 0;
+                Assert.Equal(expected, actual);
+            }
         }
     }
 

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Orleans.Runtime;
 
@@ -8,11 +10,15 @@ namespace Orleans.Streams
     [Serializable]
     internal class ImplicitStreamSubscriberTable
     {
-        private readonly Dictionary<string, HashSet<int>> table;
+        [NonSerialized]
+        private readonly ConcurrentDictionary<string, HashSet<int>> table;
+
+        private readonly List<Tuple<IStreamNamespacePredicate, int>> predicates;
 
         public ImplicitStreamSubscriberTable()
         {
-            table = new Dictionary<string, HashSet<int>>();
+            table = new ConcurrentDictionary<string, HashSet<int>>();
+            predicates = new List<Tuple<IStreamNamespacePredicate, int>>();
         }
 
         /// <summary>Initializes any implicit stream subscriptions specified for a grain class type. If the grain class specified does not have any associated namespaces, then nothing is done.</summary>
@@ -29,20 +35,24 @@ namespace Orleans.Streams
                     continue;
                 }
 
-                // we collect all namespaces that the specified grain class should implicitly subscribe to.
-                ISet<string> namespaces = GetNamespacesFromAttributes(grainClass);
-                if (null == namespaces) continue;
+                // we collect all predicates that the specified grain class should implicitly subscribe to.
 
-                if (namespaces.Count > 0)
+                IList<IStreamNamespacePredicate> grainPredicates = GetPredicatesFromAttributes(grainClass);
+                if (grainPredicates.Any())
                 {
-                    // the grain class is subscribed to at least one namespace. in order to create a grain reference later, we need a qualifying interface but it doesn't matter which (because we'll be creating references to extensions), so we'll take the first interface in the sequence.
-                    AddImplicitSubscriber(grainClass, namespaces);
+                    // we'll need the class type code.
+                    int implTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
+
+                    foreach (var predicate in grainPredicates)
+                    {
+                        predicates.Add(Tuple.Create(predicate, implTypeCode));
+                    }
                 }
             }
         }
 
         /// <summary>
-        /// Retrieve a map of implicit subscriptionsIds to implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID. 
+        /// Retrieve a map of implicit subscriptionsIds to implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID.
         /// </summary>
         /// <param name="streamId">A stream ID.</param>
         /// <param name="grainFactory">The grain factory used to get consumer references.</param>
@@ -51,29 +61,31 @@ namespace Orleans.Streams
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
         internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId, IInternalGrainFactory grainFactory)
         {
-            if (String.IsNullOrWhiteSpace(streamId.Namespace))
+            if (string.IsNullOrWhiteSpace(streamId.Namespace))
             {
                 throw new ArgumentException("The stream ID doesn't have an associated namespace.", nameof(streamId));
             }
 
-            HashSet<int> entry;
-            var result = new Dictionary<Guid, IStreamConsumerExtension>();
-            if (table.TryGetValue(streamId.Namespace, out entry))
-            {
-                foreach (var i in entry)
-                {
-                    IStreamConsumerExtension consumer = MakeConsumerReference(grainFactory, streamId.Guid, i);
-                    Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
-                    if (result.ContainsKey(subscriptionGuid))
-                    {
-                        throw new InvalidOperationException(string.Format("Internal invariant violation: generated duplicate subscriber reference: {0}, subscriptionId: {1}", consumer, subscriptionGuid));
-                    }
-                    result.Add(subscriptionGuid, consumer);
-                }                
-                return result;                
-            }
+            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamId.Namespace);
 
+            var result = new Dictionary<Guid, IStreamConsumerExtension>();
+            foreach (var i in entry)
+            {
+                IStreamConsumerExtension consumer = MakeConsumerReference(grainFactory, streamId.Guid, i);
+                Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
+                if (result.ContainsKey(subscriptionGuid))
+                {
+                    throw new InvalidOperationException(
+                        $"Internal invariant violation: generated duplicate subscriber reference: {consumer}, subscriptionId: {subscriptionGuid}");
+                }
+                result.Add(subscriptionGuid, consumer);
+            }
             return result;
+        }
+
+        private HashSet<int> GetOrAddImplicitSubscriberTypeCodes(string streamNamespace)
+        {
+            return table.GetOrAdd(streamNamespace, FindImplicitSubscriberTypeCodes);
         }
 
         /// <summary>
@@ -163,57 +175,27 @@ namespace Orleans.Streams
                 return false;
             }
 
-            HashSet<int> entry;
-            return (table.TryGetValue(streamNamespace, out entry) && // if we don't have implictit subscriptions for this namespace, fail out
-                    entry.Contains(grainIdTypeCode));                 // if we don't have an implicit subscription for this type of grain on this namespace, fail out
+            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamNamespace);
+            return entry.Contains(grainIdTypeCode);
         }
 
         /// <summary>
-        /// Add an implicit subscriber to the table.
+        /// Finds all implicit subscribed for the given stream namespace.
         /// </summary>
-        /// <param name="grainClass">Type of the grain class whose instances subscribe to the specified namespaces.</param>
-        /// <param name="namespaces">Namespaces instances of the grain class should subscribe to.</param>
-        /// <exception cref="System.ArgumentException">
-        /// No namespaces specified.
-        /// or
-        /// Duplicate specification of namespace "...".
-        /// </exception>
-        private void AddImplicitSubscriber(Type grainClass, ISet<string> namespaces)
+        /// <param name="streamNamespace">The stream namespace to find subscribers too.</param>
+        /// <returns></returns>
+        private HashSet<int> FindImplicitSubscriberTypeCodes(string streamNamespace)
         {
-            // convert IEnumerable<> to an array without copying, if possible.
-            if (namespaces.Count == 0)
+            HashSet<int> result = new HashSet<int>();
+            foreach (Tuple<IStreamNamespacePredicate, int> predicate in predicates)
             {
-                throw new ArgumentException("no namespaces specified", "namespaces");
-            }
-
-            // we'll need the class type code.
-            int implTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
-
-            foreach (string s in namespaces)
-            {
-                // first, we trim whitespace off of the namespace string. leaving these would lead to misleading log messages.
-                string key = s.Trim();
-
-                // if the table already holds the namespace we're looking at, then we don't need to create a new entry. each entry is a dictionary that holds associations between class names and interface ids. e.g.:
-                //  
-                // "namespace0" -> HashSet {implTypeCode.0, implTypeCode.1, ..., implTypeCode.n}
-                // 
-                // each class in the entry used the ImplicitStreamSubscriptionAtrribute with the associated namespace. this information will be used later to create grain references on-demand. we must use string representations to ensure that this information is serializable.
-                if (table.ContainsKey(key))
+                if (predicate.Item1.IsMatch(streamNamespace))
                 {
-                    // an entry already exists. we append a class/interface association to the current set.
-                    HashSet<int> entries = table[key];
-                    if (!entries.Add(implTypeCode))
-                    {
-                        throw new InvalidOperationException(String.Format("attempt to initialize implicit subscriber more than once (key={0}, implTypeCode={1}).", key, implTypeCode));
-                    }
-                }
-                else
-                {
-                    // an entry does not already exist. we create a new one with one class/interface association.
-                    table[key] = new HashSet<int> { implTypeCode };
+                    result.Add(predicate.Item2);
                 }
             }
+
+            return result;
         }
 
         /// <summary>
@@ -230,38 +212,23 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Collects the namespaces associated with a grain class type through the use of ImplicitStreamSubscriptionAttribute.
+        /// Collects the namespace predicates associated with a grain class type through the use of
+        /// <see cref="ImplicitStreamSubscriptionAttribute"/>.
         /// </summary>
-        /// <param name="grainClass">A grain class type that might have ImplicitStreamSubscriptionAttributes associated with it.</param>
-        /// <returns></returns>
-        /// <exception cref="System.ArgumentException">grainType does not describe a grain class.</exception>
-        /// <exception cref="System.InvalidOperationException">duplicate specification of ImplicitConsumerActivationAttribute(...).</exception>
-        private static ISet<string> GetNamespacesFromAttributes(Type grainClass)
+        /// <param name="grainClass">A grain class type that might have
+        /// attributes of type <see cref="ImplicitStreamSubscriptionAttribute"/>  associated with it.</param>
+        /// <returns>The list of stream namespace predicates.</returns>
+        /// <exception cref="System.ArgumentException"><paramref name="grainClass"/> does not describe a grain class.</exception>
+        private static IList<IStreamNamespacePredicate> GetPredicatesFromAttributes(Type grainClass)
         {
             if (!TypeUtils.IsGrainClass(grainClass))
             {
-                throw new ArgumentException(string.Format("{0} is not a grain class.", grainClass.FullName), "grainClass");
+                throw new ArgumentException($"{grainClass.FullName} is not a grain class.", nameof(grainClass));
             }
 
-            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(inherit: false);
+            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(false);
 
-            // otherwise, we'll consider all of them and aggregate the specifications. duplicates will not be permitted.
-            var result = new HashSet<string>();
-            foreach (var attrib in attribs)
-            {
-                if (string.IsNullOrWhiteSpace(attrib.Namespace))
-                {
-                    throw new InvalidOperationException("ImplicitConsumerActivationAttribute argument cannot be null nor whitespace");
-                }
-
-                string trimmed = attrib.Namespace;
-                if (!result.Add(trimmed))
-                {
-                    throw new InvalidOperationException(string.Format("duplicate specification of attribute ImplicitConsumerActivationAttribute({0}).", attrib.Namespace));
-                }
-            }
-
-            return result;
+            return attribs.Select(attrib => attrib.Predicate).ToList();
         }
     }
 }
