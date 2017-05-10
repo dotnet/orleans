@@ -3,7 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+#if NETSTANDARD
+using Microsoft.Azure.EventHubs;
+using static Microsoft.Azure.EventHubs.EventData;
+#else
 using Microsoft.ServiceBus.Messaging;
+#endif
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
