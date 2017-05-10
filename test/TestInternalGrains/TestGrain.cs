@@ -178,4 +178,29 @@ namespace UnitTests.Grains
 
         #endregion
     }
+
+    public class OneWayGrain : Grain, IOneWayGrain
+    {
+        private int count;
+
+        public Task Notify()
+        {
+            this.count++;
+            return TaskDone.Done;
+        }
+
+        public Task Notify(ISimpleGrainObserver observer)
+        {
+            this.count++;
+            observer.StateChanged(this.count - 1, this.count);
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCount() => Task.FromResult(this.count);
+
+        public Task ThrowsOneWay()
+        {
+            throw new Exception("GET OUT!");
+        }
+    }
 }

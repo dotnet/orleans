@@ -109,6 +109,14 @@ namespace Orleans
         public sealed class ImmutableAttribute : Attribute
         {
         }
+
+        /// <summary>
+        /// Indicates that a method on a grain interface is one-way and that no response message will be sent to the caller.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class OneWayAttribute : Attribute
+        {
+        }
     }
 
     namespace MultiCluster

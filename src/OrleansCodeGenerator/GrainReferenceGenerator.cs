@@ -11,6 +11,7 @@ namespace Orleans.CodeGenerator
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
+    using Orleans.Concurrency;
     using Orleans.Runtime;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -191,7 +192,8 @@ namespace Orleans.CodeGenerator
                 var options = GetInvokeOptions(method);
 
                 // Construct the invocation call.
-                if (method.ReturnType == typeof(void))
+                var isOneWayTask = method.GetCustomAttribute<OneWayAttribute>() != null;
+                if (method.ReturnType == typeof(void) || isOneWayTask)
                 {
                     var invocation = SF.InvocationExpression(baseReference.Member("InvokeOneWayMethod"))
                         .AddArgumentListArguments(methodIdArgument)
@@ -203,6 +205,19 @@ namespace Orleans.CodeGenerator
                     }
 
                     body.Add(SF.ExpressionStatement(invocation));
+
+                    if (isOneWayTask)
+                    {
+                        if (method.ReturnType != typeof(Task))
+                        {
+                            throw new CodeGenerationException(
+                                $"Method {grainType.GetParseableName()}.{method.Name} is marked with [{nameof(OneWayAttribute)}], " +
+                                $"but has a return type which is not assignable from {typeof(Task)}");
+                        }
+
+                        var done = typeof(Task).GetNameSyntax(true).Member((object _) => Task.CompletedTask);
+                        body.Add(SF.ReturnStatement(done));
+                    }
                 }
                 else
                 {
