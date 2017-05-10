@@ -9,13 +9,4 @@ namespace Tester.AzureUtils
     
     [CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
     public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }
-
-    public abstract class BaseAzureTestClusterFixture : BaseTestClusterFixture
-    {
-        protected override void CheckPreconditionsOrThrow()
-        {
-            base.CheckPreconditionsOrThrow();
-            TestUtils.CheckForAzureStorage();
-        }
-    }
 }

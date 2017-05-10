@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -13,16 +14,15 @@ namespace UnitTests.GrainInterfaces
     /// Consumer grain which passively reacts to subscriptions which was made on behalf of
     /// it using Programmatic Subscribing 
     /// </summary>
-    public interface IPassive_ConsumerGrain: IGrainWithGuidKey
+    public interface IPassive_ConsumerGrain: IGrainWithGuidKey, IStreamSubscriptionObserver<int>, IStreamSubscriptionObserver<IFruit>
     {
         Task StopConsuming();
         Task<int> GetCountOfOnAddFuncCalled();
         Task<int> GetNumberConsumed();
-        Task SetupOnSubscriptionChangeActionForProvider(string providerName);
     }
 
     //the consumer grain marker interface which would unsubscribe on any subscription added by StreamSubscriptionManager
-    public interface IJerk_ConsumerGrain : IGrainWithGuidKey
+    public interface IJerk_ConsumerGrain : IGrainWithGuidKey, IStreamSubscriptionObserver<int>
     {
     }
 
@@ -47,6 +47,25 @@ namespace UnitTests.GrainInterfaces
     public interface ITypedProducerGrainProducingInt : ITypedProducerGrain
     { }
 
-    public interface ITypedProducerGrainProducingString : ITypedProducerGrain
+    public interface ITypedProducerGrainProducingApple : ITypedProducerGrain
     { }
+
+    public interface IFruit
+    {
+        int GetNumber();
+    }
+
+    public class Apple : IFruit
+    {
+        int number;
+        public Apple(int number)
+        {
+            this.number = number;
+        }
+
+        public int GetNumber()
+        {
+            return number;
+        }
+    }
 }

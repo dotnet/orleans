@@ -22,6 +22,8 @@ namespace Orleans.Messaging
 
         internal IGatewayListProvider CreateGatewayListProvider()
         {
+            this.cfg.CheckGatewayProviderSettings();
+
             IGatewayListProvider listProvider;
             ClientConfiguration.GatewayProviderType gatewayProviderToUse = cfg.GatewayProviderToUse;
             

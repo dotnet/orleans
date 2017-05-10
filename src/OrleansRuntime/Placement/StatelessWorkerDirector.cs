@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class StatelessWorkerDirector : IPlacementDirector<StatelessWorkerPlacement>
+    internal class StatelessWorkerDirector : IPlacementDirector<StatelessWorkerPlacement>, IActivationSelector<StatelessWorkerPlacement>
     {
         private static readonly SafeRandom random = new SafeRandom();
 
         public Task<PlacementResult> OnSelectActivation(
-            PlacementStrategy strategy, GrainId target, IPlacementContext context)
+            PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
             if (target.IsClient)
                 throw new InvalidOperationException("Cannot use StatelessWorkerStrategy to route messages to client grains.");
@@ -43,11 +43,9 @@ namespace Orleans.Runtime.Placement
             return Task.FromResult((PlacementResult)null);
         }
 
-        public Task<PlacementResult> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var grainType = context.GetGrainTypeName(target.GrainId);
-            return Task.FromResult(
-                PlacementResult.SpecifyCreation(context.LocalSilo, strategy, grainType));
+            return Task.FromResult(context.LocalSilo);
         }
 
         internal static ActivationData PickRandom(List<ActivationData> local)

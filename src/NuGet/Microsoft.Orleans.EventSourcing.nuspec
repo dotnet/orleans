@@ -22,9 +22,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansEventSourcing.dll" target="lib\net451" />
-    <file src="OrleansEventSourcing.pdb" target="lib\net451" />
-    <file src="OrleansEventSourcing.xml" target="lib\net451" />
+    <file src="OrleansEventSourcing.dll" target="lib\net461" />
+    <file src="OrleansEventSourcing.pdb" target="lib\net461" />
+    <file src="OrleansEventSourcing.xml" target="lib\net461" />
     <file src="$SRC_DIR$OrleansEventSourcing\**\*.cs" target="src" />
   </files>
 </package>

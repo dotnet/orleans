@@ -9,13 +9,12 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ServiceBus.Tests</RootNamespace>
     <AssemblyName>ServiceBus.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
     <TargetFrameworkProfile />
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -127,12 +126,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="SlowConsumingTests\EHSlowConsumingTests.cs" />
+    <Compile Include="SlowConsumingTests\EventHubStreamProviderSettingsTests.cs" />
     <Compile Include="Streaming\EHClientStreamTests.cs" />
     <Compile Include="Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs" />
     <Compile Include="Streaming\EHStreamPerPartitionTests.cs" />
     <Compile Include="Streaming\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="Streaming\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="Streaming\TimePurgePredicateTests.cs" />
+    <Compile Include="TestStreamProviders\EHStreamProviderWithCreatedCacheList.cs" />
     <Compile Include="TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestEventHubStreamProvider.cs" />
   </ItemGroup>

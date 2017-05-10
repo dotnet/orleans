@@ -11,9 +11,11 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.Runtime</RootNamespace>
     <AssemblyName>OrleansRuntime</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -63,7 +65,7 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
-    <Compile Include="Placement\PlacementTarget.cs" />
+    <Compile Include="Placement\IActivationSelector.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />
     <Compile Include="Services\GrainServiceClient.cs" />
@@ -95,7 +97,6 @@
     <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
-    <Compile Include="Placement\IPlacementDirector.cs" />
     <Compile Include="Placement\RandomPlacementDirector.cs" />
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
@@ -143,7 +144,7 @@
     <Compile Include="Scheduler\ClosureWorkItem.cs" />
     <Compile Include="Scheduler\IWorkItem.cs" />
     <Compile Include="Scheduler\SchedulingContext.cs" />
-    <Compile Include="Placement\IPlacementContext.cs" />
+    <Compile Include="Placement\IPlacementRuntime.cs" />
     <Compile Include="Counters\CountersStatistics.cs" />
     <Compile Include="Counters\OrleansCounterManager.cs" />
     <Compile Include="GrainDirectory\AdaptiveGrainDirectoryCache.cs" />

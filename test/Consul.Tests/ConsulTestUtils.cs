@@ -23,6 +23,7 @@ namespace Consul.Tests
             try
             {
                 var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(15);
                 var response = await client.GetAsync($"{CONSUL_ENDPOINT}/v1/health/service/consul?pretty");
                 return response.StatusCode == HttpStatusCode.OK;
             }
@@ -30,7 +31,10 @@ namespace Consul.Tests
             {
                 return false;
             }
-
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
         }
     }
 }

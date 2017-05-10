@@ -3,7 +3,7 @@
     "WindowsAzure.Storage": "7.0.0"
   },
   "frameworks": {
-    "net451": {}
+    "net461": {}
   },
   "runtimes": {
     "win-anycpu": {},

@@ -17,13 +17,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>True if this is a rewindable provider, false otherwise.</returns>
         bool IsRewindable { get; }
-
-        /// <summary>
-        /// Set onSubscriptionChange action for susbcriptions on different streams
-        /// </summary>
-        /// <typeparam name="T">Type the stream subscription handle is handling</typeparam>
-        /// <param name="onAddAction">delegate which will be executed when subscription added</param>
-        Task SetOnSubscriptionChangeAction<T>(Func<StreamSubscriptionHandle<T>, Task> onAddAction);
     }
 }
 

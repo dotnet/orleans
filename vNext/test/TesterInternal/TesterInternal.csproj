@@ -51,7 +51,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\TesterInternal\**\*.cs" Exclude="..\..\..\test\TesterInternal\obj\**\*.cs;..\..\..\test\TesterInternal\bin\**\*.cs;..\..\..\test\TesterInternal\Properties\*.cs;..\..\..\test\TesterInternal\CounterControlProgTests.cs;..\..\..\test\TesterInternal\GeoClusterTests\*.cs;..\..\..\test\TesterInternal\HostedTestClusterBase.cs;..\..\..\test\TesterInternal\OrleansHostProgTests.cs" />
+    <Compile Include="..\..\..\test\TesterInternal\**\*.cs" Exclude="..\..\..\test\TesterInternal\obj\**\*.cs;..\..\..\test\TesterInternal\bin\**\*.cs;..\..\..\test\TesterInternal\Properties\*.cs;..\..\..\test\TesterInternal\CounterControlProgTests.cs;..\..\..\test\TesterInternal\GeoClusterTests\*.cs;..\..\..\test\TesterInternal\OrleansHostProgTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

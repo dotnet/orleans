@@ -14,10 +14,12 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans</RootNamespace>
     <AssemblyName>Orleans</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>false</SignAssembly>
     <TargetFrameworkProfile />
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
@@ -118,7 +120,11 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="LogConsistency\ILogViewAdaptorHost.cs" />
+    <Compile Include="Placement\IPlacementDirector.cs" />
+    <Compile Include="Placement\IPlacementContext.cs" />
+    <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
+    <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
@@ -171,16 +177,17 @@
     <Compile Include="Services\IGrainService.cs" />
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionObserver.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManagerAdmin.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManagerRetriever.cs" />
     <Compile Include="Streams\Core\StreamSubscription.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManagerAdmin.cs" />
-    <Compile Include="Streams\Core\SubscriptionChangeHandler.cs" />
+    <Compile Include="Streams\Internal\StreamSubscriptionChangeHandler.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
-    <Compile Include="Streams\Providers\StreamProviderUtils.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
+    <Compile Include="Utils\CachedReadConcurrentDictionary.cs" />
     <Compile Include="Utils\Factory.cs" />
     <Compile Include="Utils\IKeyedServiceCollection.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
@@ -298,6 +305,7 @@
     <Compile Include="Streams\Core\StreamSequenceToken.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
+    <Compile Include="Utils\RuntimeTypeNameFormatter.cs" />
     <Compile Include="Utils\ServiceCollectionExtensions.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />

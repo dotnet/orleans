@@ -2,7 +2,6 @@
 using System.Fabric;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.ServiceFabric.Services.Runtime;
 using Orleans;
 using Orleans.Messaging;
@@ -74,34 +73,52 @@ namespace Microsoft.Orleans.ServiceFabric
         }
 
         /// <summary>
-        /// Adds support for connecting to a cluster hosted in Service Fabric to the provided service collection.
+        /// Adds support for connecting to a cluster hosted in Service Fabric.
         /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
+        /// <param name="clientBuilder">The client builder.</param>
         /// <param name="serviceName">The Service Fabric service name.</param>
-        /// <returns>The provided service collection.</returns>
-        public static IServiceCollection AddServiceFabricClientSupport(
-            this IServiceCollection serviceCollection,
+        /// <returns>The provided client builder.</returns>
+        public static IClientBuilder AddServiceFabric(
+            this IClientBuilder clientBuilder,
+            string serviceName)
+        {
+            return clientBuilder.AddServiceFabric(new Uri(serviceName));
+        }
+
+        /// <summary>
+        /// Adds support for connecting to a cluster hosted in Service Fabric.
+        /// </summary>
+        /// <param name="clientBuilder">The client builder.</param>
+        /// <param name="serviceName">The Service Fabric service name.</param>
+        /// <returns>The provided client builder.</returns>
+        public static IClientBuilder AddServiceFabric(
+            this IClientBuilder clientBuilder,
             Uri serviceName)
         {
-            AddStandardServices(serviceCollection);
+            clientBuilder.ConfigureServices(
+                serviceCollection =>
+                {
+                    AddStandardServices(serviceCollection);
 
-            // Use Service Fabric for cluster membership.
-            serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
-                sp =>
-                new FabricServiceSiloResolver(
-                    serviceName,
-                    sp.GetService<IFabricQueryManager>(),
-                    sp.GetService<Factory<string, Logger>>()));
-            serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
-            return serviceCollection;
+                    // Use Service Fabric for cluster membership.
+                    serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
+                        sp =>
+                            new FabricServiceSiloResolver(
+                                serviceName,
+                                sp.GetService<IFabricQueryManager>(),
+                                sp.GetService<Factory<string, Logger>>()));
+                    serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
+                });
+
+            return clientBuilder;
         }
 
         private static void AddStandardServices(IServiceCollection serviceCollection)
         {
-            serviceCollection.TryAddSingleton<FabricClient>();
-            serviceCollection.TryAddSingleton<CreateFabricClientDelegate>(sp => () => sp.GetService<FabricClient>());
-            serviceCollection.TryAddSingleton<IServicePartitionResolver, ServicePartitionResolver>();
-            serviceCollection.TryAddSingleton<IFabricQueryManager, FabricQueryManager>();
+            serviceCollection.AddSingleton<FabricClient>();
+            serviceCollection.AddSingleton<CreateFabricClientDelegate>(sp => () => sp.GetRequiredService<FabricClient>());
+            serviceCollection.AddSingleton<IServicePartitionResolver, ServicePartitionResolver>();
+            serviceCollection.AddSingleton<IFabricQueryManager, FabricQueryManager>();
         }
     }
 }

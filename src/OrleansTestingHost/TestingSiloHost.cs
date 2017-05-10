@@ -35,6 +35,7 @@ namespace Orleans.TestingHost
     /// Also make sure that your test project references your test grains and test grain interfaces 
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
+    [Obsolete("Use TestCluster", false)]
     public class TestingSiloHost
     {
         /// <summary> Single instance of TestingSiloHost </summary>

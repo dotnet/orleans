@@ -44,31 +44,9 @@
     <ProjectReference Include="..\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHClientStreamTests.cs">
-      <Link>Streaming\EHClientStreamTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs">
-      <Link>Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHStreamPerPartitionTests.cs">
-      <Link>Streaming\EHStreamPerPartitionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHStreamProviderCheckpointTests.cs">
-      <Link>Streaming\EHStreamProviderCheckpointTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\EHSubscriptionMultiplicityTests.cs">
-      <Link>Streaming\EHSubscriptionMultiplicityTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\Streaming\TimePurgePredicateTests.cs">
-      <Link>Streaming\TimePurgePredicateTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs">
-      <Link>TestStreamProviders\StreamPerPartitionEventHubStreamProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\ServiceBus.Tests\TestStreamProviders\TestEventHubStreamProvider.cs">
-      <Link>TestStreamProviders\TestEventHubStreamProvider.cs</Link>
-    </Compile>
+
+   <ItemGroup>
+    <Compile Include="..\..\..\test\ServiceBus.Tests\**\*.cs" Exclude="..\..\..\test\ServiceBus.Tests\obj\**\*.cs;..\..\..\test\ServiceBus.Tests\bin\**\*.cs;..\..\..\test\ServiceBus.Tests\Properties\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

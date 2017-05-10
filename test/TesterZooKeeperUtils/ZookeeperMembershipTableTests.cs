@@ -1,10 +1,10 @@
 using System.Threading.Tasks;
-using org.apache.zookeeper;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
+using Tester.ZooKeeperUtils;
 
 namespace UnitTests.MembershipTests
 {
@@ -34,23 +34,8 @@ namespace UnitTests.MembershipTests
 
         protected override async Task<string> GetConnectionString()
         {
-            var connectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
-            if (string.IsNullOrWhiteSpace(connectionString)) return null;
-
-            bool isReachable = false;
-            await ZooKeeper.Using(connectionString, 2000, null, async zk =>
-            {
-                try
-                {
-                    await zk.existsAsync("/test", false);
-                    isReachable = true;
-                }
-                catch (KeeperException.ConnectionLossException)
-                {
-                }
-            });
-
-            return isReachable ? connectionString : null;
+            bool isReachable = await ZookeeperTestUtils.EnsureZooKeeperAsync();
+            return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString : null;
         }
 
         [SkippableFact]

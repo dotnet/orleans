@@ -2,7 +2,7 @@
   "appDomain": "ifAvailable",
   "diagnosticMessages": true,
   "parallelizeAssembly": false,
-  "parallelizeTestCollections": true,
+  "parallelizeTestCollections": false,
   "methodDisplay": "classAndMethod",
   "shadowCopy": false
 }

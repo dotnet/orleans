@@ -8,7 +8,7 @@
     "Xunit.SkippableFact": "1.2.14"
   },
   "frameworks": {
-    "net451": {}
+    "net461": {}
   },
   "runtimes": {
     "win-anycpu": {},

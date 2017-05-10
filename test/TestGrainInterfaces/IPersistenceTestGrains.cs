@@ -136,6 +136,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetValue();
         Task DoWrite(int val);
         Task<int> DoRead();
+        Task<string> GetActivationId();
     }
 
     public interface IPersistenceUserHandledErrorGrain : IGrainWithGuidKey

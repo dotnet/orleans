@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Providers;
+using Orleans.Serialization;
 
 namespace Samples.StorageProviders
 {
@@ -17,7 +16,7 @@ namespace Samples.StorageProviders
     /// </summary>
     public abstract class BaseJSONStorageProvider : IStorageProvider
     {
-        private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings();
+        private JsonSerializerSettings serializerSettings;
 
         /// <summary>
         /// Logger object
@@ -55,6 +54,7 @@ namespace Samples.StorageProviders
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Log = providerRuntime.GetLogger(this.GetType().FullName);
+            this.serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings();
             return TaskDone.Done;
         }
 
@@ -134,9 +134,9 @@ namespace Samples.StorageProviders
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        protected static string ConvertToStorageFormat(IGrainState grainState)
+        protected string ConvertToStorageFormat(IGrainState grainState)
         {
-            return JsonConvert.SerializeObject(grainState.State, SerializerSettings);
+            return JsonConvert.SerializeObject(grainState.State, this.serializerSettings);
         }
 
         /// <summary>

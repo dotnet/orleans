@@ -596,55 +596,7 @@ namespace Orleans.Serialization
                             || (!typeInfo.Namespace.Equals("System", StringComparison.Ordinal)
                                 && !typeInfo.Namespace.StartsWith("System.", StringComparison.Ordinal))))
                     {
-#pragma warning disable 618
-                        if (typeInfo.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Any())
-#pragma warning restore 618
-                        {
-                            // Call the static Register method on the type
-                            if (logger.IsVerbose3)
-                                logger.Verbose3(
-                                    "Running register method for type {0} from assembly {1}",
-                                    typeInfo.Name,
-                                    assembly.GetName().Name);
-
-                            var register = typeInfo.GetMethod("Register", new[] {typeof(SerializationManager)});
-                            if (register != null)
-                            {
-                                try
-                                {
-                                    if (register.ContainsGenericParameters) throw new OrleansException("Type serializer '" + register.GetType().FullName + "' contains generic parameters and can not be registered. Did you mean to provide a split your type serializer into a combination of nongeneric RegisterSerializerAttribute and generic SerializableAttribute classes?");
-                                    register.Invoke(null, new object[] {this});
-                                }
-                                catch (OrleansException ex)
-                                {
-                                    logger.Error(
-                                        ErrorCode.SerMgr_TypeRegistrationFailure,
-                                        "Failure registering type " + type.OrleansTypeName() + " from assembly "
-                                        + assembly.GetLocationSafe(),
-                                        ex);
-                                    throw;
-                                }
-                                catch (Exception)
-                                {
-                                    // Ignore failures to load our own serializers, such as the F# ones in case F# isn't installed.
-                                    if (safeFailSerializers.Contains(assembly.GetName().Name))
-                                        logger.Warn(
-                                            ErrorCode.SerMgr_TypeRegistrationFailureIgnore,
-                                            "Failure registering type " + type.OrleansTypeName() + " from assembly "
-                                            + assembly.GetLocationSafe() + ". Ignoring it.");
-                                    else throw;
-                                }
-                            }
-                            else
-                            {
-                                logger.Warn(
-                                    ErrorCode.SerMgr_MissingRegisterMethod,
-                                    "Type {0} from assembly {1} has the RegisterSerializer attribute but no public static void Register(SerializationManager sm) method.",
-                                    type.Name,
-                                    assembly.GetName().Name);
-                            }
-                        }
-                        else if (IsGeneratedGrainReference(typeInfo))
+                        if (IsGeneratedGrainReference(typeInfo))
                         {
                             RegisterGrainReferenceSerializers(type);
                         }

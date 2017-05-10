@@ -4,18 +4,18 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class RandomPlacementDirector : IPlacementDirector<RandomPlacement>
+    internal class RandomPlacementDirector : IPlacementDirector<RandomPlacement>, IActivationSelector<RandomPlacement>
     {
         private readonly SafeRandom random = new SafeRandom();
 
         public virtual async Task<PlacementResult> OnSelectActivation(
-            PlacementStrategy strategy, GrainId target, IPlacementContext context)
+            PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
             List<ActivationAddress> places = (await context.Lookup(target)).Addresses;
             return ChooseRandomActivation(places, context);
         }
 
-        protected PlacementResult ChooseRandomActivation(List<ActivationAddress> places, IPlacementContext context)
+        protected PlacementResult ChooseRandomActivation(List<ActivationAddress> places, IPlacementRuntime context)
         {
             if (places.Count <= 0)
             {
@@ -37,13 +37,11 @@ namespace Orleans.Runtime.Placement
             return PlacementResult.IdentifySelection(places[random.Next(places.Count)]);
         }
 
-        public virtual Task<PlacementResult> OnAddActivation(
+        public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var grainType = context.GetGrainTypeName(target.GrainId);
-            var allSilos = context.GetCompatibleSiloList(target);
-            return Task.FromResult(
-                PlacementResult.SpecifyCreation(allSilos[random.Next(allSilos.Count)], strategy, grainType));
+            var allSilos = context.GetCompatibleSilos(target);
+            return Task.FromResult(allSilos[random.Next(allSilos.Count)]);
         }
     }
 }

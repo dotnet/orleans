@@ -5,7 +5,6 @@ namespace Microsoft.Orleans.ServiceFabric
 {
     using System;
     using System.Collections.Generic;
-    using System.Fabric;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
@@ -16,7 +15,6 @@ namespace Microsoft.Orleans.ServiceFabric
 
     using Microsoft.Orleans.ServiceFabric.Models;
     using Microsoft.Orleans.ServiceFabric.Utilities;
-    using Microsoft.ServiceFabric.Services.Client;
 
     /// <summary>
     /// Gateway provider which reads gateway information from Service Fabric's naming service.
@@ -28,7 +26,7 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private readonly TimeSpan refreshPeriod;
 
-        private FabricServiceSiloResolver fabricServiceSiloResolver;
+        private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
 
         private List<Uri> gateways = new List<Uri>();
 
@@ -39,24 +37,17 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricGatewayProvider"/> class.
         /// </summary>
-        public FabricGatewayProvider()
+        /// <param name="siloResolver">The silo resolver.</param>
+        public FabricGatewayProvider(IFabricServiceSiloResolver siloResolver)
         {
+            this.fabricServiceSiloResolver = siloResolver;
             this.refreshPeriod = TimeSpan.FromSeconds(30);
             this.MaxStaleness = TimeSpan.FromSeconds(this.refreshPeriod.TotalSeconds * 2);
         }
 
-        /// <summary>
-        /// Initializes the provider, will be called before all other methods
-        /// </summary>
-        /// <param name="clientConfiguration">The client configuration.</param>
-        /// <param name="logger">The logger to be used by the provider.</param>
+        /// <inheritdoc />
         public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
         {
-            // TODO: inject these
-            var serviceName = new Uri(clientConfiguration.DataConnectionString);
-            var fabricClient = new FabricClient();
-            var queryManager = new FabricQueryManager(fabricClient, new ServicePartitionResolver(() => fabricClient));
-            this.fabricServiceSiloResolver = new FabricServiceSiloResolver(serviceName, queryManager, logger.GetLogger);
             this.fabricServiceSiloResolver.Subscribe(this);
 
             this.log = logger.GetLogger(nameof(FabricGatewayProvider));
@@ -64,48 +55,30 @@ namespace Microsoft.Orleans.ServiceFabric
             this.timer = new Timer(this.Refresh, null, this.refreshPeriod, this.refreshPeriod);
         }
 
-        /// <summary>
-        /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
-        /// </summary>
+        /// <inheritdoc />
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.gateways);
 
-        /// <summary>
-        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
-        /// </summary>
+        /// <inheritdoc />
         public TimeSpan MaxStaleness { get; }
 
-        /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
-        /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
-        /// </summary>
+        /// <inheritdoc />
         public bool IsUpdatable => true;
 
-        /// <summary>
-        /// Subscribes the provided <paramref name="subscriber"/> from notification events.
-        /// </summary>
-        /// <param name="subscriber">The listener.</param>
-        /// <returns>A value indicating whether the listener was subscribed.</returns>
+        /// <inheritdoc />
         public bool SubscribeToGatewayNotificationEvents(IGatewayListListener subscriber)
         {
             this.subscribers.TryAdd(subscriber, subscriber);
             return true;
         }
 
-        /// <summary>
-        /// Unsubscribes the provided <paramref name="listener"/> from notification events.
-        /// </summary>
-        /// <param name="listener">The listener.</param>
-        /// <returns>A value indicating whether the listener was unsubscribed.</returns>
+        /// <inheritdoc />
         public bool UnSubscribeFromGatewayNotificationEvents(IGatewayListListener listener)
         {
             this.subscribers.TryRemove(listener, out listener);
             return true;
         }
 
-        /// <summary>
-        /// Notifies this instance of an update to one or more partitions.
-        /// </summary>
-        /// <param name="silos">The updated set of partitions.</param>
+        /// <inheritdoc />
         public void OnUpdate(FabricSiloInfo[] silos)
         {
             this.gateways = silos.Select(silo => silo.GatewayAddress.ToGatewayUri()).ToList();
@@ -130,7 +103,7 @@ namespace Microsoft.Orleans.ServiceFabric
             }
         }
 
-        /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
+        /// <inheritdoc />
         public void Dispose()
         {
             this.timer?.Dispose();

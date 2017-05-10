@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -177,7 +178,7 @@ namespace Orleans.Runtime
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
             if (message.IsExpirableMessage(Config.Globals))
-                message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
+                message.TimeToLive = ResponseTimeout;
 
             if (!oneWay)
             {
@@ -325,6 +326,14 @@ namespace Orleans.Runtime
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
                     }
+
+                    if (exc1 is InconsistentStateException && target is Grain)
+                    {
+                        var activation = ((Grain)target).Data;
+                        invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                        this.DeactivateOnIdle(activation.ActivationId);
+                    }
+
                     if (message.Direction != Message.Directions.OneWay)
                     {
                         SafeSendExceptionResponse(message, exc1);
@@ -682,7 +691,7 @@ namespace Orleans.Runtime
         public bool TryAddExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(handler.GetType());
+            var invoker = TryGetExtensionInvoker(this.typeManager, handler.GetType());
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
 
@@ -717,7 +726,7 @@ namespace Orleans.Runtime
             return (ActivationData)activationData;
         }
 
-        private IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
+        internal static IGrainExtensionMethodInvoker TryGetExtensionInvoker(GrainTypeManager typeManager, Type handlerType)
         {
             var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if (interfaces.Count != 1)

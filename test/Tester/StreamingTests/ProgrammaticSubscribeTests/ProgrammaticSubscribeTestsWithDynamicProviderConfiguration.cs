@@ -6,7 +6,6 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
@@ -40,7 +39,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task Programmatic_Subscribe_UsingClientSideSubscriptionManager_UsingDynamicProviderConfig()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
@@ -54,7 +53,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
 
             //set up producer
-            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -77,7 +76,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task Programmatic_Subscribe_DynamicAddNewStreamProvider_WhenConsuming()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
@@ -104,16 +103,8 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
             await SetupStreamingSubscriptionForGrains<IPassive_ConsumerGrain>(subManager, streamId2, consumers);
 
-            //set up on subscription change actions for new provider StreamProviderName2
-            var tasks = new List<Task>();
-            foreach (var consumer in consumers)
-            {
-                tasks.Add(consumer.SetupOnSubscriptionChangeActionForProvider(StreamProviderName2));
-            }
-            await Task.WhenAll(tasks);
-            tasks.Clear();
             //set up producer2 to produce to stream2
-            var producer2 = this.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer2 = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             await producer2.StartPeriodicProducing();
@@ -124,7 +115,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer2.StopPeriodicProducing();
             await producer.StopPeriodicProducing();
 
-            
+            var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },

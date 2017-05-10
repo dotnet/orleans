@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -699,6 +698,44 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_Provider_InconsistentStateException_DeactivatesGrain()
+        {
+            Guid id = Guid.NewGuid();
+            string providerName = ErrorInjectorProviderName;
+            IPersistenceProviderErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(id);
+
+            var val = await grain.GetValue();
+
+            int expectedVal = 62;
+            var originalActivationId = await grain.GetActivationId();
+            await grain.DoWrite(expectedVal);
+            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+
+            const int attemptedVal3 = 63;
+            SetErrorInjection(providerName, new ErrorInjectionBehavior
+            {
+                ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
+                ExceptionType = typeof(InconsistentStateException)
+            });
+            CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
+
+            // Stored value unchanged
+            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+            Assert.NotEqual(originalActivationId, await grain.GetActivationId());
+
+            SetErrorInjection(providerName, ErrorInjectionPoint.None);
+            val = await grain.GetValue();
+            // Stored value unchanged
+            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
+
+            // The value should not have changed.
+            Assert.Equal(expectedVal, val);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterWrite()
         {
             Guid id = Guid.NewGuid();
@@ -1136,20 +1173,21 @@ namespace UnitTests.StorageTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            mgmtGrain.SendControlCommandToProvider(typeof(ErrorInjectionStorageProvider).FullName,
-                providerName, (int)MockStorageProvider.Commands.SetErrorInjection, errorInjectionPoint).Wait();
+            SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
         }
 
-        private void CheckStorageProviderErrors(
-            Func<Task> taskFunc)
+        private void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
+        {
+            ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory);
+        }
+
+        private void CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)
         {
             StackTrace at = new StackTrace();
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(15);
             try
             {
-                bool ok = taskFunc().Wait(timeout);
-                if (!ok) throw new TimeoutException();
+                taskFunc().WithTimeout(timeout).GetAwaiter().GetResult();
 
                 if (ErrorInjectionStorageProvider.DoInjectErrors)
                 {
@@ -1161,12 +1199,13 @@ namespace UnitTests.StorageTests
             catch (Exception e)
             {
                 output.WriteLine("Exception caught: {0}", e);
-                var exc = e.GetBaseException();
-                if (exc is OrleansException)
+                var baseException = e.GetBaseException();
+                if (baseException is OrleansException && baseException.InnerException != null)
                 {
-                    exc = exc.InnerException;
+                    baseException = baseException.InnerException;
                 }
-                Assert.IsAssignableFrom<StorageProviderInjectedError>(exc);
+
+                Assert.IsAssignableFrom(expectedException ?? typeof(StorageProviderInjectedError), baseException);
                 //if (exc is StorageProviderInjectedError)
                 //{
                 //     //Expected error

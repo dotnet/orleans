@@ -56,7 +56,7 @@ namespace Tester.StreamingTests
             var subscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
             var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -191,7 +191,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             //register the consumer grain to second stream
@@ -235,7 +235,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingString>(Guid.NewGuid());
+            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             //register the consumer grain to second stream
