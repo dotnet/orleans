@@ -216,7 +216,7 @@ namespace Orleans.Streams
                         continue;
                     }
 
-                    tasks.Add(NotifyProducer(producer, subscriptionId, streamId, streamConsumer, filter));
+                    tasks.Add(NotifyProducerOfNewSubscriber(producer, subscriptionId, streamId, streamConsumer, filter));
                 }
 
                 Exception exception = null;
@@ -251,7 +251,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task NotifyProducer(PubSubPublisherState producer, GuidId subscriptionId, StreamId streamId,
+        private async Task NotifyProducerOfNewSubscriber(PubSubPublisherState producer, GuidId subscriptionId, StreamId streamId,
             IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             try
@@ -436,16 +436,35 @@ namespace Orleans.Streams
 
         private async Task NotifyProducersOfRemovedSubscription(GuidId subscriptionId, StreamId streamId)
         {
-            int numProducers = State.Producers.Count;
-            if (numProducers > 0)
+            int numProducersBeforeNotify = State.Producers.Count;
+            if (numProducersBeforeNotify > 0)
             {
-                if (logger.IsVerbose) logger.Verbose("Notifying {0} existing producers about unregistered consumer.", numProducers);
+                if (logger.IsVerbose) logger.Verbose("Notifying {0} existing producers about unregistered consumer.", numProducersBeforeNotify);
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers.Where(producerState => IsActiveProducer(producerState.Producer))
-                                                  .Select(producerState => producerState.Producer.RemoveSubscriber(subscriptionId, streamId))
+                                                  .Select(producerState => NotifyProducerOfRemovedSubscriber(producerState, subscriptionId, streamId))
                                                   .ToList();
                 await Task.WhenAll(tasks);
+                //if producers got removed
+                if (State.Producers.Count < numProducersBeforeNotify)
+                    await this.WriteStateAsync();
+            }
+        }
+
+        private async Task NotifyProducerOfRemovedSubscriber(PubSubPublisherState producer, GuidId subscriptionId, StreamId streamId)
+        {
+            try
+            {
+                await producer.Producer.RemoveSubscriber(subscriptionId, streamId);
+            }
+            catch (GrainExtensionNotInstalledException)
+            {
+                RemoveProducer(producer);
+            }
+            catch (ClientNotAvailableException)
+            {
+                RemoveProducer(producer);
             }
         }
 
