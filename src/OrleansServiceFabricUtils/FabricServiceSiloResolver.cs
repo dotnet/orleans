@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Microsoft.Orleans.ServiceFabric.Models;
@@ -35,11 +36,11 @@ namespace Microsoft.Orleans.ServiceFabric
         public FabricServiceSiloResolver(
             Uri serviceName,
             IFabricQueryManager queryManager,
-            Factory<string, Logger> loggerFactory = null)
+            Factory<string, Logger> loggerFactory)
         {
             this.serviceName = serviceName;
             this.queryManager = queryManager;
-            this.log = loggerFactory?.Invoke(nameof(FabricServiceSiloResolver));
+            this.log = loggerFactory(nameof(FabricServiceSiloResolver));
             this.partitionChangeHandler = this.OnPartitionChange;
         }
         
@@ -67,6 +68,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public async Task Refresh()
         {
+            if (this.log.IsVerbose) this.log.Verbose($"Refreshing silos for service {this.serviceName}");
             var result = await this.queryManager.ResolveSilos(this.serviceName);
             lock (this.updateLock)
             {
@@ -78,10 +80,11 @@ namespace Microsoft.Orleans.ServiceFabric
                 foreach (var partition in this.silos)
                 {
                     var partitionInfo = partition.Partition;
-                    updatedRegistrations[partitionInfo.Id] = this.queryManager.RegisterPartitionChangeHandler(
+                    var registrationId = updatedRegistrations[partitionInfo.Id] = this.queryManager.RegisterPartitionChangeHandler(
                         this.serviceName,
                         partitionInfo,
                         this.partitionChangeHandler);
+                    if (this.log.IsVerbose) this.log.Verbose($"Registering partition change handler 0x{registrationId:X} for partition {partition.Partition}");
                 }
 
                 // Remove old registrations.
@@ -91,6 +94,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     {
                         if (!updatedRegistrations.ContainsKey(registration.Key))
                         {
+                            if (this.log.IsVerbose) this.log.Verbose($"Unregistering partition change handler 0x{registration.Value:X}");
                             this.queryManager.UnregisterPartitionChangeHandler(registration.Value);
                         }
                     }
@@ -111,7 +115,7 @@ namespace Microsoft.Orleans.ServiceFabric
         {
             if (args.HasException)
             {
-                this.log?.Warn(
+                this.log.Warn(
                     (int) ErrorCode.ServiceFabric_Resolver_PartitionResolutionException,
                     "Exception resolving partition change.",
                     args.Exception);
@@ -130,7 +134,7 @@ namespace Microsoft.Orleans.ServiceFabric
 
                     if (updated.Partition.IsOlderThan(existing))
                     {
-                        this.log?.Info($"Update for partition {updated} is superseded by existing version.");
+                        this.log.Info($"Update for partition {updated} is superseded by existing version.");
 
                         // Do not update the partition if the exiting one has a newer version than the update.
                         break;
@@ -146,9 +150,19 @@ namespace Microsoft.Orleans.ServiceFabric
             if (!found)
             {
                 var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition));
-                this.log?.Warn(
-                    (int)ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
+                this.log.Warn(
+                    (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
                     $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
+            }
+            else if (this.log.IsVerbose2)
+            {
+                var newSilos = new StringBuilder();
+                foreach (var silo in updated.Silos)
+                {
+                    newSilos.Append($"\n* {silo}");
+                }
+
+                this.log.Verbose2($"Received update for partition {updated.Partition}. Updated values:{newSilos}");
             }
         }
 

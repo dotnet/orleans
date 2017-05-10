@@ -241,7 +241,7 @@ namespace Orleans.Messaging
                 if (logger.IsInfo)
                 {
                     logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
-                            "Refreshed the live GateWay list. Found {0} gateways from Gateway listProvider: {1}. Picked only known live out of them. Now has {2} live Gateways: {3}. Previous refresh time was = {4}",
+                            "Refreshed the live Gateway list. Found {0} gateways from Gateway listProvider: {1}. Picked only known live out of them. Now has {2} live Gateways: {3}. Previous refresh time was = {4}",
                                 knownGateways.Count(),
                             Utils.EnumerableToString(knownGateways),
                             cachedLiveGateways.Count,
