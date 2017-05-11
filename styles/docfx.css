@@ -761,14 +761,21 @@ footer {
     padding-bottom: 0px;
     border: none;
   }
-  .toc .level2 > li {
+  .toc .nav > li, .toc .nav > li >a {
     display: inline-block;
   }
-  .toc .level2 > li:after {
+  .toc li:after {
     margin-left: -3px;
     margin-right: 5px;
     content: ", ";
     color: #666666;
+  }
+  .toc .level1 > li {
+    display: block;
+  }
+  
+  .toc .level1 > li:after {
+    display: none;
   }
   .article.grid-right {
     margin-left: 0;
