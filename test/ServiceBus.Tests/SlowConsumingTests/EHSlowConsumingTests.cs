@@ -31,8 +31,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private const double flowControlThredhold = 0.6;
-        public static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
+        public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
+            new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
         private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
             new EventHubSettings(
@@ -86,6 +86,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
                 ProviderSettings.WriteProperties(settings);
+                ProviderSettings.WriteDataGeneratingConfig(settings);
                 EventHubConfig.Value.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 
@@ -98,13 +99,16 @@ namespace ServiceBus.Tests.SlowConsumingTests
             }
         }
 
+        private readonly Random seed;
+
         public EHSlowConsumingTests(Fixture fixture)
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
+            seed = new Random();
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
@@ -116,11 +120,11 @@ namespace ServiceBus.Tests.SlowConsumingTests
             int healthyConsumerCount = 30;
             var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
-            //set up producer and start producing
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
-            await producer.BecomeProducer(streamId.Guid, StreamNamespace, StreamProviderName);
-            await producer.StartPeriodicProducing(TimeSpan.FromMilliseconds(100));
-
+            //configure data generator for stream and start producing
+            var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var randomStreamPlacementArg = new EventDataGeneratorStreamProvider.AdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
+            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
+                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
 
@@ -132,8 +136,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(false, lastTry), timeout);
 
             //clean up test
-            await producer.StopPeriodicProducing();
             await StopHealthyConsumerGrainComing(healthyConsumers);
+            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
+                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
         }
 
         private async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)

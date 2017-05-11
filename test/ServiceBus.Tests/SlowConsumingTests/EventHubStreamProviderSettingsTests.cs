@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace NonSilo.Tests.StreamingTests
+namespace ServiceBus.Tests.SlowConsumingTests
 {
 
     /// <summary>

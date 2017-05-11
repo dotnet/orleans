@@ -107,6 +107,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         protected Func<string, string, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
+        //for testing purpose, used in EventHubGeneratorStreamProvider
+        internal Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> EventHubReceiverFactory;
+        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
+        internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
         /// <summary>
         /// Factory initialization.
         /// Provider config must contain the event hub settings type or the settings themselves.
@@ -272,7 +276,7 @@ namespace Orleans.ServiceBus.Providers
         {
             return new EventHubQueueCacheFactory(providerSettings, SerializationManager);
         }
-
+ 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
         {
             var config = new EventHubPartitionSettings
@@ -282,7 +286,8 @@ namespace Orleans.ServiceBus.Providers
             };
             Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
             return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(config.Hub.Path, config.Partition, recieverLogger), 
-                this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>());
+                this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>(),
+                this.EventHubReceiverFactory);
         }
 
         private async Task<string[]> GetPartitionIdsAsync()
