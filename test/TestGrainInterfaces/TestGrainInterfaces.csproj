@@ -73,6 +73,7 @@
     <Compile Include="IExtensionTestGrain.cs" />
     <Compile Include="IExternalTypeGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
+    <Compile Include="IFilteredImplicitSubscriptionWithExtensionGrain.cs" />
     <Compile Include="IFSharpParametersGrain.cs" />
     <Compile Include="IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />

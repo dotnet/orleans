@@ -1,9 +1,8 @@
-﻿using Orleans;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -15,9 +14,8 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            var logger = base.GetLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {base.IdentityString}");
+            var logger = base.GetLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {IdentityString}");
             logger.Info("OnActivateAsync");
-
             var streamProvider = GetStreamProvider("SMSProvider");
             var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
             counters = new Dictionary<string, int>();
@@ -30,7 +28,7 @@ namespace UnitTests.Grains
                     {
                         logger.Info($"Received a {streamNamespace} event {e}");
                         counters[streamNamespace]++;
-                        return TaskDone.Done;
+                        return Task.CompletedTask;
                     });
             }
         }
@@ -38,15 +36,6 @@ namespace UnitTests.Grains
         public Task<int> GetCounter(string streamNamespace)
         {
             return Task.FromResult(counters[streamNamespace]);
-        }
-    }
-
-    [Serializable]
-    public class RedStreamNamespacePredicate : IStreamNamespacePredicate
-    {
-        public bool IsMatch(string streamNamespace)
-        {
-            return streamNamespace.StartsWith("red");
         }
     }
 }
