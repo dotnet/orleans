@@ -47,7 +47,7 @@ namespace Orleans.ServiceBus.Providers
 
         public Task CloseAsync()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

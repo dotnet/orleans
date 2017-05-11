@@ -186,14 +186,14 @@ namespace UnitTests.Grains
         public Task Notify()
         {
             this.count++;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task Notify(ISimpleGrainObserver observer)
         {
             this.count++;
             observer.StateChanged(this.count - 1, this.count);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<int> GetCount() => Task.FromResult(this.count);
