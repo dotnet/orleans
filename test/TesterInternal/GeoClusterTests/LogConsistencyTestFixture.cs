@@ -170,7 +170,7 @@ namespace Tests.GeoClusterTests
                 {
                     var clustername = Cluster[i] = ((char)('A' + i)).ToString();
                     MultiCluster.NewGeoCluster(globalserviceid, clustername, 1,
-                        cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString, cfg));
+                        cfg => cfg.ConfigureProvidersForTesting(TestDefaultConfiguration.DataConnectionString));
                     Client[i] = this.MultiCluster.NewClient(clustername, 0, ClientWrapper.Factory);
                 }
 

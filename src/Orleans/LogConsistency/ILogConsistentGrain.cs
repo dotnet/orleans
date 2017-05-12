@@ -23,14 +23,11 @@ namespace Orleans.LogConsistency
         /// <param name="state"> The initial state of the view </param>
         /// <param name="grainTypeName"> The type name of the grain </param>
         /// <param name="storageProvider"> The storage provider, if needed </param>
+        /// <param name="eventStorageProvider"> The event storage provider, if needed </param>
         /// <param name="services"> Protocol services </param>
-        void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, IStorageProvider storageProvider, ILogConsistencyProtocolServices services);
+        void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, IStorageProvider storageProvider, IEventStorageProvider eventStorageProvider, ILogConsistencyProtocolServices services);
 
-        /// <summary>
-        /// Gets the default adaptor factory to use, or null if there is no default 
-        /// (in which case user MUST configure a consistency provider)
-        /// </summary>
-        ILogViewAdaptorFactory DefaultAdaptorFactory { get; }
+
      }
 
 

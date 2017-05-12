@@ -30,13 +30,10 @@ namespace Orleans.EventSourcing.StateStorage
         public Logger Log { get; private set; }
 
         /// <inheritdoc/>
-        public bool UsesStorageProvider
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool UsesStorageProvider { get { return true; } }
+
+        /// <inheritdoc/>
+        public bool UsesEventStorageProvider { get { return false; } }
 
         private static int counter; // used for constructing a unique id
         private int id;
@@ -81,7 +78,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// <param name="initialState">The initial state for this view</param>
         /// <param name="grainTypeName">The type name of the grain</param>
         /// <param name="services">Runtime services for multi-cluster coherence protocols</param>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, ILogConsistencyProtocolServices services) 
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, IEventStorageProvider eventStorageProvider, ILogConsistencyProtocolServices services) 
             where TView : class, new()
             where TEntry : class
         {

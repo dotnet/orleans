@@ -51,6 +51,7 @@
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
+    <Compile Include="GeoClusterTests\ProviderConfiguration.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="GrainStateContainingGrainReferences.cs" />
     <Compile Include="MembershipTests\ClientIdPartitionDataRebuildTests.cs" />

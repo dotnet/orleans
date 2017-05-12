@@ -13,16 +13,8 @@ namespace TestGrains
 {
     /// <summary>
     /// An example of a journaled grain that models a bank account.
-    /// 
-    /// Configured to use the default storage provider.
-    /// Configured to use the LogStorage consistency provider.
-    /// 
-    /// This provider persists all events, and allows us to retrieve them all.
+    /// Uses the default providers for log-consistency and storage.
     /// </summary>
-
-    [StorageProvider(ProviderName = "Default")]
-    [LogConsistencyProvider(ProviderName = "LogStorage")]
-
     public class AccountGrain : JournaledGrain<AccountGrain.GrainState, Transaction>, IAccountGrain
     {
         /// <summary>
@@ -91,14 +83,19 @@ namespace TestGrains
         }
     }
 
-    
-    /// A variant of the same grain that does not persist the log, but only the latest grain state
+
+    /// A variant of the same grain that does not store events, but uses an IStorageProvider to store the latest snapshot
     /// (so it does not do true event sourcing). 
     [LogConsistencyProvider(ProviderName = "StateStorage")]
-    public class AccountGrain_PersistStateOnly : AccountGrain
+    public class AccountGrain_StateStorage : AccountGrain
     {
     }
 
+    /// A variant of the same grain that uses an IStorageProvider, to store the entire log as a single object
+    [LogConsistencyProvider(ProviderName = "LogStorage")]
+    public class AccountGrain_LogStorage : AccountGrain
+    {
+    }
 
     /// A variant of the account grain that uses one instance per cluster
     [OneInstancePerCluster]

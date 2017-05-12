@@ -50,7 +50,20 @@ namespace TestGrains
     {
     }
 
- 
+    [LogConsistencyProvider(ProviderName = "EventStorage")]
+    [EventStorageProvider(ProviderName = "SlowMemoryEventStore")]
+    public class CountersGrain_EventStore_NonReentrant : CountersGrain
+    {
+    }
+
+    [LogConsistencyProvider(ProviderName = "EventStorage")]
+    [EventStorageProvider(ProviderName = "SlowMemoryEventStore")]
+    [Reentrant]
+    public class CountersGrain_EventStore_Reentrant : CountersGrain
+    {
+    }
+
+
 
 
 }

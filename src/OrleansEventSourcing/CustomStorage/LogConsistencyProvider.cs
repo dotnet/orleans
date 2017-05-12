@@ -41,6 +41,9 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         public bool UsesStorageProvider { get  { return false; } }
 
+        /// <inheritdoc/>
+        public bool UsesEventStorageProvider { get { return false; } }
+
         /// <summary>
         /// Gets a unique name for this provider, suited for logging.
         /// </summary>
@@ -75,11 +78,11 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostgrain, TView initialstate, string graintypename, IStorageProvider storageProvider, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, IEventStorageProvider eventStorageProvider, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class
         {
-            return new CustomStorageAdaptor<TView, TEntry>(hostgrain, initialstate, services, PrimaryCluster);
+            return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster);
         }
 
     }

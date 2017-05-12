@@ -127,6 +127,7 @@
     <Compile Include="LogConsistency\LogConsistencyProviderManager.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
     <Compile Include="Silo\IStartupBuilder.cs" />
+    <Compile Include="Storage\IEventStorageProviderManager.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />
     <Compile Include="Silo\SiloHost.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />
@@ -181,7 +182,11 @@
     <Compile Include="Scheduler\WorkItemType.cs" />
     <Compile Include="Scheduler\WorkQueue.cs" />
     <Compile Include="Silo\SiloControl.cs" />
+    <Compile Include="Storage\EventStorageProviderManager.cs" />
+    <Compile Include="Storage\IProviderManagerBase.cs" />
+    <Compile Include="Storage\MemoryEventStorageGrain.cs" />
     <Compile Include="Storage\MemoryStorageGrain.cs" />
+    <Compile Include="Storage\ProviderManagerBase.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
     <Compile Include="Streams\LoadShedQueueFlowController.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />

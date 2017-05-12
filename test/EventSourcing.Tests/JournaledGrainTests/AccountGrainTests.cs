@@ -9,9 +9,10 @@ using TestExtensions;
 using Xunit.Abstractions;
 using Orleans.Runtime;
 
-namespace Tester.EventSourcingTests
+namespace EventSourcing.Tests
 {
-    public class AccountGrainTests : IClassFixture<EventSourcingClusterFixture>
+    [Collection("EventSourcingCluster"), TestCategory("EventSourcing"), TestCategory("Functional")]
+    public class AccountGrainTests
     {
         private readonly EventSourcingClusterFixture fixture;
 
@@ -60,20 +61,29 @@ namespace Tester.EventSourcingTests
             }
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-        public async Task AccountWithLog()
+        [Fact]
+        public async Task AccountOnEventStorage()
         {
             var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
             await TestSequence(account, true);
         }
 
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-        public async Task AccountWithoutLog()
+        [Fact]
+        public async Task AccountOnLogStorage()
         {
-            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_PersistStateOnly");
+            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_LogStorage");
+            await TestSequence(account, true);
+        }
+
+        [Fact]
+        public async Task AccountOnStateStorage()
+        {
+            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_StateStorage");
             await TestSequence(account, false);
         }
+
+
 
     }
 }

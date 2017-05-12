@@ -403,10 +403,12 @@ namespace Orleans.EventSourcing.Common
             return promise.Task;
         }
 
+        /// <summary>
+        /// A constant used for identifying submissions that are unconditional
+        /// </summary>
+        protected const int Unconditional = -1;
 
-        private const int unconditional = -1;
-
-        private void SubmitInternal(DateTime time, TLogEntry logentry, int conditionalPosition = unconditional, TaskCompletionSource<bool> resultPromise = null)
+        private void SubmitInternal(DateTime time, TLogEntry logentry, int conditionalPosition = Unconditional, TaskCompletionSource<bool> resultPromise = null)
         {
             // create a submission entry
             var submissionentry = this.MakeSubmissionEntry(logentry);
@@ -835,7 +837,7 @@ namespace Orleans.EventSourcing.Common
             for (int pos = 0; pos < pending.Count; pos++)
             {
                 var submissionEntry = pending[pos];
-                if (submissionEntry.ConditionalPosition != unconditional
+                if (submissionEntry.ConditionalPosition != Unconditional
                     && (foundFailedConditionalUpdates ||
                            submissionEntry.ConditionalPosition != (version + pos)))
                 {
@@ -848,7 +850,7 @@ namespace Orleans.EventSourcing.Common
 
             if (foundFailedConditionalUpdates)
             {
-                pending.RemoveAll(e => e.ConditionalPosition != unconditional);
+                pending.RemoveAll(e => e.ConditionalPosition != Unconditional);
                 tentativeStateInternal = null;
                 try
                 {

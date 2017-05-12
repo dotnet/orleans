@@ -27,6 +27,7 @@ using Orleans.Providers.Streams.Generator;
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("EventSourcing.Tests")]
 
 [assembly: KnownAssembly(typeof(EventSequenceTokenV2), TreatTypesAsSerializable = true)]
 [assembly: GenerateSerializer(typeof(EventSequenceTokenV2))]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -370,6 +371,140 @@ namespace Orleans.Runtime
 #else
             return new System.Diagnostics.StackTrace(skipFrames).ToString();
 #endif
+        }
+
+        private class ArraySlice<T> : IReadOnlyList<T>
+        {
+            private T[] array;
+            private int start;
+            private int count;
+
+            public ArraySlice(T[] array, int start, int count)
+            {
+                if (start < 0 || start > array.Length)
+                    throw new ArgumentOutOfRangeException(nameof(start));
+                if (count < 0 || start + count > array.Length)
+                    throw new ArgumentOutOfRangeException(nameof(count));
+                this.array = array;
+                this.start = start;
+                this.count = count;
+            }
+
+            public int Count
+            {
+                get
+                {
+                    return count;
+                }
+            }
+
+            public T this[int index]
+            {
+                get
+                {
+                    if (index < start || index >= start + count)
+                        throw new IndexOutOfRangeException();
+                    return array[index];
+                }
+            }
+
+            public IEnumerator<T> GetEnumerator()
+            {
+                return new Enumerator() {
+                    Array = array,
+                    StartPosition = start,
+                    CurrentPosition = start - 1,
+                    EndPosition = start + count };
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            private class Enumerator : IEnumerator<T>
+            {
+                // we copy all fields into the enumerator for faster access
+                public T[] Array;
+                public int StartPosition;
+                public int CurrentPosition;
+                public int EndPosition;
+
+                public T Current
+                {
+                    get
+                    {
+                        // value is undefined before iteration starts or after it ends
+                        if (CurrentPosition < StartPosition || CurrentPosition >= EndPosition)
+                        {
+                            return default(T);
+                        }
+                        else
+                        {
+                            return Array[CurrentPosition];
+                        }
+                    }
+                }
+
+                object IEnumerator.Current
+                {
+                    get
+                    {
+                        // value is undefined before iteration starts or after it ends
+                        if (CurrentPosition < StartPosition || CurrentPosition >= EndPosition)
+                        {
+                            return default(T);
+                        }
+                        else
+                        {
+                            return Array[CurrentPosition];
+                        }
+                    }
+                }
+
+                public void Dispose()
+                {
+                }
+
+                public bool MoveNext()
+                {
+                    return (++CurrentPosition < EndPosition);
+                }
+
+                public void Reset()
+                {
+                    CurrentPosition = StartPosition - 1;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns a subrange of this array. The subrange starts at a specified position
+        /// and has a specified length.
+        /// </summary>
+        /// <para>The returned subrange is a view, i.e. does not copy elements, but returns elements from the original array. </para>
+        /// <typeparam name="T">the type of the array</typeparam>
+        /// <param name="array">the array</param>
+        /// <param name="start">the zero-based starting position of the subrange</param>
+        /// <param name="count">the number of characters in the subrange</param>
+        /// <returns>a read-only collection containing the requested slice of the array</returns>
+        public static IReadOnlyCollection<T> Subrange<T>(this T[] array, int start, int count)
+        {
+            return new ArraySlice<T>(array, start, count);
+        }
+
+        /// <summary>
+        /// Returns a subrange of this array. The subrange starts at the 
+        /// specified position and continues to the end of the array.
+        /// </summary>
+        /// <para>The returned subrange is a view, i.e. does not copy elements, but returns elements from the original array. </para>
+        /// <typeparam name="T">the type of the array</typeparam>
+        /// <param name="array">the array</param>
+        /// <param name="start">the zero-based starting position of the subrange</param>
+        /// <returns>a read-only collection containing the requested slice of the array</returns>
+        public static IReadOnlyCollection<T> Subrange<T>(this T[] array, int start)
+        {
+            return new ArraySlice<T>(array, start, array.Length - start);
         }
     }
 }

@@ -41,6 +41,20 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
+        /// Adds a log consistency provider of type <see cref="Orleans.EventSourcing.EventStorage.LogConsistencyProvider"/>
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name.</param>
+        public static void AddEventStorageBasedLogConsistencyProvider(
+            this ClusterConfiguration config,
+            string providerName = "EventStorage")
+        {
+            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
+
+            config.Globals.RegisterLogConsistencyProvider<EventSourcing.EventStorage.LogConsistencyProvider>(providerName);
+        }
+
+        /// <summary>
         /// Adds a log consistency provider of type <see cref="Orleans.EventSourcing.CustomStorage.LogConsistencyProvider"/>
         /// </summary>
         /// <param name="config">The cluster configuration object to add provider to.</param>
@@ -48,7 +62,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="numStorageGrains">The number of storage grains to use.</param>
         public static void AddCustomStorageInterfaceBasedLogConsistencyProvider(
             this ClusterConfiguration config,
-            string providerName = "LogStorage",
+            string providerName = "CustomStorage",
             string primaryCluster = null)
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));

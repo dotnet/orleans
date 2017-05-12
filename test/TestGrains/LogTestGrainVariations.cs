@@ -30,9 +30,9 @@ namespace TestGrains
     {
     }
 
-    // use the default storage provider as the shared storage
+    // use the default storage provider and the default log consistency provider
     [OneInstancePerCluster]
-    public class LogTestGrainDefaultStorage : LogTestGrain
+    public class LogTestGrainDefault : LogTestGrain
     {
     }
 
@@ -48,6 +48,14 @@ namespace TestGrains
     [OneInstancePerCluster]
     [StorageProvider(ProviderName = "MemoryStore")]
     public class LogTestGrainMemoryStorage : LogTestGrain
+    {
+    }
+
+    // use MemoryStore (which uses GSI grain)
+    [OneInstancePerCluster]
+    [LogConsistencyProvider(ProviderName = "EventStorage")]
+    [EventStorageProvider(ProviderName = "MemoryEventStore")]
+    public class LogTestGrainMemoryEventStorage : LogTestGrain
     {
     }
 

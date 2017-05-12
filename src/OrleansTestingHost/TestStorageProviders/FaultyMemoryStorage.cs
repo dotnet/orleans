@@ -14,6 +14,13 @@ namespace Orleans.TestingHost
     }
 
     /// <summary>
+    /// A memory event storage provider that supports injection of storage exceptions.
+    /// </summary>
+    public class FaultyMemoryEventStorage : FaultInjectionEventStorageProvider<MemoryEventStorage>
+    {
+    }
+
+    /// <summary>
     /// Extension methods for configuring a FaultyMemoryStorage 
     /// </summary>
     public static class FaultInjectionStorageProviderConfigurationExtensions
@@ -42,6 +49,32 @@ namespace Orleans.TestingHost
             };
 
             config.Globals.RegisterStorageProvider<FaultyMemoryStorage>(providerName, properties);
+        }
+
+        /// <summary>
+        /// Adds a event-storage provider of type <see cref="FaultyMemoryEventStorage"/>
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name.</param>
+        /// <param name="numStorageGrains">The number of storage grains to use.</param>
+        /// <param name="delayMilliseconds">A delay to add to each access, in milliseconds</param>
+        public static void AddFaultyMemoryEventStorageProvider(
+            this ClusterConfiguration config,
+            string providerName = "FaultyMemoryEventStore",
+            int numStorageGrains = MemoryStorage.NumStorageGrainsDefaultValue,
+            int delayMilliseconds = 0)
+        {
+            //TODO: find a way to share the provider configuration setup so we don't have duplicate code.
+
+            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
+
+            var properties = new Dictionary<string, string>
+            {
+                { MemoryStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
+                { FaultyMemoryStorage.DelayMillisecondsPropertyName, delayMilliseconds.ToString() },
+            };
+
+            config.Globals.RegisterEventStorageProvider<FaultyMemoryEventStorage>(providerName, properties);
         }
     }
 

@@ -22,6 +22,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams.Core;
 using Orleans.Streams;
+using Orleans.Runtime.Storage;
 using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime
@@ -135,6 +136,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
+        private IEventStorageProviderManager eventStorageProviderManager;
         private ILogConsistencyProviderManager logConsistencyProviderManager;
         private IStreamProviderRuntime providerRuntime;
         private IStreamProviderManager providerManager;
@@ -250,6 +252,10 @@ namespace Orleans.Runtime
         internal void SetStorageManager(IStorageProviderManager storageManager)
         {
             storageProviderManager = storageManager;
+        }
+        internal void SetEventStorageManager(IEventStorageProviderManager eventStorageManager)
+        {
+            eventStorageProviderManager = eventStorageManager;
         }
 
         internal void SetLogConsistencyManager(ILogConsistencyProviderManager logConsistencyManager)
@@ -736,7 +742,7 @@ namespace Orleans.Runtime
                 if (typeof(IStatefulGrain).IsAssignableFrom(grainType))
                 {
                     //for stateful grains, install storage bridge
-                    SetupStorageProvider(grainType, data);
+                    data.StorageProvider = SetupProvider<IStorageProvider, StorageProviderAttribute>(storageProviderManager, grainType);
 
                     var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
 
@@ -752,10 +758,22 @@ namespace Orleans.Runtime
                     // for log-view grains, install log-view adaptor
                     if (grain is ILogConsistentGrain)
                     {
-                        var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);
+                        var consistencyProvider = SetupProvider<ILogConsistencyProvider, LogConsistencyProviderAttribute>(logConsistencyProviderManager, grainType);
+
+                        // if this provider depends on a storage provider, find it
+                        var storageProvider = consistencyProvider.UsesStorageProvider ?
+                            SetupProvider<IStorageProvider, StorageProviderAttribute>(storageProviderManager, grainType)
+                            : null;
+
+                        // if this provider depends on a event storage provider, find it
+                        var eventStorageProvider = consistencyProvider.UsesEventStorageProvider ?
+                            SetupProvider<IEventStorageProvider, EventStorageProviderAttribute>(eventStorageProviderManager, grainType)
+                            : null;
+
+                        // now install the adaptor into the grain
                         grainCreator.InstallLogViewAdaptor(grain, grainType,
                             grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy ?? this.multiClusterRegistrationStrategyManager.DefaultStrategy,
-                            consistencyProvider, data.StorageProvider);
+                            consistencyProvider, storageProvider, eventStorageProvider);
                     }
                 }
                 
@@ -803,114 +821,48 @@ namespace Orleans.Runtime
             return subObserverProxyMap.Count > 0;
         }
 
-        private void SetupStorageProvider(Type grainType, ActivationData data)
+        private TProvider SetupProvider<TProvider,TAttribute>(IProviderManagerBase<TProvider> manager, Type grainType)
+            where TProvider: class, IProvider where TAttribute : ProviderAttribute
         {
             var grainTypeName = grainType.FullName;
 
-            // Get the storage provider name, using the default if not specified.
-            var attr = grainType.GetTypeInfo().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
-            var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
+            // Get the provider name, using the default provider name if not specified.
+            var attr = grainType.GetTypeInfo().GetCustomAttributes<TAttribute>(true).FirstOrDefault();
+            var providerName = attr != null ? attr.ProviderName : Constants.DEFAULT_PROVIDER_NAME;
 
-            IStorageProvider provider;
-            if (storageProviderManager == null || storageProviderManager.GetNumLoadedProviders() == 0)
+            // check that providers were loaded successfully
+            if (manager == null || manager.GetNumLoadedProviders() == 0)
             {
-                var errMsg = string.Format("No storage providers found loading grain type {0}", grainTypeName);
-                logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_1, errMsg);
+                var errMsg = $"No {manager.ProviderCategory}Providers found loading grain type {grainTypeName}";
+                logger.Error(ErrorCode.Provider_CatalogNoProvider_1, errMsg);
                 throw new BadProviderConfigException(errMsg);
             }
-            if (string.IsNullOrWhiteSpace(storageProviderName))
+
+            TProvider provider = null;
+
+            if (string.IsNullOrWhiteSpace(providerName))
             {
                 // Use default storage provider
-                provider = storageProviderManager.GetDefaultProvider();
+                provider = manager.GetDefaultProvider();
             }
             else
             {
-                // Look for MemoryStore provider as special case name
-                bool caseInsensitive = Constants.MEMORY_STORAGE_PROVIDER_NAME.Equals(storageProviderName, StringComparison.OrdinalIgnoreCase);
-                storageProviderManager.TryGetProvider(storageProviderName, out provider, caseInsensitive);
-                if (provider == null)
-                {
-                    var errMsg = string.Format(
-                        "Cannot find storage provider with Name={0} for grain type {1}", storageProviderName,
-                        grainTypeName);
-                    logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_2, errMsg);
-                    throw new BadProviderConfigException(errMsg);
-                }
-            }
-            data.StorageProvider = provider;
-
-            if (logger.IsVerbose2)
-            {
-                string msg = string.Format("Assigned storage provider with Name={0} to grain type {1}",
-                    storageProviderName, grainTypeName);
-                logger.Verbose2(ErrorCode.Provider_CatalogStorageProviderAllocated, msg);
-            }
-        }
-
-        private ILogViewAdaptorFactory SetupLogConsistencyProvider(Grain grain, Type grainType, ActivationData data)
-        {
-            var attr = grainType.GetTypeInfo().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
-            var consistencyProviderName = attr?.ProviderName;
-
-            ILogConsistencyProvider consistencyProvider;
-
-            if (logConsistencyProviderManager == null)
-            {
-                var errMsg = string.Format("No consistency provider manager found loading grain type {0}", grainType.FullName);
-                logger.Error(ErrorCode.Provider_CatalogNoLogConsistencyProvider, errMsg);
-                throw new BadProviderConfigException(errMsg);
+                manager.TryGetProvider(providerName, out provider);
             }
 
-            if (!string.IsNullOrWhiteSpace(consistencyProviderName))
+            if (provider != null)
             {
-                // find the named consistency provider; throw exception if it is not in the config
-                if (!logConsistencyProviderManager.TryGetProvider(consistencyProviderName, out consistencyProvider, false))
-                {
-                    var errMsg = string.Format(
-                        "Cannot find consistency provider with Name={0} for grain type {1}", attr.ProviderName,
-                        grainType.FullName);
-                    logger.Error(ErrorCode.Provider_CatalogNoLogConsistencyProvider, errMsg);
-                    throw new BadProviderConfigException(errMsg);
-                }
+                string msg = $"Assigned {manager.ProviderCategory}Provider with Name={providerName} to grain type {grainTypeName}";
+                logger.Verbose2(ErrorCode.Provider_CatalogProviderAllocated, msg);
+
+                return provider;
             }
             else
             {
-                // See if the config specifies a "Default" consistency provider; if so use that
-                logConsistencyProviderManager.TryGetProvider(Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME, out consistencyProvider, true);
-            }
-
-            if (consistencyProvider != null)
-            {
-                // we found a log consistency provider in the configuration file
-
-                // if it depends on a storage provider, find that one too
-                if (consistencyProvider.UsesStorageProvider)
-                    SetupStorageProvider(grainType, data);
-
-                string msg = string.Format("Assigned log consistency provider with Name={0} to grain type {1}",
-                    attr.ProviderName, grainType.FullName);
-                logger.Verbose2(ErrorCode.Provider_CatalogLogConsistencyProviderAllocated, msg);
-
-                return consistencyProvider;
-            }
-
-            // Case 2 : no log consistency provider was specified in the configuration file. 
-            // now we check if the grain type specifies a default adaptor factory
-
-            var defaultFactory = ((ILogConsistentGrain)grain).DefaultAdaptorFactory;
-
-            if (defaultFactory == null)
-            {
-                var errMsg = string.Format("No log consistency provider found loading grain type {0}", grainType.FullName);
-                logger.Error(ErrorCode.Provider_CatalogNoLogConsistencyProvider, errMsg);
+                var errMsg = $"Cannot find {manager.ProviderCategory}Provider with Name={providerName} for grain type {grainTypeName}";
+                logger.Error(ErrorCode.Provider_CatalogNoProvider_2, errMsg);
                 throw new BadProviderConfigException(errMsg);
-            };
-
-            // if it depends on a storage provider, find that one too
-            if (defaultFactory.UsesStorageProvider)
-                SetupStorageProvider(grainType, data);
-
-            return defaultFactory;
+            }
         }
 
         private async Task SetupActivationState(ActivationData result, string grainType)

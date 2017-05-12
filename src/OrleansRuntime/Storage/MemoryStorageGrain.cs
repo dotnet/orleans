@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.MultiCluster;
 using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
@@ -11,6 +12,7 @@ namespace Orleans.Storage
     /// Implementaiton class for the Storage Grain used by In-memory storage provider
     /// <c>Orleans.Storage.MemoryStorage</c>
     /// </summary>
+    [GlobalSingleInstance]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
         private IDictionary<string, GrainStateStore> grainStore;

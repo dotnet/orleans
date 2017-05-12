@@ -68,6 +68,14 @@ namespace Orleans.Providers
     }
 
     /// <summary>
+    /// Provider-facing interface for manager of event-storage providers
+    /// </summary>
+    public interface IEventStorageProviderRuntime : IProviderRuntime
+    {
+        // for now empty, later can add storage specific runtime capabilities.
+    }
+
+    /// <summary>
     /// Provider-facing interface for log consistency
     /// </summary>
     public interface ILogConsistencyProviderRuntime : IProviderRuntime

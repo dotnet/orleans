@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using Orleans;
 using TestGrainInterfaces;
+using TestGrains;
 using Xunit;
 using Assert = Xunit.Assert;
 using TestExtensions;
@@ -10,11 +11,11 @@ using Xunit.Abstractions;
 using Orleans.Runtime;
 using System.Xml.Linq;
 using System.IO;
-using TestGrains;
 
-namespace Tester.EventSourcingTests
+namespace EventSourcing.Tests
 {
-    public class ChatGrainTests : IClassFixture<EventSourcingClusterFixture>
+    [Collection("EventSourcingCluster"), TestCategory("EventSourcing"), TestCategory("Functional")]
+    public class ChatGrainTests
     {
         private readonly EventSourcingClusterFixture fixture;
 
@@ -23,7 +24,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task Init()
         {
             var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
@@ -37,7 +38,7 @@ namespace Tester.EventSourcingTests
             Assert.True(content.EndsWith(expectedsuffix));
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task PostThenDelete()
         {
             var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
@@ -62,7 +63,7 @@ namespace Tester.EventSourcingTests
             }
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task PostThenEdit()
         {
             var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
@@ -91,7 +92,7 @@ namespace Tester.EventSourcingTests
             }
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task Truncate()
         {
             var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");

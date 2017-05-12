@@ -16,9 +16,7 @@ namespace TestGrains
     /// <summary>
     /// An example of a journaled grain that records seat reservations.
     /// 
-    /// Configured to have one instance per cluster.
-    /// Configured to use the default storage provider.
-    /// Configured to use the StateStorage consistency provider.
+    /// Uses the default storage provider and log-consistency provider.
     /// 
     /// This means we persist the latest state only ... we are not truly "event sourcing".
     /// It is not necessary here to persist all events, as the state already stores all the successful reservations.
@@ -26,8 +24,6 @@ namespace TestGrains
     /// </summary>
     
     [OneInstancePerCluster]
-    [StorageProvider(ProviderName = "Default")]
-    [LogConsistencyProvider(ProviderName = "StateStorage")]
     public class SeatReservationGrain : JournaledGrain<ReservationState,SeatReservation>, ISeatReservationGrain
     {
       

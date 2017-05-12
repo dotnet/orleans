@@ -29,5 +29,26 @@ namespace Orleans.Runtime.Configuration
 
             config.Globals.RegisterStorageProvider<MemoryStorage>(providerName, properties);
         }
+
+        /// <summary>
+        /// Adds a event-storage provider of type <see cref="MemoryEventStorage"/>
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name.</param>
+        /// <param name="numStorageGrains">The number of storage grains to use.</param>
+        public static void AddMemoryEventStorageProvider(
+            this ClusterConfiguration config,
+            string providerName = "MemoryEventStore",
+            int numStorageGrains = MemoryEventStorage.NumStorageGrainsDefaultValue)
+        {
+            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
+
+            var properties = new Dictionary<string, string>
+            {
+                { MemoryEventStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
+            };
+
+            config.Globals.RegisterEventStorageProvider<MemoryEventStorage>(providerName, properties);
+        }
     }
 }

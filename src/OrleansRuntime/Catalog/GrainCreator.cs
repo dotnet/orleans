@@ -97,17 +97,18 @@ namespace Orleans.Runtime
         /// <param name="mcRegistrationStrategy">The multi-cluster registration strategy.</param>
         /// <param name="factory">The consistency adaptor factory</param>
         /// <param name="storageProvider">The storage provider, or null if none needed</param>
+        /// <param name="eventStorageProvider">The event storage provider, or null if none needed</param>
         /// <returns>The newly created grain.</returns>
         public void InstallLogViewAdaptor(Grain grain, Type grainType, 
             Type stateType, IMultiClusterRegistrationStrategy mcRegistrationStrategy,
-            ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
+            ILogViewAdaptorFactory factory, IStorageProvider storageProvider, IEventStorageProvider eventStorageProvider)
         {
             // encapsulate runtime services used by consistency adaptors
             var svc = this.protocolServicesFactory(grain, mcRegistrationStrategy);
 
             var state = Activator.CreateInstance(stateType);
 
-            ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, svc);
+            ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, eventStorageProvider, svc);
         }
     }
 }

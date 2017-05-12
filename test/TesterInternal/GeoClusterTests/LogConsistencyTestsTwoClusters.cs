@@ -36,6 +36,12 @@ namespace Tests.GeoClusterTests
         }
 
         [SkippableFact]
+        public async Task TestBattery_DefaultProviders()
+        {
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainDefault", true, phases, output);
+        }
+
+        [SkippableFact]
         public async Task TestBattery_GsiDefaultStorageProvider()
         {
             await fixture.RunChecksOnGrainClass("TestGrains.GsiLogTestGrain", true, phases, output);
@@ -45,6 +51,12 @@ namespace Tests.GeoClusterTests
         public async Task TestBattery_MemoryStorageProvider()
         {
             await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainMemoryStorage", true, phases, output);
+        }
+
+        [SkippableFact]
+        public async Task TestBattery_MemoryEventStorageProvider()
+        {
+            await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainMemoryEventStorage", true, phases, output);
         }
 
         [SkippableFact]

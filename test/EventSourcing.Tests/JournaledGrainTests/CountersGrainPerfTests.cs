@@ -12,11 +12,18 @@ using Orleans.Runtime;
 using System.Collections.Generic;
 using Xunit.Sdk;
 
-namespace Tester.EventSourcingTests
+namespace EventSourcing.Tests
 {
-    [TestCaseOrderer("Tester.EventSourcingTests.SimplePriorityOrderer", "Tester")]
-    public partial class CountersGrainTests
+    [Collection("EventSourcingCluster"), TestCategory("EventSourcing")]
+    [TestCaseOrderer("EventSourcing.Tests.SimplePriorityOrderer", "EventSourcing.Tests")]
+    public class CountersGrainPerfTests
     {
+        private readonly EventSourcingClusterFixture fixture;
+
+        public CountersGrainPerfTests(EventSourcingClusterFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
         // you can look at the time taken by each of the tests below
         // to get a rough idea on how the synchronization choices, and the configuration parameters,
@@ -47,53 +54,77 @@ namespace Tester.EventSourcingTests
             );
         }
 
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmEachUpdate_MemoryStateStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmAtEndOnly_MemoryStateStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmEachUpdate_MemoryLogStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmAtEndOnly_MemoryLogStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
+        public async Task Perf_ConfirmEachUpdate_MemoryEventStore_NonReentrant()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_EventStore_NonReentrant");
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
+        }
+        [Fact]
+        public async Task Perf_ConfirmAtEndOnly_MemoryEventStore_NonReentrant()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_EventStore_NonReentrant");
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
+        }
+        [Fact]
         public async Task Perf_ConfirmEachUpdate_MemoryStateStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmAtEndOnly_MemoryStateStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmEachUpdate_MemoryLogStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
         }
-        [Fact, TestCategory("EventSourcing")]
+        [Fact]
         public async Task Perf_ConfirmAtEndOnly_MemoryLogStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
+        }
+        [Fact]
+        public async Task Perf_ConfirmEachUpdate_MemoryEventStore_Reentrant()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_EventStore_Reentrant");
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, true);
+        }
+        [Fact]
+        public async Task Perf_ConfirmAtEndOnly_MemoryEventStore_Reentrant()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_EventStore_Reentrant");
+            await CountersGrainTests.ConcurrentIncrements(grain, iterations, false);
         }
 
 
@@ -114,13 +145,11 @@ namespace Tester.EventSourcingTests
 
         public IEnumerable<TTestCase> OrderTestCases<TTestCase>(IEnumerable<TTestCase> testCases) where TTestCase : ITestCase
         {
-            // return all tests with RunThisFirst attribute
-            foreach (var tc in testCases.Where(tc => HasRunThisFirstAttribute(tc)))
-                yield return tc;
-
-            // return all other tests
-            foreach (var tc in testCases.Where(tc => !HasRunThisFirstAttribute(tc)))
-                yield return tc;
+            var sorted = testCases.Select(t => new KeyValuePair<TTestCase,int>(t, HasRunThisFirstAttribute(t) ? 0 : 1))
+                               .OrderBy(kvp => kvp.Value)
+                               .Select(kvp => kvp.Key)
+                               .ToList();
+            return sorted;
         }
     }
 

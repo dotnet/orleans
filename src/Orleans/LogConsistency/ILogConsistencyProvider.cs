@@ -30,14 +30,20 @@ namespace Orleans.LogConsistency
         /// <summary> Returns true if a storage provider is required for constructing adaptors. </summary>
         bool UsesStorageProvider { get; }
 
+
+        /// <summary> Returns true if a event-storage provider is required for constructing adaptors. </summary>
+        bool UsesEventStorageProvider { get; }
+
+
         /// <summary>
         /// Construct a <see cref="ILogViewAdaptor{TLogView,TLogEntry}"/> to be installed in the given host grain.
         /// </summary>
         ILogViewAdaptor<TLogView, TLogEntry> MakeLogViewAdaptor<TLogView, TLogEntry>(
-            ILogViewAdaptorHost<TLogView, TLogEntry> hostgrain,
-            TLogView initialstate,
-            string graintypename,
+            ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain,
+            TLogView initialState,
+            string grainTypeName,
             IStorageProvider storageProvider,
+            IEventStorageProvider eventStorageProvider,
             ILogConsistencyProtocolServices services)
 
             where TLogView : class, new()

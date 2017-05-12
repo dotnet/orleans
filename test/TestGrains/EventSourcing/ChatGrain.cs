@@ -17,16 +17,12 @@ namespace TestGrains
     /// An example of a journaled grain implementing a chat.
     /// The state of the grain is an XML document (System.Xml.Linq.XDocument).
     /// 
-    /// Configured to use the default storage provider.
-    /// Configured to use the LogStorage consistency provider.
+    /// Uses the default providers for log-consistency and storage.
     /// 
-    /// This means we persist all events; since events are replayed when a grain is loaded 
-    /// we can change the XML schema later
+    /// Persists all events; events are automatically replayed when a grain is loaded 
+    /// so we can change the XML schema later
     /// 
     /// </summary>
-
-    [StorageProvider(ProviderName = "Default")]
-    [LogConsistencyProvider(ProviderName = "LogStorage")]
     public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain
     {
 

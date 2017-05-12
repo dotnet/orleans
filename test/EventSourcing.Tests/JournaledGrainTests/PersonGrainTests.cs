@@ -9,9 +9,10 @@ using TestExtensions;
 using Xunit.Abstractions;
 using Orleans.Runtime;
 
-namespace Tester.EventSourcingTests
+namespace EventSourcing.Tests
 {
-    public class PersonGrainTests : IClassFixture<EventSourcingClusterFixture>
+    [Collection("EventSourcingCluster"), TestCategory("EventSourcing"), TestCategory("Functional")]
+    public class PersonGrainTests
     {
         private readonly EventSourcingClusterFixture fixture;
 
@@ -20,7 +21,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task JournaledGrainTests_Activate()
         {
             var grainWithState = this.fixture.GrainFactory.GetGrain<IPersonGrain>(Guid.Empty);
@@ -28,7 +29,7 @@ namespace Tester.EventSourcingTests
             Assert.NotNull(await grainWithState.GetTentativePersonalAttributes());
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task JournaledGrainTests_Persist()
         {
             var grainWithState = this.fixture.GrainFactory.GetGrain<IPersonGrain>(Guid.Empty);
@@ -41,7 +42,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal("Luke", attributes.FirstName);
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task JournaledGrainTests_AppendMoreEvents()
         {
             var leia = this.fixture.GrainFactory.GetGrain<IPersonGrain>(Guid.NewGuid());
@@ -58,7 +59,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal("Solo", attributes.LastName);
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task JournaledGrainTests_TentativeConfirmedState()
         {
             var leia = this.fixture.GrainFactory.GetGrain<IPersonGrain>(Guid.NewGuid());

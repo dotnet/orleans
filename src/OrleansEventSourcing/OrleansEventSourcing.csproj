@@ -47,15 +47,16 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="EventStorage\LogConsistencyProvider.cs" />
+    <Compile Include="EventStorage\LogViewAdaptor.cs" />
+    <Compile Include="EventStorage\IEventWithGuid.cs" />
     <Compile Include="LogConsistencyConfigurationExtensions.cs" />
     <Compile Include="CustomStorage\LogViewAdaptor.cs" />
     <Compile Include="CustomStorage\LogConsistencyProvider.cs" />
     <Compile Include="CustomStorage\ICustomStorageInterface.cs" />
-    <Compile Include="LogStorage\DefaultAdaptorFactory.cs" />
     <Compile Include="LogStorage\LogConsistencyProvider.cs" />
     <Compile Include="LogStorage\LogViewAdaptor.cs" />
     <Compile Include="Common\StringEncodedWriteVector.cs" />
-    <Compile Include="StateStorage\DefaultAdaptorFactory.cs" />
     <Compile Include="StateStorage\GrainStateWithMetaData.cs" />
     <Compile Include="StateStorage\LogConsistencyProvider.cs" />
     <Compile Include="JournaledGrain.cs" />
@@ -69,13 +70,14 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="project.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

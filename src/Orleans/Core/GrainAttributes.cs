@@ -330,17 +330,22 @@ namespace Orleans
         /// </para>
         /// </summary>
         [AttributeUsage(AttributeTargets.Class)]
-        public sealed class StorageProviderAttribute : Attribute
+        public sealed class StorageProviderAttribute : ProviderAttribute
         {
-            /// <summary>
-            /// The name of the provider to be used for persisting of grain state
-            /// </summary>
-            public string ProviderName { get; set; }
+        }
 
-            public StorageProviderAttribute()
-            {
-                ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
-            }
+        /// <summary>
+        /// The [Orleans.Providers.EventStorageProvider] attribute is used to define which event-storage provider to use for persistence of grain state.
+        /// <para>
+        /// Specifying [Orleans.Providers.EventStorageProvider] property is recommended for all grains which extend JournaledGrain and 
+        /// use a log-consistency provider that requires an event-store.
+        /// If no [Orleans.Providers.EventStorageProvider] attribute is  specified, then a "Default" event-storage provider will be used.
+        /// If a suitable event-storage provider cannot be located for this grain, then the grain will fail to load into the Silo.
+        /// </para>
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class EventStorageProviderAttribute : ProviderAttribute
+        {
         }
 
         /// <summary>
@@ -355,16 +360,21 @@ namespace Orleans
         /// </para>
         /// </summary>
         [AttributeUsage(AttributeTargets.Class)]
-        public sealed class LogConsistencyProviderAttribute : Attribute
+        public sealed class LogConsistencyProviderAttribute : ProviderAttribute
+        {
+        }
+
+        /// <summary> Superclass of various storage-related provider categories. Only subclasses can be used as an attribute. </summary>
+        public abstract class ProviderAttribute : Attribute
         {
             /// <summary>
-            /// The name of the provider to be used for consistency
+            /// The name of the provider to be used
             /// </summary>
             public string ProviderName { get; set; }
 
-            public LogConsistencyProviderAttribute()
+            public ProviderAttribute()
             {
-                ProviderName = Runtime.Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;
+                ProviderName = Runtime.Constants.DEFAULT_PROVIDER_NAME;
             }
         }
     }

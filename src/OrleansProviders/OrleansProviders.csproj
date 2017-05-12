@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
+    <Compile Include="Storage\MemoryEventStorage.cs" />
     <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
     <Compile Include="Streams\Common\PooledCache\IEvictionStrategy.cs" />
     <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />

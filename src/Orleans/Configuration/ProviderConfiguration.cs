@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Xml;
 using Orleans.Providers;
+using System.Reflection;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -200,6 +201,7 @@ namespace Orleans.Runtime.Configuration
     {
         public const string BOOTSTRAP_PROVIDER_CATEGORY_NAME = "Bootstrap";
         public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
+        public const string EVENT_STORAGE_PROVIDER_CATEGORY_NAME = "EventStorage";
         public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
         public const string LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME = "LogConsistency";
         public const string STATISTICS_PROVIDER_CATEGORY_NAME = "Statistics";
@@ -311,6 +313,20 @@ namespace Orleans.Runtime.Configuration
                 providerTypeFullName, providerName);
 
             category.Providers.Add(config.Name, config);
+        }
+
+        internal static void RegisterProvider<TProvider>(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string providerCategory, string providerName, IDictionary<string, string> properties = null, params Type[] requireAssignableFrom)
+        {
+            Type providerType = typeof(TProvider);
+            var providerTypeInfo = providerType.GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                requireAssignableFrom.Any((Type t) => !t.IsAssignableFrom(providerType)))
+            {
+                var typelist = string.Join(",", requireAssignableFrom.Select((Type t) => t.Name));
+                throw new ArgumentException($"Expected non-generic, non-abstract type which implements {typelist} interface", "typeof(T)");
+            }
+            RegisterProvider(providerConfigurations, providerCategory, providerType.FullName, providerName, properties);
         }
 
         internal static bool TryGetProviderConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, 

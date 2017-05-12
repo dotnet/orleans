@@ -29,6 +29,7 @@ namespace Tests.GeoClusterTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
 
+                options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("Default");
                 options.ClusterConfiguration.AddAzureTableStorageProvider();
                 options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
                 options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
@@ -51,7 +52,7 @@ namespace Tests.GeoClusterTests
         [SkippableFact]
         public async Task DefaultStorage()
         {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefault");
         }
         [SkippableFact]
         public async Task MemoryStorage()

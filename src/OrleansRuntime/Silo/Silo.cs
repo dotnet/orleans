@@ -83,6 +83,7 @@ namespace Orleans.Runtime
         private readonly InsideRuntimeClient runtimeClient;
         private readonly AssemblyProcessor assemblyProcessor;
         private StorageProviderManager storageProviderManager;
+        private EventStorageProviderManager eventStorageProviderManager;
         private LogConsistencyProviderManager logConsistencyProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
         private BootstrapProviderManager bootstrapProviderManager;
@@ -567,17 +568,27 @@ namespace Orleans.Runtime
             // Initialize storage providers once we have a basic silo runtime environment operating
             storageProviderManager = new StorageProviderManager(grainFactory, Services, siloProviderRuntime);
             scheduler.QueueTask(
-                () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
+                () => storageProviderManager.LoadProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
+            // Initialize event-storage providers once we have a basic silo runtime environment operating
+            eventStorageProviderManager = new EventStorageProviderManager(grainFactory, Services, siloProviderRuntime);
+            scheduler.QueueTask(
+                () => eventStorageProviderManager.LoadProviders(GlobalConfig.ProviderConfigurations),
+                providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+            catalog.SetEventStorageManager(eventStorageProviderManager);
+            allSiloProviders.AddRange(eventStorageProviderManager.GetProviders());
+            if (logger.IsVerbose) { logger.Verbose("EventStorage provider manager created successfully."); }
+
             // Initialize log consistency providers once we have a basic silo runtime environment operating
             logConsistencyProviderManager = new LogConsistencyProviderManager(grainFactory, Services, siloProviderRuntime);
             scheduler.QueueTask(
-                () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
+                () => logConsistencyProviderManager.LoadProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
             catalog.SetLogConsistencyManager(logConsistencyProviderManager);

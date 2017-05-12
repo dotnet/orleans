@@ -11,9 +11,10 @@ using Xunit.Abstractions;
 using Orleans.Runtime;
 using System.Collections.Generic;
 
-namespace Tester.EventSourcingTests
+namespace EventSourcing.Tests
 {
-    public partial class CountersGrainTests : IClassFixture<EventSourcingClusterFixture>
+    [Collection("EventSourcingCluster"), TestCategory("EventSourcing"), TestCategory("Functional")]
+    public class CountersGrainTests
     {
         private readonly EventSourcingClusterFixture fixture;
 
@@ -22,7 +23,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task Record()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
@@ -44,7 +45,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal(0, (await grain.GetTentativeState()).Count());
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact]
         public async Task ConcurrentIncrements()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
@@ -54,10 +55,10 @@ namespace Tester.EventSourcingTests
 
         private static string[] keys = { "a", "b", "c", "d", "e", "f", "g", "h" };
         private static readonly SafeRandom random = new SafeRandom();
-        private string RandomKey() { return keys[random.Next(keys.Length)]; }
+        private static string RandomKey() { return keys[random.Next(keys.Length)]; }
 
 
-        private async Task ConcurrentIncrements(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
+        internal async static Task ConcurrentIncrements(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
         {
             // increment (count) times, on random keys, concurrently
             var tasks = new List<Task>();

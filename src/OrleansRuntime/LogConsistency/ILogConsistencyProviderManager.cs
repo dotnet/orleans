@@ -1,19 +1,11 @@
 ﻿using System.Collections.Generic;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.LogConsistency
 {
-    internal interface ILogConsistencyProviderManager : IProviderManager
+    internal interface ILogConsistencyProviderManager : IProviderManagerBase<ILogConsistencyProvider>
     {
-        Logger GetLogger(string loggerName);
-
-        IEnumerable<string> GetProviderNames();
-
-        int GetLoadedProvidersNum();
-
-        bool TryGetProvider(string name, out ILogConsistencyProvider provider, bool caseInsensitive = false);
     }
-
-
 }
