@@ -50,7 +50,7 @@
     <Compile Include="ErrorCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\EventDataGeneratorStreamProvider.cs" />
-    <Compile Include="Providers\EventDataGeneratorStreamProvider\EeventHubPartitionGeneratorReceiver.cs" />
+    <Compile Include="Providers\EventDataGeneratorStreamProvider\EventHubPartitionGeneratorReceiver.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\EventHubPartitionDataGenerator.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\EventHubUtils.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\IEventDataGenerator.cs" />

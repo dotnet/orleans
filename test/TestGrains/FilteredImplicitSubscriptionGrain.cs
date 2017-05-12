@@ -30,7 +30,7 @@ namespace UnitTests.Grains
                     {
                         logger.Info($"Received a {streamNamespace} event {e}");
                         counters[streamNamespace]++;
-                        return TaskDone.Done;
+                        return Task.CompletedTask; 
                     });
             }
         }
