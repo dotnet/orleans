@@ -124,7 +124,6 @@ namespace UnitTests.StreamingTests
         {
             logger.Info($"************************ {nameof(FilteredImplicitSubscriptionWithExtensionGrainTest)} *********************************");
 
-            var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
             var redEvents = new[] { 3, 5, 2, 4 };
             var blueEvents = new[] { 7, 3, 6 };
 

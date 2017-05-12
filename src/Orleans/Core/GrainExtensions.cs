@@ -1,7 +1,6 @@
 using System;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Streams;
 
 namespace Orleans
 {
@@ -214,12 +213,6 @@ namespace Orleans
             {
                 throw new ArgumentNullException(nameof(grain));
             }
-        }
-
-        public static StreamIdentity GetImplicitStreamIdentity(this IGrainWithGuidCompoundKey grain)
-        {
-            var key = grain.GetPrimaryKey(out string keyExtension);
-            return new StreamIdentity(key, keyExtension);
         }
     }
 }
