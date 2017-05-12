@@ -13,6 +13,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
+using Orleans.ServiceBus.Providers.Testing;
 
 namespace Orleans.ServiceBus.Providers
 {

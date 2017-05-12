@@ -11,25 +11,48 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.ServiceBus.Providers.Testing
 {
 
-    internal static class EventDataProxyMethods
+    /// <summary>
+    /// Setter for EventData members
+    /// </summary>
+    public static class EventDataProxyMethods
     {
+        /// <summary>
+        /// Set EventData.Offset
+        /// </summary>
+        /// <param name="eventData"></param>
+        /// <param name="offSet"></param>
         public static void SetOffset(this EventData eventData, string offSet)
         {
             EventDataMethodCache.Instance.SetOffset(eventData, offSet);
         }
 
+        /// <summary>
+        /// Setter for EventData.SequenceNumber
+        /// </summary>
+        /// <param name="eventData"></param>
+        /// <param name="sequenceNumber"></param>
         public static void SetSequenceNumber(this EventData eventData, long sequenceNumber)
         {
             EventDataMethodCache.Instance.SetSequenceNumber(eventData, sequenceNumber);
         }
+        /// <summary>
+        /// Setter for EventData.EnqueueTimeUtc
+        /// </summary>
+        /// <param name="eventData"></param>
+        /// <param name="enqueueTime"></param>
         public static void SetEnqueuedTimeUtc(this EventData eventData, DateTime enqueueTime)
         {
             EventDataMethodCache.Instance.SetEnqueuedTimeUtc(eventData, enqueueTime);
         }
 #if NETSTANDARD
+        /// <summary>
+        /// Setter for EventData.PartitionKey
+        /// </summary>
+        /// <param name="eventData"></param>
+        /// <param name="partitionKey"></param>
         public static void SetPartitionKey(this EventData eventData, string partitionKey)
         {
             EventDataMethodCache.Instance.SetPartitionKey(eventData, partitionKey);

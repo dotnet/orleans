@@ -6,6 +6,7 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.ServiceBus.Providers.Testing;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {

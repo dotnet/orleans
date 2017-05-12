@@ -104,7 +104,17 @@ namespace Orleans.ServiceBus.Providers
             return true;
         }
 
-        internal static EventData ToEventData<T>(SerializationManager serializationManager, Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        /// <summary>
+        /// Put events list and its context into a EventData object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="serializationManager"></param>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
+        /// <param name="events"></param>
+        /// <param name="requestContext"></param>
+        /// <returns></returns>
+        public static EventData ToEventData<T>(SerializationManager serializationManager, Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {

@@ -10,7 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.ServiceBus.Providers.Testing
 {
     /// <summary>
     /// Data generator for test purpose
@@ -27,20 +27,59 @@ namespace Orleans.ServiceBus.Providers
         bool TryReadEvents(int maxCount, out IEnumerable<T> events);
     }
 
-    internal interface IStreamDataGeneratingController
+    /// <summary>
+    /// StreamDataGeneratingController control stream data generating start and stop
+    /// </summary>
+    public interface IStreamDataGeneratingController
     {
+        /// <summary>
+        /// configure data generator for a stream
+        /// </summary>
+        /// <param name="streamId"></param>
         void AddDataGeneratorForStream(IStreamIdentity streamId);
+        /// <summary>
+        /// Ask one stream to stop producing
+        /// </summary>
+        /// <param name="streamId"></param>
         void StopProducingOnStream(IStreamIdentity streamId);
     }
 
-    internal interface IStreamDataGenerator<T>: IDataGenerator<T>
+    /// <summary>
+    /// data generator for a specific stream
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface IStreamDataGenerator<T>: IDataGenerator<T>
     {
-        IntCounter SequenceNumberCounter { set; }
+        /// <summary>
+        /// counter for sequence number
+        /// </summary>
+        IIntCounter SequenceNumberCounter { set; }
+        /// <summary>
+        /// Stream identity for this data generator
+        /// </summary>
         IStreamIdentity StreamId { get; }
+        /// <summary>
+        /// 
+        /// </summary>
         bool ShouldProduce { set; }
     }
 
-    internal class IntCounter
+    /// <summary>
+    /// counter for integer
+    /// </summary>
+    public interface IIntCounter
+    {
+        /// <summary>
+        /// counter value
+        /// </summary>
+        int Value { get; }
+        /// <summary>
+        /// increment the counter
+        /// </summary>
+        void Increment();
+    }
+
+    internal class IntCounter : IIntCounter
     {
         private int counter = 0;
         public int Value { get { return this.counter; } }
