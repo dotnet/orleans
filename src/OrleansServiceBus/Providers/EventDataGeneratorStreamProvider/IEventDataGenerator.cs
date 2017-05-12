@@ -12,8 +12,18 @@ using System.Linq;
 
 namespace Orleans.ServiceBus.Providers
 {
-    internal interface IDataGenerator<T>
+    /// <summary>
+    /// Data generator for test purpose
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface IDataGenerator<T>
     {
+        /// <summary>
+        /// Data generator mimic event reading
+        /// </summary>
+        /// <param name="maxCount"></param>
+        /// <param name="events"></param>
+        /// <returns></returns>
         bool TryReadEvents(int maxCount, out IEnumerable<T> events);
     }
 
