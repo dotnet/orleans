@@ -203,6 +203,11 @@ namespace Orleans.Runtime
             return Key.GetUniformHashCode();
         }
 
+        internal string ToKeyStringWithoutType()
+        {
+            return Key.ToKeyStringWithoutType();
+        }
+
         public override string ToString()
         {
             return ToStringImpl(false);
