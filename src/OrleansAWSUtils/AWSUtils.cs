@@ -32,6 +32,8 @@ namespace OrleansAWSUtils
                     return RegionEndpoint.EUWest1;
                 case "sa-east-1":
                     return RegionEndpoint.SAEast1;
+                case "us-gov-west-1":
+                    return RegionEndpoint.USGovCloudWest1;
                 default:
                     return RegionEndpoint.USWest2;
             }
