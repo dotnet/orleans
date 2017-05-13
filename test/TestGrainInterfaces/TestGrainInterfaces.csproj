@@ -135,6 +135,7 @@
     <Compile Include="IConsiderForCodeGenerationGrain.cs" />
     <Compile Include="ProgramaticStreamSubscribe\IPassive_ConsumerGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RedStreamNamespacePredicate.cs" />
     <Compile Include="SerializerExclusions.cs" />
     <Compile Include="SerializerTestTypes.cs" />
     <Compile Include="SlowConsumingGrains\ISlowConsumingGrain.cs" />

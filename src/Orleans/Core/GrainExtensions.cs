@@ -186,17 +186,14 @@ namespace Orleans
         {
             return GetGrainIdentity(grain).GetPrimaryKeyLong(out keyExt);
         }
-
         public static long GetPrimaryKeyLong(this IGrain grain)
         {
             return GetGrainIdentity(grain).PrimaryKeyLong;
         }
-
         public static Guid GetPrimaryKey(this IGrain grain, out string keyExt)
         {
             return GetGrainIdentity(grain).GetPrimaryKey(out keyExt);
         }
-
         public static Guid GetPrimaryKey(this IGrain grain)
         {
             return GetGrainIdentity(grain).PrimaryKey;

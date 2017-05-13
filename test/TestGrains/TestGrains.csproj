@@ -81,7 +81,6 @@
     <Compile Include="ProgrammaticSubscribe\Passive_ConsumerGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\SubscribeGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\TypedProducerGrain.cs" />
-    <Compile Include="RedStreamNamespacePredicate.cs" />
     <Compile Include="RoundtripSerializationGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="ExternalTypeGrain.cs" />

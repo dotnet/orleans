@@ -1,7 +1,7 @@
 using System;
 using Orleans.Streams;
 
-namespace UnitTests.Grains
+namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     public class RedStreamNamespacePredicate : IStreamNamespacePredicate

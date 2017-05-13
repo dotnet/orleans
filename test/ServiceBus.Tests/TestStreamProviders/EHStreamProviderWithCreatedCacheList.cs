@@ -11,7 +11,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     internal class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
     {
-        public class AdapterFactory : EventHubAdapterFactory, IControllable
+        public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
             private readonly List<IEventHubQueueCache> createdCaches;
 
@@ -35,11 +35,11 @@ namespace ServiceBus.Tests.TestStreamProviders
                 {
                     _caches = caches;
                 }
-                private const int defaultMaxAddCount = 2;
+                private const int defaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger,
                     IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, SerializationManager serializationManager)
                 {
-                    //set defaultMaxAddCount to 2 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
+                    //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly.
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), 
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge));
                     _caches.Add(cache);
@@ -47,7 +47,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 }
             }
 
-            public static int IsCacheBackPressureTriggeredCommand = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 3;
+            public const int IsCacheBackPressureTriggeredCommand = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 3;
 
             /// <summary>
             /// Only command expecting: determine whether back pressure algorithm on any of the created caches
@@ -56,14 +56,20 @@ namespace ServiceBus.Tests.TestStreamProviders
             /// <param name="command"></param>
             /// <param name="arg"></param>
             /// <returns></returns>
-            public Task<object> ExecuteCommand(int command, object arg)
+            public override Task<object> ExecuteCommand(int command, object arg)
             {
-                foreach (var cache in this.createdCaches)
+                switch (command)
                 {
-                    if (cache.GetMaxAddCount() == 0)
-                        return Task.FromResult<object>(true);
+                    case IsCacheBackPressureTriggeredCommand:
+                        foreach (var cache in this.createdCaches)
+                        {
+                            if (cache.GetMaxAddCount() == 0)
+                                return Task.FromResult<object>(true);
+                        }
+                        return Task.FromResult<object>(false);
+                    default: return base.ExecuteCommand(command, arg);
                 }
-                return Task.FromResult<object>(false);
+
             }
         }
     }

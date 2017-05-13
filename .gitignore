@@ -205,3 +205,5 @@ FakesAssemblies/
 **/pingme.txt
 .vs/
 src/SetupTestScriptOutput.txt
+
+\.DS_Store
