@@ -1,7 +1,6 @@
 ﻿using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
@@ -38,15 +37,6 @@ namespace UnitTests.Grains
         public Task<int> GetCounter(string streamNamespace)
         {
             return Task.FromResult(counters[streamNamespace]);
-        }
-    }
-
-    [Serializable]
-    public class RedStreamNamespacePredicate : IStreamNamespacePredicate
-    {
-        public bool IsMatch(string streamNamespace)
-        {
-            return streamNamespace.StartsWith("red");
         }
     }
 }
