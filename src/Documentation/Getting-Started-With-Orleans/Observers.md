@@ -67,14 +67,14 @@ class HelloGrain : Grain, IHello
     public Task Subscribe(IChat observer)
     {
         _subsManager.Subscribe(observer);
-        return TaskDone.Done
+        return TaskDone.Done;
     }
 
     //Also clients use this to unsubscribe themselves to no longer receive the messages.
     public Task UnSubscribe(IChat observer)
     {
         _subsManager.Unsubscribe(observer);
-        return TaskDone.Done
+        return TaskDone.Done;
     }
 }
 ```
