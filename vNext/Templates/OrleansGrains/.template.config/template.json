@@ -1,0 +1,35 @@
+{
+    "author": "Microsoft",
+    "classification": [
+        "Orleans",
+        "Cloud-Computing",
+        "Actor-Model",
+        "Actors",
+        "Distributed-Systems",
+        "C#",
+        "Grain",
+        ".NET"
+    ],
+    "name": "Microsoft Orleans (2.0 Technical Preview) Grains",
+    "identity": "Microsoft.Orleans.Templates.Grains",
+    "shortname": "orleans-grains",
+    "tags": {
+        "language": "C#",
+        "type": "project"
+    },
+    "sourceName": "OrleansGrains",
+    "preferNameDirectory": "true",
+    "postActions": [
+        {
+            "condition": "(!skipRestore)",
+            "description": "Restore Orleans NuGet packages required by this project.",
+            "manualInstructions": [
+                {
+                    "text": "Run 'dotnet restore'"
+                }
+            ],
+            "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+            "continueOnError": true
+        }
+    ]
+}
