@@ -229,8 +229,8 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
 
 ## Further Reading
 
- - [List of Orleans Packages](http://dotnet.github.io/orleans/NuGets)
- - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/)
+ - [List of Orleans Packages](http://dotnet.github.io/orleans/Documentation/Installation/NuGets.html)
+ - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Documentation/Orleans-Configuration-Guide/)
  - [Orleans Best Practices](http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf)
  - [Running in a Stand Alone Silo](Running-in-a-Stand-alone-Silo.md)
- - [Azure Web Sample](http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample)
+ - [Azure Web Sample](http://dotnet.github.io/orleans/Documentation/Samples-Overview/Azure-Web-Sample)
