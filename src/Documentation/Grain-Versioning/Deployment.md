@@ -1,10 +1,8 @@
-# Deploy new versions in Azure
-
-## Using Cloud Services
+# Deploy new version of grains
 
 ### Rolling upgrade
 
-In this method you deploy a new cspkg directly on your Production environment.
+In this method you deploy newer silos directly on your environment.
 This is the simplest method, but it can be difficult to interrupt an on-going deployment
 and to rollback.
 
@@ -20,10 +18,10 @@ on newer silos.
 
 ### Using a staging environment
 
-In this method you deploy a new cspkg in the Staging environment before doing
-a VIP-swap. The Production and the Staging deployments will be __part of the same
-cluster__. It is important that silos from both environment can talk to each other:
-you should setup a virtual network for this.
+In this method you will need a second environment (Staging environment),
+on which you will deploy newer silos before stopping the Production environment.
+The Production and the Staging silos and clients will be __part of the same
+cluster__. It is important that silos from both environment can talk to each other.
 
 Recommended configuration:
 - `DefaultCompatibilityStrategy` set to `BackwardCompatible`

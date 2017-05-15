@@ -2,7 +2,7 @@
 
 > [!WARNING]
 > This page describes how to use grain interface versioning. The versioning of
-> Grain state it out of the scope.
+> Grain state it out of scope.
 
 ## Overview
 On a given cluster, silos can support different versions of a grain type.
@@ -27,8 +27,8 @@ Where `X` is the version number of the grain interface, which is typically monot
 When a call from a versioned grain arrive in a cluster:
 - If no activation exists, a compatible activation will be created
 - If an activation exists:
-  - If the current one is not compatible, it will be deactivated and new compatible will be created
-  - If the current one is compatible, the call will be handled normally
+  - If the current one is not compatible, it will be deactivated and new compatible will be created (see [version selector strategy](Version-selector-strategy.md))
+  - If the current one is compatible, the call will be handled normally (see [compatible grains](Compatible-grains.md))
 
 By default:
 - All versioned grains are supposed to be backward-compatible only (see [backward compatibility guidelines](Backward-compatibility-guidelines.md)). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. This default behavior can be changed with `GlobalConfiguration.DefaultCompatibilityStrategy`

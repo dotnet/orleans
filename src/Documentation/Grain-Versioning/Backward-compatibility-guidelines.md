@@ -51,6 +51,7 @@ public interface IMyGrain : IGrainWithIntegerKey
 
 It can seems obvious, but you should be very careful when changing the body of an existing method.
 Unless you are fixing a bug, it is better to just add a new method if you need to modify the code.
+(see [compatible grains](Compatible-grains.md))
 
 Example:
 ``` cs
@@ -117,6 +118,6 @@ If you want to remove methods, this should be done in 2 steps:
   public interface IMyGrain : IGrainWithIntegerKey
   {
     // New method added in V2
-    Task MyNewMethodMethod(int arg, obj o);
+    Task MyNewMethod(int arg, obj o);
   }
   ```

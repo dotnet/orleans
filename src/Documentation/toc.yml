@@ -88,8 +88,12 @@
       href: Grain-Versioning/Grain-Versioning.md
     - name: Backward Compatibility Guidelines
       href: Grain-Versioning\Backward-compatibility-guidelines.md
-    - name: Deployment in Azure
-      href: Grain-Versioning\Azure-deployment.md
+    - name: Compatible grains
+      href: Grain-Versioning\Compatible-grains.md
+    - name: Version selector strategy
+      href: Grain-Versioning\Version-selector-strategy.md
+    - name: Deployment
+      href: Grain-Versioning\Deployment.md
 - name: Runtime Implementation Details
   items:
     - name: Messaging Delivery Guarantees
