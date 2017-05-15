@@ -108,7 +108,10 @@ namespace Orleans.ServiceBus.Providers
         protected Func<string, string, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
-        internal Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> EventHubReceiverFactory;
+        /// <summary>
+        /// Factory to create a IEventHubReceiver
+        /// </summary>
+        protected Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> EventHubReceiverFactory;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
         /// <summary>
