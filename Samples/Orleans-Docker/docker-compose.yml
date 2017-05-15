@@ -1,0 +1,9 @@
+version: '3.1'
+
+services:
+  orleans-client:
+    image: orleans-client
+    depends_on: 
+      - orleans-silo
+  orleans-silo:
+    image: orleans-silo
