@@ -60,7 +60,7 @@ namespace Orleans.EventSourcing.EventStorage
             Log = providerRuntime.GetLogger(GetLoggerName());
             Log.Info("Init (Severity={0})", Log.SeverityLevel);
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -68,7 +68,7 @@ namespace Orleans.EventSourcing.EventStorage
         /// </summary>
         public Task Close()
         {
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 

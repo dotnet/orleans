@@ -25,14 +25,14 @@ namespace Orleans.Storage
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for MemoryEventStorageGrain virtually indefinitely.
             logger = GetLogger(GetType().Name);
             logger.Info("OnActivateAsync");
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
             eventStore = null;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private static int Within(int min, int x, int max)

@@ -104,7 +104,7 @@ namespace Orleans.EventSourcing
         public Task Close()
         {
             this.connection.Close();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 

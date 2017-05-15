@@ -18,7 +18,7 @@ namespace Orleans.TestingHost
         {
             foreach (var e in exceptions)
                 faultSequence.Enqueue(e);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 
@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public Task Clear()
         {
             faultSequence.Clear();
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc />
@@ -37,7 +37,7 @@ namespace Orleans.TestingHost
             if (next != null)
                 throw next;
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
     }
 }

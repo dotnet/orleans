@@ -92,7 +92,7 @@ namespace Orleans.Storage
                 int idx = i; // Capture variable to avoid modified closure error
                 storageGrains[idx] = new Lazy<IMemoryEventStorageGrain>(() => providerRuntime.GrainFactory.GetGrain<IMemoryEventStorageGrain>(idx));
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>
@@ -101,7 +101,7 @@ namespace Orleans.Storage
             for (int i = 0; i < numStorageGrains; i++)
                 storageGrains[i] = null;
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         private IMemoryEventStorageGrain GetStorageGrain(string id)
