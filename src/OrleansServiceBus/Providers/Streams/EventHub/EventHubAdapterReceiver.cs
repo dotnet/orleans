@@ -17,9 +17,18 @@ using Orleans.ServiceBus.Providers.Testing;
 
 namespace Orleans.ServiceBus.Providers
 {
-    internal class EventHubPartitionSettings
+    /// <summary>
+    /// Event Hub Partition settings
+    /// </summary>
+    public class EventHubPartitionSettings
     {
+        /// <summary>
+        /// Eventhub settings
+        /// </summary>
         public IEventHubSettings Hub { get; set; }
+        /// <summary>
+        /// Partition name
+        /// </summary>
         public string Partition { get; set; }
     }
 
