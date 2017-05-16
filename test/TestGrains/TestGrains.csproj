@@ -74,6 +74,7 @@
     <Compile Include="EventSourcing\CountersGrainVariations.cs" />
     <Compile Include="EventSourcing\SeatReservationGrain.cs" />
     <Compile Include="FilteredImplicitSubscriptionGrain.cs" />
+    <Compile Include="FilteredImplicitSubscriptionWithExtensionGrain.cs" />
     <Compile Include="GrainService\CustomGrainService.cs" />
     <Compile Include="GrainService\GrainServiceTestGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\IExternalStreamSubscriptionHandle.cs" />

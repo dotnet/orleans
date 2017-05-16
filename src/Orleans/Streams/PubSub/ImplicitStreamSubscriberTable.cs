@@ -13,11 +13,13 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly ConcurrentDictionary<string, HashSet<int>> table;
 
+        private readonly HashSet<int> grainsWithKeyExtensions;
         private readonly List<Tuple<IStreamNamespacePredicate, int>> predicates;
 
         public ImplicitStreamSubscriberTable()
         {
             table = new ConcurrentDictionary<string, HashSet<int>>();
+            grainsWithKeyExtensions = new HashSet<int>();
             predicates = new List<Tuple<IStreamNamespacePredicate, int>>();
         }
 
@@ -42,7 +44,10 @@ namespace Orleans.Streams
                 {
                     // we'll need the class type code.
                     int implTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
-
+                    if (typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(grainClass))
+                    {
+                        grainsWithKeyExtensions.Add(implTypeCode);
+                    }
                     foreach (var predicate in grainPredicates)
                     {
                         predicates.Add(Tuple.Create(predicate, implTypeCode));
@@ -71,7 +76,7 @@ namespace Orleans.Streams
             var result = new Dictionary<Guid, IStreamConsumerExtension>();
             foreach (var i in entry)
             {
-                IStreamConsumerExtension consumer = MakeConsumerReference(grainFactory, streamId.Guid, i);
+                IStreamConsumerExtension consumer = MakeConsumerReference(grainFactory, streamId, i);
                 Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
                 if (result.ContainsKey(subscriptionGuid))
                 {
@@ -202,12 +207,16 @@ namespace Orleans.Streams
         /// Create a reference to a grain that we expect to support the stream consumer extension.
         /// </summary>
         /// <param name="grainFactory">The grain factory used to get consumer references.</param>
-        /// <param name="primaryKey">The primary key of the grain.</param>
+        /// <param name="streamId">The stream ID to use for the grain ID construction.</param>
         /// <param name="implTypeCode">The type code of the grain interface.</param>
         /// <returns></returns>
-        private IStreamConsumerExtension MakeConsumerReference(IInternalGrainFactory grainFactory, Guid primaryKey, int implTypeCode)
+        private IStreamConsumerExtension MakeConsumerReference(IInternalGrainFactory grainFactory, StreamId streamId,
+            int implTypeCode)
         {
-            GrainId grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
+            var keyExtension = grainsWithKeyExtensions.Contains(implTypeCode)
+                ? streamId.Namespace
+                : null;
+            GrainId grainId = GrainId.GetGrainId(implTypeCode, streamId.Guid, keyExtension);
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 
