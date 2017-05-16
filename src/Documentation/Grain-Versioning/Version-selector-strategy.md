@@ -1,7 +1,7 @@
 # Version selector strategy
 
-When several versions of the same grain interface exist, and a new
-activation has to be created, a compatible version will be chosen according
+When several versions of the same grain interface exist in the cluster, and a new
+activation has to be created, a [compatible version](Compatible-grains.md) will be chosen according
 to the strategy defined in `GlobalConfiguration.DefaultVersionSelectorStrategy`.
 
 Orleans out of the box supports the following strategies:
@@ -37,4 +37,4 @@ For example if we have 2 versions of a given grain interface, V2, V3, all fully
 compatibles:
 
   - If the request was made from a V1 client/silo, the new activation will be a V2
-  - If the request was made from a V3 client/silo, the new activation will be a V3
+  - If the request was made from a V3 client/silo, the new activation will be a V2 too
