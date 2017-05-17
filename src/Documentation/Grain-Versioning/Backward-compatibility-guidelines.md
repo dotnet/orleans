@@ -47,6 +47,34 @@ public interface IMyGrain : IGrainWithIntegerKey
 }
 ```
 
+Example of what can happen if you just rename the parameter names, let's say
+that we have the two following interface version deployed in the cluster:
+``` cs
+[Version(1)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // return a - b
+  Task<int> Substract(int a, int b);
+}
+```
+``` cs
+[Version(2)]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+  // return y - x
+  Task<int> Substract(int y, int x);
+}
+```
+
+This methods seems identical. But if the client was called with V1, and the request is
+handled by a V2 activation:
+``` cs
+var grain = client.GetGrain<IMyGrain>(0);
+var result = await grain.Substract(5, 4); // Will return "-1" instead of expected "1"
+```
+
+This is due to how the internal Orleans serializer works.
+
 ## Avoid changing existing method logic
 
 It can seems obvious, but you should be very careful when changing the body of an existing method.
