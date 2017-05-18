@@ -47,7 +47,8 @@ public interface IMyGrain : IGrainWithIntegerKey
 }
 ```
 
-Example of what can happen if you just rename the parameter names, let's say
+**NOTE**: you should not do this change in your code, as it's an example of a bad practice that leads to very bad side-effects.
+This is an example of what can happen if you just rename the parameter names: let's say
 that we have the two following interface version deployed in the cluster:
 ``` cs
 [Version(1)]
