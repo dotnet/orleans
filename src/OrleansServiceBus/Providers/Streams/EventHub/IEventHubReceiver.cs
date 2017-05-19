@@ -15,9 +15,20 @@ namespace Orleans.ServiceBus.Providers
     /// Abstraction on EventhubReceiver class, used to configure EventHubReceiver class in EventhubAdapterReceiver,
     /// also used to configure EHGeneratorReceiver in EventHubAdapterReceiver for testing purpose
     /// </summary>
-    internal interface IEventHubReceiver
+    public interface IEventHubReceiver
     {
+        /// <summary>
+        /// Send a async message to the partition asking for more messages
+        /// </summary>
+        /// <param name="maxCount">Max amount of message which should be delivered in this request</param>
+        /// <param name="waitTime">Wait time of this request</param>
+        /// <returns></returns>
         Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime);
+
+        /// <summary>
+        /// Send a clean up message
+        /// </summary>
+        /// <returns></returns>
         Task CloseAsync();
     }
 

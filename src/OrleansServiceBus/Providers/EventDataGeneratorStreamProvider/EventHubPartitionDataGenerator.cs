@@ -14,18 +14,31 @@ using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.ServiceBus.Providers.Testing
 {
     /// <summary>
     /// Generate data for one stream
     /// </summary>
-    internal class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
+    public class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
     {
+        /// <inheritdoc cref="IEventHubReceiver"/>
         public IStreamIdentity StreamId { get; set; }
-        public IntCounter SequenceNumberCounter { set; private get; }
-        private Logger logger;
+
+        /// <inheritdoc cref="IEventHubReceiver"/>
+        public IIntCounter SequenceNumberCounter { set; private get; }
+        /// <inheritdoc cref="IEventHubReceiver"/>
         public bool ShouldProduce { private get; set; }
+
+        private Logger logger;
         private SerializationManager serializationManager;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="streamId"></param>
+        /// <param name="settings"></param>
+        /// <param name="logger"></param>
+        /// <param name="serializationManager"></param>
         public SimpleStreamEventDataGenerator(IStreamIdentity streamId, EventHubGeneratorStreamProviderSettings settings,
             Logger logger, SerializationManager serializationManager)
         {
@@ -35,6 +48,7 @@ namespace Orleans.ServiceBus.Providers
             this.serializationManager = serializationManager;
         }
 
+        /// <inheritdoc cref="IStreamDataGenerator{T}"/>
         public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
         {
             if (!this.ShouldProduce)
@@ -69,7 +83,7 @@ namespace Orleans.ServiceBus.Providers
             return eventDataList.Count > 0;
         }
 
-        IEnumerable<int> GenerateEvent(int sequenceNumber)
+        private IEnumerable<int> GenerateEvent(int sequenceNumber)
         {
             var events = new List<int>();
             events.Add(sequenceNumber);
@@ -80,7 +94,7 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// EHPartitionDataGenerator generate data for a EH partition, which can include data from different streams
     /// </summary>
-    internal class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
+    public class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
     {
         //differnt stream in the same partition should use the same sequenceNumberCounter
         private IntCounter sequenceNumberCounter = new IntCounter();
@@ -88,6 +102,12 @@ namespace Orleans.ServiceBus.Providers
         private List<IStreamDataGenerator<EventData>> generators;
         private SerializationManager serializationManager;
         private EventHubGeneratorStreamProviderSettings settings;
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="logger"></param>
+        /// <param name="serializationManager"></param>
+        /// <param name="settings"></param>
         public EventHubPartitionDataGenerator(Logger logger, SerializationManager serializationManager, EventHubGeneratorStreamProviderSettings settings)
         {
             this.logger = logger.GetSubLogger(this.GetType().Name);
@@ -95,6 +115,7 @@ namespace Orleans.ServiceBus.Providers
             this.serializationManager = serializationManager;
             this.settings = settings;
         }
+        /// <inheritdoc cref="IStreamDataGeneratingController"/>>
         public void AddDataGeneratorForStream(IStreamIdentity streamId)
         {
             var generator = (IStreamDataGenerator<EventData>)Activator.CreateInstance(settings.StreamDataGeneratorType,
@@ -103,6 +124,7 @@ namespace Orleans.ServiceBus.Providers
             this.logger.Info($"Data generator set up on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
             this.generators.Add(generator);
         }
+        /// <inheritdoc cref="IStreamDataGeneratingController"/>>
         public void StopProducingOnStream(IStreamIdentity streamId)
         {
             this.generators.ForEach(generator => {
@@ -113,6 +135,7 @@ namespace Orleans.ServiceBus.Providers
                 }
             });
         }
+        /// <inheritdoc cref="IDataGenerator{T}"/>>
         public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
         {
             if (this.generators.Count == 0)

@@ -7,6 +7,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
+using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
