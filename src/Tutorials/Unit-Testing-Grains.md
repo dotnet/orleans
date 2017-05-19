@@ -7,7 +7,7 @@ title: Unit Testing Grains
 
 This tutorial shows how to unit test your grains to make sure they behave correctly.
 There are two main ways to unit test your grains, and the method you choose will depend on the type of functionality you are testing.
-You have use a mocking framework like [Moq](https://github.com/moq/moq) to mock parts of the Orleans runtime that your grain interacts with, or you can use the  `Microsoft.Orleans.TestingHost` NuGet package to create test silos for your grains.
+You can use a mocking framework like [Moq](https://github.com/moq/moq) to mock parts of the Orleans runtime that your grain interacts with, or you can use the  `Microsoft.Orleans.TestingHost` NuGet package to create test silos for your grains.
 
 ## Using Mocks
 
@@ -82,7 +82,7 @@ namespace Tests
             cluster.Deploy();
 
             var hello = cluster.GrainFactory.GetGrain<IHelloGrain>(Guid.NewGuid());
-            var greeting = await hello.SayHell();
+            var greeting = await hello.SayHello();
 
             cluster.StopAllSilos();
 
