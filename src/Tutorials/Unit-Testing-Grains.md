@@ -5,81 +5,159 @@ title: Unit Testing Grains
 
 # Unit Testing Grains
 
-This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
-For a distributed application written in Orleans, you'll need load tests and integration tests as well but here we'll only focus on unit tests.
+This tutorial shows how to unit test your grains to make sure they behave correctly.
+There are two main ways to unit test your grains, and the method you choose will depend on the type of functionality you are testing.
+You have use a mocking framework like [Moq](https://github.com/moq/moq) to mock parts of the Orleans runtime that your grain interacts with, or you can use the  `Microsoft.Orleans.TestingHost` NuGet package to create test silos for your grains.
 
-Orleans makes it possible to mock many of its parts ([example](https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal)) but here we only focus on simply running grains in test silos.
+## Using Mocks
 
-The steps are
+Orleans makes it possible to mock many parts of system, and for a lot of scenarios this is the easiest way to unit test grains. 
+This approach does have limitations, and may require that grains include code used only by your unit tests.
 
-- You should create a project using your favorite unit testing framework.
-- Add references to `Microsoft.Orleans.TestingHost`, `Microsoft.Orleans.OrleansProviders` and `Microsoft.Orleans.OrleansTelemetryConsumers.Counters` packages from NuGet to the project.
-- Reference your interfaces and collection projects in the test project.
-- Inherit your test classes from `Orleans.TestingHost.TestingSiloHost`.
-- Shutdown the silo properly in each test class.
+For example, let us imagine that the grain we are testing interacts with other grains.
+In order to be able to mock those other grains we also need to mock the `GrainFactory` member of the grain under test.
+By default `GrainFactory` is a normal `protected` property, but most mocking frameworks require properties to be `public` and `virtual` to be able to mock them.
+So the first thing we need to do is make `GrainFactory` both `public` and `virtual` property:
 
-## The process
-The TestingSiloHost creates a mini cluster of 2 silos in 2 different AppDomains and initializes a client in the main AppDomain which test cases will run on, in its constructor.
- Then it will run all of the test cases in the class and at cleanup time shuts the silos down.
-The test cases like ordinary grain code should call grains and then wait for the results using await and should not block the execution.
+```csharp
+public new virtual IGrainFactory GrainFactory 
+{
+    get { return base.GrainFactory; }
+}
+```
 
-## Writing the code
-The `TestingSiloHost` which we inherit from starts the silos up for us but we need to shutdown them ourselves.
-The samples here are using xUnit but you can use NUnit, MsTest, or any other testing framework that you want. Let's use the hello world sample's code here as an example.
+Now we can create our grain outside of the Orleans runtime and use mocking to control the behaviour of `GrainFactory`:
 
-``` csharp
+```csharp
 using System;
 using System.Threading.Tasks;
-using HelloWorldInterfaces;
+using Orleans;
+using Xunit;
+using Moq;
+
+namespace Tests 
+{
+    public class WorkerGrainTests 
+    {
+        [Fact]
+        public async Task RecordsMessageInJournal() 
+        {
+            var data = "Hello, World";
+
+            var journal = new Mock<IJournalGrain>();            
+
+            var worker = new Mock<WorkerGrain>();
+            myGrain.Setup(x => x.GrainFactory.GetGrain<IJournalGrain>(It.IsAny<Guid>())).Returns(journal.Object);
+
+            await worker.DoWork(data)
+
+            journal.Verfiy(x => x.Record(data), Times.Once());
+        }
+    }
+}
+```
+
+Here we create our grain under test, `WorkerGrain`, using Moq which means we can then override the behaviour of the `GrainFactory` so that it returns a mocked `IJournalGrain`. 
+We can then verify that our `WorkerGrain` interacts with the `IJournalGrain` as we expect.
+
+### Using TestCluster
+
+The `Microsoft.Orleans.TestingHost` NuGet package contains `TestCluster` which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.
+
+```csharp
+using System;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.TestingHost;
 using Xunit;
 
+namespace Tests 
+{
+    public class HelloGrainTests 
+    {
+        [Fact]
+        public async Task SaysHelloCorrectly()
+        {
+            var cluster = new TestCluster();
+            cluster.Deploy();
+
+            var hello = cluster.GrainFactory.GetGrain<IHelloGrain>(Guid.NewGuid());
+            var greeting = await hello.SayHell();
+
+            cluster.StopAllSilos();
+
+            Assert.Equal("Hello, World", greeting);
+        }
+    }
+}
+```
+
+Due to the overhead of starting an in-memory cluster you may wish to create a `TestCluster` and reuse it among multiple test cases.
+For example this can be done using Xunit's class or collection fixtures (see [https://xunit.github.io/docs/shared-context.html](https://xunit.github.io/docs/shared-context.html) for more details).
+
+In order to share a `TestCluster` between multiple test cases, first create a fixture type:
+
+```csharp
+public class ClusterFixture : IDisposable 
+{
+    public ClusterFixture()
+    {
+        this.Cluster = new TestCluster();
+        this.Cluster.Deploy();
+    }
+
+    public void Dispose()
+    {
+        this.Cluster.Dispose();
+    }
+
+    public TestCluster Cluster { get; private set; }
+}
+```
+
+Next create a collection fixture:
+
+```csharp
+[CollectionDefinition(ClusterCollection.Name)]
+public class ClusterCollection : ICollectionFixture<ClusterFixture>
+{    
+    public const string Name = "ClusterCollection";
+}
+```
+
+You can now reuse a`TestCluster` in your test cases:
+
+```csharp
+using System;
+using System.Threading.Tasks;
+using Orleans;
+using Xunit;
+
 namespace Tests
 {
-    public class HelloWorldSiloTests : TestingSiloHost, IDisposable
+    [Collection(ClusterCollection.Name)]
+    public class HelloGrainTests
     {
-        public void Dispose()
+        private readonly TestCluster _cluster;
+
+        public HelloGrainTests(ClusterFixture fixture)
         {
-            // Optional.
-            // By default, the next test class which uses TestingSiloHost will
-            // cause a fresh Orleans silo environment to be created.
-            StopAllSilos();
+            _cluster = fixture.Cluster;
         }
 
         [Fact]
-        public async Task SayHelloRespondsCorrectly()
-        {
-            // The Orleans silo / client test environment is already set up at this point.
+        public async Task SaysHelloCorrectly()
+        {            
+            var hello = _cluster.GrainFactory.GetGrain<IHelloGrain>(Guid.NewGuid());
+            var greeting = await hello.SayHell();
 
-            const long id = 0;
-            const string greeting = "Bonjour";
+            cluster.StopAllSilos();
 
-            IHello grain = GrainFactory.GetGrain<IHello>(id);
-
-            // This will create and call a Hello grain with specified 'id' in one of the test silos.
-            string reply = await grain.SayHello(greeting);
-
-            Assert.NotNull(reply);
-            string expected = $"You said: '{greeting}', I say: Hello!";
-            Assert.AreEqual(expected, reply);
+            Assert.Equal("Hello, World", greeting);
         }
     }
-}   
-
+}
 ```
 
-Since this test method is asynchronous and leverages the `await` keyword, be sure the method is defined as `async` and returns a `Task`.
-As you can see having `ClassCleanup()` is optional but it's good to have it around.
-Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.
-
-So writing tests for Orleans is not much different from a normal test project.
-You just need to reference the two NuGet packages and derive your class from `TestingSiloHost`.
-
-## Remarks
-
-- Keep in mind that the silo will not be restarted after each test method so if your methods need a fully clean grain then make sure that they'll use different grain IDs.
-- The `TestingSiloHost` class has multiple utility methods for starting and stopping silos which can be used for programmatic simulation of some failure situations.
-- Starting and stopping the silo for each test case takes time and is not a good idea unless you really need it for a test.
-- The two created silos will be named "Primary" and "Secondary". It is important to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special `MembershipTableGrain` system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.
-- Configurations of the environment are based on `TestSiloOptions` and `TestClientOptions` objects which can be passed to the constructor of the base class.
+Xunit will call the `Dispose` method of the `ClusterFixture` type when all tests have been completed and the in-memory cluster silos will be stopped.
+`TestCluster` also has a constructor which accepts `TestClusterOptions` that can be used to configure the silos in the cluster.
