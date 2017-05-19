@@ -79,9 +79,23 @@
   - name: Troubleshooting Deployments
     href: Advanced-Concepts/Troubleshooting-Deployments.md
   - name: Powershell Client
-    href: Advanced-Concepts/Powershell-Client.md   
+    href: Advanced-Concepts/Powershell-Client.md
   - name: Heterogeneous Silos
     href: Advanced-Concepts/Heterogeneous-Silos.md
+- name: Grain Versioning
+  href: Grain-Versioning/Grain-Versioning.md
+  homepage: Grain-Versioning/Grain-Versioning.md
+  items:
+    - name: Grain Versioning
+      href: Grain-Versioning/Grain-Versioning.md
+    - name: Backward Compatibility Guidelines
+      href: Grain-Versioning\Backward-compatibility-guidelines.md
+    - name: Compatible grains
+      href: Grain-Versioning\Compatible-grains.md
+    - name: Version selector strategy
+      href: Grain-Versioning\Version-selector-strategy.md
+    - name: Deployment
+      href: Grain-Versioning\Deployment.md
 - name: Runtime Implementation Details
   items:
     - name: Messaging Delivery Guarantees
@@ -115,7 +129,7 @@
       href: Orleans-Streams/Streams-Implementation.md
     - name: Streams Extensibility
       href: Orleans-Streams/Streams-Extensibility.md
-      
+
 - name: Multi-Cluster Support
   href: Multi-Cluster/Overview.md
   homepage: Multi-Cluster/Overview.md
@@ -147,7 +161,7 @@
       href: Event-Sourcing/LogConsistencyProviders.md
     - name: Diagnostics
       href: Event-Sourcing/Diagnostics.md
- 
+
 - name: Configuration Guide
   homepage: Orleans-Configuration-Guide/index.md
   href: Orleans-Configuration-Guide/index.md
