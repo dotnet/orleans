@@ -44,6 +44,7 @@ namespace Tests
             // Optional.
             // By default, the next test class which uses TestingSiloHost will
             // cause a fresh Orleans silo environment to be created.
+            //this code causes a build error. "Cannot call non-static method from a static context"
             StopAllSilos();
         }
 
