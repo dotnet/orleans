@@ -151,8 +151,6 @@ namespace Tests
             var hello = _cluster.GrainFactory.GetGrain<IHelloGrain>(Guid.NewGuid());
             var greeting = await hello.SayHell();
 
-            cluster.StopAllSilos();
-
             Assert.Equal("Hello, World", greeting);
         }
     }
