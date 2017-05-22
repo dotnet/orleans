@@ -93,7 +93,7 @@ namespace Tests
 ```
 
 Due to the overhead of starting an in-memory cluster you may wish to create a `TestCluster` and reuse it among multiple test cases.
-For example this can be done using Xunit's class or collection fixtures (see [https://xunit.github.io/docs/shared-context.html](https://xunit.github.io/docs/shared-context.html) for more details).
+For example this can be done using xUnit's class or collection fixtures (see [https://xunit.github.io/docs/shared-context.html](https://xunit.github.io/docs/shared-context.html) for more details).
 
 In order to share a `TestCluster` between multiple test cases, first create a fixture type:
 
@@ -159,5 +159,5 @@ namespace Tests
 }
 ```
 
-Xunit will call the `Dispose` method of the `ClusterFixture` type when all tests have been completed and the in-memory cluster silos will be stopped.
+xUnit will call the `Dispose` method of the `ClusterFixture` type when all tests have been completed and the in-memory cluster silos will be stopped.
 `TestCluster` also has a constructor which accepts `TestClusterOptions` that can be used to configure the silos in the cluster.
