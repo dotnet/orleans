@@ -7,58 +7,7 @@ title: Unit Testing Grains
 
 This tutorial shows how to unit test your grains to make sure they behave correctly.
 There are two main ways to unit test your grains, and the method you choose will depend on the type of functionality you are testing.
-You can use a mocking framework like [Moq](https://github.com/moq/moq) to mock parts of the Orleans runtime that your grain interacts with, or you can use the  `Microsoft.Orleans.TestingHost` NuGet package to create test silos for your grains.
-
-## Using Mocks
-
-Orleans makes it possible to mock many parts of system, and for a lot of scenarios this is the easiest way to unit test grains. 
-This approach does have limitations, and may require that grains include code used only by your unit tests.
-
-For example, let us imagine that the grain we are testing interacts with other grains.
-In order to be able to mock those other grains we also need to mock the `GrainFactory` member of the grain under test.
-By default `GrainFactory` is a normal `protected` property, but most mocking frameworks require properties to be `public` and `virtual` to be able to mock them.
-So the first thing we need to do is make `GrainFactory` both `public` and `virtual` property:
-
-```csharp
-public new virtual IGrainFactory GrainFactory 
-{
-    get { return base.GrainFactory; }
-}
-```
-
-Now we can create our grain outside of the Orleans runtime and use mocking to control the behaviour of `GrainFactory`:
-
-```csharp
-using System;
-using System.Threading.Tasks;
-using Orleans;
-using Xunit;
-using Moq;
-
-namespace Tests 
-{
-    public class WorkerGrainTests 
-    {
-        [Fact]
-        public async Task RecordsMessageInJournal() 
-        {
-            var data = "Hello, World";
-
-            var journal = new Mock<IJournalGrain>();            
-
-            var worker = new Mock<WorkerGrain>();
-            myGrain.Setup(x => x.GrainFactory.GetGrain<IJournalGrain>(It.IsAny<Guid>())).Returns(journal.Object);
-
-            await worker.DoWork(data)
-
-            journal.Verfiy(x => x.Record(data), Times.Once());
-        }
-    }
-}
-```
-
-Here we create our grain under test, `WorkerGrain`, using Moq which means we can then override the behaviour of the `GrainFactory` so that it returns a mocked `IJournalGrain`. 
-We can then verify that our `WorkerGrain` interacts with the `IJournalGrain` as we expect.
+The `Microsoft.Orleans.TestingHost` NuGet package can be used to create test silos for your grains, or you can use a mocking framework like [Moq](https://github.com/moq/moq) to mock parts of the Orleans runtime that your grain interacts with.
 
 ### Using TestCluster
 
@@ -159,3 +108,55 @@ namespace Tests
 
 xUnit will call the `Dispose` method of the `ClusterFixture` type when all tests have been completed and the in-memory cluster silos will be stopped.
 `TestCluster` also has a constructor which accepts `TestClusterOptions` that can be used to configure the silos in the cluster.
+
+## Using Mocks
+
+Orleans also makes it possible to mock many parts of system, and for many of scenarios this is the easiest way to unit test grains. 
+This approach does have limitations (e.g. around scheduling reentrancy and serialization), and may require that grains include code used only by your unit tests.
+The [Orleans TestKit](https://github.com/OrleansContrib/OrleansTestKit) provides an alternative approach which side-steps many of these limitations.
+
+For example, let us imagine that the grain we are testing interacts with other grains.
+In order to be able to mock those other grains we also need to mock the `GrainFactory` member of the grain under test.
+By default `GrainFactory` is a normal `protected` property, but most mocking frameworks require properties to be `public` and `virtual` to be able to mock them.
+So the first thing we need to do is make `GrainFactory` both `public` and `virtual` property:
+
+```csharp
+public new virtual IGrainFactory GrainFactory 
+{
+    get { return base.GrainFactory; }
+}
+```
+
+Now we can create our grain outside of the Orleans runtime and use mocking to control the behaviour of `GrainFactory`:
+
+```csharp
+using System;
+using System.Threading.Tasks;
+using Orleans;
+using Xunit;
+using Moq;
+
+namespace Tests 
+{
+    public class WorkerGrainTests 
+    {
+        [Fact]
+        public async Task RecordsMessageInJournal() 
+        {
+            var data = "Hello, World";
+
+            var journal = new Mock<IJournalGrain>();            
+
+            var worker = new Mock<WorkerGrain>();
+            myGrain.Setup(x => x.GrainFactory.GetGrain<IJournalGrain>(It.IsAny<Guid>())).Returns(journal.Object);
+
+            await worker.DoWork(data)
+
+            journal.Verfiy(x => x.Record(data), Times.Once());
+        }
+    }
+}
+```
+
+Here we create our grain under test, `WorkerGrain`, using Moq which means we can then override the behaviour of the `GrainFactory` so that it returns a mocked `IJournalGrain`. 
+We can then verify that our `WorkerGrain` interacts with the `IJournalGrain` as we expect.
