@@ -30,3 +30,6 @@ See [Issue #73](https://github.com/dotnet/orleans/issues/73)
 5. **Port Orleans to [coreclr](https://github.com/dotnet/coreclr)** [Medium]
 See [Issue #368](https://github.com/dotnet/orleans/issues/368)
   * Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn't be too big. This will allow to run Orleans efficiently cross platform.
+  
+ 6. **Security between silo and client
+  * Suggest for Orleans work in security mode, where certificate is chosen for encrypt data.
