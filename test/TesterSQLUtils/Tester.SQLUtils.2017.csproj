@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
@@ -9,10 +8,7 @@
     <AssemblyName>Tester.SQLUtils</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
     <PackageReference Include="System.Data.SqlClient" Version="4.3.0" />
     <PackageReference Include="FluentAssertions" Version="4.18.0" />
@@ -36,6 +32,7 @@
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.2017.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <Link>CreateOrleansTables_MySql.sql</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -54,8 +51,5 @@
     <None Include="Tester.SQLUtils.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
@@ -9,16 +8,12 @@
     <AssemblyName>Tester</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="4.18.0" />
-    <PackageReference Include="xunit" Version="2.1.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.2017.csproj" />
@@ -26,8 +21,6 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.2017.csproj" />
     <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj" />
-    <!--<ProjectReference Include="..\TestFSharpInterfaces\TestFSharpInterfaces.fsproj">-->
-    <!--<ProjectReference Include="..\TestFSharp\TestFSharp.fsproj" />-->
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.2017.csproj" />
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.2017.csproj" />
@@ -35,6 +28,10 @@
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.2017.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.2017.csproj" />
     <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.2017.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IncludeFSharp)'=='true'">
+    <ProjectReference Include="..\TestFSharp\TestFSharp.2017.fsproj" />
+    <ProjectReference Include="..\TestFSharpInterfaces\TestFSharpInterfaces.2017.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

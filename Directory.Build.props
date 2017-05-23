@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">1.5.0</VersionPrefix>
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">beta2</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <Authors>Microsoft</Authors>
+    <Product>Microsoft Orleans</Product>
+    <Copyright>Copyright (c) Microsoft Corporation 2017</Copyright>
+    <PackageLicenseUrl>https://github.com/dotnet/Orleans#license</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
+    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <!-- For Debug builds generated a date/time dependent version suffix -->
+  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
+  </PropertyGroup>
+
+  <!-- Until we removing old csproj files we need to exclude assembly attributes from AssemblyInfo.cs files -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);EXCLUDE_ASSEMBLYINFO</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Until VS2017 Update 3 released we've to exclude the F# bits from compilation -->
+  <PropertyGroup Condition="'$(IncludeFSharp)'==''">
+    <DefineConstants>$(DefineConstants);EXCLUDEFSHARP</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols>
+    <GenerateDocumentationFile Condition="'$(Configuration)'=='Release'">true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Include="ShowFilesOutsideOfProject" />
+  </ItemGroup>
+</Project>

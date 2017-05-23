@@ -5,7 +5,7 @@ SET CMDHOME=%~dp0.
 
 @REM Locate VS 2017 with the proper method
 
-SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.55/vswhere.exe
+SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.62/vswhere.exe
 SET VSWHERE_LOCAL_DIR=%CMDHOME%\Tools
 SET VSWHERE_LOCAL_PATH=%VSWHERE_LOCAL_DIR%\vswhere.exe
 

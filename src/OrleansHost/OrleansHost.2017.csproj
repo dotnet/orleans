@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansHost</PackageId>
     <Title>Microsoft Orleans Silo Host</Title>
     <Description>
@@ -10,20 +9,14 @@
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
     <OutputType>Exe</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-    <NoWarn>1591</NoWarn>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.Runtime.Host</RootNamespace>
     <AssemblyName>OrleansHost</AssemblyName>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net451'">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net461'">
     <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />

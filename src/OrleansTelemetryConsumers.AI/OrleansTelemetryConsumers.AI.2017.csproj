@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
     <Description>
@@ -9,17 +8,10 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansTelemetryConsumers.AI</AssemblyName>
     <RootNamespace>OrleansTelemetryConsumers.AI</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.ApplicationInsights" Version="1.2.3" />
   </ItemGroup>

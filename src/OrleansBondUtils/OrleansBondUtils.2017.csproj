@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.Serialization.Bond</PackageId>
     <Title>Microsoft Orleans Bond Serializer</Title>
     <Description>
@@ -8,21 +7,15 @@
     </Description>
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <AssemblyName>OrleansBondUtils</AssemblyName>
     <RootNamespace>OrleansBondUtils</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <Content Include="..\NuGet\BondSerializerInstall.ps1">
       <Pack>true</Pack>
