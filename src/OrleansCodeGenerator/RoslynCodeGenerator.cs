@@ -503,7 +503,7 @@ namespace Orleans.CodeGenerator
             if (GrainInterfaceUtils.IsGrainInterface(type))
             {
                 // If code generation is being performed at runtime, the interface must be accessible to the generated code.
-                if (!runtime || TypeUtilities.IsTypePublic(type))
+                if (!runtime || TypeUtilities.IsAccessibleFromAssembly(type, targetAssembly))
                 {
                     if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
 

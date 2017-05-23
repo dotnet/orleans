@@ -51,7 +51,7 @@ namespace Orleans.CodeGenerator
 
         internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
         {
-            if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
+            if (!TypeUtilities.IsAccessibleFromAssembly(t, targetAssembly))
             {
                 return false;
             }
@@ -108,9 +108,11 @@ namespace Orleans.CodeGenerator
 
             if (TypeUtils.HasAllSerializationMethods(t)) return false;
 
-            // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
+            // For every field which is not marked as [NonSerialized], check that it is accessible from code.
+            // If any of those fields are not accessible, then a serializer cannot be generated for this type.
             var skipSerializerGeneration =
-                t.GetAllFields().Any(field => this.IsFieldInaccessibleForSerialization(module, targetAssembly, field));
+                t.GetAllFields().Where(field => !field.IsNotSerialized())
+                    .Any(field => !TypeUtilities.IsAccessibleFromAssembly(field.FieldType, targetAssembly));
             if (skipSerializerGeneration)
             {
                 return false;
@@ -118,17 +120,6 @@ namespace Orleans.CodeGenerator
 
             typesToProcess.Add(t);
             return true;
-        }
-
-        private bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
-        {
-            // A field is inaccessible for serialization if:
-            // * It needs to be serialized,
-            // * There is not already a serializer available for it, and
-            // * The field type is not accessible for the purpose of serialization.
-            return !field.IsNotSerialized()
-                   && !this.serializationManager.HasSerializer(field.FieldType)
-                   && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }
 
         internal bool GetNextTypeToProcess(out Type next)

@@ -13,6 +13,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Streams;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -129,6 +130,9 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(grainReferenceType),
                 $"Should be able to serialize grain reference type {grainReferenceType}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(PubSubGrainState)),
+                $"Should be able to serialize internal type {nameof(PubSubGrainState)}.");
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]
