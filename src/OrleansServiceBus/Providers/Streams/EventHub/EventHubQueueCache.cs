@@ -53,7 +53,7 @@ namespace Orleans.ServiceBus.Providers
             this.evictionStrategy.OnPurged = this.OnPurge;
             this.evictionStrategy.PurgeObservable = cache;
             cacheDataAdapter.OnBlockAllocated = this.evictionStrategy.OnBlockAllocated;
-            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger);
+            //this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger);
         }
     
         /// <inheritdoc />
@@ -68,7 +68,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
-            this.cachePressureMonitor.AddCachePressureMonitor(monitor);
+           // this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public int GetMaxAddCount()
         {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
+            return defaultMaxAddCount;
         }
 
         /// <summary>
@@ -153,14 +153,14 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            if (!cache.TryGetNextMessage(cursorObj, out message))
-                return false;
-            double cachePressureContribution;
+            return cache.TryGetNextMessage(cursorObj, out message);
+                //return false;
+           /* double cachePressureContribution;
             cachePressureMonitor.RecordCachePressureContribution(
                 TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
                     ? cachePressureContribution
-                    : 0.0);
-            return true;
+                    : 0.0);*/
+            //return true;
         }
 
     }

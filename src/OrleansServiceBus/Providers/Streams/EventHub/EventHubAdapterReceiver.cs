@@ -108,7 +108,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
                 cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
-                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
+                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
                 receiver = await this.eventHubReceiverFactory(settings, offset, logger);
                 monitor.TrackInitialization(true);
