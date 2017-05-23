@@ -155,6 +155,11 @@ namespace Orleans.Runtime
             }
         }
 
+        internal class GrainActivationContextFactory
+        {
+            public IGrainActivationContext Context { get; set; }
+        }
+
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
@@ -285,6 +290,8 @@ namespace Orleans.Runtime
             this.GrainTypeData = typeData;
             this.serviceScope = grainServices.CreateScope();
 
+            SetGrainActivationContextInScopedServices(this.ActivationServices, this);
+
             if (typeData != null)
             {
                 var grainType = typeData.Type;
@@ -296,6 +303,12 @@ namespace Orleans.Runtime
                     this.collector = null;
                 }
             }
+        }
+
+        private static void SetGrainActivationContextInScopedServices(IServiceProvider sp, IGrainActivationContext context)
+        {
+            var contextFactory = sp.GetRequiredService<GrainActivationContextFactory>();
+            contextFactory.Context = context;
         }
 
         public IStorageProvider StorageProvider { get; set; }

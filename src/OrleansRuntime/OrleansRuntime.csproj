@@ -61,7 +61,6 @@
     <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\DefaultGrainActivator.cs" />
-    <Compile Include="Catalog\IGrainActivationContext.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Catalog\IGrainActivator.cs" />
     <Compile Include="Core\GrainRuntime.cs" />

@@ -15,8 +15,9 @@ namespace UnitTests.Grains
         private readonly IGrainFactory injectedGrainFactory;
         private readonly long grainFactoryId;
         public static readonly ObjectIDGenerator ObjectIdGenerator = new ObjectIDGenerator();
+        private readonly IGrainActivationContext grainActivationContext;
 
-        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory)
+        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainActivationContext grainActivationContext)
         {
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
@@ -26,6 +27,7 @@ namespace UnitTests.Grains
             // object Id will be the same if the underlying object is the same,
             // this is one way to prove that this GrainFactory is injected from DI
             this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out set);
+            this.grainActivationContext = grainActivationContext;
         }
 
         public Task<long> GetLongValue()
@@ -35,7 +37,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetStringValue()
         {
-            return GetInjectedSingletonServiceValue();
+            return Task.FromResult(this.grainActivationContext.GrainIdentity.PrimaryKeyLong.ToString());
         }
 
         public Task<string> GetInjectedSingletonServiceValue()
@@ -63,6 +65,7 @@ namespace UnitTests.Grains
         {
             if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedService>(), this.injectedService)) throw new Exception("singleton not equal");
             if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedScopedService>(), this.injectedScopedService)) throw new Exception("scoped not equal");
+            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IGrainActivationContext>(), this.grainActivationContext)) throw new Exception("scoped grain activation context not equal");
 
             return Task.CompletedTask;
         }
