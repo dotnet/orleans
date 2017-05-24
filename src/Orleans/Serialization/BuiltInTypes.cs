@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -1700,6 +1701,26 @@ namespace Orleans.Serialization
         internal static object CopyUri(object obj, ICopyContext context)
         {
             return obj; // URIs are immutable
+        }
+
+        #endregion
+
+        #region CultureInfo
+
+        internal static void SerializeCultureInfo(object obj, ISerializationContext context, Type expected)
+        {
+            var cultureInfo = (CultureInfo)obj;
+            context.StreamWriter.Write(cultureInfo.Name);
+        }
+
+        internal static object DeserializeCultureInfo(Type expected, IDeserializationContext context)
+        {           
+            return new CultureInfo(context.StreamReader.ReadString());
+        }
+
+        internal static object CopyCultureInfo(object obj, ICopyContext context)
+        {
+            return obj;
         }
 
         #endregion
