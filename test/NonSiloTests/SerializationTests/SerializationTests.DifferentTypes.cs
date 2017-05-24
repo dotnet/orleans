@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using TestExtensions;
@@ -117,6 +118,7 @@ namespace UnitTests.Serialization
         }
 
 #if !NETSTANDARD_TODO
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_RecursiveSerialization()
         {
@@ -128,6 +130,28 @@ namespace UnitTests.Serialization
 
             TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
         }
+
 #endif
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_CultureInfo()
+        {
+            var input = new List<CultureInfo> { CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("de") };
+
+            foreach (var cultureInfo in input)
+            {
+                var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(cultureInfo);
+                Assert.Equal(cultureInfo, output);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_CultureInfoList()
+        {
+            var input = new List<CultureInfo> { CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("de") };
+
+            var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
+            Assert.True(input.SequenceEqual(output));
+        }
     }
 }
