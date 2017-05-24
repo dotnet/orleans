@@ -84,7 +84,7 @@ namespace Orleans.ServiceBus.Providers
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)
             {
-                logger.Verbose(isUnderPressure
+                logger.Info(isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
                     : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");
             }
