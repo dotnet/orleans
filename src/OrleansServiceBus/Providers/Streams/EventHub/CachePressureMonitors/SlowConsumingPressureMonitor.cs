@@ -95,7 +95,7 @@ namespace Orleans.ServiceBus.Providers
                 //if under pressure, extend the nextCheckedTime, make sure wasUnderPressure is true for a whole window  
                 this.wasUnderPressure = underPressure;
                 this.nextCheckedTime = utcNow + this.PressureWindowSize;
-                logger.Verbose($"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                logger.Info($"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
                 this.biggestPressureInCurrentWindow = 0;
             }
 
@@ -106,7 +106,7 @@ namespace Orleans.ServiceBus.Providers
                 this.biggestPressureInCurrentWindow = 0;
                 //if at the end of the window, pressure clears out, log
                 if(this.wasUnderPressure && !underPressure)
-                    logger.Verbose($"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                    logger.Info($"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
                 this.wasUnderPressure = underPressure;
             }
 

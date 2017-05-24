@@ -16,7 +16,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Default flow control threshold
         /// </summary>
-        public static readonly double DefaultThreshold = 1 / 3;
+        public static readonly double DefaultThreshold = 1.0 / 3.0;
         private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
         private readonly Logger logger;
 
@@ -84,7 +84,7 @@ namespace Orleans.ServiceBus.Providers
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)
             {
-                logger.Verbose(isUnderPressure
+                logger.Info(isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
                     : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");
             }
