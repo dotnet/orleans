@@ -21,7 +21,8 @@ namespace Orleans.Runtime
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
         private readonly Logger logger = LogManager.GetLogger("DeploymentLoadPublisher", LoggerType.Runtime);
-        
+        private IDisposable publishTimer;
+
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
 
         public DeploymentLoadPublisher(
@@ -48,7 +49,7 @@ namespace Orleans.Runtime
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = random.NextTimeSpan(statisticsRefreshTime);
-                this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
+                this.publishTimer = this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
             }
             await RefreshStatistics();
             await PublishStatistics(null);
@@ -178,6 +179,9 @@ namespace Orleans.Runtime
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             if (!status.IsTerminating()) return;
+
+            if (Equals(updatedSilo, this.Silo))
+                this.publishTimer.Dispose();
 
             SiloRuntimeStatistics ignore;
             periodicStats.TryRemove(updatedSilo, out ignore);
