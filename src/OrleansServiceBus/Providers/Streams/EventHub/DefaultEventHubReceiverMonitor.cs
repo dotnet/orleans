@@ -64,7 +64,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="oldest">The difference between now utc on host and the eventhub enqueue time of the oldest message in a set of messages read.</param>
         /// <param name="newest">The difference between now utc on host and the eventhub enqueue time of the newest message in a set of messages read.</param>
-        public void TrackAgeOfMessagesRead(TimeSpan newest, TimeSpan oldest)
+        public void TrackAgeOfMessagesRead(TimeSpan oldest, TimeSpan newest)
         {
             logger.TrackMetric("AgeOfMessagesBeingProcessed", newest, LogProperties);
         }
