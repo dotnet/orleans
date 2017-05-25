@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
@@ -10,8 +12,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
     {
         private readonly StreamImpl<T>                  stream;
         private readonly string                         streamProviderName;
+
+        [NonSerialized]
+        private readonly SerializationManager serializationManager;
+
         [NonSerialized]
         private readonly IStreamPubSub                  pubSub;
+
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
         private SimpleMessageStreamProducerExtension    myExtension;
@@ -29,12 +36,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal bool IsRewindable { get; private set; }
 
         internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
-            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData, IStreamPubSub pubSub, bool isRewindable)
+            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
+            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
             this.pubSub = pubSub;
+            this.serializationManager = serializationManager;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
             this.optimizeForImmutableData = optimizeForImmutableData;
@@ -86,7 +95,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnNextAsync"));
 
             if (!connectedToRendezvous)
+            {
+                // In order to avoid potential concurrency errors, synchronously copy the input before yielding the
+                // thread. DeliverItem below must also be take care to avoid yielding before copying for non-immutable objects.
+                item = (T)this.serializationManager.DeepCopy(item);
                 await ConnectToRendezvous();
+            }
 
             await myExtension.DeliverItem(stream.StreamId, item);
         }
