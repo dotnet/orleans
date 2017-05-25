@@ -137,11 +137,11 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (Equals(updatedSilo, this.Silo))
-                refreshTimer?.Dispose();
-
             if (status != SiloStatus.Dead)
                 return;
+
+            if (Equals(updatedSilo, this.Silo))
+                refreshTimer?.Dispose();
 
             scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
         }
