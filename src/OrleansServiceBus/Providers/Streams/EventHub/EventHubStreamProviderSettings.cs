@@ -46,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
         /// User can turn it off by setting this value to null
         /// </summary>
         public double? AveragingCachePressureMonitorFlowControlThreshold = AveragingCachePressureMonitor.DefaultThreshold;
-
+        private const double CachePressureMonitorOffThreshold = 1.0;
         /// <summary>
         /// EventHubSettingsType setting name.
         /// </summary>
@@ -154,6 +154,10 @@ namespace Orleans.ServiceBus.Providers
             {
                 properties.Add(AveragingCachePressureMonitorFlowControlThresholdName, AveragingCachePressureMonitorFlowControlThreshold.ToString());
             }
+            else
+            {
+                properties.Add(AveragingCachePressureMonitorFlowControlThresholdName, CachePressureMonitorOffThreshold.ToString());
+            }
             if (SlowConsumingMonitorPressureWindowSize.HasValue)
             {
                 properties.Add(SlowConsumingMonitorPressureWindowSizeName, SlowConsumingMonitorPressureWindowSize.ToString());
@@ -191,7 +195,10 @@ namespace Orleans.ServiceBus.Providers
             }
             if (providerConfiguration.TryGetDoubleProperty(AveragingCachePressureMonitorFlowControlThresholdName, out flowControlThreshold))
             {
-                this.AveragingCachePressureMonitorFlowControlThreshold = flowControlThreshold;
+                if (flowControlThreshold >= CachePressureMonitorOffThreshold)
+                    this.AveragingCachePressureMonitorFlowControlThreshold = null;
+                else
+                    this.AveragingCachePressureMonitorFlowControlThreshold = flowControlThreshold;
             }
         }
 
