@@ -31,7 +31,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             var expectedSetting = new EventHubStreamProviderSettings(StreamProviderName);
             expectedSetting.SlowConsumingMonitorPressureWindowSize = TimeSpan.FromMinutes(2);
-            expectedSetting.SlowConsumingMonitorFlowControlThreshold = 1 / 3;
+            expectedSetting.SlowConsumingMonitorFlowControlThreshold = 0.6;
             AssertSettingEqual_After_WriteInto_ProviderConfiguration_AndPopulateBack(expectedSetting);
         }
 
@@ -39,7 +39,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         public void SettingWithAvgConsumingMonitorSetUp_Write_Into_ProviderConfiguration_PopulateBack()
         {
             var expectedSetting = new EventHubStreamProviderSettings(StreamProviderName);
-            expectedSetting.AveragingCachePressureMonitorFlowControlThreshold = 1 / 10;
+            expectedSetting.AveragingCachePressureMonitorFlowControlThreshold = 0.1;
             AssertSettingEqual_After_WriteInto_ProviderConfiguration_AndPopulateBack(expectedSetting);
         }
 
@@ -55,15 +55,31 @@ namespace ServiceBus.Tests.SlowConsumingTests
         }
         private void AssertEqual(EventHubStreamProviderSettings expectedSettings, EventHubStreamProviderSettings actualSettings)
         {
+
             Assert.Equal(expectedSettings.StreamProviderName, actualSettings.StreamProviderName);
-            Assert.Equal(expectedSettings.SlowConsumingMonitorFlowControlThreshold, actualSettings.SlowConsumingMonitorFlowControlThreshold);
+            Assert.True(TwoSettingValueEquals(expectedSettings.SlowConsumingMonitorFlowControlThreshold, 
+                actualSettings.SlowConsumingMonitorFlowControlThreshold));
             Assert.Equal(expectedSettings.SlowConsumingMonitorPressureWindowSize, actualSettings.SlowConsumingMonitorPressureWindowSize);
-            Assert.Equal(expectedSettings.AveragingCachePressureMonitorFlowControlThreshold, actualSettings.AveragingCachePressureMonitorFlowControlThreshold);
+            Assert.True(TwoSettingValueEquals(expectedSettings.AveragingCachePressureMonitorFlowControlThreshold, 
+                actualSettings.AveragingCachePressureMonitorFlowControlThreshold));
             Assert.Equal(expectedSettings.EventHubSettingsType, actualSettings.EventHubSettingsType);
             Assert.Equal(expectedSettings.CheckpointerSettingsType, actualSettings.CheckpointerSettingsType);
             Assert.Equal(expectedSettings.CacheSizeMb, actualSettings.CacheSizeMb);
             Assert.Equal(expectedSettings.DataMinTimeInCache, actualSettings.DataMinTimeInCache);
             Assert.Equal(expectedSettings.DataMaxAgeInCache, actualSettings.DataMaxAgeInCache);
+        }
+
+        private bool TwoSettingValueEquals(double? v1, double? v2)
+        {
+            //if both null. then return true
+            if (!v1.HasValue && !v2.HasValue)
+                return true;
+            if (v1.HasValue && v2.HasValue)
+            {
+                double tolerance = Math.Min(Math.Abs(v1.Value * .00001), Math.Abs(v2.Value * .00001));
+                return Math.Abs(v1.Value - v2.Value) < tolerance;
+            }
+            return false;
         }
     }
 }
