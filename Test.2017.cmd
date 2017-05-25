@@ -1,7 +1,7 @@
 @if not defined _echo @echo off
 setlocal
 
-SET CONFIGURATION=Debug
+SET CONFIGURATION=Release
 
 SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
@@ -9,6 +9,10 @@ set CMDHOME=%CMDHOME:~0,-1%
 
 pushd "%CMDHOME%"
 @cd
+
+SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%\TestResults
+
+if not exist %TestResultDir% md %TestResultDir%
 
 SET _Directory=bin\%CONFIGURATION%\net461\win
 
@@ -26,7 +30,7 @@ if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=
 @Echo Test assemblies = %TESTS%
 @Echo Test filters = %TEST_FILTERS%
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.2017.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.2017.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%TestResultDir%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%
