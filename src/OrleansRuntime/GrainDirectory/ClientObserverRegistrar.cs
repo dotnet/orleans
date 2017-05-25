@@ -21,6 +21,7 @@ namespace Orleans.Runtime
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
         private Gateway gateway;
+        private IDisposable refreshTimer;
 
 
         public ClientObserverRegistrar(
@@ -49,7 +50,7 @@ namespace Orleans.Runtime
         {
             var random = new SafeRandom();
             var randomOffset = random.NextTimeSpan(orleansConfig.Globals.ClientRegistrationRefresh);
-            this.RegisterTimer(
+            this.refreshTimer = this.RegisterTimer(
                 this.OnClientRefreshTimer,
                 null,
                 randomOffset,
@@ -136,10 +137,11 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
+            if (Equals(updatedSilo, this.Silo))
+                refreshTimer?.Dispose();
+
             if (status != SiloStatus.Dead)
-            {
                 return;
-            }
 
             scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
         }
