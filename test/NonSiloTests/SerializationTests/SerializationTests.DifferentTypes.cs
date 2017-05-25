@@ -140,7 +140,7 @@ namespace UnitTests.Serialization
 
             foreach (var cultureInfo in input)
             {
-                var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(cultureInfo);
+                var output = SerializationManager.RoundTripSerializationForTesting(cultureInfo);
                 Assert.Equal(cultureInfo, output);
             }
         }
@@ -150,7 +150,7 @@ namespace UnitTests.Serialization
         {
             var input = new List<CultureInfo> { CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("de") };
 
-            var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
+            var output = SerializationManager.RoundTripSerializationForTesting(input);
             Assert.True(input.SequenceEqual(output));
         }
     }
