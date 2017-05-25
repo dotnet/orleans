@@ -1238,6 +1238,7 @@ namespace Orleans.Runtime
                 // step 4 - UnregisterMessageTarget and OnFinishedGrainDeactivate
                 foreach (var activationData in list)
                 {
+                    Grain grainInstance = activationData.GrainInstance;
                     try
                     {
                         lock (activationData)
@@ -1259,6 +1260,13 @@ namespace Orleans.Runtime
                         directory.InvalidateCacheEntry(activationData.Address);
 
                         RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                        if (grainInstance != null)
+                        {
+                            lock (activationData)
+                            {
+                                grainCreator.Release(activationData, grainInstance);
+                            }
+                        }
                     }
                     catch (Exception exc)
                     {

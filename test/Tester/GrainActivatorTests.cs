@@ -40,20 +40,52 @@ namespace UnitTests.General
             Assert.Equal(TestStartup.HardcodedGrainActivator.HardcodedValue, actual);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task CanUseCustomGrainActivatorToReleaseGrains()
+        {
+            ISimpleDIGrain grain1 = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            long initialReleasedInstances = await grain1.GetLongValue();
+
+            ISimpleDIGrain grain2 = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            long secondReleasedInstances = await grain2.GetLongValue();
+
+            Assert.Equal(initialReleasedInstances, secondReleasedInstances);
+
+            await grain1.DoDeactivate();
+            await Task.Delay(100);
+
+            ISimpleDIGrain grain3 = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            long finalReleasedInstances = await grain3.GetLongValue();
+            Assert.Equal(initialReleasedInstances + 1, finalReleasedInstances);
+        }
+
         public class TestStartup
         {
             public class HardcodedGrainActivator : DefaultGrainActivator, IGrainActivator
             {
                 public const string HardcodedValue = "Hardcoded Test Value";
+                private int numberOfReleasedInstances;
 
                 public override object Create(IGrainActivationContext context)
                 {
                     if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
                     {
-                        return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(), HardcodedValue, 0);
+                        return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(), HardcodedValue, numberOfReleasedInstances);
                     }
 
                     return base.Create(context);
+                }
+
+                public override void Release(IGrainActivationContext context, object grain)
+                {
+                    if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                    {
+                        numberOfReleasedInstances++;
+                    }
+                    else
+                    {
+                        base.Release(context, grain);
+                    }
                 }
             }
 

@@ -96,5 +96,10 @@ namespace Orleans.Runtime
 
             ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, svc);
         }
+
+        public void Release(IGrainActivationContext context, object grain)
+        {
+            this.grainActivator.Release(context, grain);
+        }
     }
 }

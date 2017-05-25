@@ -38,5 +38,25 @@ namespace Orleans.Runtime
             var grain = activator(serviceProvider, arguments: null);
             return grain;
         }
+
+        /// <inheritdoc />
+        public virtual void Release(IGrainActivationContext context, object grain)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (grain == null)
+            {
+                throw new ArgumentNullException(nameof(grain));
+            }
+
+            var disposable = grain as IDisposable;
+            if (disposable != null)
+            {
+                disposable.Dispose();
+            }
+        }
     }
 }
