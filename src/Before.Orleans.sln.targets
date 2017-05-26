@@ -7,7 +7,7 @@
 	</PropertyGroup>
 
 	<Target Name="RestorePackages" BeforeTargets="Build" DependsOnTargets="DownloadNuGet">
-		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot; -Verbosity detailed -MSBuildVersion 14.0 -NoCache -DirectDownload" />
+		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot;" />
 	</Target>
 
         <PropertyGroup>
