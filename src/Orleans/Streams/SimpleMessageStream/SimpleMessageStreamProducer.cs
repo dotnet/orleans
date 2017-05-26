@@ -96,9 +96,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
             if (!connectedToRendezvous)
             {
-                // In order to avoid potential concurrency errors, synchronously copy the input before yielding the
-                // thread. DeliverItem below must also be take care to avoid yielding before copying for non-immutable objects.
-                item = (T)this.serializationManager.DeepCopy(item);
+                if (!this.optimizeForImmutableData)
+                {
+                    // In order to avoid potential concurrency errors, synchronously copy the input before yielding the
+                    // thread. DeliverItem below must also be take care to avoid yielding before copying for non-immutable objects.
+                    item = (T) this.serializationManager.DeepCopy(item);
+                }
+
                 await ConnectToRendezvous();
             }
 
