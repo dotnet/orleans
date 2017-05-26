@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
     <Title>Microsoft Orleans ServiceBus Utilities</Title>
     <Description>
@@ -9,17 +8,11 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansServiceBus</AssemblyName>
     <RootNamespace>OrleansServiceBus</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAzure.ConfigurationManager" Version="3.1.0" />
     <PackageReference Include="WindowsAzure.ServiceBus" Version="3.3.2" />

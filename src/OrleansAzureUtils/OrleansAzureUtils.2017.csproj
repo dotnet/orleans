@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
     <Title>Microsoft Orleans Azure Utilities</Title>
     <Description>
@@ -9,20 +8,11 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <AssemblyName>OrleansAzureUtils</AssemblyName>
     <RootNamespace>OrleansAzureUtils</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="WindowsAzure.Storage" Version="7.0.0" />
   </ItemGroup>
@@ -40,8 +30,6 @@
   <PropertyGroup>
     <!-- Visual Studio or MsBuild .sln build -->
     <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
-    <!-- TFS build -->
-    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
   </PropertyGroup>
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
