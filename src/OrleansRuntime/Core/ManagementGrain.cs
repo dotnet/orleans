@@ -8,6 +8,9 @@ using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.Versions;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Management
 {
@@ -22,6 +25,8 @@ namespace Orleans.Runtime.Management
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly MembershipTableFactory membershipTableFactory;
+        private readonly GrainTypeManager grainTypeManager;
+        private readonly IVersionStore versionStore;
         private Logger logger;
 
         public ManagementGrain(
@@ -29,13 +34,17 @@ namespace Orleans.Runtime.Management
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
-            MembershipTableFactory membershipTableFactory)
+            MembershipTableFactory membershipTableFactory, 
+            GrainTypeManager grainTypeManager, 
+            IVersionStore versionStore)
         {
             this.globalConfig = globalConfig;
             this.multiClusterOracle = multiClusterOracle;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.membershipTableFactory = membershipTableFactory;
+            this.grainTypeManager = grainTypeManager;
+            this.versionStore = versionStore;
         }
 
         public override Task OnActivateAsync()
@@ -255,6 +264,36 @@ namespace Orleans.Runtime.Management
 
         }
 
+        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        {
+            await SetStrategy(
+                store => store.SetCompatibilityStrategy(strategy),
+                siloControl => siloControl.SetCompatibilityStrategy(strategy));
+        }
+
+        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        {
+            await SetStrategy(
+                store => store.SetSelectorStrategy(strategy),
+                siloControl => siloControl.SetSelectorStrategy(strategy));
+        }
+
+        public async Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        {
+            CheckIfIsExistingInterface(interfaceId);
+            await SetStrategy(
+                store => store.SetCompatibilityStrategy(interfaceId, strategy),
+                siloControl => siloControl.SetCompatibilityStrategy(interfaceId, strategy));
+        }
+
+        public async Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        {
+            CheckIfIsExistingInterface(interfaceId);
+            await SetStrategy(
+                store => store.SetSelectorStrategy(interfaceId, strategy),
+                siloControl => siloControl.SetSelectorStrategy(interfaceId, strategy));
+        }
+
         public async Task<int> GetTotalActivationCount()
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
@@ -275,6 +314,34 @@ namespace Orleans.Runtime.Management
         {
             return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
+        }
+
+        private void CheckIfIsExistingInterface(int interfaceId)
+        {
+            Type unused;
+            var interfaceMap = this.grainTypeManager.ClusterGrainInterfaceMap;
+            if (!interfaceMap.TryGetServiceInterface(interfaceId, out unused))
+            {
+                throw new ArgumentException($"Interface code '{interfaceId} not found", nameof(interfaceId));
+            }
+        }
+
+        private async Task SetStrategy(Func<IVersionStore, Task> storeFunc, Func<ISiloControl, Task> applyFunc)
+        {
+            await storeFunc(versionStore);
+            var silos = GetSiloAddresses(null);
+            var actionPromises = PerformPerSiloAction(
+                silos,
+                s => applyFunc(GetSiloControlReference(s)));
+            try
+            {
+                await Task.WhenAll(actionPromises);
+            }
+            catch (Exception)
+            {
+                // ignored: silos that failed to set the new strategy will reload it from the storage
+                // in the futur.
+            }
         }
 
         private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)

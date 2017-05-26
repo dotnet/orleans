@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -18,6 +19,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
         private TimeSpan waitDelay;
         protected IClusterClient Client { get; private set; }
+        protected IManagementGrain ManagementGrain { get; private set; }
 #if DEBUG
         private const string BuildConfiguration = "Debug";
 #else
@@ -156,12 +158,14 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             options.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
             options.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
             options.ClientConfiguration.Gateways.RemoveAt(1); // Only use primary gw
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
 
             waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
 
             await StartSiloV1();
             Client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
             await Client.Connect();
+            ManagementGrain = Client.GetGrain<IManagementGrain>(0);
         }
 
         private async Task StartSiloV1()

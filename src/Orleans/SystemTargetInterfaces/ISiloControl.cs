@@ -6,7 +6,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
-    internal interface ISiloControl : ISystemTarget
+    internal interface ISiloControl : ISystemTarget, IVersionManagement
     {
         Task Ping(string message);
 

@@ -193,12 +193,15 @@
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Streams\Predicates\IStreamNamespacePredicate.cs" />
     <Compile Include="Streams\PubSub\StreamSubscriptionManagerExtensions.cs" />
+    <Compile Include="SystemTargetInterfaces\IVersionManagement.cs" />
     <Compile Include="Utils\CachedReadConcurrentDictionary.cs" />
     <Compile Include="Utils\Factory.cs" />
     <Compile Include="Utils\IKeyedServiceCollection.cs" />
     <Compile Include="Versions\Compatibility\AllVersionsCompatible.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatible.cs" />
+    <Compile Include="Versions\Compatibility\StrictVersionCompatible.cs" />
     <Compile Include="Versions\Compatibility\ICompatibilityDirector.cs" />
+    <Compile Include="Versions\IVersionStore.cs" />
     <Compile Include="Versions\Selector\AllCompatibleVersions.cs" />
     <Compile Include="Versions\Selector\LatestVersion.cs" />
     <Compile Include="Versions\Selector\MinimumVersion.cs" />

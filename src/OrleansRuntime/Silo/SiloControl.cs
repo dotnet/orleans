@@ -5,6 +5,11 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Versions;
+using Orleans.Runtime.Versions.Compatibility;
+using Orleans.Runtime.Versions.Selector;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 
 namespace Orleans.Runtime
@@ -17,13 +22,19 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloPerformanceMetrics siloMetrics;
+        private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
+        private readonly CompatibilityDirectorManager compatibilityDirectorManager;
+        private readonly VersionSelectorManager selectorManager;
 
         public SiloControl(
             Silo silo,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
             GrainTypeManager grainTypeManager,
-            ISiloPerformanceMetrics siloMetrics)
+            ISiloPerformanceMetrics siloMetrics, 
+            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CompatibilityDirectorManager compatibilityDirectorManager,
+            VersionSelectorManager selectorManager)
             : base(Constants.SiloControlId, silo.SiloAddress)
         {
             this.silo = silo;
@@ -31,6 +42,9 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             this.grainTypeManager = grainTypeManager;
             this.siloMetrics = siloMetrics;
+            this.cachedVersionSelectorManager = cachedVersionSelectorManager;
+            this.compatibilityDirectorManager = compatibilityDirectorManager;
+            this.selectorManager = selectorManager;
         }
 
         #region Implementation of ISiloControl
@@ -172,6 +186,34 @@ namespace Orleans.Runtime
         public Task<string[]> GetGrainTypeList()
         {
             return Task.FromResult(this.grainTypeManager.GetGrainTypeList());
+        }
+
+        public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        {
+            this.compatibilityDirectorManager.SetStrategy(strategy);
+            this.cachedVersionSelectorManager.ResetCache();
+            return Task.CompletedTask;
+        }
+
+        public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        {
+            this.selectorManager.SetSelector(strategy);
+            this.cachedVersionSelectorManager.ResetCache();
+            return Task.CompletedTask;
+        }
+
+        public Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        {
+            this.compatibilityDirectorManager.SetStrategy(interfaceId, strategy);
+            this.cachedVersionSelectorManager.ResetCache();
+            return Task.CompletedTask;
+        }
+
+        public Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        {
+            this.selectorManager.SetSelector(interfaceId, strategy);
+            this.cachedVersionSelectorManager.ResetCache();
+            return Task.CompletedTask;
         }
 
         #endregion
