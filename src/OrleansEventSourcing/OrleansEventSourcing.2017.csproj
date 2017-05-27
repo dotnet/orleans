@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.EventSourcing</PackageId>
     <Title>Microsoft Orleans Event-Sourcing</Title>
     <Description>
@@ -8,10 +9,16 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansEventSourcing</AssemblyName>
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>

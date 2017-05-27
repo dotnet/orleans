@@ -3,8 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.CodeGeneration;
 
-#if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
-
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -19,12 +17,9 @@ using Orleans.CodeGeneration;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("6fac9056-5fb2-44ef-a3ba-63aa58f09428")]
-
-#endif
-
+[assembly: SkipCodeGeneration]
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: SkipCodeGeneration]

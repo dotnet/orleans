@@ -78,7 +78,6 @@
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="project.json" />
     <None Include="Tester.SQLUtils.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

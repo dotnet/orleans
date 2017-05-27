@@ -67,8 +67,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command="&quot;$(CodeGenToolExe)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
-      <Output TaskParameter="Outputs" ItemName="Compile" />
-      <Output TaskParameter="Outputs" ItemName="FileWrites" />
+       <Output TaskParameter="Outputs" ItemName="Compile" />
+       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
   </Target>
 </Project>

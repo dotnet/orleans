@@ -9,7 +9,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <!-- Work out the path to ClientGenerator.exe -->
   <Choose>
     <!-- Using Orleans NuGet packages -->
-    <When Condition="Exists('$(MSBuildThisFileDirectory)..\tools\ClientGenerator.exe')">
+    <When Condition="Exists('$(MSBuildThisFileDirectory)..\tools')">
       <PropertyGroup>
         <CodeGenToolExeDir>$(MSBuildThisFileDirectory)..\tools</CodeGenToolExeDir>
       </PropertyGroup>

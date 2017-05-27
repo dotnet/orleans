@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Performance Counters</Title>
     <Description>
@@ -8,10 +9,16 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansTelemetryConsumers.Counters</AssemblyName>
     <RootNamespace>OrleansTelemetryConsumers.Counters</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Configuration.Install" />
   </ItemGroup>

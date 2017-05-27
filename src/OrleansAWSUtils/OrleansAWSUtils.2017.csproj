@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansAWSUtils</PackageId>
     <Title>Microsoft Orleans AWS Utilities</Title>
     <Description>
@@ -8,11 +9,17 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansAWSUtils</AssemblyName>
     <RootNamespace>OrleansAWSUtils</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.1.5.2" />
     <PackageReference Include="AWSSDK.SQS" Version="3.1.0.9" />
