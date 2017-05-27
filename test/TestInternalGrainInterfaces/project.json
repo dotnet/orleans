@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "FSharp.Core": "4.1.17"
+    "FSharp.Core": "4.0.0.1"
   },
   "frameworks": {
     "net461": {}

@@ -2,8 +2,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Orleans.CodeGeneration;
 
-#if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
-
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -18,7 +16,4 @@ using Orleans.CodeGeneration;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("99a8e011-3a30-423a-9f67-d1349fd8b1cd")]
-
-#endif
-
 [assembly: SkipCodeGeneration]

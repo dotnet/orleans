@@ -3,8 +3,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-#if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
-
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -21,11 +19,9 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("47e9ae37-4eae-48d5-a778-2c80e9a6375f")]
-
-#endif
-
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
 [assembly: SkipCodeGeneration]
+

@@ -1,11 +1,5 @@
 <Project>
-  <PropertyGroup>
-    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
-  </PropertyGroup>
-
-  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
-
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);EXCLUDEFSHARP</DefineConstants>
   </PropertyGroup>
 </Project>

@@ -1,6 +1,4 @@
-﻿#if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
-
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
@@ -17,5 +15,3 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("29F44309-65C6-4D22-BD45-CD6E21845446")]
-
-#endif

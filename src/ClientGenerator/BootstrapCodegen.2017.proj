@@ -11,9 +11,7 @@
       Bootstrap=true;
       OutputPath=$(BootstrapOutputPath);
       IntermediateOutputPath=$(BootstrapOutputPath)obj\;
-      DefineConstants=$(ExcludeCodegenConstants);
-      IsPackable=false;
-      GeneratePackageOnBuild=false;
+      DefineConstants=$(ExcludeCodegenConstants)
     </MsBuildProperties>
   </PropertyGroup>
   <Target Name="Build">
