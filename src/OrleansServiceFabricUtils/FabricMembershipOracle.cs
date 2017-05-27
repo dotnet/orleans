@@ -96,7 +96,8 @@ namespace Microsoft.Orleans.ServiceFabric
 
                 // Take all the active silos if their count does not exceed the desired number of gateways
                 var maxSize = this.globalConfig.MaxMultiClusterGateways;
-                result = new List<SiloAddress>(this.silos.Keys);
+                var gateways = this.silos.Where(entry => entry.Value.Status == SiloStatus.Active).Select(entry => entry.Key);
+                result = new List<SiloAddress>(gateways);
 
                 // Restrict the length to the maximum size.
                 if (result.Count > maxSize)
@@ -283,8 +284,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <param name="partitions">The updated set of partitions.</param>
         public void OnUpdate(FabricSiloInfo[] partitions)
         {
-            var added = default(HashSet<SiloAddress>);
-            var removed = default(HashSet<SiloAddress>);
+            var changes = default(List<Tuple<SiloAddress, SiloStatus>>);
             lock (this.updateLock)
             {
                 foreach (var updatedSilo in partitions)
@@ -292,74 +292,63 @@ namespace Microsoft.Orleans.ServiceFabric
                     // Update the silo if it was not previously seen or if the existing entry's status
                     // does not match the updated status.
                     SiloEntry existing;
-                    if (!this.silos.TryGetValue(updatedSilo.SiloAddress, out existing))
+                    if (this.silos.TryGetValue(updatedSilo.SiloAddress, out existing))
+                    {
+                        // Mark the existing silo as being refreshed.
+                        existing.Refreshed = true;
+
+                        if (existing.Status != SiloStatus.Active)
+                        {
+                            this.log.Error(
+                                (int) ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
+                                $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Address: {updatedSilo.SiloAddress}");
+                        }
+                    }
+                    else
                     {
                         // Add the new silo.
-                        if (added == null) added = new HashSet<SiloAddress>();
-                        added.Add(updatedSilo.SiloAddress);
+                        if (changes == null) changes = new List<Tuple<SiloAddress, SiloStatus>>();
+                        changes.Add(Tuple.Create(updatedSilo.SiloAddress, SiloStatus.Active));
                         this.silos[updatedSilo.SiloAddress] = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
                         {
                             Refreshed = true
                         };
                     }
-                    else
-                    {
-                        // Mark the existing silo as being refreshed.
-                        existing.Refreshed = true;
-                    }
                 }
 
-                // Identify removed silos.
+                // Identify newly dead silos and reset all refresh flags.
                 foreach (var silo in this.silos)
                 {
-                    // Never remove self.
+                    // The local silo never dies by this mechanism.
                     if (silo.Key.Equals(this.SiloAddress)) continue;
 
-                    // Do not remove silos which were present in the update.
-                    if (silo.Value.Refreshed)
+                    // Silos which were not included in the update must be dead.
+                    if (!silo.Value.Refreshed)
                     {
-                        // Reset the refresh flag.
-                        silo.Value.Refreshed = false;
-                        continue;
+                        // Mark the silo as dead and record it so that we can notify subscribers.
+                        silo.Value.Status = SiloStatus.Dead;
+                        if (changes == null) changes = new List<Tuple<SiloAddress, SiloStatus>>();
+                        changes.Add(Tuple.Create(silo.Key, SiloStatus.Dead));
                     }
 
-                    // The silo was not present in the update, remove it.
-                    if (removed == null) removed = new HashSet<SiloAddress>();
-                    removed.Add(silo.Key);
-                }
-
-                // If any silos were removed, 
-                if (removed != null)
-                {
-                    foreach (var silo in removed)
-                    {
-                        this.silos.Remove(silo);
-                    }
+                    // Reset the refresh flag.
+                    silo.Value.Refreshed = false;
                 }
             }
 
             // If anything was updated, clear the cache before notifying clients.
-            if (added != null || removed != null)
+            if (changes != null)
             {
                 // Clear the caches.
                 this.ClearCaches();
 
                 // If any silos were added or removed, notify subscribers of the new status.
                 var siloStatusListeners = this.subscribers.Values.ToList();
-                if (added != null)
+                foreach (var change in changes)
                 {
-                    foreach (var address in added)
-                    {
-                        this.NotifySubscribers(address, SiloStatus.Active, siloStatusListeners);
-                    }
-                }
-
-                if (removed != null)
-                {
-                    foreach (var address in removed)
-                    {
-                        this.NotifySubscribers(address, SiloStatus.Dead, siloStatusListeners);
-                    }
+                    var silo = change.Item1;
+                    var status = change.Item2;
+                    this.NotifySubscribers(silo, status, siloStatusListeners);
                 }
             }
         }
@@ -458,7 +447,8 @@ namespace Microsoft.Orleans.ServiceFabric
                 this.Name = name;
             }
 
-            public SiloStatus Status { get; }
+            public SiloStatus Status { get; set; }
+
             public string Name { get; }
 
             /// <summary>

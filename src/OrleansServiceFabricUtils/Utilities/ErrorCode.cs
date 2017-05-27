@@ -13,5 +13,6 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
         ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions = ServiceFabricBase + 4,
         ServiceFabric_Resolver_PartitionNotFound = ServiceFabricBase + 5,
         ServiceFabric_Resolver_PartitionResolutionException = ServiceFabricBase + 6,
+        ServiceFabric_MembershipOracle_EncounteredUndeadSilo = ServiceFabricBase + 7,
     }
 }
