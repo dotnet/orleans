@@ -47,11 +47,6 @@ namespace Orleans.Providers.Streams.Common
         public IObjectPool<T> Pool { set { pool = value; } }
 
         /// <summary>
-        /// Pooled resource size
-        /// </summary>
-        public virtual int SizeInByte { get {return Marshal.SizeOf(this);} }
-
-        /// <summary>
         /// If this object is to be used in a fixed size object pool, this call should be
         ///   overridden with the purge implementation that returns the object to the pool.
         /// </summary>

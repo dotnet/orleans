@@ -61,7 +61,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="count">Messages read.</param>
         /// <param name="oldest"></param>
         /// <param name="newest"></param>
-        public void TrackMessagesRecieved(long count, TimeSpan? oldest, TimeSpan? newest)
+        public void TrackMessagesReceived(long count, TimeSpan? oldest, TimeSpan? newest)
         {
             logger.TrackMetric("MessagesRecieved", count, this.logProperties);
             if(oldest.HasValue)

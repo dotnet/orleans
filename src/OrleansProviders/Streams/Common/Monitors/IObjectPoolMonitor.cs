@@ -15,14 +15,14 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Track every time cache allocate memory from block pool
         /// </summary>
-        /// <param name="memoryInByte"></param>
-        void TrackMemroyAllocatedByCache(int memoryInByte);
+        /// <param name="blockCount"></param>
+        void TrackObjectAllocatedByCache(int blockCount);
 
         /// <summary>
         /// Track every time cache release memory back to block pool
         /// </summary>
-        /// <param name="memoryInByte"></param>
-        void TrackMemoryReleasedFromCache(int memoryInByte);
+        /// <param name="blockCount"></param>
+        void TrackObjectReleasedFromCache(int blockCount);
 
         #endregion
 
@@ -31,10 +31,10 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Periodically report block pool status
         /// </summary>
-        /// <param name="objectPoolSizeInByte">Total size of block pool</param>
-        /// <param name="freeMemoryInByte">Free memory in block pool which is available for cache to allocate</param>
-        /// <param name="claimedMemoryInByte">Memory claimed by cache in this block pool</param>
-        void Report(long objectPoolSizeInByte, long freeMemoryInByte, long claimedMemoryInByte);
+        /// <param name="totalBlocks">Total size of block pool</param>
+        /// <param name="freeBlocks">Free memory in block pool which is available for cache to allocate</param>
+        /// <param name="claimedBlocks">Memory claimed by cache in this block pool</param>
+        void Report(long totalBlocks, long freeBlocks, long claimedBlocks);
 
         #endregion
     }

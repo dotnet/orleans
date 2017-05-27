@@ -9,6 +9,9 @@ using Orleans.ServiceBus.Providers;
 
 namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
 {
+    /// <summary>
+    /// Default monitor for Object pool used by EventHubStreamProvider
+    /// </summary>
     public class DefaultEventHubObjectPoolMonitor : IObjectPoolMonitor
     {
         private Logger logger;
@@ -30,23 +33,23 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void Report(long objectPoolSizeInByte, long freeMemoryInByte, long claimedMemoryInByte)
+        public void Report(long totalBlocks, long freeBlocks, long claimedBlocks)
         {
-            this.logger.TrackMetric("PoolSizeInByte", objectPoolSizeInByte, this.logProperties);
-            this.logger.TrackMetric("PoolFreeMemroyInByte", freeMemoryInByte, this.logProperties);
-            this.logger.TrackMetric("PoolClaimedMemoryInByte", claimedMemoryInByte, this.logProperties);
+            this.logger.TrackMetric("TotalBlocks", totalBlocks, this.logProperties);
+            this.logger.TrackMetric("FreeBlocks", freeBlocks, this.logProperties);
+            this.logger.TrackMetric("ClaimedBlocks", claimedBlocks, this.logProperties);
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackMemoryReleasedFromCache(int memoryInByte)
+        public void TrackObjectReleasedFromCache(int blockCount)
         {
-            this.logger.TrackMetric("MemoryReleasedInByte", memoryInByte, this.logProperties);
+            this.logger.TrackMetric("BlockReleasedCount", blockCount, this.logProperties);
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackMemroyAllocatedByCache(int memoryInByte)
+        public void TrackObjectAllocatedByCache(int blockCount)
         {
-            this.logger.TrackMetric("MemoryAllocatedInByte", memoryInByte, this.logProperties);
+            this.logger.TrackMetric("BlockAllocatedCount", blockCount, this.logProperties);
         }
     }
 }

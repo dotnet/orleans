@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.ServiceBus.Providers
@@ -46,8 +47,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheMonitor = cacheMonitor;
             if (cacheMonitor != null && monitorWriteInterval.HasValue)
             {
-                var safeTimer = new SafeTimer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
-                safeTimer.Start(monitorWriteInterval.Value, monitorWriteInterval.Value);
+                var safeTimer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
             }
             this.cacheSizeInByte = 0;
         }

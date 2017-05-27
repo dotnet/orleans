@@ -30,7 +30,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="count">Messages read.</param>
         /// <param name="oldest">The difference between now utc on host and the eventhub enqueue time of the oldest message in a set of messages read.</param>
         /// <param name="newest">The difference between now utc on host and the eventhub enqueue time of the newest message in a set of messages read.</param>
-        void TrackMessagesRecieved(long count, TimeSpan? oldest, TimeSpan? newest);
+        void TrackMessagesReceived(long count, TimeSpan? oldest, TimeSpan? newest);
 
         /// <summary>
         /// Track attempts to shutdown the receiver.

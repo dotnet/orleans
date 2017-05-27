@@ -11,7 +11,10 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly byte[] buffer;
         private int count;
-        private readonly int blockSize;
+        /// <summary>
+        /// Buffer size in Byte
+        /// </summary>
+        public readonly int SizeInByte;
         private Action<IDisposable> purgeAction;
 
         /// <summary>
@@ -20,25 +23,18 @@ namespace Orleans.Providers.Streams.Common
         public object Id => buffer;
 
         /// <summary>
-        /// Size of the FixedSizeBuffer
-        /// </summary>
-        public override int SizeInByte {
-            get { return this.blockSize; }
-        }
-
-        /// <summary>
         /// Manages access to a fixed size byte buffer.
         /// </summary>
         /// <param name="blockSizeInByte"></param>
         public FixedSizeBuffer(int blockSizeInByte)
         {
-            if (blockSize < 0)
+            if (blockSizeInByte < 0)
             {
                 throw new ArgumentOutOfRangeException("blockSize", "blockSize must be positive value.");
             }
             count = 0;
-            this.blockSize = blockSizeInByte;
-            buffer = new byte[blockSize];
+            this.SizeInByte = blockSizeInByte;
+            buffer = new byte[this.SizeInByte];
         }
 
         /// <summary>
@@ -70,7 +66,7 @@ namespace Orleans.Providers.Streams.Common
         public bool TryGetSegment(int size, out ArraySegment<byte> value)
         {
             value = default(ArraySegment<byte>);
-            if (size > blockSize - count)
+            if (size > this.SizeInByte - count)
             {
                 return false;
             }

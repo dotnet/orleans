@@ -15,8 +15,7 @@ namespace Orleans.Providers.Streams.Common
         private const int DefaultPoolCapacity = 1 << 10; // 1k
         private readonly Stack<T> pool;
         private readonly Func<T> factoryFunc;
-        private long totalMemoryInByte;
-        private long freeMemoryInByte;
+        private long totalBlocks;
         /// <summary>
         /// monitor to report statistics for current object pool
         /// </summary>
@@ -53,8 +52,7 @@ namespace Orleans.Providers.Streams.Common
                 var safeTimer = new SafeTimer(this.ReportObjectPoolStatistics, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
                 safeTimer.Start(monitorWriteInterval.Value, monitorWriteInterval.Value);
             }
-            this.totalMemoryInByte = 0;
-            this.freeMemoryInByte = 0;
+            this.totalBlocks = 0;
         }
 
         /// <summary>
@@ -67,14 +65,13 @@ namespace Orleans.Providers.Streams.Common
             if (pool.Count != 0)
             {
                 resource = pool.Pop();
-                this.freeMemoryInByte -= resource.SizeInByte;
             }
             else
             {
                 resource = factoryFunc();
-                this.totalMemoryInByte += resource.SizeInByte;
+                this.totalBlocks++;
             }
-            this.monitor?.TrackMemroyAllocatedByCache(resource.SizeInByte);
+            this.monitor?.TrackObjectAllocatedByCache(1);
             resource.Pool = this;
             return resource;
         }
@@ -85,15 +82,15 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="resource"></param>
         public virtual void Free(T resource)
         {
-            this.monitor?.TrackMemoryReleasedFromCache(resource.SizeInByte);
-            this.freeMemoryInByte += resource.SizeInByte;
+            this.monitor?.TrackObjectReleasedFromCache(1);
             pool.Push(resource);
         }
 
         private void ReportObjectPoolStatistics(object state)
         {
-            long claimedMemoryInByte = this.totalMemoryInByte - this.freeMemoryInByte;
-            this.monitor.Report(this.totalMemoryInByte, freeMemoryInByte, claimedMemoryInByte);
+            var freeBlocks = this.pool.Count;
+            long claimedBlocks = this.totalBlocks - freeBlocks;
+            this.monitor.Report(this.totalBlocks, freeBlocks, claimedBlocks);
         }
     }
 }
