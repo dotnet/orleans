@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -99,6 +100,33 @@ namespace DefaultCluster.Tests.General
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
+        }
+
+        [Fact, TestCategory("Serialization"), TestCategory("JSON")]
+        public async Task GrainReference_Json_Serialization_Nested()
+        {
+            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(HostedCluster.SerializationManager, HostedCluster.GrainFactory);
+            
+            var grain = HostedCluster.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId());
+            await grain.SetA(56820);
+            var input = new GenericGrainReferenceHolder
+            {
+                Reference = grain
+            };
+
+            var json = JsonConvert.SerializeObject(input, settings);
+            var output = JsonConvert.DeserializeObject<GenericGrainReferenceHolder>(json, settings);
+
+            Assert.Equal(input.Reference, output.Reference);
+            var reference = output.Reference.Cast<ISimpleGrain>();
+            Assert.Equal(56820, await reference.GetA());
+        }
+
+        [Serializable]
+        public class GenericGrainReferenceHolder
+        {
+            [JsonProperty]
+            public ISimpleGrain Reference { get; set; }
         }
 
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
@@ -219,13 +247,8 @@ namespace DefaultCluster.Tests.General
         {
             var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(this.HostedCluster.SerializationManager, this.GrainFactory);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj, settings);
-            object other = Newtonsoft.Json.JsonConvert.DeserializeObject(json, obj.GetType(), settings);
-#if NETSTANDARD_TODO
-                // On .NET Standard, currently we need to manually fixup grain references.
-                var otherAsRef = other as Orleans.Runtime.GrainReference;
-                if (otherAsRef != null) this.GrainFactory.BindGrainReference(otherAsRef);
-#endif
+            string json = JsonConvert.SerializeObject(obj, settings);
+            object other = JsonConvert.DeserializeObject(json, settings);
             return (T)other;
         }
     }
