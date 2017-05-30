@@ -95,7 +95,7 @@ set PROJ=%CMDHOME%\Orleans.sln
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -104,7 +104,7 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -120,7 +120,7 @@ set OutDir=%OutDir%\VSIX
 
 REM Disable CS2008 sine we've no source files in the template projects.
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%" /nowarn:CS2008
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%" /nowarn:CS2008
 
 @if ERRORLEVEL 1 GOTO :ErrorStop
 
