@@ -243,7 +243,6 @@ namespace Orleans.Runtime
             services.AddFromExisting<IMessageCenter, MessageCenter>();
             services.AddFromExisting<ISiloMessageCenter, MessageCenter>();
             services.AddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
-            services.AddSingleton<Catalog>();
             services.AddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.AddSingleton<InsideRuntimeClient>();
             services.AddFromExisting<IRuntimeClient, InsideRuntimeClient>();
@@ -297,7 +296,12 @@ namespace Orleans.Runtime
             services.AddSingleton<CachedVersionSelectorManager>();
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
+
+            // Grain activation
+            services.AddSingleton<Catalog>();
             services.AddSingleton<GrainCreator>();
+            services.AddSingleton<IGrainActivator, DefaultGrainActivator>();
+
             services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
             {

@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -36,7 +35,7 @@ namespace UnitTests.General
         public async Task CanGetGrainWithInjectedDependencies()
         {
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
-            long ignored = await grain.GetTicksFromService();
+            long ignored = await grain.GetLongValue();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -76,26 +75,27 @@ namespace UnitTests.General
         public async Task CannotGetExplictlyRegisteredGrain()
         {
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
-            var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetTicksFromService());
+            var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
             Assert.Contains("Error creating activation for", exception.Message);
             Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
         }
-    }
 
-    public class TestStartup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public class TestStartup
         {
-            services.AddSingleton<IInjectedService, InjectedService>();
+            public IServiceProvider ConfigureServices(IServiceCollection services)
+            {
+                services.AddSingleton<IInjectedService, InjectedService>();
 
-            // explicitly register a grain class to assert that it will NOT use the registration, 
-            // as by design this is not supported.
-            services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
-                sp => new ExplicitlyRegisteredSimpleDIGrain(
-                    sp.GetRequiredService<IInjectedService>(),
-                    "some value"));
+                // explicitly register a grain class to assert that it will NOT use the registration, 
+                // as by design this is not supported.
+                services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
+                    sp => new ExplicitlyRegisteredSimpleDIGrain(
+                        sp.GetRequiredService<IInjectedService>(),
+                        "some value",
+                        5));
 
-            return services.BuildServiceProvider();
+                return services.BuildServiceProvider();
+            }
         }
     }
 }

@@ -25,7 +25,7 @@ namespace UnitTests.Grains
             this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out set);
         }
 
-        public Task<long> GetTicksFromService()
+        public Task<long> GetLongValue()
         {
             return injectedService.GetTicks();
         }
@@ -39,27 +39,40 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(this.grainFactoryId);
         }
+        public Task DoDeactivate()
+        {
+            this.DeactivateOnIdle();
+            return Task.CompletedTask;
+        }
     }
 
     public class ExplicitlyRegisteredSimpleDIGrain : Grain, ISimpleDIGrain
     {
         private readonly IInjectedService injectedService;
-        private string someValueThatIsNotRegistered;
+        private readonly string someValueThatIsNotRegistered;
+        private readonly int numberOfReleasedInstancesBeforeThisActivation;
 
-        public ExplicitlyRegisteredSimpleDIGrain(IInjectedService injectedService, string someValueThatIsNotRegistered)
+        public ExplicitlyRegisteredSimpleDIGrain(IInjectedService injectedService, string someValueThatIsNotRegistered, int numberOfReleasedInstancesBeforeThisActivation)
         {
             this.injectedService = injectedService;
             this.someValueThatIsNotRegistered = someValueThatIsNotRegistered;
+            this.numberOfReleasedInstancesBeforeThisActivation = numberOfReleasedInstancesBeforeThisActivation;
         }
 
-        public Task<long> GetTicksFromService()
+        public Task<long> GetLongValue()
         {
-            return injectedService.GetTicks();
+            return Task.FromResult((long)numberOfReleasedInstancesBeforeThisActivation);
         }
 
         public Task<string> GetStringValue()
         {
            return Task.FromResult(this.someValueThatIsNotRegistered);
+        }
+
+        public Task DoDeactivate()
+        {
+            this.DeactivateOnIdle();
+            return Task.CompletedTask;
         }
     }
 
