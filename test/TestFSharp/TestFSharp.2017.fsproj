@@ -1,0 +1,27 @@
+﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>TestFSharp</AssemblyName>
+    <RootNamespace>TestFSharp</RootNamespace>
+    <ProjectGuid>{8a652779-85ef-48e2-a639-1eed3ce2c39c}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Grains.fs" />
+    <PackageReference Include="FSharp.Core" Version="4.1.17" />
+    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj">
+      <Name>TestFSharpInterfaces.2017</Name>
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj">
+      <Name>TestGrainInterfaces.2017</Name>
+      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

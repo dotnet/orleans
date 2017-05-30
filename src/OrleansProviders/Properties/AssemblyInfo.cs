@@ -5,6 +5,8 @@ using Orleans.CodeGeneration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 
+#if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
+
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -19,6 +21,8 @@ using Orleans.Providers.Streams.Generator;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("781624d3-58fb-4196-8529-ce7d0fa5c466")]
+
+#endif
 
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]

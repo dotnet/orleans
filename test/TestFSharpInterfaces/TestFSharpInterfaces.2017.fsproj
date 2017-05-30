@@ -1,0 +1,17 @@
+﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>TestFSharpInterfaces</AssemblyName>
+    <RootNamespace>TestFSharpInterfaces</RootNamespace>
+    <ProjectGuid>{a4f61392-36a3-457c-80d0-9cdc48f5922f}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="IFSharpBaseInterface.fs" />
+    <Compile Include="IFSharpParameters.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="4.1.17" />
+    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

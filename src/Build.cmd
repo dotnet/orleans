@@ -5,7 +5,7 @@ SET CMDHOME=%~dp0.
 
 @REM Locate VS 2017 with the proper method
 
-SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.55/vswhere.exe
+SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.62/vswhere.exe
 SET VSWHERE_LOCAL_DIR=%CMDHOME%\Tools
 SET VSWHERE_LOCAL_PATH=%VSWHERE_LOCAL_DIR%\vswhere.exe
 
@@ -95,7 +95,7 @@ set PROJ=%CMDHOME%\Orleans.sln
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -104,7 +104,7 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -120,7 +120,7 @@ set OutDir=%OutDir%\VSIX
 
 REM Disable CS2008 sine we've no source files in the template projects.
 
-%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%" /nowarn:CS2008
+%MSBUILDEXE% /nr:False /m /p:Configuration=%CONFIGURATION%;ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false "%PROJ%" /nowarn:CS2008
 
 @if ERRORLEVEL 1 GOTO :ErrorStop
 

@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansPSUtils</PackageId>
     <Title>Microsoft Orleans PowerShell Utilities</Title>
     <Description>
@@ -9,11 +8,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-    <NoWarn>1591</NoWarn>
     <AssemblyName>OrleansPSUtils</AssemblyName>
     <RootNamespace>OrleansPSUtils</RootNamespace>
   </PropertyGroup>
@@ -23,9 +19,6 @@
   <PropertyGroup Condition="'$(OutDir)' == ''">
     <OutDir>bin\$(Configuration)\$(TargetFramework)\Orleans\</OutDir>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.0.0" />
   </ItemGroup>
