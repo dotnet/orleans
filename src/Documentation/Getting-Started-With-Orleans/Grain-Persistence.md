@@ -117,7 +117,7 @@ Check with your database vendor for their latest supported ADO.NET provider.
 
 
 ```xml
-<Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore" DataConnectionString="Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;" />
+<Provider Type="Orleans.Storage.AdoNetStorageProvider" Name="SqlStore" DataConnectionString="Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;" />
 ```
 
 * __`DataConnectionString="..."`__ (mandatory) - The SQL connection string to use.
