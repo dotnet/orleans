@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
+using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -49,8 +50,7 @@ namespace Orleans.Providers.Streams.Common
 
             if (this.monitor != null && monitorWriteInterval.HasValue)
             {
-                var safeTimer = new SafeTimer(this.ReportObjectPoolStatistics, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
-                safeTimer.Start(monitorWriteInterval.Value, monitorWriteInterval.Value);
+                var timer = new Timer(this.ReportObjectPoolStatistics, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
             }
             this.totalBlocks = 0;
         }

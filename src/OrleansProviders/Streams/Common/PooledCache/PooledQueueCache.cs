@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.Runtime;
 using Orleans.Streams;
+using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -99,8 +100,7 @@ namespace Orleans.Providers.Streams.Common
 
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
             {
-                var safeTimer = new SafeTimer(this.ReportCacheMessageStatistics, null, cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
-                safeTimer.Start(cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
+                var timer = new Timer(this.ReportCacheMessageStatistics, null, cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
             }
            
         }

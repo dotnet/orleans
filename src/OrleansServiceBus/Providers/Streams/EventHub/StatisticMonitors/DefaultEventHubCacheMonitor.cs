@@ -33,6 +33,16 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
+        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure)
+        {
+            logger.TrackMetric($"{pressureMonitorType}-UnderPressure", underPressure ? 1 : 0, this.logProperties);
+            if(cachePressureContributionCount.HasValue)
+                logger.TrackMetric($"{pressureMonitorType}-PressureContributionCount", cachePressureContributionCount.Value, this.logProperties);
+            if(currentPressure.HasValue)
+                logger.TrackMetric($"{pressureMonitorType}-CurrentPressure", currentPressure.Value, this.logProperties);
+        }
+
+        /// <inheritdoc cref="ICacheMonitor"/>
         public void ReportCacheSize(long totalCacheSizeInByte)
         {
             logger.TrackMetric("TotalCacheSizeInByte", totalCacheSizeInByte, this.logProperties);

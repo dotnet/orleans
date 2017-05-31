@@ -33,6 +33,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="globalConfig"></param>
         /// <param name="nodeConfig"></param>
+        /// <param name="ehHubPath"></param>
         public EventHubMonitorAggregationDimentions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig, string ehHubPath)
         {
             this.GlobalConfig = globalConfig;

@@ -13,7 +13,7 @@ using Orleans.Runtime.Configuration;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
-    internal class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
+    public class EHStreamProviderWithCreatedCacheList : PersistentStreamProvider<EHStreamProviderWithCreatedCacheList.AdapterFactory>
     {
         public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
@@ -26,13 +26,11 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                var globalConfig = this.serviceProvider
-                    .GetRequiredService<Func<GlobalConfiguration>>().Invoke();
-                var nodeConfig = this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>()
-                    .Invoke();
+                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
+                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
                 var eventHubPath = hubSettings.Path;
                 var sharedDimentions = new EventHubMonitorAggregationDimentions(globalConfig, nodeConfig, eventHubPath);
-                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches, sharedDimentions);
+                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches, sharedDimentions, this.CacheMonitorFactory, this.ObjectPoolMonitorFactory);
             }
 
             private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -40,8 +38,10 @@ namespace ServiceBus.Tests.TestStreamProviders
                 private readonly List<IEventHubQueueCache> caches;
 
                 public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
-                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimentions sharedDimentions)
-                    : base(providerSettings, serializationManager, sharedDimentions)
+                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimentions sharedDimentions,
+                    Func<EventHubCacheMonitorDimentions, Logger, ICacheMonitor> cacheMonitorFactory = null,
+                    Func<EventHubObjectPoolMonitorDimentions, Logger, IObjectPoolMonitor> objectPoolMonitorFactory = null)
+                    : base(providerSettings, serializationManager, sharedDimentions, cacheMonitorFactory, objectPoolMonitorFactory)
                 {
                     this.caches = caches;
                 }
@@ -53,8 +53,9 @@ namespace ServiceBus.Tests.TestStreamProviders
                     var cacheMonitorDimentions = new EventHubCacheMonitorDimentions(sharedDimentions, partition, bufferPool.Id);
                     var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimentions, cacheLogger);
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
-                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), 
-                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, cacheMonitor, providerSettings.StatisticMonitorWriteInterval, timePurge));
+                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
+                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, cacheMonitor, providerSettings.StatisticMonitorWriteInterval, timePurge),
+                        cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
                     this.caches.Add(cache);
                     return cache;
                 }

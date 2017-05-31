@@ -28,7 +28,7 @@ namespace Orleans.ServiceBus.Providers
         /// Create a block pool monitor to report performance metrics.
         /// Factory funciton should return an IObjectPoolMonitor.
         /// </summary>
-        public Func<EventHubObjectPoolMonitorDimentions, Logger, IObjectPoolMonitor> ObjectPoolMonitorFacrtory { set; get; }
+        public Func<EventHubObjectPoolMonitorDimentions, Logger, IObjectPoolMonitor> ObjectPoolMonitorFactory { set; get; }
 
         /// <summary>
         /// Constructor for EventHubQueueCacheFactory
@@ -48,7 +48,7 @@ namespace Orleans.ServiceBus.Providers
             this.timePurge = new TimePurgePredicate(this.providerSettings.DataMinTimeInCache, this.providerSettings.DataMaxAgeInCache);
             this.sharedDimentions = sharedDimentions;
             this.CacheMonitorFactory = cacheMonitorFactory == null?(dimentions, logger) => new DefaultEventHubCacheMonitor(dimentions, logger) : cacheMonitorFactory;
-            this.ObjectPoolMonitorFacrtory = objectPoolMonitorFactory == null?(dimentions, logger) => new DefaultEventHubObjectPoolMonitor(dimentions, logger) : objectPoolMonitorFactory;
+            this.ObjectPoolMonitorFactory = objectPoolMonitorFactory == null?(dimentions, logger) => new DefaultEventHubObjectPoolMonitor(dimentions, logger) : objectPoolMonitorFactory;
         }
 
         /// <summary>
@@ -71,6 +71,8 @@ namespace Orleans.ServiceBus.Providers
         /// Function used to configure BufferPool for EventHubQueueCache. User can override this function to provide more customization on BufferPool creation
         /// </summary>
         /// <param name="providerSettings"></param>
+        /// <param name="logger"></param>
+        /// <param name="sharedDimentions"></param>
         /// <returns></returns>
         protected virtual IObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings, Logger logger, EventHubMonitorAggregationDimentions sharedDimentions)
         {
@@ -78,7 +80,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 var blockPoolId = $"BlockPool-{new Guid().ToString()}-BlockSize-{1<<20}";
                 var monitorDimentions = new EventHubObjectPoolMonitorDimentions(sharedDimentions, blockPoolId);
-                var blockPoolMonitor = this.ObjectPoolMonitorFacrtory(monitorDimentions, logger);
+                var blockPoolMonitor = this.ObjectPoolMonitorFactory(monitorDimentions, logger);
                 this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), blockPoolId,
                     providerSettings.CacheSizeMb,
                     blockPoolMonitor, providerSettings.StatisticMonitorWriteInterval);

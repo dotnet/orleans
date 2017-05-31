@@ -72,6 +72,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     internal class CachePressureInjectionMonitor : ICachePressureMonitor
     {
         public bool isUnderPressure { get; set; }
+        public ICacheMonitor CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
             this.isUnderPressure = false;

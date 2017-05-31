@@ -61,7 +61,7 @@ namespace Orleans.ServiceBus.Providers
             this.evictionStrategy.OnPurged = this.OnPurge;
             this.evictionStrategy.PurgeObservable = cache;
             cacheDataAdapter.OnBlockAllocated = this.evictionStrategy.OnBlockAllocated;
-            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger);
+            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, this.CacheMonitor);
         }
     
         /// <inheritdoc />
@@ -76,6 +76,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
+            monitor.CacheMonitor = this.CacheMonitor;
             this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 

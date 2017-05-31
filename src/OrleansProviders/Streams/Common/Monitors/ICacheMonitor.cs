@@ -14,6 +14,11 @@ namespace Orleans.Providers.Streams.Common
         #region Event driven metrics
 
         /// <summary>
+        /// Track cache pressure metrics when cache pressure monitor encounter a status change
+        /// </summary>
+        void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure);
+
+        /// <summary>
         /// Track message added to the cache, and newest and oldest messsges among them 
         /// </summary>
         /// <param name="messageAdded"></param>

@@ -166,8 +166,8 @@ namespace Orleans.ServiceBus.Providers
                     if (purgedBuffer == this.currentBuffer)
                         break;
                     this.purgedBuffers.Dequeue();
-                    purgedBuffer.Dispose();
                     releaseMemoryInByte += purgedBuffer.SizeInByte;
+                    purgedBuffer.Dispose();
                     if (purgedBuffer == purgeCandidate)
                         break;
                 }
