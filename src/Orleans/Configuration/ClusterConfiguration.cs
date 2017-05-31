@@ -419,58 +419,49 @@ namespace Orleans.Runtime.Configuration
 
         internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
-            var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+            var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
 
-            if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase) ||
-                addrOrHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-                addrOrHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+            // IF the address is an empty string, default to the local machine
+            if (string.IsNullOrEmpty(addrOrHost))
             {
-                return loopback;
+                addrOrHost = Dns.GetHostName();
             }
-            else if (addrOrHost == "0.0.0.0")
+
+            // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
+            IPAddress address;
+            if (IPAddress.TryParse(addrOrHost, out address))
             {
-                return IPAddress.Any;
+                return address;
             }
-            else
+
+            var candidates = new List<IPAddress>();
+
+            // Get IP address from DNS. If addrOrHost is localhost or loopback will 
+            // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
+            var nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
+            foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
             {
-                // IF the address is an empty string, default to the local machine, but not the loopback address
-                if (String.IsNullOrEmpty(addrOrHost))
+                // If the subnet does not match - we can't resolve this address.
+                // If subnet is not specified - pick smallest address deterministically.
+                if (subnet == null)
                 {
-                    addrOrHost = Dns.GetHostName();
-
-                    // If for some reason we get "localhost" back. This seems to have happened to somebody.
-                    if (addrOrHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-                        return loopback;
+                    candidates.Add(nodeIp);
                 }
-
-                var candidates = new List<IPAddress>();
-                IPAddress[] nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
-                foreach (var nodeIp in nodeIps)
+                else
                 {
-                    if (nodeIp.AddressFamily != family || nodeIp.Equals(loopback)) continue;
-
-                    // If the subnet does not match - we can't resolve this address.
-                    // If subnet is not specified - pick smallest address deterministically.
-                    if (subnet == null)
+                    var ip = nodeIp;
+                    if (subnet.Select((b, i) => ip.GetAddressBytes()[i] == b).All(x => x))
                     {
                         candidates.Add(nodeIp);
                     }
-                    else
-                    {
-                        IPAddress ip = nodeIp;
-                        if (subnet.Select((b, i) => ip.GetAddressBytes()[i] == b).All(x => x))
-                        {
-                            candidates.Add(nodeIp);
-                        }
-                    }
                 }
-                if (candidates.Count > 0)
-                {
-                    return PickIPAddress(candidates);
-                }
-                var subnetStr = Utils.EnumerableToString(subnet, null, ".", false);
-                throw new ArgumentException("Hostname '" + addrOrHost + "' with subnet " + subnetStr + " and family " + family + " is not a valid IP address or DNS name");
             }
+            if (candidates.Count > 0)
+            {
+                return PickIPAddress(candidates);
+            }
+            var subnetStr = Utils.EnumerableToString(subnet, null, ".", false);
+            throw new ArgumentException("Hostname '" + addrOrHost + "' with subnet " + subnetStr + " and family " + family + " is not a valid IP address or DNS name");
         }
 
         private static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
