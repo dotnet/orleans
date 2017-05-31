@@ -111,22 +111,22 @@ namespace DefaultCluster.Tests.General
             await grain.SetA(56820);
             var input = new GenericGrainReferenceHolder
             {
-                Reference = grain
+                Reference = grain as GrainReference
             };
 
             var json = JsonConvert.SerializeObject(input, settings);
             var output = JsonConvert.DeserializeObject<GenericGrainReferenceHolder>(json, settings);
 
             Assert.Equal(input.Reference, output.Reference);
-            var reference = output.Reference.Cast<ISimpleGrain>();
-            Assert.Equal(56820, await reference.GetA());
+            var reference = output.Reference;
+            Assert.Equal(56820, await ((ISimpleGrain)reference).GetA());
         }
 
         [Serializable]
         public class GenericGrainReferenceHolder
         {
             [JsonProperty]
-            public ISimpleGrain Reference { get; set; }
+            public GrainReference Reference { get; set; }
         }
 
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
@@ -248,7 +248,7 @@ namespace DefaultCluster.Tests.General
             var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(this.HostedCluster.SerializationManager, this.GrainFactory);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
             string json = JsonConvert.SerializeObject(obj, settings);
-            object other = JsonConvert.DeserializeObject(json, settings);
+            object other = JsonConvert.DeserializeObject(json, typeof(T), settings);
             return (T)other;
         }
     }
