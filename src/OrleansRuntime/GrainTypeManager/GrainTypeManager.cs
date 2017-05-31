@@ -41,12 +41,9 @@ namespace Orleans.Runtime
         }
 
         public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
-            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy)
         {
-        }
+            var localTestMode = silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
 
-        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
-        {
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
