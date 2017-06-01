@@ -156,6 +156,7 @@
     <Compile Include="Serialization\ILDelegateBuilder.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Serialization\OrleansSerializer.cs" />
     <Compile Include="Services\IGrainServiceClient.cs" />
     <Compile Include="Services\IGrainService.cs" />
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
