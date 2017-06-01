@@ -36,12 +36,9 @@ namespace Orleans.Runtime
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
         
         public GrainTypeManager(ILocalSiloDetails siloDetails, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
-            : this(siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy, serializationManager, multiClusterRegistrationStrategyManager)
         {
-        }
+            var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
 
-        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
-        {
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
             this.serializationManager = serializationManager;
