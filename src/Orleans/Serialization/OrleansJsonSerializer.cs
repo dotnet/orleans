@@ -287,49 +287,61 @@ namespace Orleans.Serialization
 
     internal class GrainReferenceConverter : JsonConverter
     {
-        private static readonly Type GrainReferenceType;
-
-        private static readonly ConcurrentDictionary<Type, GrainFactory.GrainReferenceCaster> Casters =
-            new ConcurrentDictionary<Type, GrainFactory.GrainReferenceCaster>();
-        private static readonly Func<Type, GrainFactory.GrainReferenceCaster> CreateCasterDelegate = CreateCaster;
+        private static readonly Type AddressableType = typeof(IAddressable);
         private readonly IGrainFactory grainFactory;
+        private readonly JsonSerializer internalSerializer;
 
         public GrainReferenceConverter(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;
-        }
 
-        static GrainReferenceConverter()
-        {
-            GrainReferenceType = typeof(GrainReference);
+            // Create a serializer for internal serialization which does not have a specified GrainReference serializer.
+            // This internal serializer will use GrainReference's ISerializable implementation for serialization and deserialization.
+            this.internalSerializer = JsonSerializer.Create(new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.All,
+                PreserveReferencesHandling = PreserveReferencesHandling.None,
+                DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                NullValueHandling = NullValueHandling.Ignore,
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                Formatting = Formatting.None,
+                Converters =
+                {
+                    new IPAddressConverter(),
+                    new IPEndPointConverter(),
+                    new GrainIdConverter(),
+                    new SiloAddressConverter(),
+                    new UniqueKeyConverter()
+                }
+            });
         }
 
         public override bool CanConvert(Type objectType)
         {
-            return GrainReferenceType.IsAssignableFrom(objectType);
+            return AddressableType.IsAssignableFrom(objectType);
         }
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            var key = (value as GrainReference)?.ToKeyString();
-            serializer.Serialize(writer, key);
+            // Serialize the grain reference using the internal serializer.
+            this.internalSerializer.Serialize(writer, value);
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            var key = serializer.Deserialize<string>(reader);
-            if (string.IsNullOrWhiteSpace(key)) return null;
+            // Deserialize using the internal serializer which will use the concrete GrainReference implementation's
+            // ISerializable constructor.
+            var result = this.internalSerializer.Deserialize(reader, objectType);
+            var grainRef = result as IAddressable;
+            if (grainRef == null) return result;
 
-            var result = GrainReference.FromKeyString(key, null);
-            this.grainFactory.BindGrainReference(result);
-            return Casters.GetOrAdd(objectType, CreateCasterDelegate)(result);
-        }
-
-        private static GrainFactory.GrainReferenceCaster CreateCaster(Type grainReferenceType)
-        {
-            var interfaceType = grainReferenceType.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>().TargetType;
-            return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
+            // Bind the deserialized grain reference to the runtime.
+            this.grainFactory.BindGrainReference(grainRef);
+            return grainRef;
         }
     }
+
     #endregion
 }
