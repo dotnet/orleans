@@ -427,6 +427,12 @@ namespace Orleans.Runtime.Configuration
                 addrOrHost = Dns.GetHostName();
             }
 
+            // Fix StreamFilteringTests_SMS tests
+            if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+            {
+                return loopback;
+            }
+
             // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
             IPAddress address;
             if (IPAddress.TryParse(addrOrHost, out address))
@@ -436,7 +442,7 @@ namespace Orleans.Runtime.Configuration
 
             var candidates = new List<IPAddress>();
 
-            // Get IP address from DNS. If addrOrHost is localhost or loopback will 
+            // Get IP address from DNS. If addrOrHost is localhost will 
             // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
             var nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
             foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
