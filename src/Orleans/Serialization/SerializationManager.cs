@@ -1046,11 +1046,15 @@ namespace Orleans.Serialization
         }
 
         /// <summary>        
-        /// This method exposes internal IsOrleansShallowCopyable to allow external custom serializers to check if is it ok to shallow copy objects when deep copying.               
+        /// Returns <see langword="true"/> if instances of the provided type can be safely shallow-copied;
+        /// otherwise <see langword="false"/>, indicating that instances must instead be deep-copied.
         /// </summary>
         /// <param name="type">The type to check.</param>
-        /// <returns>Returns true if ok to shallow copy.</returns>
-        public static bool IsTypeOrleansShallowCopyable(Type type)
+        /// <returns>
+        /// <see langword="true"/> if instances of the provided type can be safely shallow-copied; otherwise
+        /// <see langword="false"/>, indicating that instances must instead be deep-copied.
+        /// </returns>
+        public static bool IsTypeShallowCopyable(Type type)
         {
             return type.IsOrleansShallowCopyable();
         }
