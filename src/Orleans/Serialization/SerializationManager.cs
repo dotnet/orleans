@@ -1045,20 +1045,6 @@ namespace Orleans.Serialization
                 ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
-        /// <summary>        
-        /// Returns <see langword="true"/> if instances of the provided type can be safely shallow-copied;
-        /// otherwise <see langword="false"/>, indicating that instances must instead be deep-copied.
-        /// </summary>
-        /// <param name="type">The type to check.</param>
-        /// <returns>
-        /// <see langword="true"/> if instances of the provided type can be safely shallow-copied; otherwise
-        /// <see langword="false"/>, indicating that instances must instead be deep-copied.
-        /// </returns>
-        public static bool IsTypeShallowCopyable(Type type)
-        {
-            return type.IsOrleansShallowCopyable();
-        }
-
 #endregion
 
 #region Serializing
