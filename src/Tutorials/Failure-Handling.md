@@ -39,7 +39,7 @@ After you see a grain operation failed you can do one or some  of the following.
 This is by far the most typical case.
 - Try to fix/reset the partially changed state by calling a method which resets the state to the last known correct state or just reads it from storage by calling `ReadStateAsync`.
 - Reset the state of all related activations as well to ensure a clean state for all of them.
-- Due multi-grain state manipulations using a [Process Manager](https://msdn.microsoft.com/en-us/library/jj591569.aspx) or database transaction to make sure it's either done completely or nothing is changed to avoid the state being partially updated.
+- Perform multi-grain state manipulations using a [Process Manager](https://msdn.microsoft.com/en-us/library/jj591569.aspx) or database transaction to make sure it's either done completely or nothing is changed to avoid the state being partially updated.
 
 Depending on your application, the retry logic might follow a simple or complex pattern, and you might have to do other stuff like notifying external systems and other things, but generally you either have to retry your action, restart the grain/grains involved or stop responding until something which is not available becomes available.
 
