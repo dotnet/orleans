@@ -3,75 +3,67 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using Orleans.CodeGeneration;
+using Orleans.Utilities;
 
 namespace Orleans
 {
     /// <summary>
-    /// Maintains a map between grain classes and corresponding <see cref="InterceptedMethodInvoker"/> instances.
+    /// Maintains a map between grain classes and corresponding interface-implementation mappings.
     /// </summary>
-    internal class InterceptedMethodInvokerCache
+    internal class InterfaceToImplementationMappingCache
     {
         /// <summary>
-        /// The map from implementation types to interface ids to invoker.
+        /// The map from implementation types to interface ids to map of method ids to method infos.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Dictionary<int, InterceptedMethodInvoker>> invokers =
-            new ConcurrentDictionary<Type, Dictionary<int, InterceptedMethodInvoker>>();
-        
+        private readonly CachedReadConcurrentDictionary<Type, Dictionary<int, Dictionary<int, MethodInfo>>> mappings =
+            new CachedReadConcurrentDictionary<Type, Dictionary<int, Dictionary<int, MethodInfo>>>();
+
         /// <summary>
-        /// Returns a grain method invoker which calls the grain's implementation of <see cref="IGrainInvokeInterceptor"/>
-        /// if it exists, otherwise calling the provided <paramref name="invoker"/> directly.
+        /// Returns a mapping from method id to method info for the provided implementation and interface id.
         /// </summary>
         /// <param name="implementationType">The grain type.</param>
         /// <param name="interfaceId">The interface id.</param>
-        /// <param name="invoker">
-        /// The underlying invoker, which will be passed to the grain's <see cref="IGrainInvokeInterceptor.Invoke"/>
-        /// method.
-        /// </param>
         /// <returns>
-        /// A grain method invoker which calls the grain's implementation of <see cref="IGrainInvokeInterceptor"/>.
+        /// A mapping from method id to method info.
         /// </returns>
-        public InterceptedMethodInvoker GetOrCreate(Type implementationType, int interfaceId, IGrainMethodInvoker invoker)
+        public Dictionary<int, MethodInfo> GetOrCreate(Type implementationType, int interfaceId)
         {
             // Get or create the mapping between interfaceId and invoker for the provided type.
-            Dictionary<int, InterceptedMethodInvoker> invokerMap;
-            if (!this.invokers.TryGetValue(implementationType, out invokerMap))
+            Dictionary<int, Dictionary<int, MethodInfo>> invokerMap;
+            if (!this.mappings.TryGetValue(implementationType, out invokerMap))
             {
                 // Generate an the invoker mapping using the provided invoker.
-                this.invokers[implementationType] = invokerMap = CreateInterfaceToImplementationMap(implementationType, invoker);
+                this.mappings[implementationType] = invokerMap = CreateInterfaceToImplementationMap(implementationType);
             }
 
             // Attempt to get the invoker for the provided interfaceId.
-            InterceptedMethodInvoker interceptedMethodInvoker;
-            if (!invokerMap.TryGetValue(interfaceId, out interceptedMethodInvoker))
+            Dictionary<int, MethodInfo> interfaceToImplementationMap;
+            if (!invokerMap.TryGetValue(interfaceId, out interfaceToImplementationMap))
             {
                 throw new InvalidOperationException(
                     $"Type {implementationType} does not implement interface with id {interfaceId} ({interfaceId:X}).");
             }
 
-            return interceptedMethodInvoker;
+            return interfaceToImplementationMap;
         }
 
         /// <summary>
         /// Maps the interfaces of the provided <paramref name="implementationType"/>.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
-        /// <param name="invoker">The grain method invoker.</param>
         /// <returns>The mapped interface.</returns>
-        private static Dictionary<int, InterceptedMethodInvoker> CreateInterfaceToImplementationMap(
-            Type implementationType,
-            IGrainMethodInvoker invoker)
+        private static Dictionary<int, Dictionary<int, MethodInfo>> CreateInterfaceToImplementationMap(Type implementationType)
         {
-            if (implementationType.IsConstructedGenericType) return CreateMapForConstructedGeneric(implementationType, invoker);
-            return CreateMapForNonGeneric(implementationType, invoker);
+            if (implementationType.IsConstructedGenericType) return CreateMapForConstructedGeneric(implementationType);
+            return CreateMapForNonGeneric(implementationType);
         }
 
         /// <summary>
-        /// Creates and returns a map from interface id to intercepted invoker for non-generic or open-generic types.
+        /// Creates and returns a map from interface id to map of method id to method info for the provided non-generic type.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
-        /// <param name="invoker">The underlying invoker.</param>
-        /// <returns>A map from interface id to intercepted invoker.</returns>
-        private static Dictionary<int, InterceptedMethodInvoker> CreateMapForNonGeneric(Type implementationType, IGrainMethodInvoker invoker)
+        /// <returns>A map from interface id to map of method id to method info for the provided type.</returns>
+        private static Dictionary<int, Dictionary<int, MethodInfo>> CreateMapForNonGeneric(Type implementationType)
         {
             if (implementationType.IsConstructedGenericType)
             {
@@ -83,7 +75,7 @@ namespace Orleans
             var interfaces = implementationType.GetInterfaces();
 
             // Create an invoker for every interface on the provided type.
-            var result = new Dictionary<int, InterceptedMethodInvoker>(interfaces.Length);
+            var result = new Dictionary<int, Dictionary<int, MethodInfo>>(interfaces.Length);
             foreach (var iface in interfaces)
             {
                 var methods = GrainInterfaceUtils.GetMethods(iface);
@@ -111,21 +103,18 @@ namespace Orleans
 
                 // Add the resulting map of methodId -> method to the interface map.
                 var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
-                result[interfaceId] = new InterceptedMethodInvoker(invoker, methodMap);
+                result[interfaceId] = methodMap;
             }
 
             return result;
         }
 
         /// <summary>
-        /// Creates and returns a map from interface id to intercepted invoker for constructed generic types.
+        /// Creates and returns a map from interface id to map of method id to method info for the provided constructed generic type.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
-        /// <param name="invoker">The underlying invoker.</param>
-        /// <returns>A map from interface id to intercepted invoker.</returns>
-        private static Dictionary<int, InterceptedMethodInvoker> CreateMapForConstructedGeneric(
-            Type implementationType,
-            IGrainMethodInvoker invoker)
+        /// <returns>A map from interface id to map of method id to method info for the provided type.</returns>
+        private static Dictionary<int, Dictionary<int, MethodInfo>> CreateMapForConstructedGeneric(Type implementationType)
         {
             // It is important to note that the interfaceId and methodId are computed based upon the non-concrete
             // version of the implementation type. During code generation, the concrete type would not be available
@@ -144,7 +133,7 @@ namespace Orleans
             var concreteInterfaces = implementationType.GetInterfaces();
 
             // Create an invoker for every interface on the provided type.
-            var result = new Dictionary<int, InterceptedMethodInvoker>(genericInterfaces.Length);
+            var result = new Dictionary<int, Dictionary<int, MethodInfo>>(genericInterfaces.Length);
             for (var i = 0; i < genericInterfaces.Length; i++)
             {
                 // Because these methods are identical except for type parameters, their methods should also be identical except
@@ -179,7 +168,7 @@ namespace Orleans
 
                 // Add the resulting map of methodId -> method to the interface map.
                 var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(genericInterfaces[i]);
-                result[interfaceId] = new InterceptedMethodInvoker(invoker, methodMap);
+                result[interfaceId] = methodMap;
             }
 
             return result;

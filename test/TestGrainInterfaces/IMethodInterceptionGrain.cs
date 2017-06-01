@@ -27,4 +27,15 @@ namespace UnitTests.GrainInterfaces
     {
         Task<int> GetBestNumber();
     }
+
+    public static class GrainCallFilterTestConstants
+    {
+        public const string Key = "GrainInfo";
+    }
+
+    public interface IGrainCallFilterTestGrain : IGrainWithIntegerKey
+    { 
+        Task<string> Execute(bool early, bool mid, bool late);
+        Task<string> GetRequestContext();
+    }
 }

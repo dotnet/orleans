@@ -1,5 +1,7 @@
 ﻿using System.Globalization;
 using System.Threading.Tasks;
+using Orleans.Providers;
+using Orleans.Runtime;
 
 namespace UnitTests.Grains
 {
@@ -97,6 +99,53 @@ namespace UnitTests.Grains
         public Task<string> GetInputAsString(bool input) => Task.FromResult(input.ToString(CultureInfo.InvariantCulture));
 
         public Task<int> GetBestNumber() => Task.FromResult(38);
+    }
 
+    public class GrainCallFilterTestGrain : Grain, IGrainCallFilterTestGrain, IGrainCallFilter, IGrainInvokeInterceptor
+    {
+        private const string Key = GrainCallFilterTestConstants.Key;
+        private IGrainCallContext context;
+
+        public async Task<string> Execute(bool early, bool mid, bool late)
+        {
+            if (late)
+            {
+                this.context.Arguments[2] = false;
+                await this.context.Invoke();
+            }
+
+            return $"I will {(early ? string.Empty : "not ")}misbehave!";
+        }
+
+        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "!");
+
+        public async Task Invoke(IGrainCallContext ctx)
+        {
+            this.context = ctx;
+            var value = RequestContext.Get(Key) as string;
+            if (value != null) RequestContext.Set(Key, value + 'i');
+            await ctx.Invoke();
+            this.context = null;
+        }
+
+        public async Task<object> Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker)
+        {
+            var value = RequestContext.Get(Key) as string;
+            if (value != null) RequestContext.Set(Key, value + 'n');
+
+            if (string.Equals(method?.Name, nameof(Execute)) && (bool)request.Arguments[0])
+            {
+                await context.Invoke();
+            }
+
+            var result = await invoker.Invoke(this, request);
+
+            if (string.Equals(method?.Name, nameof(Execute)) && (bool)request.Arguments[1])
+            {
+                await context.Invoke();
+            }
+
+            return result;
+        }
     }
 }

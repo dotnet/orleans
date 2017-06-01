@@ -79,7 +79,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="InvocationInterceptTests.cs" />
+    <Compile Include="GrainCallFilterTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="StreamingTests\ControllableStreamGeneratorProviderTests.cs" />

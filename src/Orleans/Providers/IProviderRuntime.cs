@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -51,11 +52,13 @@ namespace Orleans.Providers
         /// <summary>
         /// Sets the invocation interceptor which will be invoked on each request.
         /// </summary>
+        [Obsolete("Register InvokeInterceptor instances with the service provider during configuration.")]
         void SetInvokeInterceptor(InvokeInterceptor interceptor);
 
         /// <summary>
         /// Gets the invocation interceptor which will be invoked on each request.
         /// </summary>
+        [Obsolete("Retrieve InvokeInterceptor instances from the ServiceProvider property.")]
         InvokeInterceptor GetInvokeInterceptor();
     }
 

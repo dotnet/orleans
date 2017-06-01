@@ -59,12 +59,16 @@ namespace Orleans.Runtime.LogConsistency
 
         public void SetInvokeInterceptor(InvokeInterceptor interceptor)
         {
+#pragma warning disable 618
             runtime.SetInvokeInterceptor(interceptor);
+#pragma warning restore 618
         }
 
         public InvokeInterceptor GetInvokeInterceptor()
         {
+#pragma warning disable 618
             return runtime.GetInvokeInterceptor();
+#pragma warning restore 618
         }
 
         public Logger GetLogger(string loggerName)
