@@ -11,6 +11,11 @@ namespace Orleans.Storage
             return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed;
         }
 
+        public static bool IsConflict(this StorageException storageException)
+        {
+            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict;
+        }
+
         public static bool IsContainerNotFound(this StorageException storageException)
         {
             return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.NotFound

@@ -233,7 +233,7 @@ namespace Orleans.Storage
             {
                 await updateOperation.Invoke().ConfigureAwait(false);
             }
-            catch (StorageException ex) when (ex.IsPreconditionFailed())
+            catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
             {
                 throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", currentETag, ex);
             }
