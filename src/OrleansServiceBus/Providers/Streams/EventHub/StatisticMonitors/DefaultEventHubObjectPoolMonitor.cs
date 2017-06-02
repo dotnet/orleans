@@ -41,13 +41,13 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackMemoryReleasedFromCache(long releasedMemoryInByte)
+        public void TrackMemoryReleased(long releasedMemoryInByte)
         {
             this.logger.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.logProperties);
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackMemoryAllocatedByCache(long allocatedMemoryInByte)
+        public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             this.logger.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.logProperties);
         }

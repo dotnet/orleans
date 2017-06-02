@@ -22,12 +22,12 @@ namespace ServiceBus.Tests.MonitorTests
             CallCounters = new ObjectPoolMonitorCounters();
         }
  
-        public void TrackMemoryAllocatedByCache(long releasedMemoryInByte)
+        public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectAllocatedByCacheCallCounter);
         }
 
-        public void TrackMemoryReleasedFromCache(long allocatedMemoryInByte)
+        public void TrackMemoryReleased(long releasedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectReleasedFromCacheCallCounter);
         }

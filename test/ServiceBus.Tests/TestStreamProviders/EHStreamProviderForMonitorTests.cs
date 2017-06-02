@@ -41,7 +41,8 @@ namespace ServiceBus.Tests.TestStreamProviders
                 var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
                 Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => CacheMonitorForTesting.Instance;
                 Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) =>BlockPoolMonitorForTesting.Instance;
-                return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory);
+                return new EHStreamProviderWithCreatedCacheList.AdapterFactory.CacheFactoryForTesting(providerSettings, SerializationManager, this.createdCaches,
+                    sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory);
             }
 
             public enum QueryCommands

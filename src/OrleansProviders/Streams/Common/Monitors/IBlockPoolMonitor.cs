@@ -15,13 +15,13 @@ namespace Orleans.Providers.Streams.Common
         /// Track memory newly allocated by cache
         /// </summary>
         /// <param name="allocatedMemoryInByte"></param>
-        void TrackMemoryAllocatedByCache(long allocatedMemoryInByte);
+        void TrackMemoryAllocated(long allocatedMemoryInByte);
 
         /// <summary>
         /// Track memory relased from cache
         /// </summary>
         /// <param name="releasedMemoryInByte"></param>
-        void TrackMemoryReleasedFromCache(long releasedMemoryInByte);
+        void TrackMemoryReleased(long releasedMemoryInByte);
 
         /// <summary>
         /// Periodically report block pool status
@@ -59,7 +59,7 @@ namespace Orleans.Providers.Streams.Common
         public void TrackObjectAllocated()
         {
             long memoryAllocatedInByte = blockSizeInByte;
-            this.blockPoolMonitor.TrackMemoryAllocatedByCache(memoryAllocatedInByte);
+            this.blockPoolMonitor.TrackMemoryAllocated(memoryAllocatedInByte);
         }
 
         /// <summary>
@@ -68,7 +68,7 @@ namespace Orleans.Providers.Streams.Common
         public void TrackObjectReleased()
         {
             long memoryReleasedInByte = blockSizeInByte;
-            this.blockPoolMonitor.TrackMemoryReleasedFromCache(memoryReleasedInByte);
+            this.blockPoolMonitor.TrackMemoryReleased(memoryReleasedInByte);
         }
 
         /// <summary>

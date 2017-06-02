@@ -172,8 +172,8 @@ namespace Orleans.ServiceBus.Providers
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
 #if NETSTANDARD
-            TimeSpan oldest = dequeueTimeUtc - messages[0].SystemProperties.EnqueuedTimeUtc;
-            TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
+            DateTime oldestMessageEnqueueTime = messages[0].SystemProperties.EnqueuedTimeUtc;
+            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
 #else
             DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTimeUtc;
             DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTimeUtc;

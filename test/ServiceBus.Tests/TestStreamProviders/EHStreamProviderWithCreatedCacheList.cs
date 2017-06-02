@@ -17,14 +17,23 @@ namespace ServiceBus.Tests.TestStreamProviders
     {
         public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
-            private readonly List<IEventHubQueueCache> createdCaches;
+            protected readonly List<IEventHubQueueCache> createdCaches;
 
             public AdapterFactory()
             {
                 createdCaches = new List<IEventHubQueueCache>();
             }
 
-            private class CacheFactoryForTesting : EventHubQueueCacheFactory
+            protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
+            {
+                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
+                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
+                var eventHubPath = hubSettings.Path;
+                var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
+                return new CacheFactoryForTesting(providerSettings, SerializationManager, this.createdCaches, sharedDimensions);
+            }
+
+            public class CacheFactoryForTesting : EventHubQueueCacheFactory
             {
                 private readonly List<IEventHubQueueCache> caches;
 
