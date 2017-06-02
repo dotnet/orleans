@@ -9,6 +9,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using System.Collections.Generic;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -29,10 +30,7 @@ namespace Orleans.ServiceBus.Providers
         protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private IEvictionStrategy<TCachedMessage> evictionStrategy;
-
-        /// <inheritdoc cref="IEventHubQueueCache"/>
-        public ICacheMonitor CacheMonitor { get; private set; }
-
+        private ICacheMonitor cacheMonitor;
         /// <summary>
         /// Logic used to store queue position
         /// </summary>
@@ -55,13 +53,13 @@ namespace Orleans.ServiceBus.Providers
         {
             this.defaultMaxAddCount = defaultMaxAddCount;
             Checkpointer = checkpointer;
-            this.CacheMonitor = cacheMonitor;
             cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer, logger, cacheMonitor, cacheMonitorWriteInterval);
+            this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
             this.evictionStrategy.PurgeObservable = cache;
             cacheDataAdapter.OnBlockAllocated = this.evictionStrategy.OnBlockAllocated;
-            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, this.CacheMonitor);
+            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
         }
     
         /// <inheritdoc />
@@ -76,7 +74,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
-            monitor.CacheMonitor = this.CacheMonitor;
+            monitor.CacheMonitor = this.cacheMonitor;
             this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
@@ -133,7 +131,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Add an EventHub EventData to the cache.
+        /// Add an Eventhub EventData to the cache
         /// </summary>
         /// <param name="message"></param>
         /// <param name="dequeueTimeUtc"></param>
@@ -141,6 +139,16 @@ namespace Orleans.ServiceBus.Providers
         public StreamPosition Add(EventData message, DateTime dequeueTimeUtc)
         {
             return cache.Add(message, dequeueTimeUtc);
+        }
+        /// <summary>
+        /// Add a list of EventHub EventData to the cache.
+        /// </summary>
+        /// <param name="messages"></param>
+        /// <param name="dequeueTimeUtc"></param>
+        /// <returns></returns>
+        public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
+        {
+            return cache.Add(messages, dequeueTimeUtc);
         }
 
         /// <summary>

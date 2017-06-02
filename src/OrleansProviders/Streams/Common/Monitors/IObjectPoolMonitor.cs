@@ -7,34 +7,32 @@ using System.Threading.Tasks;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Monitor track block pool related metrics
+    /// Monitor track object pool related metrics
     /// </summary>
     public interface IObjectPoolMonitor
     {
         #region Event driven metrics
         /// <summary>
-        /// Track every time cache allocate memory from block pool
+        /// Track every time when an object is allocated
         /// </summary>
-        /// <param name="blockCount"></param>
-        void TrackObjectAllocatedByCache(int blockCount);
+        void TrackObjectAllocated();
 
         /// <summary>
-        /// Track every time cache release memory back to block pool
+        /// Track every time an object was released back to the pool
         /// </summary>
-        /// <param name="blockCount"></param>
-        void TrackObjectReleasedFromCache(int blockCount);
+        void TrackObjectReleased();
 
         #endregion
 
-        #region Periodically report block pool status 
+        #region Periodically report object pool status 
 
         /// <summary>
-        /// Periodically report block pool status
+        /// Periodically report object pool status
         /// </summary>
-        /// <param name="totalBlocks">Total size of block pool</param>
-        /// <param name="freeBlocks">Free memory in block pool which is available for cache to allocate</param>
-        /// <param name="claimedBlocks">Memory claimed by cache in this block pool</param>
-        void Report(long totalBlocks, long freeBlocks, long claimedBlocks);
+        /// <param name="totalObjects">Total size of object pool</param>
+        /// <param name="availableObjects">Count for objects in the pool which is available for allocating</param>
+        /// <param name="claimedObjects">Count for objects which are claimed, hence not available</param>
+        void Report(long totalObjects, long availableObjects, long claimedObjects);
 
         #endregion
     }

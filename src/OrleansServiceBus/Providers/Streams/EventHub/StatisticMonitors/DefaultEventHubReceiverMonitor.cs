@@ -17,15 +17,15 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions">Aggregation Dimention bag for EventhubReceiverMonitor</param>
+        /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
         /// <param name="logger"></param>
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimentions dimentions, Logger logger)
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Logger logger)
         {
             this.logger = logger;
             logProperties = new Dictionary<string, string>
             {
-                {"Path", dimentions.EventHubPath},
-                {"Partition", dimentions.EventHubPartition}
+                {"Path", dimensions.EventHubPath},
+                {"Partition", dimensions.EventHubPartition}
             };
         }
 
@@ -59,15 +59,16 @@ namespace Orleans.ServiceBus.Providers
         /// Tracks messages read and time taken per successful read.  Tracked per successful partition read operation.
         /// </summary>
         /// <param name="count">Messages read.</param>
-        /// <param name="oldest"></param>
-        /// <param name="newest"></param>
-        public void TrackMessagesReceived(long count, TimeSpan? oldest, TimeSpan? newest)
+        /// <param name="oldestMessageEnqueueTimeUtc"></param>
+        /// <param name="newestMessageEnqueueTimeUtc"></param>
+        public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
+            var now = DateTime.UtcNow;
             logger.TrackMetric("MessagesRecieved", count, this.logProperties);
-            if(oldest.HasValue)
-                logger.TrackMetric("OldestMessageRead", oldest.Value, this.logProperties);
-            if(newest.HasValue)
-                logger.TrackMetric("NewestMessageRead", newest.Value, this.logProperties);
+            if(oldestMessageEnqueueTimeUtc.HasValue)
+                logger.TrackMetric("OldestMessageReadEnqueueTimeToNow", now- oldestMessageEnqueueTimeUtc.Value, this.logProperties);
+            if(newestMessageEnqueueTimeUtc.HasValue)
+                logger.TrackMetric("NewestMessageReadEnqueueTimeToNow", now - newestMessageEnqueueTimeUtc.Value, this.logProperties);
         }
 
         /// <summary>

@@ -24,34 +24,25 @@ namespace ServiceBus.Tests.TestStreamProviders
                 createdCaches = new List<IEventHubQueueCache>();
             }
 
-            protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
-            {
-                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
-                var eventHubPath = hubSettings.Path;
-                var sharedDimentions = new EventHubMonitorAggregationDimentions(globalConfig, nodeConfig, eventHubPath);
-                return new CacheFactoryForTesting(providerSettings, SerializationManager, createdCaches, sharedDimentions, this.CacheMonitorFactory, this.ObjectPoolMonitorFactory);
-            }
-
             private class CacheFactoryForTesting : EventHubQueueCacheFactory
             {
                 private readonly List<IEventHubQueueCache> caches;
 
                 public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
-                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimentions sharedDimentions,
-                    Func<EventHubCacheMonitorDimentions, Logger, ICacheMonitor> cacheMonitorFactory = null,
-                    Func<EventHubObjectPoolMonitorDimentions, Logger, IObjectPoolMonitor> objectPoolMonitorFactory = null)
-                    : base(providerSettings, serializationManager, sharedDimentions, cacheMonitorFactory, objectPoolMonitorFactory)
+                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimensions sharedDimensions,
+                    Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = null,
+                    Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                    : base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
                 {
                     this.caches = caches;
                 }
                 private const int defaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
-                    Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge,
-                    SerializationManager serializationManager, EventHubMonitorAggregationDimentions sharedDimentions)
+                    Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
+                    SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions)
                 {
-                    var cacheMonitorDimentions = new EventHubCacheMonitorDimentions(sharedDimentions, partition, bufferPool.Id);
-                    var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimentions, cacheLogger);
+                    var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
+                    var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, cacheLogger);
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, cacheMonitor, providerSettings.StatisticMonitorWriteInterval, timePurge),

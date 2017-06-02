@@ -175,18 +175,17 @@ namespace Orleans.ServiceBus.Providers
             TimeSpan oldest = dequeueTimeUtc - messages[0].SystemProperties.EnqueuedTimeUtc;
             TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
 #else
-            TimeSpan oldest = dequeueTimeUtc - messages[0].EnqueuedTimeUtc;
-            TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].EnqueuedTimeUtc;
+            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTimeUtc;
+            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTimeUtc;
 #endif
-            monitor?.TrackMessagesReceived(messages.Count, oldest, newest);
+            monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            foreach (EventData message in messages)
+            List<StreamPosition> messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
+            foreach (var streamPosition in messageStreamPositions)
             {
-                StreamPosition streamPosition = cache.Add(message, dequeueTimeUtc);
                 batches.Add(new StreamActivityNotificationBatch(streamPosition.StreamIdentity.Guid,
                     streamPosition.StreamIdentity.Namespace, streamPosition.SequenceToken));
             }
-            cache.CacheMonitor?.TrackMessageAdded(messages.Count);
             if (!checkpointer.CheckpointExists)
             {
                 checkpointer.Update(

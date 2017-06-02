@@ -16,7 +16,7 @@ namespace ServiceBus.Tests.MonitorTests
     {
         public static EventHubReceiverMonitorForTesting Instance = new EventHubReceiverMonitorForTesting(null, null);
         public EventHubReceiverMonitorCounters CallCounters;
-        private EventHubReceiverMonitorForTesting(EventHubReceiverMonitorDimentions dimentions, Logger logger)
+        private EventHubReceiverMonitorForTesting(EventHubReceiverMonitorDimensions dimensions, Logger logger)
         {
             this.CallCounters = new EventHubReceiverMonitorCounters();
         }
@@ -30,7 +30,7 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
         }
 
-        public void TrackMessagesReceived(long count, TimeSpan? oldest, TimeSpan? newest)
+        public void TrackMessagesReceived(long count, DateTime? oldestEnqueueTime, DateTime? newestEnqueueTime)
         {
             Interlocked.Increment(ref this.CallCounters.TrackMessagesReceivedCallCounter);
         }

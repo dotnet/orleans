@@ -134,7 +134,12 @@ namespace Orleans.Providers
                 this.serializer = serializer;
             }
 
-            public DateTime? GetMessageEnqueueTime(ref MemoryMessageData message)
+            public DateTime? GetMessageEnqueueTimeUtc(ref MemoryMessageData message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref MemoryMessageData message)
             {
                 return null;
             }

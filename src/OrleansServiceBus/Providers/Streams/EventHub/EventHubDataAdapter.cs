@@ -187,9 +187,15 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
-        public DateTime? GetMessageEnqueueTime(ref CachedEventHubMessage message)
+        public DateTime? GetMessageEnqueueTimeUtc(ref CachedEventHubMessage message)
         {
             return message.EnqueueTimeUtc;
+        }
+
+        /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
+        public DateTime? GetMessageDequeueTimeUtc(ref CachedEventHubMessage message)
+        {
+            return message.DequeueTimeUtc;
         }
 
         /// <summary>

@@ -18,12 +18,13 @@ namespace ServiceBus.Tests.MonitorTests
         public static CacheMonitorForTesting Instance = new CacheMonitorForTesting(null, null);
         public CacheMonitorCounters CallCounters;
 
-        private CacheMonitorForTesting(EventHubCacheMonitorDimentions dimentions, Logger logger)
+        private CacheMonitorForTesting(EventHubCacheMonitorDimensions dimensions, Logger logger)
         {
             this.CallCounters = new CacheMonitorCounters();
         }
 
-        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure)
+        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
+            double? flowControlThreshold)
         {
             Interlocked.Increment(ref CallCounters.TrackCachePressureMonitorStatusChangeCallCounter);
         }
@@ -33,7 +34,7 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref CallCounters.ReportCacheSizeCallCounter);
         }
 
-        public void ReportMessageStatistics(TimeSpan? oldestMessageAge, TimeSpan? oldestMessageEnqueueTimeToNow, TimeSpan? newestMessageEnqueueTimeToNow, long totalMessageCount)
+        public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
         {
             Interlocked.Increment(ref CallCounters.ReportMessageStatisticsCallCounter);
         }
@@ -48,12 +49,12 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref CallCounters.TrackMemoryReleasedCallCounter);
         }
 
-        public void TrackMessageAdded(long mesageAdded)
+        public void TrackMessagesAdded(long mesageAdded)
         {
             Interlocked.Increment(ref CallCounters.TrackMessageAddedCounter);
         }
 
-        public void TrackMessagePurged(long messagePurged)
+        public void TrackMessagesPurged(long messagePurged)
         {
             Interlocked.Increment(ref CallCounters.TrackMessagePurgedCounter);
         }

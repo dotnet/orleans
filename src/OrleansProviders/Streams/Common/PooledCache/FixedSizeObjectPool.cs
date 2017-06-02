@@ -33,11 +33,10 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="poolSize"></param>
         /// <param name="factoryFunc"></param>
-        /// <param name="blockPoolId">Unique Id for current block pool</param>
         /// <param name="monitor"></param>
         /// <param name="monitorWriteInterval"></param>
-        public FixedSizeObjectPool(Func<T> factoryFunc, string blockPoolId, int poolSize, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
-            : base(factoryFunc, blockPoolId, poolSize, monitor, monitorWriteInterval)
+        public FixedSizeObjectPool(Func<T> factoryFunc, int poolSize, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
+            : base(factoryFunc, poolSize, monitor, monitorWriteInterval)
         {
             if (poolSize < MinObjectCount)
             {

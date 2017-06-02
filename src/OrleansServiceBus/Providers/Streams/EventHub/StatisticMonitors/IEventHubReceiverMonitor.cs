@@ -28,9 +28,9 @@ namespace Orleans.ServiceBus.Providers
         /// Tracks messages read and time taken per successful read.  Tracked per successful partition read operation.
         /// </summary>
         /// <param name="count">Messages read.</param>
-        /// <param name="oldest">The difference between now utc on host and the eventhub enqueue time of the oldest message in a set of messages read.</param>
-        /// <param name="newest">The difference between now utc on host and the eventhub enqueue time of the newest message in a set of messages read.</param>
-        void TrackMessagesReceived(long count, TimeSpan? oldest, TimeSpan? newest);
+        /// <param name="oldestMessageEnqueueTimeUtc"></param>
+        /// <param name="newestMessageEnqueueTimeUtc"></param>
+        void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc);
 
         /// <summary>
         /// Track attempts to shutdown the receiver.

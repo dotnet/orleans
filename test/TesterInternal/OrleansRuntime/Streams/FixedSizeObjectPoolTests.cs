@@ -25,7 +25,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc1Free1Test()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), Guid.NewGuid().ToString(), 10);
+            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 10);
 
             // Allocate and free 20 items
             for (int i = 0; i < 20; i++)
@@ -41,7 +41,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc10Free1Test()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), Guid.NewGuid().ToString(), 10);
+            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 10);
 
             // Allocate 10 items
             var resources = Enumerable.Range(0, 10).Select(i => pool.Allocate()).ToList();
@@ -67,7 +67,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc50Max10Test()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), Guid.NewGuid().ToString(), 10);
+            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 10);
 
             // Allocate 50 items
             var resources = Enumerable.Range(0, 50).Select(i => pool.Allocate()).ToList();
@@ -80,7 +80,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc50Max10DoubleFreeTest()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), Guid.NewGuid().ToString(), 10);
+            IObjectPool<TestPooledResource> pool = new FixedSizeObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 10);
 
             // Allocate 50 items
             var resources = Enumerable.Range(0, 50).Select(i => pool.Allocate()).ToList();

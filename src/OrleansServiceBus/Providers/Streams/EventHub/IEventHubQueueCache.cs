@@ -7,6 +7,7 @@ using Microsoft.ServiceBus.Messaging;
 #endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
+using System.Collections.Generic;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -21,7 +22,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="message"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        StreamPosition Add(EventData message, DateTime dequeueTimeUtc);
+        List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc);
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.
         /// </summary>
@@ -47,10 +48,5 @@ namespace Orleans.ServiceBus.Providers
         /// Send purge signal to the cache, the cache will perform a time based purge on its cached messages
         /// </summary>
         void SignalPurge();
-
-        /// <summary>
-        /// Cache monitor for current cache
-        /// </summary>
-        ICacheMonitor CacheMonitor { get; }
     }
 }

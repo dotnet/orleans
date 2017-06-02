@@ -8,10 +8,10 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// Base class for monitor aggregation dimentions, whcih is a information bag for the monitoring target. 
-    /// Monitors can use this information bag to build its aggregation dimentions.
+    /// Base class for monitor aggregation dimensions, whcih is a information bag for the monitoring target. 
+    /// Monitors can use this information bag to build its aggregation dimensions.
     /// </summary>
-    public class EventHubMonitorAggregationDimentions
+    public class EventHubMonitorAggregationDimensions
     {
         /// <summary>
         /// Data object holding Silo global configuration parameters.
@@ -34,7 +34,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="globalConfig"></param>
         /// <param name="nodeConfig"></param>
         /// <param name="ehHubPath"></param>
-        public EventHubMonitorAggregationDimentions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig, string ehHubPath)
+        public EventHubMonitorAggregationDimensions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig, string ehHubPath)
         {
             this.GlobalConfig = globalConfig;
             this.NodeConfig = nodeConfig;
@@ -44,26 +44,26 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
-        public EventHubMonitorAggregationDimentions(EventHubMonitorAggregationDimentions dimentions)
+        /// <param name="dimensions"></param>
+        public EventHubMonitorAggregationDimensions(EventHubMonitorAggregationDimensions dimensions)
         {
-            this.GlobalConfig = dimentions.GlobalConfig;
-            this.NodeConfig = dimentions.NodeConfig;
-            this.EventHubPath = dimentions.EventHubPath;
+            this.GlobalConfig = dimensions.GlobalConfig;
+            this.NodeConfig = dimensions.NodeConfig;
+            this.EventHubPath = dimensions.EventHubPath;
         }
 
         /// <summary>
         /// Zero parameter constructor
         /// </summary>
-        public EventHubMonitorAggregationDimentions()
+        public EventHubMonitorAggregationDimensions()
         {
         }
     }
 
     /// <summary>
-    /// Aggregation dimentions for EventHubReceiverMonitor
+    /// Aggregation dimensions for EventHubReceiverMonitor
     /// </summary>
-    public class EventHubReceiverMonitorDimentions : EventHubMonitorAggregationDimentions
+    public class EventHubReceiverMonitorDimensions : EventHubMonitorAggregationDimensions
     {
         /// <summary>
         /// Eventhub partition
@@ -73,10 +73,10 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
+        /// <param name="dimensions"></param>
         /// <param name="ehPartition"></param>
-        public EventHubReceiverMonitorDimentions(EventHubMonitorAggregationDimentions dimentions, string ehPartition)
-            :base(dimentions)
+        public EventHubReceiverMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition)
+            :base(dimensions)
         {
             this.EventHubPartition = ehPartition;
         }
@@ -84,15 +84,15 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Zero parameter constructor
         /// </summary>
-        public EventHubReceiverMonitorDimentions()
+        public EventHubReceiverMonitorDimensions()
         {
         }
     }
 
     /// <summary>
-    /// Aggregation dimentions for cache monitor used in Eventhub stream provider ecosystem
+    /// Aggregation dimensions for cache monitor used in Eventhub stream provider ecosystem
     /// </summary>
-    public class EventHubCacheMonitorDimentions : EventHubReceiverMonitorDimentions
+    public class EventHubCacheMonitorDimensions : EventHubReceiverMonitorDimensions
     {
         /// <summary>
         /// Block pool this cache belongs to
@@ -102,11 +102,11 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
+        /// <param name="dimensions"></param>
         /// <param name="ehPartition"></param>
         /// <param name="blockPoolId"></param>
-        public EventHubCacheMonitorDimentions(EventHubMonitorAggregationDimentions dimentions, string ehPartition, string blockPoolId)
-            :base(dimentions, ehPartition)
+        public EventHubCacheMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition, string blockPoolId)
+            :base(dimensions, ehPartition)
         {
             this.ObjectPoolId = blockPoolId;
         }
@@ -114,36 +114,36 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Zero parametrers constructor
         /// </summary>
-        public EventHubCacheMonitorDimentions()
+        public EventHubCacheMonitorDimensions()
         {
         }
     }
 
     /// <summary>
-    /// Aggregation dimentions for block pool monitor used in Eventhub stream provider ecosystem
+    /// Aggregation dimensions for block pool monitor used in Eventhub stream provider ecosystem
     /// </summary>
-    public class EventHubObjectPoolMonitorDimentions : EventHubMonitorAggregationDimentions
+    public class EventHubBlockPoolMonitorDimensions : EventHubMonitorAggregationDimensions
     {
         /// <summary>
         /// Block pool Id
         /// </summary>
-        public string ObjectPoolId { get; set; }
+        public string BlockPoolId { get; set; }
 
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
-        /// <param name="objectPooolId"></param>
-        public EventHubObjectPoolMonitorDimentions(EventHubMonitorAggregationDimentions dimentions, string objectPooolId)
-            :base(dimentions)
+        /// <param name="dimensions"></param>
+        /// <param name="blockPoolId"></param>
+        public EventHubBlockPoolMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string blockPoolId)
+            :base(dimensions)
         {
-            this.ObjectPoolId = objectPooolId;
+            this.BlockPoolId = blockPoolId;
         }
 
         /// <summary>
         /// Zero parameter constructor
         /// </summary>
-        public EventHubObjectPoolMonitorDimentions()
+        public EventHubBlockPoolMonitorDimensions()
         {
         }
     }

@@ -143,7 +143,12 @@ namespace Orleans.Providers.Streams.Generator
                 this.serializationManager = serializationManager;
             }
 
-            public DateTime? GetMessageEnqueueTime(ref CachedMessage message)
+            public DateTime? GetMessageEnqueueTimeUtc(ref CachedMessage message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref CachedMessage message)
             {
                 return null;
             }

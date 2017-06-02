@@ -13,26 +13,26 @@ using UnitTests.Grains;
 
 namespace ServiceBus.Tests.MonitorTests
 {
-    public class ObjectPoolMonitorForTesting : IObjectPoolMonitor
+    public class BlockPoolMonitorForTesting : IBlockPoolMonitor
     {
-        public static ObjectPoolMonitorForTesting Instance = new ObjectPoolMonitorForTesting(null, null);
+        public static BlockPoolMonitorForTesting Instance = new BlockPoolMonitorForTesting(null, null);
         public ObjectPoolMonitorCounters CallCounters;
-        private ObjectPoolMonitorForTesting(EventHubObjectPoolMonitorDimentions dimentions, Logger logger)
+        private BlockPoolMonitorForTesting(EventHubBlockPoolMonitorDimensions dimensions, Logger logger)
         {
             CallCounters = new ObjectPoolMonitorCounters();
         }
  
-        public void TrackObjectAllocatedByCache(int blockCount)
+        public void TrackMemoryAllocatedByCache(long releasedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectAllocatedByCacheCallCounter);
         }
 
-        public void TrackObjectReleasedFromCache(int blockCount)
+        public void TrackMemoryReleasedFromCache(long allocatedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectReleasedFromCacheCallCounter);
         }
 
-        public void Report(long totalBlocks, long freeBlocks, long claimedBlocks)
+        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.ReportCallCounter);
         }

@@ -80,7 +80,7 @@ namespace Orleans.Providers.Streams.Generator
                 generatorConfig.PopulateFromProviderConfig(providerConfig);
             }
             // 10 meg buffer pool.  10 1 meg blocks
-            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1<<20), Guid.NewGuid().ToString(), 10);
+            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1<<20), 10);
         }
 
         /// <summary>

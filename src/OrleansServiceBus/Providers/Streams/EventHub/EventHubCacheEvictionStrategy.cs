@@ -23,6 +23,7 @@ namespace Orleans.ServiceBus.Providers
 
         private long cacheSizeInByte;
         private readonly TimePurgePredicate timePurge;
+        private Timer timer;
         /// <summary>
         /// Buffers which are purged
         /// </summary>
@@ -47,7 +48,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheMonitor = cacheMonitor;
             if (cacheMonitor != null && monitorWriteInterval.HasValue)
             {
-                var safeTimer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
+                this.timer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
             }
             this.cacheSizeInByte = 0;
         }
@@ -103,7 +104,7 @@ namespace Orleans.ServiceBus.Providers
                 return;
 
             //items got purged, time to conduct follow up actions 
-            this.cacheMonitor?.TrackMessagePurged(itemsPurged);
+            this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             UpdatePurgedBuffers(lastMessagePurged.Value, this.PurgeObservable.Oldest);
             if (this.logger.IsVerbose)

@@ -20,20 +20,21 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
+        /// <param name="dimensions"></param>
         /// <param name="logger"></param>
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimentions dimentions, Logger logger)
+        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Logger logger)
         {
             this.logger = logger;
             this.logProperties = new Dictionary<string, string>
             {
-                {"Path", dimentions.EventHubPath},
-                {"Partition", dimentions.EventHubPartition}
+                {"Path", dimensions.EventHubPath},
+                {"Partition", dimensions.EventHubPartition}
             };
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure)
+        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
+            double? flowControlThreshold)
         {
             logger.TrackMetric($"{pressureMonitorType}-UnderPressure", underPressure ? 1 : 0, this.logProperties);
             if(cachePressureContributionCount.HasValue)
@@ -49,16 +50,13 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public void ReportMessageStatistics(TimeSpan? oldestMessageAge, TimeSpan? oldestMessageEnqueueTimeToNow, TimeSpan? newestMessageEnqueueTimeToNow, long totalMessageCount)
+        public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
         {
-            if(oldestMessageAge.HasValue)
-                logger.TrackMetric("OldestMessageAge", oldestMessageAge.Value, this.logProperties);
+            if(oldestMessageEnqueueTimeUtc.HasValue && newestMessageEnqueueTimeUtc.HasValue)
+                logger.TrackMetric("OldestMessageRelativeAgeToNewestMessage", newestMessageEnqueueTimeUtc.Value - oldestMessageDequeueTimeUtc.Value, this.logProperties);
 
-            if(oldestMessageEnqueueTimeToNow.HasValue)
-                logger.TrackMetric("OldestMessageEnqueueTimeToNow", oldestMessageEnqueueTimeToNow.Value, this.logProperties);
-
-            if(newestMessageEnqueueTimeToNow.HasValue)
-                logger.TrackMetric("NewestMessageEnqueueTimeToNow", newestMessageEnqueueTimeToNow.Value, this.logProperties);
+            if(oldestMessageDequeueTimeUtc.HasValue)
+                logger.TrackMetric("OldestMessageDequeueTimeToNow", DateTime.UtcNow - oldestMessageDequeueTimeUtc.Value, this.logProperties);
 
             logger.TrackMetric("TotalMessageCount", totalMessageCount, this.logProperties);
         }
@@ -76,13 +74,13 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public void TrackMessageAdded(long mesageAdded)
+        public void TrackMessagesAdded(long mesageAdded)
         {
             logger.TrackMetric("MessageAdded", mesageAdded, this.logProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public void TrackMessagePurged(long messagePurged)
+        public void TrackMessagesPurged(long messagePurged)
         {
             logger.TrackMetric("MessagePurged", messagePurged, this.logProperties);
         }

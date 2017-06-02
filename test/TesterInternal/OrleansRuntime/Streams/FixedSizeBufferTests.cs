@@ -13,12 +13,6 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public int Allocated { get; private set; }
             public int Freed { get; private set; }
-            public string Id { get; private set; }
-
-            public MyTestPooled()
-            {
-                this.Id = Guid.NewGuid().ToString();
-            }
 
             public FixedSizeBuffer Allocate()
             {

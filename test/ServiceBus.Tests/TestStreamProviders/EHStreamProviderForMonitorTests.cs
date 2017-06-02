@@ -29,10 +29,19 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
             {
-                this.ReceiverMonitorFactory = (dimentions, logger) => EventHubReceiverMonitorForTesting.Instance;
-                this.CacheMonitorFactory = (dimentions, logger) => CacheMonitorForTesting.Instance;
-                this.ObjectPoolMonitorFactory = (dimentions, logger) =>ObjectPoolMonitorForTesting.Instance;
+                this.ReceiverMonitorFactory = (dimensions, logger) => EventHubReceiverMonitorForTesting.Instance;
                 base.Init(providerCfg, providerName, log, svcProvider);
+            }
+
+            protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
+            {
+                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
+                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
+                var eventHubPath = hubSettings.Path;
+                var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
+                Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => CacheMonitorForTesting.Instance;
+                Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) =>BlockPoolMonitorForTesting.Instance;
+                return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory);
             }
 
             public enum QueryCommands
@@ -54,7 +63,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                         re = EventHubReceiverMonitorForTesting.Instance.CallCounters;
                         break;
                     case (int)QueryCommands.GetObjectPoolMonitorCallCounters:
-                        re = ObjectPoolMonitorForTesting.Instance.CallCounters;
+                        re = BlockPoolMonitorForTesting.Instance.CallCounters;
                         break;
                     default: return base.ExecuteCommand(command, arg);
 

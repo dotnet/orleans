@@ -12,7 +12,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
     /// <summary>
     /// Default monitor for Object pool used by EventHubStreamProvider
     /// </summary>
-    public class DefaultEventHubObjectPoolMonitor : IObjectPoolMonitor
+    public class DefaultEventHubBlockPoolMonitor : IBlockPoolMonitor
     {
         private Logger logger;
         private Dictionary<string, string> logProperties;
@@ -20,36 +20,36 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimentions"></param>
+        /// <param name="dimensions"></param>
         /// <param name="logger"></param>
-        public DefaultEventHubObjectPoolMonitor(EventHubObjectPoolMonitorDimentions dimentions, Logger logger)
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Logger logger)
         {
             this.logger = logger;
             this.logProperties = new Dictionary<string, string>
             {
-                {"Path", dimentions.EventHubPath},
-                {"ObjectPoolId", dimentions.ObjectPoolId}
+                {"Path", dimensions.EventHubPath},
+                {"ObjectPoolId", dimensions.BlockPoolId}
             };
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void Report(long totalBlocks, long freeBlocks, long claimedBlocks)
+        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
-            this.logger.TrackMetric("TotalBlocks", totalBlocks, this.logProperties);
-            this.logger.TrackMetric("FreeBlocks", freeBlocks, this.logProperties);
-            this.logger.TrackMetric("ClaimedBlocks", claimedBlocks, this.logProperties);
+            this.logger.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.logProperties);
+            this.logger.TrackMetric("AvailableMemoryInByte", availableMemoryInByte, this.logProperties);
+            this.logger.TrackMetric("ClaimedMemoryInByte", claimedMemoryInByte, this.logProperties);
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackObjectReleasedFromCache(int blockCount)
+        public void TrackMemoryReleasedFromCache(long releasedMemoryInByte)
         {
-            this.logger.TrackMetric("BlockReleasedCount", blockCount, this.logProperties);
+            this.logger.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.logProperties);
         }
 
         /// <inheritdoc cref="IObjectPoolMonitor"/>
-        public void TrackObjectAllocatedByCache(int blockCount)
+        public void TrackMemoryAllocatedByCache(long allocatedMemoryInByte)
         {
-            this.logger.TrackMetric("BlockAllocatedCount", blockCount, this.logProperties);
+            this.logger.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.logProperties);
         }
     }
 }

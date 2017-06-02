@@ -36,6 +36,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly Logger logger;
         private readonly ICacheMonitor cacheMonitor;
         private int itemCount;
+        private Timer timer;
         /// <summary>
         /// Cached message most recently added
         /// </summary>
@@ -100,7 +101,7 @@ namespace Orleans.Providers.Streams.Common
 
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
             {
-                var timer = new Timer(this.ReportCacheMessageStatistics, null, cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
+                this.timer = new Timer(this.ReportCacheMessageStatistics, null, cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
             }
            
         }
@@ -135,10 +136,10 @@ namespace Orleans.Providers.Streams.Common
                 var newestMessage = this.Newest.Value;
                 var oldestMessage = this.Oldest.Value;
                 var now = DateTime.UtcNow;
-                var newestMessageEnqueueTime = this.cacheDataAdapter.GetMessageEnqueueTime(ref newestMessage);
-                var oldestMessageEnqueueTime = this.cacheDataAdapter.GetMessageEnqueueTime(ref oldestMessage);
-                var oldestMessageAge = oldestMessageEnqueueTime - newestMessageEnqueueTime;
-                this.cacheMonitor.ReportMessageStatistics(oldestMessageAge, now - oldestMessageEnqueueTime, now - newestMessageEnqueueTime, this.itemCount);
+                var newestMessageEnqueueTime = this.cacheDataAdapter.GetMessageEnqueueTimeUtc(ref newestMessage);
+                var oldestMessageEnqueueTime = this.cacheDataAdapter.GetMessageEnqueueTimeUtc(ref oldestMessage);
+                var oldestMessageDequeueTime = this.cacheDataAdapter.GetMessageDequeueTimeUtc(ref oldestMessage);
+                this.cacheMonitor.ReportMessageStatistics(oldestMessageEnqueueTime, oldestMessageDequeueTime, newestMessageEnqueueTime, this.itemCount);
             }
         }
 
@@ -299,6 +300,23 @@ namespace Orleans.Providers.Streams.Common
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Add a list of queue message to the cache 
+        /// </summary>
+        /// <param name="messages"></param>
+        /// <param name="dequeueTime"></param>
+        /// <returns></returns>
+        public List<StreamPosition> Add(List<TQueueMessage> messages, DateTime dequeueTime)
+        {
+            var streamPosisions = new List<StreamPosition>();
+            foreach (var message in messages)
+            {
+                streamPosisions.Add(this.Add(message, dequeueTime));
+            }
+            this.cacheMonitor.TrackMessagesAdded(messages.Count);
+            return streamPosisions;
         }
 
         /// <summary>

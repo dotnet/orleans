@@ -105,18 +105,8 @@ namespace Orleans.ServiceBus.Providers
         /// Create a receiver monitor to report performance metrics.
         /// Factory funciton should return an IEventHubReceiverMonitor.
         /// </summary>
-        protected Func<EventHubReceiverMonitorDimentions, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
-        /// <summary>
-        /// Create a cache monitor to report performance metrics.
-        /// Factory funciton should return an ICacheMonitor.
-        /// </summary>
-        protected Func<EventHubCacheMonitorDimentions, Logger, ICacheMonitor> CacheMonitorFactory;
+        protected Func<EventHubReceiverMonitorDimensions, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
-        /// <summary>
-        /// Create a object pool monitor to report performance metrics.
-        /// Factory funciton should return an IObjectPoolMonitor.
-        /// </summary>
-        protected Func<EventHubObjectPoolMonitorDimentions, Logger, IObjectPoolMonitor> ObjectPoolMonitorFactory;
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
         /// <summary>
@@ -181,14 +171,8 @@ namespace Orleans.ServiceBus.Providers
 
             if (ReceiverMonitorFactory == null)
             {
-                ReceiverMonitorFactory = (dimentions, receiverLogger) => new DefaultEventHubReceiverMonitor(dimentions, receiverLogger.GetSubLogger("monitor", "-"));
+                ReceiverMonitorFactory = (dimensions, receiverLogger) => new DefaultEventHubReceiverMonitor(dimensions, receiverLogger.GetSubLogger("monitor", "-"));
             }
-
-            if(this.CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimentions, logger) => new DefaultEventHubCacheMonitor(dimentions, logger);
-
-            if(this.ObjectPoolMonitorFactory == null)
-                this.ObjectPoolMonitorFactory = (dimentions, logger) => new DefaultEventHubObjectPoolMonitor(dimentions, logger);
 
             logger = log.GetLogger($"EventHub.{hubSettings.Path}");
         }
@@ -297,8 +281,8 @@ namespace Orleans.ServiceBus.Providers
             var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
             var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
             var eventHubPath = hubSettings.Path;
-            var sharedDimentions = new EventHubMonitorAggregationDimentions(globalConfig, nodeConfig, eventHubPath);
-            return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimentions, this.CacheMonitorFactory, this.ObjectPoolMonitorFactory);
+            var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
+            return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimensions);
         }
  
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
@@ -310,13 +294,13 @@ namespace Orleans.ServiceBus.Providers
             };
             Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
             
-            var receiverMonitorDimentions = new EventHubReceiverMonitorDimentions();
-            receiverMonitorDimentions.EventHubPartition = config.Partition;
-            receiverMonitorDimentions.EventHubPath = config.Hub.Path;
-            receiverMonitorDimentions.NodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
-            receiverMonitorDimentions.GlobalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
+            var receiverMonitorDimensions = new EventHubReceiverMonitorDimensions();
+            receiverMonitorDimensions.EventHubPartition = config.Partition;
+            receiverMonitorDimensions.EventHubPath = config.Hub.Path;
+            receiverMonitorDimensions.NodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
+            receiverMonitorDimensions.GlobalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
 
-            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimentions, recieverLogger), 
+            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger), 
                 this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>(),
                 this.EventHubReceiverFactory);
         }

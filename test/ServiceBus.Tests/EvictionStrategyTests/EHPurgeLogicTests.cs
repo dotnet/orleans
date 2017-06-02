@@ -55,7 +55,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             this.bufferPoolSizeInMB = EventHubStreamProviderSettings.DefaultCacheSizeMb;
             var oneKB = 1024;
-            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB), Guid.NewGuid().ToString(), this.bufferPoolSizeInMB);
+            this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB), this.bufferPoolSizeInMB);
 
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
@@ -225,16 +225,16 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
-            var monitorDimentions = new EventHubReceiverMonitorDimentions();
-            monitorDimentions.EventHubPartition = ehSettings.Partition;
-            monitorDimentions.EventHubPath = ehSettings.Hub.Path;
-            monitorDimentions.GlobalConfig = null;
-            monitorDimentions.NodeConfig = null;
+            var monitorDimensions = new EventHubReceiverMonitorDimensions();
+            monitorDimensions.EventHubPartition = ehSettings.Partition;
+            monitorDimensions.EventHubPath = ehSettings.Hub.Path;
+            monitorDimensions.GlobalConfig = null;
+            monitorDimensions.NodeConfig = null;
 
             this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(monitorDimentions, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.logger), this.GetNodeConfiguration);
             this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(monitorDimentions, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.logger), this.GetNodeConfiguration);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }

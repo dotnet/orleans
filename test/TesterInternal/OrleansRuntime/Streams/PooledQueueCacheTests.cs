@@ -158,7 +158,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 this.bufferPool = bufferPool;
             }
 
-            public DateTime? GetMessageEnqueueTime(ref TestCachedMessage message)
+            public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
             {
                 return null;
             }
@@ -223,7 +228,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             // 10 buffers of 1k each
             public TestBlockPool()
-                : base(() => new FixedSizeBuffer(PooledBufferSize), Guid.NewGuid().ToString(), PooledBufferCount)
+                : base(() => new FixedSizeBuffer(PooledBufferSize), PooledBufferCount)
             {
             }
 

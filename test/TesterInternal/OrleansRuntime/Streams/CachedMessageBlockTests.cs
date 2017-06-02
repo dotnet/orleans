@@ -76,7 +76,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 return streamPosition;
             }
 
-            public DateTime? GetMessageEnqueueTime(ref TestCachedMessage message)
+            public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
             {
                 return null;
             }
@@ -105,13 +110,6 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class MyTestPooled : IObjectPool<CachedMessageBlock<TestCachedMessage>>
         {
-            public string Id { get; private set; }
-
-            public MyTestPooled()
-            {
-                Id = Guid.NewGuid().ToString();
-            }
-
             public CachedMessageBlock<TestCachedMessage> Allocate()
             {
                 return new CachedMessageBlock<TestCachedMessage>(TestBlockSize){Pool = this};

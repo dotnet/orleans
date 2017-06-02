@@ -54,8 +54,15 @@ namespace Orleans.Providers.Streams.Common
         /// Get cached message enqueueTime
         /// </summary>
         /// <param name="message"></param>
-        /// <returns>Return message's enqueue time, return null if message didn't keep a enqueue time</returns>
-        DateTime? GetMessageEnqueueTime(ref TCachedMessage message);
+        /// <returns>Return message's enqueue time Utc, return null if message didn't keep a enqueue time</returns>
+        DateTime? GetMessageEnqueueTimeUtc(ref TCachedMessage message);
+
+        /// <summary>
+        /// Get cached message dequeue time
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns>Return message's dequeue time Utc, return null if the message didn't keep a dequeue time</returns>
+        DateTime? GetMessageDequeueTimeUtc(ref TCachedMessage message);
     }
 
     /// <summary>

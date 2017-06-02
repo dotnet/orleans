@@ -24,11 +24,6 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="resource"></param>
         void Free(T resource);
-
-        /// <summary>
-        /// Unique id of current blockId
-        /// </summary>
-        string Id { get; }
     }
 
     /// <summary>
