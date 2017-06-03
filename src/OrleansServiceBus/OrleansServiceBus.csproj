@@ -54,6 +54,8 @@
     <Compile Include="Providers\EventDataGeneratorStreamProvider\EventHubPartitionDataGenerator.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\EventHubUtils.cs" />
     <Compile Include="Providers\EventDataGeneratorStreamProvider\IEventDataGenerator.cs" />
+    <Compile Include="Providers\EventDataGeneratorStreamProvider\MockEventHubSettings.cs" />
+    <Compile Include="Providers\EventDataGeneratorStreamProvider\NoOpCheckpointer.cs" />
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\AggregatedCachePressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\AveragingCachePressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\ICachePressureMonitor.cs" />
