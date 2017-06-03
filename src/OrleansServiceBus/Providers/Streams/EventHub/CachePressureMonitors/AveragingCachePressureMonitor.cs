@@ -1,4 +1,5 @@
-﻿using Orleans.Runtime;
+﻿using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,10 @@ namespace Orleans.ServiceBus.Providers
         /// Default flow control threshold
         /// </summary>
         public static readonly double DefaultThreshold = 1.0 / 3.0;
+        /// <summary>
+        /// Cache monitor which is used to report cache related metrics
+        /// </summary>
+        public ICacheMonitor CacheMonitor { set; private get; }
         private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
         private readonly Logger logger;
 
@@ -30,8 +35,9 @@ namespace Orleans.ServiceBus.Providers
         /// Constructor
         /// </summary>
         /// <param name="logger"></param>
-        public AveragingCachePressureMonitor(Logger logger)
-            :this(DefaultThreshold, logger)
+        /// <param name="monitor"></param>
+        public AveragingCachePressureMonitor(Logger logger, ICacheMonitor monitor=null)
+            :this(DefaultThreshold, logger, monitor)
         { }
 
         /// <summary>
@@ -39,12 +45,14 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
-        public AveragingCachePressureMonitor(double flowControlThreshold, Logger logger)
+        /// <param name="monitor"></param>
+        public AveragingCachePressureMonitor(double flowControlThreshold, Logger logger, ICacheMonitor monitor=null)
         {
             this.flowControlThreshold = flowControlThreshold;
             this.logger = logger.GetSubLogger(this.GetType().Name);
             nextCheckedTime = DateTime.MinValue;
             isUnderPressure = false;
+            this.CacheMonitor = monitor;
         }
 
         /// <inheritdoc />
@@ -84,7 +92,8 @@ namespace Orleans.ServiceBus.Providers
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)
             {
-                logger.Info(isUnderPressure
+                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, isUnderPressure, cachePressureContributionCount, pressure, this.flowControlThreshold);
+                logger.Verbose(isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
                     : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");
             }

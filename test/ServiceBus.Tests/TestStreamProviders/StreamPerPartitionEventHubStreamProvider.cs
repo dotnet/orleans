@@ -37,9 +37,10 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
             public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), adapterSettings.CacheSizeMb);
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
-                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate));
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, null, 
+                    null, this.timePurgePredicate));
             }
         }
 

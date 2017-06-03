@@ -212,6 +212,7 @@ namespace Orleans.Runtime
             services.AddSingleton(initializationParams.ClusterConfig);
             services.AddSingleton(initializationParams.GlobalConfig);
             services.AddTransient(sp => initializationParams.NodeConfig);
+            services.AddTransient(sp => initializationParams.GlobalConfig);
             services.AddTransient<Func<NodeConfiguration>>(sp => () => initializationParams.NodeConfig);
             services.AddTransient(typeof(IStreamSubscriptionObserver<>),typeof(StreamSubscriptionObserverProxy<>));
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();

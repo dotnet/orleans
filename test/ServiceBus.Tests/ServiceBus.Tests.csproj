@@ -130,8 +130,13 @@
     <Compile Include="EvictionStrategyTests\TestMocks.cs" />
     <Compile Include="SlowConsumingTests\EHSlowConsumingTests.cs" />
     <Compile Include="SlowConsumingTests\EventHubStreamProviderSettingsTests.cs" />
+    <Compile Include="StatisticMonitorTests\CacheMonitorForTesting.cs" />
+    <Compile Include="TestStreamProviders\EHStreamProviderForMonitorTests.cs" />
+    <Compile Include="StatisticMonitorTests\EventHubReceiverMonitorForTesting.cs" />
+    <Compile Include="StatisticMonitorTests\BlockPoolMonitorForTesting.cs" />
     <Compile Include="Streaming\EHClientStreamTests.cs" />
     <Compile Include="Streaming\EHImplicitSubscriptionStreamRecoveryTests.cs" />
+    <Compile Include="StatisticMonitorTests\EHStatisticMonitorTests.cs" />
     <Compile Include="Streaming\EHStreamPerPartitionTests.cs" />
     <Compile Include="Streaming\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="Streaming\EHSubscriptionMultiplicityTests.cs" />

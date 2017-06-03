@@ -186,6 +186,18 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
         }
 
+        /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
+        public DateTime? GetMessageEnqueueTimeUtc(ref CachedEventHubMessage message)
+        {
+            return message.EnqueueTimeUtc;
+        }
+
+        /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
+        public DateTime? GetMessageDequeueTimeUtc(ref CachedEventHubMessage message)
+        {
+            return message.DequeueTimeUtc;
+        }
+
         /// <summary>
         /// Converts a TQueueMessage message from the queue to a TCachedMessage cachable structures.
         /// </summary>

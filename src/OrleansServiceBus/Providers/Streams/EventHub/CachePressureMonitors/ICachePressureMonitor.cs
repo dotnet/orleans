@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Orleans.Providers.Streams.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,5 +25,10 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="utcNow"></param>
         /// <returns></returns>
         bool IsUnderPressure(DateTime utcNow);
+
+        /// <summary>
+        /// Cache monitor which is used to report cache related metrics
+        /// </summary>
+        ICacheMonitor CacheMonitor { set; }
     }
 }

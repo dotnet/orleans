@@ -22,7 +22,6 @@ namespace Orleans.Providers.Streams.Common
         private int writeIndex;
         private int readIndex;
 
-
         /// <summary>
         /// Linked list node, so this message block can be kept in a linked list
         /// </summary>

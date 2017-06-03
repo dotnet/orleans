@@ -76,6 +76,16 @@ namespace UnitTests.OrleansRuntime.Streams
                 return streamPosition;
             }
 
+            public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
+            {
+                return null;
+            }
+
             public IBatchContainer GetBatchContainer(ref TestCachedMessage cachedMessage)
             {
                 return new TestBatchContainer()

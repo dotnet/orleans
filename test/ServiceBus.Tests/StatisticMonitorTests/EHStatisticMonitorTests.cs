@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
-using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,17 +10,19 @@ using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using ServiceBus.Tests.TestStreamProviders;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit;
+using Orleans.TestingHost.Utils;
+using UnitTests.Grains;
+using ServiceBus.Tests.SlowConsumingTests;
 
-namespace ServiceBus.Tests.SlowConsumingTests
+namespace ServiceBus.Tests.MonitorTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
-    public class EHSlowConsumingTests : OrleansTestingBase, IClassFixture<EHSlowConsumingTests.Fixture>
+    public class EHStatisticMonitorTests : OrleansTestingBase, IClassFixture<EHStatisticMonitorTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHTestsNamespace";
@@ -29,9 +30,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private const string EHConsumerGroup = "orleansnightly";
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-        private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
-        private const double flowControlThredhold = 0.6;
+        private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
+        private static readonly int ehPartitionCountPerSilo = 4;
         public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
             new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
@@ -51,10 +52,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(2);
-                ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
-                ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
-                ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
+                var options = new TestClusterOptions(1);
+                ProviderSettings.StatisticMonitorWriteInterval = monitorWriteInterval;
+
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }
@@ -95,14 +95,14 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
                 // register stream provider
-                config.Globals.RegisterStreamProvider<EHStreamProviderWithCreatedCacheList>(StreamProviderName, settings);
+                config.Globals.RegisterStreamProvider<EHStreamProviderForMonitorTests>(StreamProviderName, settings);
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
         }
 
         private readonly Random seed;
 
-        public EHSlowConsumingTests(Fixture fixture)
+        public EHStatisticMonitorTests(Fixture fixture)
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
@@ -110,7 +110,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
+        public async Task EHStatistics_MonitorCalledAccordingly()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
             //set up one slow consumer grain
@@ -119,12 +119,12 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             //set up 30 healthy consumer grain to show how much we favor slow consumer 
             int healthyConsumerCount = 30;
-            var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
+            var healthyConsumers = await EHSlowConsumingTests.SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             var randomStreamPlacementArg = new EventDataGeneratorStreamProvider.AdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
+            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
                 (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
@@ -132,39 +132,50 @@ namespace ServiceBus.Tests.SlowConsumingTests
             //make slow consumer stop consuming
             await slowConsumer.StopConsuming();
 
-            //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
-            await Task.Delay(monitorPressureWindowSize);
-            await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(false, lastTry), timeout);
+            //assert EventHubReceiverMonitor call counters
+            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null);
+            foreach (var callCounter in receiverMonitorCounters)
+            {
+                AssertReceiverMonitorCallCounters(callCounter as EventHubReceiverMonitorCounters);
+            }
 
-            //clean up test
-            await StopHealthyConsumerGrainComing(healthyConsumers);
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
+            var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null);
+            foreach (var callCounter in cacheMonitorCounters)
+            {
+                AssertCacheMonitorCallCounters(callCounter as CacheMonitorCounters);
+            }
+
+            var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
+             (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null);
+            foreach (var callCounter in objectPoolMonitorCounters)
+            {
+                AssertObjectPoolMonitorCallCounters(callCounter as ObjectPoolMonitorCounters);
+            }
         }
 
-        public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
+        private void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters)
         {
-            List<ISampleStreaming_ConsumerGrain> grains = new List<ISampleStreaming_ConsumerGrain>();
-            List<Task> tasks = new List<Task>();
-            while (grainCount > 0)
-            {
-                var consumer = GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
-                grains.Add(consumer);
-                tasks.Add(consumer.BecomeConsumer(streamId, streamNameSpace, streamProvider));
-                grainCount--;
-            }
-            await Task.WhenAll(tasks);
-            return grains;
+            Assert.True(totalCacheMonitorCallCounters.TrackCachePressureMonitorStatusChangeCallCounter > 0);
+            Assert.True(totalCacheMonitorCallCounters.TrackMemoryAllocatedCallCounter > 0);
+            Assert.Equal(totalCacheMonitorCallCounters.TrackMemoryReleasedCallCounter, 0);
+            Assert.True(totalCacheMonitorCallCounters.TrackMessageAddedCounter > 0);
+            Assert.Equal(totalCacheMonitorCallCounters.TrackMessagePurgedCounter, 0);
         }
 
-        private async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
+        private void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
         {
-            List<Task> tasks = new List<Task>();
-            foreach (var grain in grains)
-            {
-                tasks.Add(grain.StopConsuming());
-            }
-            await Task.WhenAll(tasks);
+            Assert.Equal(totalReceiverMonitorCallCounters.TrackInitializationCallCounter, ehPartitionCountPerSilo);
+            Assert.True(totalReceiverMonitorCallCounters.TrackMessagesReceivedCallCounter > 0);
+            Assert.True(totalReceiverMonitorCallCounters.TrackReadCallCounter > 0);
+            Assert.Equal(totalReceiverMonitorCallCounters.TrackShutdownCallCounter, 0);
+        }
+
+        private void AssertObjectPoolMonitorCallCounters(ObjectPoolMonitorCounters totalObjectPoolMonitorCallCounters)
+        {
+            Assert.True(totalObjectPoolMonitorCallCounters.TrackObjectAllocatedByCacheCallCounter > 0);
+            Assert.Equal(totalObjectPoolMonitorCallCounters.TrackObjectReleasedFromCacheCallCounter, 0);
         }
 
         private async Task<bool> AssertCacheBackPressureTriggered(bool expectedResult, bool assertIsTrue)
@@ -184,7 +195,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private async Task<bool> IsBackPressureTriggered()
         {
             IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName,
+            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName,
                              StreamProviderName, EHStreamProviderWithCreatedCacheList.AdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)
             {

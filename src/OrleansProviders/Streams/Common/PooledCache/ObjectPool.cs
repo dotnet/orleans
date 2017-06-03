@@ -1,6 +1,8 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
+using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -14,12 +16,21 @@ namespace Orleans.Providers.Streams.Common
         private const int DefaultPoolCapacity = 1 << 10; // 1k
         private readonly Stack<T> pool;
         private readonly Func<T> factoryFunc;
+        private long totalObjects;
+        private Timer timer;
+        /// <summary>
+        /// monitor to report statistics for current object pool
+        /// </summary>
+        protected IObjectPoolMonitor monitor;
+
         /// <summary>
         /// Simple object pool
         /// </summary>
         /// <param name="factoryFunc">Function used to create new resources of type T</param>
         /// <param name="initialCapacity">Initial number of items to allocate</param>
-        public ObjectPool(Func<T> factoryFunc, int initialCapacity = DefaultPoolCapacity)
+        /// <param name="monitor">monitor to report statistics for object pool</param>
+        /// <param name="monitorWriteInterval"></param>
+        public ObjectPool(Func<T> factoryFunc, int initialCapacity = DefaultPoolCapacity, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
         {
             if (factoryFunc == null)
             {
@@ -31,6 +42,13 @@ namespace Orleans.Providers.Streams.Common
             }
             this.factoryFunc = factoryFunc;
             pool = new Stack<T>(initialCapacity);
+            this.monitor = monitor;
+
+            if (this.monitor != null && monitorWriteInterval.HasValue)
+            {
+                this.timer = new Timer(this.ReportObjectPoolStatistics, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
+            }
+            this.totalObjects = 0;
         }
 
         /// <summary>
@@ -39,9 +57,17 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public virtual T Allocate()
         {
-            var resource = pool.Count != 0
-                ? pool.Pop()
-                : factoryFunc();
+            T resource;
+            if (pool.Count != 0)
+            {
+                resource = pool.Pop();
+            }
+            else
+            {
+                resource = factoryFunc();
+                this.totalObjects++;
+            }
+            this.monitor?.TrackObjectAllocated();
             resource.Pool = this;
             return resource;
         }
@@ -52,7 +78,15 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="resource"></param>
         public virtual void Free(T resource)
         {
+            this.monitor?.TrackObjectReleased();
             pool.Push(resource);
+        }
+
+        private void ReportObjectPoolStatistics(object state)
+        {
+            var availableObjects = this.pool.Count;
+            long claimedObjects = this.totalObjects - availableObjects;
+            this.monitor.Report(this.totalObjects, availableObjects, claimedObjects);
         }
     }
 }

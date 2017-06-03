@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.ServiceBus.Providers
@@ -19,25 +20,37 @@ namespace Orleans.ServiceBus.Providers
         /// Buffers which are currently in use in the cache
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
+
+        private long cacheSizeInByte;
         private readonly TimePurgePredicate timePurge;
+        private Timer timer;
         /// <summary>
         /// Buffers which are purged
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> purgedBuffers;
         private FixedSizeBuffer currentBuffer;
         private readonly Logger logger;
+        private ICacheMonitor cacheMonitor;
 
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="logger"></param>
+        /// <param name="cacheMonitor"></param>
+        /// <param name="monitorWriteInterval"></param>
         /// <param name="timePurage"></param>
-        public EventHubCacheEvictionStrategy(Logger logger, TimePurgePredicate timePurage = null)
+        public EventHubCacheEvictionStrategy(Logger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
         {
             this.inUseBuffers = new Queue<FixedSizeBuffer>();
             this.logger = logger.GetSubLogger(this.GetType().Name);
             this.purgedBuffers = new Queue<FixedSizeBuffer>();
             this.timePurge = timePurage ?? TimePurgePredicate.Default;
+            this.cacheMonitor = cacheMonitor;
+            if (cacheMonitor != null && monitorWriteInterval.HasValue)
+            {
+                this.timer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
+            }
+            this.cacheSizeInByte = 0;
         }
         /// <inheritdoc />
         public IPurgeObservable<CachedEventHubMessage> PurgeObservable { private get; set; }
@@ -62,6 +75,8 @@ namespace Orleans.ServiceBus.Providers
             this.inUseBuffers.Enqueue(newBuffer);
             this.currentBuffer = newBuffer;
             newBuffer.SetPurgeAction(this.OnFreeBlockRequest);
+            this.cacheSizeInByte += newBuffer.SizeInByte;
+            this.cacheMonitor?.TrackMemoryAllocated(newBuffer.SizeInByte);
         }
 
         /// <inheritdoc />
@@ -89,6 +104,7 @@ namespace Orleans.ServiceBus.Providers
                 return;
 
             //items got purged, time to conduct follow up actions 
+            this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             UpdatePurgedBuffers(lastMessagePurged.Value, this.PurgeObservable.Oldest);
             if (this.logger.IsVerbose)
@@ -97,6 +113,11 @@ namespace Orleans.ServiceBus.Providers
                 var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
                 ReportPurge(itemCountBeforePurge, itemCountAfterPurge);
             }
+        }
+
+        private void ReportCacheSize(object state)
+        {
+            this.cacheMonitor?.ReportCacheSize(this.cacheSizeInByte);
         }
 
         private void UpdatePurgedBuffers(CachedEventHubMessage lastMessagePurged, CachedEventHubMessage? oldestMessageInCache)
@@ -139,16 +160,20 @@ namespace Orleans.ServiceBus.Providers
             //free all blocks before purgeCandidate,including purgeCandidate, expcept for current buffer in use
             if (this.purgedBuffers.Contains(purgeCandidate))
             {
+                int releaseMemoryInByte = 0;
                 while (true)
                 {
                     var purgedBuffer = this.purgedBuffers.Peek();
                     if (purgedBuffer == this.currentBuffer)
                         break;
                     this.purgedBuffers.Dequeue();
+                    releaseMemoryInByte += purgedBuffer.SizeInByte;
                     purgedBuffer.Dispose();
                     if (purgedBuffer == purgeCandidate)
                         break;
                 }
+                this.cacheSizeInByte -= releaseMemoryInByte;
+                this.cacheMonitor?.TrackMemoryReleased(releaseMemoryInByte);
             }
         }
 

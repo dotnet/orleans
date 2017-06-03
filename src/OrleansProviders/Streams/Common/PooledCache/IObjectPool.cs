@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Orleans.Providers.Streams.Common

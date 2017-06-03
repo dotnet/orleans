@@ -133,7 +133,17 @@ namespace Orleans.Providers
                 this.bufferPool = bufferPool;
                 this.serializer = serializer;
             }
-             
+
+            public DateTime? GetMessageEnqueueTimeUtc(ref MemoryMessageData message)
+            {
+                return null;
+            }
+
+            public DateTime? GetMessageDequeueTimeUtc(ref MemoryMessageData message)
+            {
+                return null;
+            }
+
             public StreamPosition QueueMessageToCachedMessage(ref MemoryMessageData cachedMessage,
                 MemoryMessageData queueMessage, DateTime dequeueTimeUtc)
             {
