@@ -5,7 +5,7 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Versions
 {
-    public interface IVersionStore : IVersionManagement
+    public interface IVersionStore : IVersionManager
     {
         bool IsEnabled { get; }
         Task<Dictionary<int, CompatibilityStrategy>> GetCompatibilityStrategies();

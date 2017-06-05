@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// Interface for system management functions of silos, 
     /// exposed as a grain for receiving remote requests / commands.
     /// </summary>
-    public interface IManagementGrain : IGrainWithIntegerKey, IVersionManagement
+    public interface IManagementGrain : IGrainWithIntegerKey, IVersionManager
     {
         /// <summary>
         /// Get the list of silo hosts and statuses currently known about in this cluster.

@@ -340,7 +340,7 @@ namespace Orleans.Runtime.Management
             catch (Exception)
             {
                 // ignored: silos that failed to set the new strategy will reload it from the storage
-                // in the futur.
+                // in the future.
             }
         }
 
