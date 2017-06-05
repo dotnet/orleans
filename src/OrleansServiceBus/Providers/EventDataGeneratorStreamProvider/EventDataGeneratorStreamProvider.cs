@@ -115,7 +115,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// <param name="svcProvider"></param>
             public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
             {
-                this.CheckpointerFactory = partition => NoOpCheckpointer.Create();
+                this.CheckpointerFactory = partition => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
                 this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
                 this.ehGeneratorSettings = new EventHubGeneratorStreamProviderSettings(providerName);
                 this.ehGeneratorSettings.PopulateDataGeneratingConfigFromProviderConfig(providerCfg);

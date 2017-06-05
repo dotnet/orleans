@@ -14,10 +14,7 @@ namespace Orleans.ServiceBus.Providers.Testing
     /// </summary>
     public class NoOpCheckpointer : IStreamQueueCheckpointer<string>
     {
-        public static Task<IStreamQueueCheckpointer<string>> Create()
-        {
-            return Task.FromResult<IStreamQueueCheckpointer<string>>(new NoOpCheckpointer());
-        }
+        public static NoOpCheckpointer Instance = new NoOpCheckpointer();
 
         public bool CheckpointExists => true;
         public Task<string> Load()
