@@ -26,24 +26,11 @@ namespace ServiceBus.Tests.MonitorTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHTestsNamespace";
-        private const string EHPath = "ehorleanstest";
-        private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
         private static readonly int ehPartitionCountPerSilo = 4;
         public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
             new EventHubGeneratorStreamProviderSettings(StreamProviderName);
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
-                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
 
         private readonly Fixture fixture;
@@ -54,32 +41,8 @@ namespace ServiceBus.Tests.MonitorTests
             {
                 var options = new TestClusterOptions(1);
                 ProviderSettings.StatisticMonitorWriteInterval = monitorWriteInterval;
-
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
-            }
-
-            private bool isSkippable;
-            protected override void CheckPreconditionsOrThrow()
-            {
-                base.CheckPreconditionsOrThrow();
-                if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.EventHubConnectionString) ||
-                    string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
-                {
-                    this.isSkippable = true;
-                    throw new SkipException("EventHubConnectionString or DataConnectionString is not set up");
-                }
-            }
-
-            public override void Dispose()
-            {
-                base.Dispose();
-                if (!isSkippable)
-                {
-                    var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
-                    dataManager.InitTableAsync().Wait();
-                    dataManager.ClearTableAsync().Wait();
-                }
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -88,8 +51,6 @@ namespace ServiceBus.Tests.MonitorTests
                 // get initial settings from configs
                 ProviderSettings.WriteProperties(settings);
                 ProviderSettings.WriteDataGeneratingConfig(settings);
-                EventHubConfig.Value.WriteProperties(settings);
-                CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting
                 settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
@@ -109,7 +70,7 @@ namespace ServiceBus.Tests.MonitorTests
             seed = new Random();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task EHStatistics_MonitorCalledAccordingly()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);

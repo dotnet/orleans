@@ -29,12 +29,14 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="providerName"></param>
         public EventHubGeneratorStreamProviderSettings(string providerName)
             :base(providerName)
-        { }
+        {
+            this.EventHubSettingsType = typeof(MockEventHubSettings);
+        }
 
         /// <summary>
         /// StreamDataGeneratorTypeName
         /// </summary>
-        public static string StreamDataGeneratorTypeName = nameof(StreamDataGeneratorType);
+        public const string StreamDataGeneratorTypeName = nameof(StreamDataGeneratorType);
         /// <summary>
         /// DefaultStreamDataGeneratorType
         /// </summary>
@@ -48,6 +50,21 @@ namespace Orleans.ServiceBus.Providers.Testing
             get { return streamDataGeneratorType ?? DefaultStreamDataGeneratorType; }
             set { streamDataGeneratorType = value; }
         }
+
+        /// <summary>
+        /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing. 
+        /// For example, if parition count set at 5, the generated partitions will be  partition-0, partition-1, partition-2, partition-3, partiton-4
+        /// </summary>
+        public int EventHubPartitionCount = DefaultEventHubPartitionCount;
+        /// <summary>
+        /// Default EventHubPartitionRangeStart
+        /// </summary>
+        public const int DefaultEventHubPartitionCount = 4;
+        /// <summary>
+        /// EventHubPartitionRangeStartName
+        /// </summary>
+        public const string EventHubPartitionCountName = nameof(EventHubPartitionCount);
+
         /// <summary>
         /// Populate data generating config from provider config
         /// </summary>
@@ -55,6 +72,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         public void PopulateDataGeneratingConfigFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             this.streamDataGeneratorType = providerConfiguration.GetTypeProperty(StreamDataGeneratorTypeName, DefaultStreamDataGeneratorType);
+            this.EventHubPartitionCount = providerConfiguration.GetIntProperty(EventHubPartitionCountName, DefaultEventHubPartitionCount);
         }
 
         /// <summary>
@@ -64,6 +82,16 @@ namespace Orleans.ServiceBus.Providers.Testing
         public void WriteDataGeneratingConfig(Dictionary<string, string> properties)
         {
             properties.Add(StreamDataGeneratorTypeName, this.StreamDataGeneratorType.AssemblyQualifiedName);
+            properties.Add(EventHubPartitionCountName, this.EventHubPartitionCount.ToString());
+        }
+
+        public static string[] GenerateEventHubPartitions(int partitionCount)
+        {
+            var size = partitionCount;
+            var partitions = new string[size];
+            for (int i = 0; i < size; i++)
+                partitions[i] = $"partition-{(i).ToString()}";
+            return partitions;
         }
     }
     /// <summary>
@@ -87,10 +115,26 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// <param name="svcProvider"></param>
             public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
             {
+                this.CheckpointerFactory = partition => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
                 this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
                 this.ehGeneratorSettings = new EventHubGeneratorStreamProviderSettings(providerName);
                 this.ehGeneratorSettings.PopulateDataGeneratingConfigFromProviderConfig(providerCfg);
                 base.Init(providerCfg, providerName, log, svcProvider);
+            }
+
+            /// <inheritdoc/>
+            protected override void InitEventHubClient()
+            {
+                //do nothing, EventDataGeneratorStreamProvider doesn't need connection with EventHubClient
+            }
+
+            /// <summary>
+            /// Generate mocked eventhub partition Ids from EventHubGeneratorStreamProviderSettings
+            /// </summary>
+            /// <returns></returns>
+            protected override Task<string[]> GetPartitionIdsAsync()
+            {
+                return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionCount));
             }
 
             private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger)

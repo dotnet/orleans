@@ -137,16 +137,7 @@ namespace Orleans.ServiceBus.Providers
             adapterSettings = new EventHubStreamProviderSettings(providerName);
             adapterSettings.PopulateFromProviderConfig(providerConfig);
             hubSettings = adapterSettings.GetEventHubSettings(providerConfig, serviceProvider);
-#if NETSTANDARD
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(hubSettings.ConnectionString)
-            {
-                EntityPath = hubSettings.Path
-            };
-            client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
-#else
-            client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
-#endif
-
+            InitEventHubClient();
             if (CheckpointerFactory == null)
             {
                 checkpointerSettings = adapterSettings.GetCheckpointerSettings(providerConfig, serviceProvider);
@@ -166,7 +157,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (QueueMapperFactory == null)
             {
-                QueueMapperFactory = partitions => new EventHubQueueMapper(partitionIds, adapterSettings.StreamProviderName);
+                QueueMapperFactory = partitions => new EventHubQueueMapper(partitions, adapterSettings.StreamProviderName);
             }
 
             if (ReceiverMonitorFactory == null)
@@ -269,6 +260,19 @@ namespace Orleans.ServiceBus.Providers
             return receivers.GetOrAdd(queueId, q => MakeReceiver(queueId));
         }
 
+        protected virtual void InitEventHubClient()
+        {
+#if NETSTANDARD
+            var connectionStringBuilder = new EventHubsConnectionStringBuilder(hubSettings.ConnectionString)
+            {
+                EntityPath = hubSettings.Path
+            };
+            client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+#else
+            client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
+#endif
+        }
+
         /// <summary>
         /// Create a IEventHubQueueCacheFactory. It will create a EventHubQueueCacheFactory by default. 
         /// User can override this function to return their own implementation of IEventHubQueueCacheFactory, 
@@ -305,7 +309,11 @@ namespace Orleans.ServiceBus.Providers
                 this.EventHubReceiverFactory);
         }
 
-        private async Task<string[]> GetPartitionIdsAsync()
+        /// <summary>
+        /// Get partition Ids from eventhub
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
 #if NETSTANDARD
             EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
