@@ -19,7 +19,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             return Task.FromResult<IStreamQueueCheckpointer<string>>(new NoOpCheckpointer());
         }
 
-        public bool CheckpointExists => false;
+        public bool CheckpointExists => true;
         public Task<string> Load()
         {
             return Task.FromResult(EventHubConstants.StartOfStream);

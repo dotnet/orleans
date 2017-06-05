@@ -52,34 +52,18 @@ namespace Orleans.ServiceBus.Providers.Testing
         }
 
         /// <summary>
-        /// Configure the start of eventhub partition range. EventDataGeneratorStreamProvider would generate the same set of partitions by filling in numbers from range
-        /// start to range end, when initializing. For example, if rangeStart at 1 and rangeEnd at 5, the generated partitions will be  partition-1, partition-2, partition-3, 
-        /// partition-4, partiton-5
+        /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing. 
+        /// For example, if parition count set at 5, the generated partitions will be  partition-0, partition-1, partition-2, partition-3, partiton-4
         /// </summary>
-        public int EventHubPartitionRangeStart = DefaultEventHubPartitionRangeStart;
+        public int EventHubPartitionCount = DefaultEventHubPartitionCount;
         /// <summary>
         /// Default EventHubPartitionRangeStart
         /// </summary>
-        public const int DefaultEventHubPartitionRangeStart = 1;
+        public const int DefaultEventHubPartitionCount = 4;
         /// <summary>
         /// EventHubPartitionRangeStartName
         /// </summary>
-        public const string EventHubPartitionRangeStartName = nameof(EventHubPartitionRangeStart);
-
-        /// <summary>
-        /// Configure the end of eventhub partition range. EventDataGeneratorStreamProvider would generate the same set of partitions by filling in numbers from range
-        /// start to range end, when initializing. For example, if rangeStart at 1 and rangeEnd at 5, the generated partitions will be partition-1, partition-2, partition-3, 
-        /// partition-4, partiton-5
-        /// </summary>
-        public int EventHubPartitionRangeEnd = DefaultEventHubPartitionRangeEnd;
-        /// <summary>
-        /// Default EventHubPartitionRangeEnd
-        /// </summary>
-        public const int DefaultEventHubPartitionRangeEnd = 4;
-        /// <summary>
-        /// EventHubPartitionRangeEndName
-        /// </summary>
-        public const string EventHubPartitionRangeEndName = nameof(EventHubPartitionRangeEnd);
+        public const string EventHubPartitionCountName = nameof(EventHubPartitionCount);
 
         /// <summary>
         /// Populate data generating config from provider config
@@ -88,8 +72,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         public void PopulateDataGeneratingConfigFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             this.streamDataGeneratorType = providerConfiguration.GetTypeProperty(StreamDataGeneratorTypeName, DefaultStreamDataGeneratorType);
-            this.EventHubPartitionRangeStart = providerConfiguration.GetIntProperty(EventHubPartitionRangeStartName, DefaultEventHubPartitionRangeStart);
-            this.EventHubPartitionRangeEnd = providerConfiguration.GetIntProperty(EventHubPartitionRangeEndName, DefaultEventHubPartitionRangeEnd);
+            this.EventHubPartitionCount = providerConfiguration.GetIntProperty(EventHubPartitionCountName, DefaultEventHubPartitionCount);
         }
 
         /// <summary>
@@ -99,16 +82,15 @@ namespace Orleans.ServiceBus.Providers.Testing
         public void WriteDataGeneratingConfig(Dictionary<string, string> properties)
         {
             properties.Add(StreamDataGeneratorTypeName, this.StreamDataGeneratorType.AssemblyQualifiedName);
-            properties.Add(EventHubPartitionRangeStartName, this.EventHubPartitionRangeStart.ToString());
-            properties.Add(EventHubPartitionRangeEndName, this.EventHubPartitionRangeEnd.ToString());
+            properties.Add(EventHubPartitionCountName, this.EventHubPartitionCount.ToString());
         }
 
-        public static string[] GenerateEventHubPartitions(int rangeStart, int rangeEnd)
+        public static string[] GenerateEventHubPartitions(int partitionCount)
         {
-            var size = rangeEnd - rangeStart + 1;
+            var size = partitionCount;
             var partitions = new string[size];
             for (int i = 0; i < size; i++)
-                partitions[i] = $"partition-{(rangeStart + i).ToString()}";
+                partitions[i] = $"partition-{(i).ToString()}";
             return partitions;
         }
     }
@@ -152,8 +134,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// <returns></returns>
             protected override Task<string[]> GetPartitionIdsAsync()
             {
-                return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionRangeStart,
-                    this.ehGeneratorSettings.EventHubPartitionRangeEnd));
+                return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionCount));
             }
 
             private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger)
