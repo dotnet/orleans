@@ -1,33 +1,35 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansProviders</PackageId>
     <Title>Microsoft Orleans Providers</Title>
     <Description>Library of built-in persistence and stream providers included in Microsoft Orleans.</Description>
-    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>OrleansProviders</AssemblyName>
+    <RootNamespace>OrleansProviders</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile
-      Include="..\..\..\src\OrleansProviders\**\*.cs"
-      Exclude="
-        ..\..\..\src\OrleansProviders\obj\**\*.cs;
-        ..\..\..\src\OrleansProviders\bin\**\*.cs;
-        ..\..\..\src\OrleansProviders\Properties\**\*.cs" />
+    <Compile Include="..\..\..\src\OrleansProviders\**\*.cs" Exclude="..\..\..\src\OrleansProviders\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
   </ItemGroup>
+
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
 </Project>

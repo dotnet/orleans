@@ -1,11 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>UnitTests</RootNamespace>
+    <AssemblyName>TesterInternal</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
@@ -21,10 +25,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\..\test\TesterInternal\**\*.cs" Exclude="..\..\..\test\TesterInternal\obj\**\*.cs;..\..\..\test\TesterInternal\bin\**\*.cs;..\..\..\test\TesterInternal\CounterControlProgTests.cs;..\..\..\test\TesterInternal\GeoClusterTests\*.cs;..\..\..\test\TesterInternal\OrleansHostProgTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="xunit" Version="2.2.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.3.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,17 +52,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="App.config" />
-    <Content Include="..\..\..\test\TesterInternal\TesterInternal.xunit.runner.json">
+    <None Include="..\..\..\test\TesterInternal\App.config">
+      <Link>App.config</Link>
+    </None>
+    <None Include="..\..\..\test\TesterInternal\TesterInternal.xunit.runner.json">
+      <Link>TesterInternal.xunit.runner.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TesterInternal\**\*.cs" Exclude="..\..\..\test\TesterInternal\obj\**\*.cs;..\..\..\test\TesterInternal\bin\**\*.cs;..\..\..\test\TesterInternal\Properties\*.cs;..\..\..\test\TesterInternal\CounterControlProgTests.cs;..\..\..\test\TesterInternal\GeoClusterTests\*.cs;..\..\..\test\TesterInternal\OrleansHostProgTests.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+    </None>
   </ItemGroup>
 </Project>

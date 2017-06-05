@@ -1,26 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>NonSilo.Tests</RootNamespace>
+    <AssemblyName>NonSilo.Tests</AssemblyName>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-  </ItemGroup>
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="1.1.1" />
     <PackageReference Include="Validation" Version="2.4.15" />
     <PackageReference Include="xunit" Version="2.2.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.3.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,11 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\NonSilo.Tests\**\*.cs" Exclude="..\..\..\test\NonSilo.Tests\obj\**\*.cs;..\..\..\test\NonSilo.Tests\bin\**\*.cs;..\..\..\test\NonSilo.Tests\Properties\*.cs;..\..\..\test\NonSilo.Tests\AssemblyLoaderTests.cs" />
+    <Compile Include="..\..\..\test\NonSilo.Tests\**\*.cs" Exclude="..\..\..\test\NonSilo.Tests\obj\**\*.cs;..\..\..\test\NonSilo.Tests\bin\**\*.cs;..\..\..\test\NonSilo.Tests\AssemblyLoaderTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="..\..\..\test\NonSilo.Tests\NonSilo.Tests.xunit.runner.json">
       <Link>NonSilo.Tests.xunit.runner.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -165,9 +163,5 @@
       <Link>ClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
 </Project>

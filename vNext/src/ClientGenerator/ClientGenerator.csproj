@@ -1,30 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
     <Title>Microsoft Orleans Build-time Code Generation</Title>
     <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
-    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <IsTool>true</IsTool>
     <IncludeReferencedProjects>true</IncludeReferencedProjects>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <OutputType>Exe</OutputType>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.CodeGeneration</RootNamespace>
     <AssemblyName>ClientGenerator</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\src\ClientGenerator\**\*.cs" Exclude="..\..\..\src\ClientGenerator\obj\**\*.cs;..\..\..\src\ClientGenerator\bin\**\*.cs;..\..\..\src\ClientGenerator\Properties\**\*.cs" />
+    <Compile Include="..\..\..\src\ClientGenerator\**\*.cs" Exclude="..\..\..\src\ClientGenerator\obj\**\*.cs;..\..\..\src\ClientGenerator\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

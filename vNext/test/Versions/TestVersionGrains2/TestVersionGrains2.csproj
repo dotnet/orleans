@@ -1,11 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>TestVersionGrains</RootNamespace>
+    <AssemblyName>TestVersionGrains</AssemblyName>
   </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -16,12 +21,15 @@
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
+
   <PropertyGroup Condition="'$(OutputPath)' != ''">
     <OutDir>$(OutputPath)\$(TargetFramework)\TestVersionGrainsV2</OutDir>
   </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\..\test\Versions\TestVersionGrains2\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrains2\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains2\obj\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains2\Properties\**\*.cs" />
+    <Compile Include="..\..\..\..\test\Versions\TestVersionGrains2\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrains2\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains2\obj\**\*.cs" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />

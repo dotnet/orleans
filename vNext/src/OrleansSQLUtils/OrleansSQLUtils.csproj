@@ -1,25 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansSQLUtils</PackageId>
     <Title>Microsoft Orleans SQL Utilities</Title>
     <Description>Library of utility types for relational storage of Microsoft Orleans.</Description>
-    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET SQL</PackageTags>
+    <PackageTags>$(PackageTags) SQL</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>OrleansSQLUtils</AssemblyName>
+    <RootNamespace>OrleansSQLUtils</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\src\OrleansSQLUtils\**\*.cs" Exclude="..\..\..\src\OrleansSQLUtils\Properties\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.cs;..\..\..\src\OrleansSQLUtils\bin\**\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.sql;..\..\..\src\OrleansSQLUtils\bin\**\*.sql" />
+    <Compile Include="..\..\..\src\OrleansSQLUtils\**\*.cs" Exclude="..\..\..\src\OrleansSQLUtils\obj\**\*.cs;..\..\..\src\OrleansSQLUtils\bin\**\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.sql;..\..\..\src\OrleansSQLUtils\bin\**\*.sql" />
   </ItemGroup>
 
   <ItemGroup>

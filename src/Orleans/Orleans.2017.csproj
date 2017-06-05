@@ -34,21 +34,11 @@
   </ItemGroup>
   <PropertyGroup>
     <OrleansBootstrapSteps>
-      GenerateVersionNumber;
       LogBuildProperties;
       OrleansDllBootstrapUsingCodeGen
     </OrleansBootstrapSteps>
   </PropertyGroup>
   <Target Name="OrleansBootstrap" AfterTargets="BeforeCompile" DependsOnTargets="$(OrleansBootstrapSteps)" Condition="'$(Bootstrap)' != 'true'" />
-  <Target Name="GenerateVersionNumber" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
-    <Message Text="GenerateVersionNumber" />
-    <PropertyGroup>
-      <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(BuildNumber)' == ''">
-      <BuildNumber>1</BuildNumber>
-    </PropertyGroup>
-  </Target>
   <Target Name="LogBuildProperties">
     <Message Importance="high" Text="[Build Properties]" />
     <!-- Show values of some useful properties -->

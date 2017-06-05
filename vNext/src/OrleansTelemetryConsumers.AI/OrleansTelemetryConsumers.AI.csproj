@@ -1,25 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
-    <IsPackable>true</IsPackable>
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
     <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
-    <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Azure Application-Insights</PackageTags>
+    <PackageTags>$(PackageTags) Azure Application-Insights</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>OrleansTelemetryConsumers.AI</AssemblyName>
+    <RootNamespace>OrleansTelemetryConsumers.AI</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <NoWarn>1591</NoWarn>
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\src\OrleansTelemetryConsumers.AI\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.AI\Properties\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\bin\**\*.cs" />
+    <Compile Include="..\..\..\src\OrleansTelemetryConsumers.AI\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.AI\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.AI\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
