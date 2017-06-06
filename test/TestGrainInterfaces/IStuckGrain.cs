@@ -11,6 +11,8 @@ namespace UnitTests.GrainInterfaces
         Task NonBlockingCall();
 
         Task<int> GetNonBlockingCallCounter();
+
+        Task BlockingDeactivation();
     }
 
     public interface IStuckCleanGrain : IGrainWithGuidKey
