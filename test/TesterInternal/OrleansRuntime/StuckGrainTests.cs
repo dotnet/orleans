@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
@@ -68,6 +69,28 @@ namespace UnitTests.StuckGrainTests
 
             // Should timeout
             await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
+
+            for (var i = 0; i < 3; i++)
+            {
+                await Assert.ThrowsAsync<TimeoutException>(
+                    () => stuckGrain.NonBlockingCall().WithTimeout(TimeSpan.FromMilliseconds(500)));
+            }
+
+            // Wait so the first task will reach with DefaultCollectionAge timeout
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            // No issue on this one
+            await stuckGrain.NonBlockingCall();
+
+            Assert.Equal(1, await stuckGrain.GetNonBlockingCallCounter());
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
+        public async Task StuckGrainTest_StuckDetectionOnDeactivation()
+        {
+            var id = Guid.NewGuid();
+            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+            await stuckGrain.BlockingDeactivation();
 
             for (var i = 0; i < 3; i++)
             {

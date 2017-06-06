@@ -367,6 +367,7 @@ namespace Orleans.Runtime
         public void PrepareForDeactivation()
         {
             SetState(ActivationState.Deactivating);
+            deactivationStartTime = DateTime.UtcNow;
             StopAllTimers();
         }
 
@@ -441,6 +442,7 @@ namespace Orleans.Runtime
 
         private DateTime currentRequestStartTime;
         private DateTime becameIdle;
+        private DateTime deactivationStartTime;
 
         public void RecordRunning(Message message)
         {
@@ -534,6 +536,16 @@ namespace Orleans.Runtime
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorInvalidActivation;
+                }
+                if (State == ActivationState.Deactivating)
+                {
+                    var deactivatingTime = DateTime.UtcNow - deactivationStartTime;
+                    if (deactivatingTime > maxRequestProcessingTime)
+                    {
+                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                            $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying  to enqueue {message}.");
+                        return EnqueueMessageResult.ErrorStuckActivation;
+                    }
                 }
                 if (Running != null)
                 {
