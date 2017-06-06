@@ -57,7 +57,7 @@ public class ClusterFixture : IDisposable
 
     public void Dispose()
     {
-        this.Cluster.Dispose();
+        this.Cluster.StopAllSilos();
     }
 
     public TestCluster Cluster { get; private set; }
