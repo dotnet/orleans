@@ -10,7 +10,7 @@ set CMDHOME=%CMDHOME:~0,-1%
 pushd "%CMDHOME%"
 @cd
 
-SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%\TestResults
+SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%
 
 if not exist %TestResultDir% md %TestResultDir%
 

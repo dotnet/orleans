@@ -22,9 +22,14 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(OutputPath)' != ''">
-    <OutDir>$(OutputPath)\$(TargetFramework)\TestVersionGrainsV1</OutDir>
+  <PropertyGroup Condition="'$(OutDir)' != ''">
+    <OutDir>$(OutDir)\TestVersionGrainsV1</OutDir>
+    <OutputPath>$(OutDir)</OutputPath>
   </PropertyGroup>
+
+  <!--<PropertyGroup Condition="'$(OutputPath)' != ''">
+    <OutDir>$(OutputPath)\$(TargetFramework)\TestVersionGrainsV1</OutDir>
+  </PropertyGroup>-->
 
   <ItemGroup>
     <Compile Include="..\..\..\..\test\Versions\TestVersionGrains\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrains\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains\obj\**\*.cs" />
@@ -32,6 +37,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />

@@ -59,7 +59,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 else
                 {
                     // vnext
-                    var target = @"\net462";
+                    var target = @"\net462\win";
                     assemblyGrainsV1Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV1Vs + target);
                     assemblyGrainsV2Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV2Vs + target);
                 }
