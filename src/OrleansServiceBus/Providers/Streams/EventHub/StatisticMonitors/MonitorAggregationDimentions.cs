@@ -128,16 +128,18 @@ namespace Orleans.ServiceBus.Providers
         /// Block pool Id
         /// </summary>
         public string BlockPoolId { get; set; }
+        public int BlockSize;
 
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="dimensions"></param>
         /// <param name="blockPoolId"></param>
-        public EventHubBlockPoolMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string blockPoolId)
+        public EventHubBlockPoolMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string blockPoolId, int blockSize)
             :base(dimensions)
         {
             this.BlockPoolId = blockPoolId;
+            this.BlockSize = blockSize;
         }
 
         /// <summary>

@@ -41,6 +41,8 @@ namespace ServiceBus.Tests.MonitorTests
             {
                 var options = new TestClusterOptions(1);
                 ProviderSettings.StatisticMonitorWriteInterval = monitorWriteInterval;
+                ProviderSettings.CacheSizeMb = 5;
+                ProviderSettings.DataMaxAgeInCache = TimeSpan.FromMinutes(5);
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }
