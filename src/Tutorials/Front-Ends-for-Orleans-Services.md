@@ -58,6 +58,7 @@ namespace WebApplication1
        	   ...
 ```
 
+The default configuration for the config has the port set to 40000, which your configuration file which we set up earlier in the documentation has been set to 30000
 
 Now when the ASP.NET application starts, it will initialize the Orleans Client.
 
