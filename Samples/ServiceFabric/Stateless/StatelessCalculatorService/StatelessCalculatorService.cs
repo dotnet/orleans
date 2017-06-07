@@ -6,6 +6,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Grains;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using Microsoft.Orleans.ServiceFabric;
@@ -112,6 +113,7 @@ namespace StatelessCalculatorService
         {
             var logger = providerRuntime.GetLogger(nameof(BootstrapProvider));
             this.Name = name;
+            
             var grain = providerRuntime.GrainFactory.GetGrain<ICalculatorGrain>(Guid.Empty);
             Task.Factory.StartNew(
                 async () =>
@@ -120,9 +122,8 @@ namespace StatelessCalculatorService
                     {
                         try
                         {
-                            var oldValue = await grain.Get();
                             var value = await grain.Add(1);
-                            //logger.Info($"{oldValue} + 1 = {value}");
+                            logger.Info($"{value - 1} + 1 = {value}");
                             await Task.Delay(TimeSpan.FromSeconds(4));
                         }
                         catch (Exception exception)

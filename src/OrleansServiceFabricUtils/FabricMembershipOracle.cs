@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans;
@@ -35,6 +36,7 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private Timer timer;
         private DateTime lastRefreshTime;
+        private TaskScheduler scheduler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricMembershipOracle"/> class.
@@ -192,6 +194,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         public Task Start()
         {
+            this.scheduler = TaskScheduler.Current;
             this.timer = new Timer(
                 self => ((FabricMembershipOracle)self).RefreshAsync().Ignore(),
                 this,
@@ -365,20 +368,23 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private void NotifySubscribers(SiloAddress address, SiloStatus newStatus, List<ISiloStatusListener> listeners)
         {
-            foreach (var subscriber in listeners)
+            Task.Factory.StartNew(() =>
             {
-                try
+                foreach (var subscriber in listeners)
                 {
-                    subscriber.SiloStatusChangeNotification(address, newStatus);
+                    try
+                    {
+                        subscriber.SiloStatusChangeNotification(address, newStatus);
+                    }
+                    catch (Exception exception)
+                    {
+                        this.log.Warn(
+                            (int) ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
+                            "Exception notifying subscriber.",
+                            exception);
+                    }
                 }
-                catch (Exception exception)
-                {
-                    this.log.Warn(
-                        (int)ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
-                        "Exception notifying subscriber.",
-                        exception);
-                }
-            }
+            }, CancellationToken.None, TaskCreationOptions.None, this.scheduler);
         }
 
         private async Task RefreshAsync()
