@@ -158,23 +158,20 @@ namespace Orleans.ServiceBus.Providers
         {
             var purgeCandidate = block as FixedSizeBuffer;
             //free all blocks before purgeCandidate,including purgeCandidate, expcept for current buffer in use
-            if (this.purgedBuffers.Contains(purgeCandidate))
+            int releaseMemoryInByte = 0;
+            while (this.purgedBuffers.Count > 0)
             {
-                int releaseMemoryInByte = 0;
-                while (true)
-                {
-                    var purgedBuffer = this.purgedBuffers.Peek();
-                    if (purgedBuffer == this.currentBuffer)
-                        break;
-                    this.purgedBuffers.Dequeue();
-                    releaseMemoryInByte += purgedBuffer.SizeInByte;
-                    purgedBuffer.Dispose();
-                    if (purgedBuffer == purgeCandidate)
-                        break;
-                }
-                this.cacheSizeInByte -= releaseMemoryInByte;
-                this.cacheMonitor?.TrackMemoryReleased(releaseMemoryInByte);
+                var purgedBuffer = this.purgedBuffers.Peek();
+                if (purgedBuffer == this.currentBuffer)
+                    break;
+                this.purgedBuffers.Dequeue();
+                releaseMemoryInByte += purgedBuffer.SizeInByte;
+                purgedBuffer.Dispose();
+                if (purgedBuffer == purgeCandidate)
+                    break;
             }
+            this.cacheSizeInByte -= releaseMemoryInByte;
+            this.cacheMonitor?.TrackMemoryReleased(releaseMemoryInByte);
         }
 
         private void ReportPurge(int itemCountBeforePurge, int itemCountAfterPurge)

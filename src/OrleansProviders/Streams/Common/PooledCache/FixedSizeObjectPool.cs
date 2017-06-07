@@ -1,4 +1,5 @@
 ﻿
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 
@@ -44,7 +45,7 @@ namespace Orleans.Providers.Streams.Common
             }
             maxObjectCount = poolSize;
         }
-
+        int counter = 0;
         /// <summary>
         /// Allocates a resource from the pool.
         /// </summary>
@@ -64,6 +65,15 @@ namespace Orleans.Providers.Streams.Common
 
                 // track used objects
                 usedObjects.Enqueue(obj);
+
+                //check if there's unreasonable duplicates
+                if(counter++ % 20 == 0)
+                {
+                    if (new System.Collections.Generic.HashSet<T>(usedObjects).Count == usedObjects.Count)
+                    {
+                        LogManager.GetLogger("Hack").Info("Used objects duplicates") ;
+                    }
+                }
             }
 
             return obj;
