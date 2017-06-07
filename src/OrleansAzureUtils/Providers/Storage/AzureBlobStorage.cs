@@ -249,9 +249,9 @@ namespace Orleans.Storage
             {
                 await updateOperation.Invoke().ConfigureAwait(false);
             }
-            catch (StorageException ex) when (ex.IsPreconditionFailed())
+            catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
             {
-                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blob.Name}, Container: {blob.Container?.Name}, CurrentETag: {currentETag}", "Unkown", currentETag, ex);
+                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blob.Name}, Container: {blob.Container?.Name}, CurrentETag: {currentETag}", "Unknown", currentETag, ex);
             }
         }
     }
