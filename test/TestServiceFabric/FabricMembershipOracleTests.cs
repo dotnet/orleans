@@ -156,7 +156,7 @@ namespace TestServiceFabric
             Assert.Equal(SiloStatus.Active, listener.Silos[silos[1].SiloAddress]);
             AssertStatus(silos[1].SiloAddress, SiloStatus.Active);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[0].SiloAddress]);
-            AssertStatus(silos[0].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[0].SiloAddress, SiloStatus.Dead);
             multiClusters = this.oracle.GetApproximateMultiClusterGateways();
             Assert.Equal(2, multiClusters.Count);
 
@@ -165,9 +165,9 @@ namespace TestServiceFabric
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[0].SiloAddress]);
-            AssertStatus(silos[0].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[0].SiloAddress, SiloStatus.Dead);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[1].SiloAddress]);
-            AssertStatus(silos[1].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[1].SiloAddress, SiloStatus.Dead);
 
             multiClusters = this.oracle.GetApproximateMultiClusterGateways();
             Assert.Equal(1, multiClusters.Count);
