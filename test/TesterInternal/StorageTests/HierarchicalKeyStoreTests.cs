@@ -16,7 +16,7 @@ namespace UnitTests.StorageTests
             public Fixture()
             {
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-                ClientConfiguration cfg = ClientConfiguration.StandardLoad();
+                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
                 LogManager.Initialize(cfg);
             }
         }

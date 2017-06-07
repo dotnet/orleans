@@ -23,10 +23,14 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 #else
         private const string BuildConfiguration = "Release";
 #endif
-        private const string AssemblyGrainsV1Vs = @"..\..\..\Versions\TestVersionGrains\bin\" + BuildConfiguration;
-        private const string AssemblyGrainsV2Vs = @"..\..\..\Versions\TestVersionGrains2\bin\" + BuildConfiguration;
-        private const string AssemblyGrainsV1Build = @"TestVersionGrainsV1";
-        private const string AssemblyGrainsV2Build = @"TestVersionGrainsV2";
+        private const string AssemblyGrainsV1Build = "TestVersionGrainsV1";
+        private const string AssemblyGrainsV2Build = "TestVersionGrainsV2";
+        private const string CommonParentDirectory = "test";
+        private const string BinDirectory = "bin";
+        private const string VersionsProjectDirectory = "Versions";
+        private const string GrainsV1ProjectName = "TestVersionGrains";
+        private const string GrainsV2ProjectName = "TestVersionGrains2";
+        private const string VersionTestBinaryName = "TestVersionGrains.dll";
         private readonly DirectoryInfo assemblyGrainsV1Dir;
         private readonly DirectoryInfo assemblyGrainsV2Dir;
 
@@ -41,29 +45,50 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected UpgradeTestsBase()
         {
             // Setup dll references
-            // If test run from cmdlime
+            // If test run from old master cmd line with single output directory
             if (Directory.Exists(AssemblyGrainsV1Build))
             {
                 assemblyGrainsV1Dir = new DirectoryInfo(AssemblyGrainsV1Build);
                 assemblyGrainsV2Dir = new DirectoryInfo(AssemblyGrainsV2Build);
             }
-            // If test run from VS
             else
             {
-                // If not run from vnext
-                if (Directory.Exists(AssemblyGrainsV1Vs))
+                var testDirectory = new DirectoryInfo(GetType().Assembly.Location);
+
+                while (String.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
                 {
-                    assemblyGrainsV1Dir = new DirectoryInfo(AssemblyGrainsV1Vs);
-                    assemblyGrainsV2Dir = new DirectoryInfo(AssemblyGrainsV2Vs);
+                    testDirectory = testDirectory.Parent;
                 }
-                else
+
+                if (testDirectory.Parent == null)
                 {
-                    // vnext
-                    var target = @"\net462\win";
-                    assemblyGrainsV1Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV1Vs + target);
-                    assemblyGrainsV2Dir = new DirectoryInfo(@"..\" + AssemblyGrainsV2Vs + target);
+                    throw new InvalidOperationException($"Cannot locate 'test' directory starting from '{GetType().Assembly.Location}'");
                 }
+
+                assemblyGrainsV1Dir = GetVersionTestDirectory(testDirectory, GrainsV1ProjectName);
+                assemblyGrainsV2Dir = GetVersionTestDirectory(testDirectory, GrainsV2ProjectName);
             }
+        }
+
+        private DirectoryInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
+        {
+            var projectDirectory = Path.Combine(testDirectory.FullName, VersionsProjectDirectory, directoryName, BinDirectory);
+
+            var directories = Directory.GetDirectories(projectDirectory, BuildConfiguration, SearchOption.AllDirectories);
+
+            if (directories.Length != 1)
+            {
+                throw new InvalidOperationException($"Number of directories found for pattern: '{BuildConfiguration}' under {testDirectory.FullName}: {directories.Length}");
+            }
+
+            var files = Directory.GetFiles(directories[0], VersionTestBinaryName, SearchOption.AllDirectories);
+
+            if (files.Length != 1)
+            {
+                throw new InvalidOperationException($"Number of files found for pattern: '{VersionTestBinaryName}' under {testDirectory.FullName}: {files.Length}");
+            }
+
+            return new DirectoryInfo(Path.GetDirectoryName(files[0]));
         }
 
         protected async Task Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(int step2Version)
