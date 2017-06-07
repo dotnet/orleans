@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using Orleans.Streams;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
+using Orleans.Versions;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
@@ -17,8 +20,10 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly OrleansTaskScheduler scheduler;
+        private readonly TimeSpan refreshClusterMapTimeout;
         private bool hasToRefreshClusterGrainInterfaceMap;
-        private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
+        private AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
+        private IVersionStore versionStore;
 
         internal TypeManager(
             SiloAddress myAddr,
@@ -46,14 +51,20 @@ namespace Orleans.Runtime
             this.grainFactory = grainFactory;
             this.versionSelectorManager = versionSelectorManager;
             this.scheduler = scheduler;
+            this.refreshClusterMapTimeout = refreshClusterMapTimeout;
+        }
+
+        internal void Initialize(IVersionStore store)
+        {
+            this.versionStore = store;
             this.hasToRefreshClusterGrainInterfaceMap = true;
             this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
-                    OnRefreshClusterMapTimer,
-                    null,
-                    TimeSpan.Zero,  // Force to do it once right now
-                    refreshClusterMapTimeout); 
+                OnRefreshClusterMapTimer,
+                null,
+                TimeSpan.Zero,  // Force to do it once right now
+                refreshClusterMapTimeout);
         }
-        
+
         public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
         {
             return Task.FromResult<IGrainTypeResolver>(grainTypeManager.ClusterGrainInterfaceMap);
@@ -124,7 +135,74 @@ namespace Orleans.Runtime
             }
 
             grainTypeManager.SetInterfaceMapsBySilo(newSilosClusterGrainInterfaceMap);
+
+            if (this.versionStore.IsEnabled)
+            {
+                await this.GetAndSetDefaultCompatibilityStrategy();
+                foreach (var kvp in await GetStoredCompatibilityStrategies())
+                {
+                    this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(kvp.Key, kvp.Value);
+                }
+                await this.GetAndSetDefaultSelectorStrategy();
+                foreach (var kvp in await GetSelectorStrategies())
+                {
+                    this.versionSelectorManager.VersionSelectorManager.SetSelector(kvp.Key, kvp.Value);
+                }
+            }
+
             versionSelectorManager.ResetCache();
+        }
+
+        private async Task GetAndSetDefaultSelectorStrategy()
+        {
+            try
+            {
+                var strategy = await this.versionStore.GetSelectorStrategy();
+                this.versionSelectorManager.VersionSelectorManager.SetSelector(strategy);
+            }
+            catch (Exception)
+            {
+                hasToRefreshClusterGrainInterfaceMap = true;
+            }
+        }
+
+        private async Task GetAndSetDefaultCompatibilityStrategy()
+        {
+            try
+            {
+                var strategy = await this.versionStore.GetCompatibilityStrategy();
+                this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(strategy);
+            }
+            catch (Exception)
+            {
+                hasToRefreshClusterGrainInterfaceMap = true;
+            }
+        }
+
+        private async Task<Dictionary<int, CompatibilityStrategy>> GetStoredCompatibilityStrategies()
+        {
+            try
+            {
+                return await this.versionStore.GetCompatibilityStrategies();
+            }
+            catch (Exception)
+            {
+                hasToRefreshClusterGrainInterfaceMap = true;
+                return new Dictionary<int, CompatibilityStrategy>();
+            }
+        }
+
+        private async Task<Dictionary<int, VersionSelectorStrategy>> GetSelectorStrategies()
+        {
+            try
+            {
+                return await this.versionStore.GetSelectorStrategies();
+            }
+            catch (Exception)
+            {
+                hasToRefreshClusterGrainInterfaceMap = true;
+                return new Dictionary<int, VersionSelectorStrategy>();
+            }
         }
 
         private async Task<KeyValuePair<SiloAddress, GrainInterfaceMap>> GetTargetSiloGrainInterfaceMap(SiloAddress siloAddress)

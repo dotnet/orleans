@@ -214,10 +214,13 @@
     <Compile Include="Versions\Compatibility\AllVersionsCompatibilityDirector.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatilityDirector.cs" />
     <Compile Include="Versions\Compatibility\CompatibilityDirectorManager.cs" />
+    <Compile Include="Versions\Compatibility\StrictVersionCompatibilityDirector.cs" />
     <Compile Include="Versions\Selector\AllCompatibleVersionsSelector.cs" />
     <Compile Include="Versions\Selector\LatestVersionDirector.cs" />
     <Compile Include="Versions\Selector\MinimumVersionSelector.cs" />
     <Compile Include="Versions\Selector\VersionDirectorManager.cs" />
+    <Compile Include="Versions\GrainVersionStore.cs" />
+    <Compile Include="Versions\VersionStoreGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

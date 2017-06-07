@@ -44,6 +44,7 @@ using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Streams.Core;
 using Orleans.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
+using Orleans.Versions;
 using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
@@ -294,7 +295,9 @@ namespace Orleans.Runtime
             services.AddSingleton<CompatibilityDirectorManager>();
             services.AddSingleton<ICompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
             services.AddSingleton<ICompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
+            services.AddSingleton<ICompatibilityDirector<StrictVersionCompatible>, StrictVersionCompatibilityDirector>();
             services.AddSingleton<CachedVersionSelectorManager>();
+            services.AddSingleton<IVersionStore, GrainVersionStore>();
 
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
@@ -577,6 +580,9 @@ namespace Orleans.Runtime
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
+            var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
+            versionStore?.SetStorageManager(storageProviderManager);
+            typeManager.Initialize(versionStore);
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating

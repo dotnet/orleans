@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
@@ -10,7 +12,7 @@ namespace Orleans.Runtime
     /// Interface for system management functions of silos, 
     /// exposed as a grain for receiving remote requests / commands.
     /// </summary>
-    public interface IManagementGrain : IGrainWithIntegerKey
+    public interface IManagementGrain : IGrainWithIntegerKey, IVersionManager
     {
         /// <summary>
         /// Get the list of silo hosts and statuses currently known about in this cluster.
@@ -170,8 +172,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
 
-
-#region MultiCluster Management
+        #region MultiCluster Management
 
         /// <summary>
         /// Get the current list of multicluster gateways.
