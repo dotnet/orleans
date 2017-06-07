@@ -104,7 +104,6 @@ namespace Orleans.ServiceBus.Providers
                 return;
 
             //items got purged, time to conduct follow up actions 
-            this.logger.Info($"Message purged : {itemsPurged}");
             this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             UpdatePurgedBuffers(lastMessagePurged.Value, this.PurgeObservable.Oldest);
@@ -154,7 +153,6 @@ namespace Orleans.ServiceBus.Providers
             // age of message relative to the most recent event in the cache.
             TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
             var re = timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
-            this.logger.Info($"Should purge? {re}, relative age {relativeAge}, timeInCache{timeInCache}");
             return re;
         }
 
