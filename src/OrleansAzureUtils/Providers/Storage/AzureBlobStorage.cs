@@ -81,7 +81,7 @@ namespace Orleans.Storage
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 
                 Log.Info((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, "Init: Name={0} ServiceId={1} {2}", name, providerRuntime.ServiceId.ToString(), string.Join(" ", FormatPropertyMessage(config)));
-                Log.Info((int)AzureProviderErrorCode.AzureBlobProvider_ParamConnectionString, "AzureBlobStorage Provider is using DataConnectionString: {0}", ConfigUtilities.PrintDataConnectionInfo(config.Properties["DataConnectionString"]));
+                Log.Info((int)AzureProviderErrorCode.AzureBlobProvider_ParamConnectionString, "AzureBlobStorage Provider is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(config.Properties["DataConnectionString"]));
             }
             catch (Exception ex)
             {
