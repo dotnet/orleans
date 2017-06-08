@@ -74,7 +74,7 @@ namespace Orleans.ServiceBus.Providers
                
             this.inUseBuffers.Enqueue(newBuffer);
             this.currentBuffer = newBuffer;
-            newBuffer.SetPurgeAction(this.OnFreeBlockRequest);
+            //newBuffer.SetPurgeAction(this.OnFreeBlockRequest);
             this.cacheSizeInByte += newBuffer.SizeInByte;
             this.cacheMonitor?.TrackMemoryAllocated(newBuffer.SizeInByte);
         }
@@ -142,6 +142,8 @@ namespace Orleans.ServiceBus.Providers
                 //is not ready to be added to purgedBuffers yet. It will be ready to be added to purgedBuffers when a new buffer is allocated for the cache
                 //and the cache is empty at that time. Otherwise, wait for next purge circle. See OnBlockAllocated method
             }
+            this.logger.Info($"Purged buffer length {this.purgedBuffers.Count}");
+            FreePurgedBuffers();
         }
 
         // Given a purge cached message, indicates whether it should be purged from the cache
@@ -150,17 +152,39 @@ namespace Orleans.ServiceBus.Providers
             TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.
             TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
+            var re = timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
+            return re;
+        }
 
-            return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
+        private void FreePurgedBuffers()
+        {
+            int releaseMemoryInByte = 0;
+            int freedBlocks = 0;
+            while (this.purgedBuffers.Count > 0)
+            {
+                var purgedBuffer = this.purgedBuffers.Peek();
+                if (purgedBuffer == this.currentBuffer)
+                    break;
+                this.purgedBuffers.Dequeue();
+                releaseMemoryInByte += purgedBuffer.SizeInByte;
+                freedBlocks++;
+                purgedBuffer.Dispose();
+            }
+            this.cacheSizeInByte -= releaseMemoryInByte;
+            this.logger.Info($"FreePurgedBuffers freed blocks {freedBlocks}");
+            this.cacheMonitor?.TrackMemoryReleased(releaseMemoryInByte);
         }
 
         private void OnFreeBlockRequest(IDisposable block)
         {
             var purgeCandidate = block as FixedSizeBuffer;
+            this.logger.Info($"purgeCandidate Id is {purgeCandidate.Id}, purgedBuffer length {this.purgedBuffers.Count}");
             //free all blocks before purgeCandidate,including purgeCandidate, expcept for current buffer in use
             if (this.purgedBuffers.Contains(purgeCandidate))
             {
+                this.logger.Info("Purged buffers contains purge candidate");
                 int releaseMemoryInByte = 0;
+                int freedBlocks = 0;
                 while (true)
                 {
                     var purgedBuffer = this.purgedBuffers.Peek();
@@ -168,11 +192,13 @@ namespace Orleans.ServiceBus.Providers
                         break;
                     this.purgedBuffers.Dequeue();
                     releaseMemoryInByte += purgedBuffer.SizeInByte;
+                    freedBlocks++;
                     purgedBuffer.Dispose();
                     if (purgedBuffer == purgeCandidate)
                         break;
                 }
                 this.cacheSizeInByte -= releaseMemoryInByte;
+                this.logger.Info($"OnFreeBlockRequest freed blocks {freedBlocks}");
                 this.cacheMonitor?.TrackMemoryReleased(releaseMemoryInByte);
             }
         }

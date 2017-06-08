@@ -26,6 +26,7 @@ namespace Orleans.ServiceBus.Providers.Testing
 
         /// <inheritdoc cref="IEventHubReceiver"/>
         public IIntCounter SequenceNumberCounter { set; private get; }
+        public FixedTimeCounter EnqueueTimeCounter { set; private get; }
         /// <inheritdoc cref="IEventHubReceiver"/>
         public bool ShouldProduce { private get; set; }
 
@@ -61,7 +62,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             while (count-- > 0)
             {
                 this.SequenceNumberCounter.Increment();
-                var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
+                var eventData = EventHubBatchContainer.ToEventData<byte[]>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
                     this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContext.Export(this.serializationManager));
 #if NETSTANDARD
 //set partition key
@@ -74,19 +75,19 @@ namespace Orleans.ServiceBus.Providers.Testing
                 //set sequence number
                 eventData.SetSequenceNumber(this.SequenceNumberCounter.Value);
                 //set enqueue time
-                eventData.SetEnqueuedTimeUtc(now);
+                eventData.SetEnqueuedTimeUtc(this.EnqueueTimeCounter.NextTimeStamp());
                 eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
+                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} and enqueueTime {eventData.EnqueuedTimeUtc} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
             }
 
             events = eventDataList;
             return eventDataList.Count > 0;
         }
 
-        private IEnumerable<int> GenerateEvent(int sequenceNumber)
+        private IEnumerable<byte[]> GenerateEvent(int sequenceNumber)
         {
-            var events = new List<int>();
-            events.Add(sequenceNumber);
+            var events = new List<byte[]>();
+            events.Add(new byte[1024 + 1024]);
             return events;
         }
     }
@@ -98,6 +99,7 @@ namespace Orleans.ServiceBus.Providers.Testing
     {
         //differnt stream in the same partition should use the same sequenceNumberCounter
         private IntCounter sequenceNumberCounter = new IntCounter();
+        private FixedTimeCounter timeCounter = new FixedTimeCounter(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         private Logger logger;
         private List<IStreamDataGenerator<EventData>> generators;
         private SerializationManager serializationManager;
@@ -121,6 +123,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             var generator = (IStreamDataGenerator<EventData>)Activator.CreateInstance(settings.StreamDataGeneratorType,
                 streamId, settings, this.logger, this.serializationManager);
             generator.SequenceNumberCounter = sequenceNumberCounter;
+            generator.EnqueueTimeCounter = timeCounter;
             this.logger.Info($"Data generator set up on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
             this.generators.Add(generator);
         }

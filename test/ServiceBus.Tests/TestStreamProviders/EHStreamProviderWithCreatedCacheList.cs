@@ -45,7 +45,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 {
                     this.caches = caches;
                 }
-                private const int defaultMaxAddCount = 10;
+                private const int defaultMaxAddCount = 1000;
                 protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
                     Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
                     SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions)

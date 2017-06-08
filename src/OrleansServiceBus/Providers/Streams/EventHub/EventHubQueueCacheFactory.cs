@@ -81,9 +81,9 @@ namespace Orleans.ServiceBus.Providers
         {
             if (this.bufferPool == null)
             {
-                var bufferSize = 1 << 20;
+                var bufferSize = 1024 * 20;
                 this.bufferPoolId = $"BlockPool-{new Guid().ToString()}-BlockSize-{bufferSize}";
-                var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, this.bufferPoolId);
+                var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, this.bufferPoolId, providerSettings.CacheSizeMb);
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(monitorDimensions, logger), bufferSize);
                 this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(bufferSize),
                     providerSettings.CacheSizeMb,

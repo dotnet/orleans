@@ -37,7 +37,7 @@ namespace Orleans.ServiceBus.Providers
         public virtual bool ShouldPurgFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
         {
             // if time in cache exceeds the minimum and age of data is greater than max allowed, purge
-            return timeInCache > minTimeInCache && relativeAge > maxRelativeMessageAge;
+            return relativeAge > maxRelativeMessageAge;
         }
     }
 }
