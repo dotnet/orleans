@@ -117,7 +117,7 @@ For example this can be done using xUnit&#39;s class or collection fixtures (see
 
     public void Dispose()
     {
-        this.Cluster.Dispose();
+        this.Cluster.StopAllSilos();
     }
 
     public TestCluster Cluster { get; private set; }

@@ -144,49 +144,170 @@ public class MyGrain&lt;MyGrainState&gt; ...
 <li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
 </ul>
 <h3 id="adonet-storage-provider-sql-storage-provider">ADO.NET Storage Provider (SQL Storage Provider)</h3>
-<p>Note that to use this it is necessary to deploy the database script to the database.
-The scripts are located in the NuGet library, similar to <code>\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net&lt;version&gt;\SQLServer\</code> depending on version and database vendor.
-They can also be found in the <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils">repository</a>.
-Currently, the NuGet package includes scripts for SQL Server, MySQL, and PostgreSQL.</p>
-<p><strong>Important:</strong>
-You need to reference an ADO.NET provider corresponding to the database vendor you use.
-Currently, you can use the following NuGet packages, but the list may change in the future.</p>
-<ul>
-<li>SQL Server <a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></li>
-<li>MySQL <a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></li>
-<li>PostgreSQL <a href="https://www.nuget.org/packages/Npgsql">Npgsql</a></li>
-</ul>
-<p>Check with your database vendor for their latest supported ADO.NET provider.   </p>
-<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.SqlUtils.StorageProvider.SqlStorageProvider&quot; Name=&quot;SqlStore&quot; DataConnectionString=&quot;Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;&quot; /&gt;
-</code></pre><ul>
-<li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The SQL connection string to use.</li>
-<li><strong><code>UseJsonFormat=&quot;false&quot;</code></strong> (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to <code>false</code>.</li>
-<li><strong><code>UseXmlFormat=&quot;false&quot;</code></strong> (optional) - If true, the .NET XML serializer will be used, otherwise the Orleans binary serializer will be used, defaults to <code>false</code>.</li>
-<li><strong><code>UseBinaryFormat=&quot;false&quot;</code></strong> (the default) - If true, the Orleans binary data format will be used.</li>
-</ul>
-<p>Note that pool size of 200 is quite a low figure.</p>
-<p>The following is an example of programmatic configuration.</p>
-<pre><code class="lang-csharp">//props[&quot;RootDirectory&quot;] = @&quot;.\Samples.FileStorage&quot;;
-//config.Globals.RegisterStorageProvider&lt;Samples.StorageProviders.OrleansFileStorage&gt;(&quot;TestStore&quot;, props);
-props[Orleans.Storage.AdoNetStorageProvider.DataConnectionStringPropertyName] = @&quot;Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;&quot;;
-props[Orleans.Storage.AdoNetStorageProvider.UseJsonFormatPropertyName] = &quot;true&quot;; //Binary, the default option, is more efficient. This is for illustrative purposes.
-config.Globals.RegisterStorageProvider&lt;Orleans.Storage.AdoNetStorageProvider&gt;(&quot;TestStore&quot;, props);
-</code></pre><p>A quick way to test this is to (see in the aforementioned the few commented lines)</p>
-<ol>
-<li>Open <code>\Samples\StorageProviders</code>.</li>
-<li>On the package manager console, run: <code>Install-Package Microsoft.Orleans.OrleansSqlUtils -project Test.Client</code>.</li>
-<li>Update all the Orleans packages in the solution, run: <code>Get-Package | where Id -like &#39;Microsoft.Orleans.*&#39; | foreach { update-package $_.Id }</code> (this is a precaution to make sure the packages are on same version).</li>
-<li>Go to <code>OrleansHostWrapper.cs</code> and to the following</li>
-</ol>
-<p>The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
+<p>The ADO .NET Storage Provider allows you to store grain state in relational databases.
+Currently, SQL Server and MySQL/MariaDB are supported. PostgreSQL is a work in progress
+and not yet available.</p>
+<p>First, install the base package:</p>
+<pre><code>Install-Package Microsoft.Orleans.OrleansSqlUtils
+</code></pre><p>Under the folder where the package gets installed alongside your project, you will
+find different SQL scripts for the supported database vendors. You can also get
+them from the <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils">OrleansSQLUtils repository</a>.
+Create a database, and then run the appropriate script to create the tables.</p>
+<p>The next steps are to install a second NuGet package (see table below) specific to the
+database vendor you want, and to configure the storage provider either programmatically or
+via XML configuration.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SQL Server</th>
+<th>MySQL / MariaDB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Script</td>
+<td>SQLServer\CreateOrleansTables_SqlServer.sql</td>
+<td>MySql\CreateOrleansTables_MySql.sql</td>
+</tr>
+<tr>
+<td>NuGet Package</td>
+<td><a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></td>
+<td><a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></td>
+</tr>
+<tr>
+<td>AdoInvariant</td>
+<td>System.Data.SqlClient</td>
+<td>MySql.Data.MySqlClient</td>
+</tr>
+</tbody>
+</table>
+<p>The following is an example of how to configure an ADO .NET Storage Provider using XML configuration:</p>
+<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+  &lt;Globals&gt;
+    &lt;StorageProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.AdoNetStorageProvider&quot;
+                Name=&quot;OrleansStorage&quot;
+                AdoInvariant=&quot;&lt;AdoInvariant&gt;&quot;
+                DataConnectionString=&quot;&lt;ConnectionString&gt;&quot;
+                UseJsonFormat=&quot;true&quot; /&gt;
+    &lt;/StorageProviders&gt;
+  &lt;/Globals&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre><p>In code, you would need something like the following:</p>
+<pre><code class="lang-csharp">var properties = new Dictionary&lt;string, string&gt;()
+{
+    [&quot;AdoInvariant&quot;] = &quot;&lt;AdoInvariant&gt;&quot;,
+    [&quot;DataConnectionString&quot;] = &quot;&lt;ConnectionString&gt;&quot;,
+    [&quot;UseJsonFormat&quot;] = &quot;true&quot;
+};
+
+config.Globals.RegisterStorageProvider&lt;AdoNetStorageProvider&gt;(&quot;OrleansStorage&quot;, properties);
+</code></pre><p>Essentially, you only need to set the database-vendor-specific connection string and an
+<code>AdoInvariant</code> (see table above) that identifies the vendor. You may also choose the format in which the data
+is saved, which may be either binary (default), JSON, or XML. While binary is the most compact
+option, it is opaque and you will not be able to read or work with the data. JSON is the
+recommended option.</p>
+<p>You can set the following properties:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>String</td>
+<td>Arbitrary name that persistent grains will use to refer to this storage provider</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>String</td>
+<td>Set to <code>Orleans.Storage.AdoNetStorageProvider</code></td>
+</tr>
+<tr>
+<td>AdoInvariant</td>
+<td>String</td>
+<td>Identifies the database vendor (see above table for values; default is <code>System.Data.SqlClient</code>)</td>
+</tr>
+<tr>
+<td>DataConnectionString</td>
+<td>String</td>
+<td>Vendor-specific database connection string (required)</td>
+</tr>
+<tr>
+<td>UseJsonFormat</td>
+<td>Boolean</td>
+<td>Use JSON format (recommended)</td>
+</tr>
+<tr>
+<td>UseXmlFormat</td>
+<td>Boolean</td>
+<td>Use XML format</td>
+</tr>
+<tr>
+<td>UseBinaryFormat</td>
+<td>Boolean</td>
+<td>Use compact binary format (default)</td>
+</tr>
+</tbody>
+</table>
+<p>The <a href="https://github.com/dotnet/orleans/tree/master/Samples/StorageProviders">StorageProviders</a> sample
+provides some code you can use to quickly test the above, and also showcases some custom storage providers.
+Use the following command in the Package Manager Console to update all Orleans packages to the latest
+version:</p>
+<pre><code>Get-Package | where Id -like &#39;Microsoft.Orleans.*&#39; | foreach { update-package $_.Id }
+</code></pre><p>The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
 there is no method to expose them to application code. More information in <a href="#ADONETPersistenceRationale">ADO.NET Persistence Rationale</a>.</p>
 <h3 id="memorystorage">MemoryStorage</h3>
-<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;MemoryStorage&quot;  /&gt;
-</code></pre><blockquote><p><strong>Note:</strong> This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.</p>
+<p><code>MemoryStorage</code> is a simple storage provider that does not really use a persistent
+data store underneath. It is convenient to learn to work with Storage Providers
+quickly, but is not intended to be used in real scenarios.</p>
+<blockquote><p><strong>Note:</strong> This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.</p>
 </blockquote>
-<ul>
-<li><strong><code>NumStorageGrains=&quot;10&quot;</code></strong> (optional) - The number of grains to use to store the state, defaults to <code>10</code></li>
-</ul>
+<p>To set up the memory storage provider using XML configuration:</p>
+<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+  &lt;Globals&gt;
+    &lt;StorageProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot;
+                Name=&quot;OrleansStorage&quot;
+                NumStorageGrains=&quot;10&quot; /&gt;
+    &lt;/StorageProviders&gt;
+  &lt;/Globals&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre><p>To set it up in code:</p>
+<pre><code class="lang-csharp">siloHost.Config.Globals.RegisterStorageProvider&lt;MemoryStorage&gt;(&quot;OrleansStorage&quot;);
+</code></pre><p>You can set the following properties:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>String</td>
+<td>Arbitrary name that persistent grains will use to refer to this storage provider</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>String</td>
+<td>Set to <code>Orleans.Storage.MemoryStorage</code></td>
+</tr>
+<tr>
+<td>NumStorageGrains</td>
+<td>Integer</td>
+<td>The number of grains to use to store the state, defaults to <code>10</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="shardedstorageprovider">ShardedStorageProvider</h3>
 <pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.ShardedStorageProvider&quot; Name=&quot;ShardedStorage&quot;&gt;
     &lt;Provider /&gt;
