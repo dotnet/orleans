@@ -54,6 +54,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// counter for sequence number
         /// </summary>
         IIntCounter SequenceNumberCounter { set; }
+        FixedTimeCounter EnqueueTimeCounter { set; }
         /// <summary>
         /// Stream identity for this data generator
         /// </summary>
@@ -62,6 +63,22 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// 
         /// </summary>
         bool ShouldProduce { set; }
+    }
+
+    public class FixedTimeCounter
+    {
+        private TimeSpan fixedInterval;
+        public FixedTimeCounter(DateTime startTime, TimeSpan interval)
+        {
+            this.value = startTime;
+            this.fixedInterval = interval;
+        }
+        private DateTime value;
+        public DateTime NextTimeStamp()
+        {
+            this.value += this.fixedInterval;
+            return this.value;
+        }
     }
 
     /// <summary>
