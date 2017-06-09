@@ -526,7 +526,8 @@ namespace Orleans.Runtime
 
             // Hook up to receive notification of process exit / Ctrl-C events
             AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
-            Console.CancelKeyPress += HandleProcessExit;
+            if (GlobalConfig.FastKillOnCancelKeyPress)
+                Console.CancelKeyPress += HandleProcessExit;
 
             ConfigureThreadPoolAndServicePointSettings();
 
