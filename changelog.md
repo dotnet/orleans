@@ -5,6 +5,23 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [v1.4.2]
+- Non-breaking improvements
+  - Generate serializers for more types #3035
+  - Improvements to GrainServices API #2839
+  - Add extensibility point to replace the grain activator #3002
+  - Expose IsOrleansShallowCopyable for external custom serializers #3077
+  - Detect if activation is in `Deactivating` state for too long and remove it from the directory if needed #3082
+  - Support grains with key extensions containing `+` symbols #2956
+  - Allow `TimeSpan.MaxValue` in configuration #2985
+  - Support for us-gov-west-1 as a possible AWS region endpoint #3017
+  - Support `CultureInfo` via built-in serializer #3036
+- Non-breaking bug fixes
+  - Change how message expiration is handled to account for server clock skew #2922
+  - Fix various unhandled exceptions happening during client closing #2962
+  - SMS: Ensure items are copied before yielding the thread in OnNextAsync #3048 #3058
+  - Remove unneeded extra constructors to play nicer with some non fully-conforming 3rd party containers #2996 #3074
+
 ### [1.5.0-beta1]
 - Breaking changes
   - Upgraded minimum framework dependency to .NET 4.6.1 #2945
