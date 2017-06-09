@@ -29,6 +29,7 @@
           "logo.svg",
           "logo-light.svg",
           "Documentation/**/**.png",
+          "Documentation/**/**.gif",
           "Tutorials/**.png",
           "Community/**.png"
         ],
