@@ -145,7 +145,13 @@
     <None Include="app.config">
       <SubType>Designer</SubType>
     </None>
+    <Content Include="GCSettingsManagement.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="packages.config" />
+    <Content Include="ServerGC.cmd">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\HelloEnvironmentGrains\HelloEnvironmentGrains.csproj">
