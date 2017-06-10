@@ -33,8 +33,8 @@ namespace Orleans.Azure.Silos
             config.AddMemoryStorageProvider();
 
             // First example of how to configure an existing provider
-            Example_ConfigureExistingStorageProvider(config);
             Example_ConfigureNewStorageProvider(config);
+            Example_ConfigureExistingStorageProvider(config);
             Example_ConfigureNewBootstrapProvider(config);
 
             // It is IMPORTANT to start the silo not in OnStart but in Run.
@@ -101,6 +101,17 @@ namespace Orleans.Azure.Silos
             // For information on handling configuration changes see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
         }
 
+        // Below is an example of how to programmatically configure a new storage provider that is not already specified in the XML config file.
+        private void Example_ConfigureNewStorageProvider(ClusterConfiguration config)
+        {
+            config.AddAzureTableStorageProvider("MyNewAzureStoreProvider");
+
+            // Once silo starts you can see that it prints in the log:
+            //  Providers:
+            //      StorageProviders:
+            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, TableName, DeleteStateOnClear, UseJsonFormat]
+        }
+
         // Storage Provider is already configured in the OrleansConfiguration.xml as:
         // <Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />
         // Below is an example of how to set the storage key in the ProviderConfiguration and how to add a new custom configuration property.
@@ -143,25 +154,6 @@ namespace Orleans.Azure.Silos
             //   Providers:
             //      StorageProviders:
             //          Name=AzureStore, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty, MyCustomProperty1, MyCustomProperty3]
-        }
-
-        // Below is an example of how to define a full configuration for a new storage provider that is not already specified in the config file.
-        private void Example_ConfigureNewStorageProvider(ClusterConfiguration config)
-        {
-            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
-            const string myProviderName = "MyNewAzureStoreProvider"; // what ever arbitrary name you want to give to your provider
-
-            var properties = new Dictionary<string, string>();
-            string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
-            properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
-            properties.Add("MyCustomProperty4", "MyCustomPropertyValue4");
-
-            config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
-
-            // Once silo starts you can see that it prints in the log:
-            //  Providers:
-            //      StorageProviders:
-            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty4]
         }
 
         // Below is an example of how to define a full configuration for a new Bootstrap provider that is not already specified in the config file.
