@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Orleans.ServiceFabric;
 using Microsoft.Orleans.ServiceFabric.Models;
@@ -132,7 +133,10 @@ namespace TestServiceFabric
                     "OtherNewSilo"),
             };
 
+            listener.VersionReached.Reset();
+            listener.WaitForVersion = 4;
             this.resolver.Notify(silos);
+            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Active, listener.Silos[silos[1].SiloAddress]);
@@ -150,24 +154,28 @@ namespace TestServiceFabric
             Assert.Equal(2, multiClusters.Count);
 
             // Remove a silo and verify that it's been removed.
+            listener.WaitForVersion = 5;
             this.resolver.Notify(new[] {silos[1]});
+            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Active, listener.Silos[silos[1].SiloAddress]);
             AssertStatus(silos[1].SiloAddress, SiloStatus.Active);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[0].SiloAddress]);
-            AssertStatus(silos[0].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[0].SiloAddress, SiloStatus.Dead);
             multiClusters = this.oracle.GetApproximateMultiClusterGateways();
             Assert.Equal(2, multiClusters.Count);
 
             // Remove a silo and verify that it's been removed.
             this.resolver.Notify(new FabricSiloInfo[0]);
+            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
+
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[0].SiloAddress]);
-            AssertStatus(silos[0].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[0].SiloAddress, SiloStatus.Dead);
             Assert.Equal(SiloStatus.Dead, listener.Silos[silos[1].SiloAddress]);
-            AssertStatus(silos[1].SiloAddress, SiloStatus.None);
+            AssertStatus(silos[1].SiloAddress, SiloStatus.Dead);
 
             multiClusters = this.oracle.GetApproximateMultiClusterGateways();
             Assert.Equal(1, multiClusters.Count);
@@ -206,6 +214,9 @@ namespace TestServiceFabric
 
         private class MockStatusListener : ISiloStatusListener
         {
+            public int Version { get; private set; }
+            public int WaitForVersion { get; set; }
+            public AutoResetEvent VersionReached { get; } = new AutoResetEvent(false);
             public Dictionary<SiloAddress, SiloStatus> Silos { get; } = new Dictionary<SiloAddress, SiloStatus>();
             public List<Tuple<SiloAddress, SiloStatus>> Notifications { get; } = new List<Tuple<SiloAddress, SiloStatus>>();
 
@@ -213,6 +224,8 @@ namespace TestServiceFabric
             {
                 this.Notifications.Add(Tuple.Create(updatedSilo, status));
                 this.Silos[updatedSilo] = status;
+                this.Version++;
+                if (this.Version >= this.WaitForVersion) this.VersionReached.Set();
             }
         }
 

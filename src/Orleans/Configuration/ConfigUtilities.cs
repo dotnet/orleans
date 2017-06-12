@@ -525,48 +525,36 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Prints the the DataConnectionString,
         /// without disclosing any credential info
-        /// such as the Azure Storage AccountKey or SqlServer password.
+        /// such as the Azure Storage AccountKey, SqlServer password or AWS SecretKey.
         /// </summary>
-        /// <param name="dataConnectionString">The connection string to print.</param>
+        /// <param name="connectionString">The connection string to print.</param>
         /// <returns>The string representation of the DataConnectionString with account credential info redacted.</returns>
-        public static string RedactConnectionStringInfo(string dataConnectionString)
+        public static string RedactConnectionStringInfo(string connectionString)
         {
-            return PrintSqlConnectionString(
-                PrintDataConnectionInfo(dataConnectionString));
-        }
-
-        /// <summary>Removes private credential information about an azure connection string by truncating the account key from it.</summary>
-        /// <param name="azureConnectionString">The original connection string</param>
-        public static string PrintDataConnectionInfo(string azureConnectionString)
-        {
-            if (String.IsNullOrEmpty(azureConnectionString)) return "null";
-
-            string azureConnectionInfo = azureConnectionString;
-            // Remove any Azure account keys from connection string info written to log files
-            int accountKeyPos = azureConnectionInfo.LastIndexOf("AccountKey=", StringComparison.Ordinal);
-            if (accountKeyPos > 0)
+            string[] secretKeys =
             {
-                azureConnectionInfo = azureConnectionInfo.Remove(accountKeyPos) + "AccountKey=<--SNIP-->";
-            }
-            return azureConnectionInfo;
-        }
+                "AccountKey=",                              // Azure Storage
+                "SharedAccessSignature=",                   // Many Azure services
+                "SharedAccessKey=", "SharedSecretValue=",   // ServiceBus
+                "Password=",                                // SQL
+                "SecretKey=", "SessionToken=",              // DynamoDb
+            };
 
-        /// <summary>Removes private credential information about a SQL connection string by truncating the account password from it.</summary>
-        /// <param name="sqlConnectionString">The original connection string</param>
-        public static string PrintSqlConnectionString(string sqlConnectionString)
-        {
-            if (String.IsNullOrEmpty(sqlConnectionString))
+            if (String.IsNullOrEmpty(connectionString)) return "null";
+
+            string connectionInfo = connectionString;
+
+            // Remove any secret keys from connection string info written to log files
+            foreach (var secretKey in secretKeys)
             {
-                return "null";
+                int keyPos = connectionInfo.IndexOf(secretKey, StringComparison.OrdinalIgnoreCase);
+                if (keyPos >= 0)
+                {
+                    connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + "<--SNIP-->";
+                }
             }
-            var sqlConnectionInfo = sqlConnectionString;
-            // Remove any Azure account keys from connection string info written to log files
-            int keyPos = sqlConnectionInfo.LastIndexOf("Password=", StringComparison.OrdinalIgnoreCase);
-            if (keyPos > 0)
-            {
-                sqlConnectionInfo = sqlConnectionInfo.Remove(keyPos) + "Password=<--SNIP-->";
-            }
-            return sqlConnectionInfo;
+
+            return connectionInfo;
         }
 
         public static TimeSpan ParseCollectionAgeLimit(XmlElement xmlElement)

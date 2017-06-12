@@ -119,7 +119,7 @@ namespace Orleans.Storage
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
-            Log.Info((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableStorage Provider is using DataConnectionString: {0}", ConfigUtilities.PrintDataConnectionInfo(dataConnectionString));
+            Log.Info((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableStorage Provider is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(dataConnectionString));
             tableDataManager = new GrainStateTableDataManager(tableName, dataConnectionString, Log);
             return tableDataManager.InitTableAsync();
         }
@@ -233,7 +233,7 @@ namespace Orleans.Storage
             {
                 await updateOperation.Invoke().ConfigureAwait(false);
             }
-            catch (StorageException ex) when (ex.IsPreconditionFailed())
+            catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
             {
                 throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", currentETag, ex);
             }
