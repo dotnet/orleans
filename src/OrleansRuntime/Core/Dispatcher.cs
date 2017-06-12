@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -636,7 +637,30 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
+            if (TryAddressMessageFast(message))
+            {
+                TransportMessage(message);
+                return;
+            }
+
             AsyncSendMessage(message, sendingActivation).Ignore();
+        }
+
+        private bool TryAddressMessageFast(Message message)
+        {
+            var targetAddress = message.TargetAddress;
+            if (targetAddress.IsComplete) return true;
+
+            AddressesAndTag addressesAndTag;
+
+            if (catalog.FastLookup(message.TargetGrain, out addressesAndTag))
+            {
+                // todo: consolidate with placement directors
+                message.TargetAddress = addressesAndTag.Addresses[0];
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
