@@ -1,16 +1,15 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Providers;
+using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    using System;
-    using System.Linq;
-    using System.Reflection;
-    using Orleans;
-    using Orleans.CodeGeneration;
-    using UnitTests.GrainInterfaces;
     public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IGrainInvokeInterceptor
     {
         public async Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)

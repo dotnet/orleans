@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,9 +13,6 @@ using Xunit;
 
 namespace UnitTests.General
 {
-    using System;
-    using Orleans;
-
     [TestCategory("BVT"), TestCategory("GrainCallFilter")]
     public class GrainCallFilterTests : TestClusterPerTest
     {

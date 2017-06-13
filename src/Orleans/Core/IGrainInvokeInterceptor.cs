@@ -1,12 +1,10 @@
 using System;
-using Orleans.Providers;
+using System.Reflection;
+using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 
 namespace Orleans
 {
-    using System.Reflection;
-    using System.Threading.Tasks;
-    using Orleans.CodeGeneration;
-
     [Obsolete("Use IMethodInvocationInterceptor instead. This interface may be removed in a future release.")]
     public interface IGrainInvokeInterceptor
     {
