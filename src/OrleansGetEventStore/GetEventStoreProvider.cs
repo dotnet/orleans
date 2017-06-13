@@ -108,7 +108,7 @@ namespace Orleans.EventSourcing
         }
 
 
-        public async Task<bool> Append<E>(string streamName, IEnumerable<KeyValuePair<Guid,E>> events, int? expectedVersion)
+        private async Task<bool> Append<E>(string streamName, IEnumerable<KeyValuePair<Guid,E>> events, int? expectedVersion)
         {
             var eventsToSave = events.Select(e => SerializeEvent<E>(e.Key, e.Value)).ToArray();
 
@@ -156,7 +156,7 @@ namespace Orleans.EventSourcing
             return true;
         }
 
-        public async Task<int> GetVersion(string streamName)
+        private async Task<int> GetVersion(string streamName)
         {
             // read the latest event
             var response = await connection.ReadEventAsync(streamName, StreamPosition.End, true).ConfigureAwait(false);
@@ -171,7 +171,7 @@ namespace Orleans.EventSourcing
             return (int) response.Event.Value.Event.EventNumber + 1;
         }
 
-        public async Task<EventStreamSegment<E>> Load<E>(string streamName, int fromVersion, int? toVersion)
+        private async Task<EventStreamSegment<E>> Load<E>(string streamName, int fromVersion, int? toVersion)
         {
             // check for invalid range parameters
             if (fromVersion < 0)
@@ -260,7 +260,7 @@ namespace Orleans.EventSourcing
             };
         }
 
-        public async Task<bool> Delete(string streamName, int? expectedVersion)
+        private async Task<bool> Delete(string streamName, int? expectedVersion)
         {
             try
             {
@@ -278,7 +278,7 @@ namespace Orleans.EventSourcing
             }
         }
 
-        public E DeserializeEvent<E>(RecordedEvent @event)
+        private E DeserializeEvent<E>(RecordedEvent @event)
         {
             return JsonConvert.DeserializeObject<E>(Encoding.UTF8.GetString(@event.Data), jsonSettings);
         }
@@ -293,12 +293,12 @@ namespace Orleans.EventSourcing
             return new EventData(eventId, friendlyname, true, Encoding.UTF8.GetBytes(jsonData), emptyMetaData);
         }
 
-        public IEventStreamHandle GetEventStreamHandle(string streamName)
+        public IEventStreamHandle<TEvent> GetEventStreamHandle<TEvent>(string streamName)
         {
-            return new EventStreamHandle(streamName, this);
+            return new EventStreamHandle<TEvent>(streamName, this);
         }
 
-        private class EventStreamHandle : IEventStreamHandle
+        private class EventStreamHandle<TEvent> : IEventStreamHandle<TEvent>
         {
             public EventStreamHandle(string streamName, GetEventStoreProvider provider)
             {
@@ -311,9 +311,9 @@ namespace Orleans.EventSourcing
 
             public string StreamName { get { return streamName; } }
 
-            public Task<bool> Append<E>(IEnumerable<KeyValuePair<Guid, E>> events, int? expectedVersion = default(int?))
+            public Task<bool> Append(IEnumerable<KeyValuePair<Guid, TEvent>> events, int? expectedVersion = default(int?))
             {
-                return provider.Append<E>(streamName, events, expectedVersion);
+                return provider.Append(streamName, events, expectedVersion);
             }
             public Task<bool> Delete(int? expectedVersion = default(int?))
             {
@@ -326,9 +326,9 @@ namespace Orleans.EventSourcing
             {
                 return provider.GetVersion(streamName);
             }
-            public Task<EventStreamSegment<E>> Load<E>(int startAtVersion = 0, int? endAtVersion = default(int?))
+            public Task<EventStreamSegment<TEvent>> Load(int startAtVersion = 0, int? endAtVersion = default(int?))
             {
-                return provider.Load<E>(streamName, startAtVersion, endAtVersion);
+                return provider.Load<TEvent>(streamName, startAtVersion, endAtVersion);
             }
         }
 

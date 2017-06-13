@@ -26,76 +26,76 @@ namespace GetEventStore.Tests
             this.fixture = fixture;
         }
 
-        private Task Store<E>(IEventStreamHandle stream, E obj)
+        private Task Store<E>(string streamName, E obj, bool serializeObjectIdentity = false)
         {
-            return stream.Append<E>(new KeyValuePair<Guid, E>[] { new KeyValuePair<Guid, E>(Guid.NewGuid(), obj) });
+            var provider = serializeObjectIdentity ? fixture.EventStoreObjectIdentity : fixture.EventStoreDefault;
+            using (var stream = provider.GetEventStreamHandle<E>(streamName))
+            {
+                return stream.Append(new KeyValuePair<Guid, E>[] { new KeyValuePair<Guid, E>(Guid.NewGuid(), obj) });
+            }
         }
 
-        private async Task<E> Load<E>(IEventStreamHandle stream)
+        private async Task<E> Load<E>(string streamName)
         {
-            var rsp = await stream.Load<E>(0, 1);
-            return rsp.Events[0].Value;
+            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle<E>(streamName))
+            {
+                var rsp = await stream.Load(0, 1);
+                return rsp.Events[0].Value;
+            }
         }
 
+        class N { public string val; public N left; public N right; }
 
-        class N { public string val;  public N left; public N right; }
-        
 
 
         [Fact]
         public async Task StoreTree()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                var left = new N() { val = "l" };
-                var right = new N() { val = "r" };
-         
-                await Store<N>(stream, new N() { left = left, right = right });
+            var streamName = Guid.NewGuid().ToString();
+            var left = new N() { val = "l" };
+            var right = new N() { val = "r" };
 
-                var n =  await Load<N>(stream);
+            await Store<N>(streamName, new N() { left = left, right = right });
 
-                Assert.Equal("l", n.left.val);
-                Assert.Equal("r", n.right.val);
-            }
+            var n = await Load<N>(streamName);
+
+            Assert.Equal("l", n.left.val);
+            Assert.Equal("r", n.right.val);
         }
 
 
         [Fact]
         public async Task StoreDag()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                var child = new N() { val = "c" };
+            var streamName = Guid.NewGuid().ToString();
+            var child = new N() { val = "c" };
 
-                await Store<N>(stream, new N() { left = child, right = child });
+            await Store<N>(streamName, new N() { left = child, right = child });
 
-                var n = await Load<N>(stream);
+            var n = await Load<N>(streamName);
 
-                Assert.Equal("c", n.left.val);
-                Assert.Equal("c", n.right.val);
+            Assert.Equal("c", n.left.val);
+            Assert.Equal("c", n.right.val);
 
-                // shared node is not recognized because object identity was not stored
-                Assert.NotEqual(n.left, n.right);
-            }
+            // shared node is not recognized because object identity was not stored
+            Assert.NotEqual(n.left, n.right);
         }
 
         [Fact]
         public async Task StoreDagWithObjectIdentity()
         {
-            using (var stream = fixture.EventStoreObjectIdentity.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                var child = new N() { val = "c" };
+            var streamName = Guid.NewGuid().ToString();
+            var child = new N() { val = "c" };
 
-                await Store<N>(stream, new N() { left = child, right = child });
+            await Store<N>(streamName, new N() { left = child, right = child }, true);
 
-                var n = await Load<N>(stream);
+            var n = await Load<N>(streamName);
 
-                Assert.Equal("c", n.left.val);
-                Assert.Equal("c", n.right.val);
+            Assert.Equal("c", n.left.val);
+            Assert.Equal("c", n.right.val);
 
-                // shared node is recognized because object identity was stored
-                Assert.Equal(n.left, n.right);
-            }
+            // shared node is recognized because object identity was stored
+            Assert.Equal(n.left, n.right);
         }
     }
 }

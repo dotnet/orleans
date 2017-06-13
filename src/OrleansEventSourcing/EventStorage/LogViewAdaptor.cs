@@ -27,12 +27,12 @@ namespace Orleans.EventSourcing.EventStorage
         private int confirmedVersion;
 
         // the handle to the event stream returned by the event store provider
-        private IEventStreamHandle eventStream;
+        private IEventStreamHandle<TEvent> eventStream;
 
         // must be constructed lazily because grain reference is not available at construction time
-        private IEventStreamHandle EventStream { get {
+        private IEventStreamHandle<TEvent> EventStream { get {
                 return (eventStream ??
-                   (eventStream = provider.EventStore.GetEventStreamHandle(
+                   (eventStream = provider.EventStore.GetEventStreamHandle<TEvent>(
                        provider.EventStore.DefaultStreamName(Host.GetType(), Services.GrainReference))));
             }
         }
@@ -78,7 +78,7 @@ namespace Orleans.EventSourcing.EventStorage
 
         public override async Task<IReadOnlyList<TEvent>> RetrieveLogSegment(int fromVersion, int toVersion)
         {
-            var response = await EventStream.Load<TEvent>(fromVersion, toVersion);
+            var response = await EventStream.Load(fromVersion, toVersion);
 
             if (response.ToVersion != toVersion || response.FromVersion != fromVersion || response.Events.Count != (toVersion - fromVersion))
             {
@@ -120,7 +120,7 @@ namespace Orleans.EventSourcing.EventStorage
                 {
                     Services.Log(Severity.Verbose, "Read issued for position={0}", confirmedVersion);
 
-                    response = await EventStream.Load<TEvent>(confirmedVersion);
+                    response = await EventStream.Load(confirmedVersion);
 
                     break;
                 }

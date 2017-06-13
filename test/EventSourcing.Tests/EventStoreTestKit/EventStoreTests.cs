@@ -26,12 +26,12 @@ namespace EventSourcing.Tests
 
         private IDisposable Init()
         {
-            stream = StoreUnderTest.GetEventStreamHandle(Guid.NewGuid().ToString());
+            stream = StoreUnderTest.GetEventStreamHandle<string>(Guid.NewGuid().ToString());
             expected = new List<KeyValuePair<Guid, String>>();
             return stream;
         }
 
-        IEventStreamHandle stream;
+        IEventStreamHandle<string> stream;
         List<KeyValuePair<Guid, String>> expected;
 
 
@@ -204,9 +204,9 @@ namespace EventSourcing.Tests
                 int countsuccesses = 0;
                 Func<int, int, Task> append = async (int count, int expVersion) =>
                  {
-                     var evts = new KeyValuePair<Guid, object>[count];
+                     var evts = new KeyValuePair<Guid, string>[count];
                      for (int i = 0; i < count; i++)
-                         evts[i] = new KeyValuePair<Guid, object>(Guid.NewGuid(), (expected.Count + i).ToString());
+                         evts[i] = new KeyValuePair<Guid, string>(Guid.NewGuid(), (expected.Count + i).ToString());
                      var result = await stream.Append(evts, expVersion);
                      if (result)
                          Interlocked.Increment(ref countsuccesses);
@@ -230,9 +230,9 @@ namespace EventSourcing.Tests
         {
             using (Init())
             {
-                var evts = new KeyValuePair<Guid, object>[5];
+                var evts = new KeyValuePair<Guid, string>[5];
                 for (int i = 0; i < 5; i++)
-                    evts[i] = new KeyValuePair<Guid, object>(Guid.NewGuid(), (expected.Count + i).ToString());
+                    evts[i] = new KeyValuePair<Guid, string>(Guid.NewGuid(), (expected.Count + i).ToString());
 
                 var result1 = await stream.Append(evts, 0);
                 var result2 = await stream.Append(evts, 0);
@@ -285,8 +285,7 @@ namespace EventSourcing.Tests
             for (int i = 0; i < howMany; i++)
                 evts.Add(new KeyValuePair<Guid, string>(Guid.NewGuid(), (expected.Count + i).ToString()));
 
-            var response = await stream.Append(
-                evts.Select(kvp => new KeyValuePair<Guid, object>(kvp.Key, kvp.Value)), expVersion);
+            var response = await stream.Append(evts, expVersion);
 
             if (!expVersion.HasValue || expVersion == expected.Count)
             {
@@ -323,11 +322,11 @@ namespace EventSourcing.Tests
             if (start < 0 || end < start)
             {
                 await Assert.ThrowsAsync<ArgumentException>(() =>
-                   stream.Load<string>(start, end));
+                   stream.Load(start, end));
             }
             else
             {
-                var response = await stream.Load<string>(start, end);
+                var response = await stream.Load(start, end);
 
                 Assert.Equal(response.StreamName, stream.StreamName);
                 Assert.NotNull(response.Events);

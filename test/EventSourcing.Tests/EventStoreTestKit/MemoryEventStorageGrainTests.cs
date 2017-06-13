@@ -33,25 +33,25 @@ namespace EventSourcing.Tests
             }
         }
 
-        public IEventStreamHandle GetEventStreamHandle(string streamName)
+        public IEventStreamHandle<TEvent> GetEventStreamHandle<TEvent>(string streamName)
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMemoryEventStorageGrain>(streamName.GetHashCode() % 5);
+            var grain = this.fixture.GrainFactory.GetGrain<IMemoryEventStorageGrain<TEvent>>(streamName.GetHashCode() % 5);
 
-            return new EventStreamHandle(streamName, grain);
+            return new EventStreamHandle<TEvent>(streamName, grain);
         }
 
 
-        private class EventStreamHandle : IEventStreamHandle
+        private class EventStreamHandle<TEvent> : IEventStreamHandle<TEvent>
         {
 
-            public EventStreamHandle(string streamName, IMemoryEventStorageGrain storageGrain)
+            public EventStreamHandle(string streamName, IMemoryEventStorageGrain<TEvent> storageGrain)
             {
                 this.streamName = streamName;
                 this.storageGrain = storageGrain;
             }
 
             private readonly string streamName;
-            private readonly IMemoryEventStorageGrain storageGrain;
+            private readonly IMemoryEventStorageGrain<TEvent> storageGrain;
 
             public string StreamName { get { return streamName; } }
 
@@ -62,28 +62,16 @@ namespace EventSourcing.Tests
                 return storageGrain.GetVersion(streamName);
             }
 
-            public async Task<EventStreamSegment<E>> Load<E>(int startAtVersion = 0, int? endAtVersion = default(int?))
+            public Task<EventStreamSegment<TEvent>> Load(int startAtVersion = 0, int? endAtVersion = default(int?))
             {
                 // call the grain that contains the storage
-                var response = await storageGrain.Load(streamName, startAtVersion, endAtVersion);
-
-                // must convert returned objects to type E
-                return new EventStreamSegment<E>()
-                {
-                    StreamName = response.StreamName,
-                    FromVersion = response.FromVersion,
-                    ToVersion = response.ToVersion,
-                    Events = response.Events.Select(kvp => new KeyValuePair<Guid, E>(kvp.Key, (E)kvp.Value)).ToList(),
-                };
-
+                return storageGrain.Load(streamName, startAtVersion, endAtVersion);
             }
 
-            public Task<bool> Append<E>(IEnumerable<KeyValuePair<Guid, E>> events, int? expectedVersion = default(int?))
+            public Task<bool> Append(IEnumerable<KeyValuePair<Guid, TEvent>> events, int? expectedVersion = default(int?))
             {
-                var eventArray = events.Select(kvp => new KeyValuePair<Guid, object>(kvp.Key, kvp.Value)).ToArray();
-
                 // call the grain that contains the event storage
-                return storageGrain.Append(streamName, eventArray, expectedVersion);
+                return storageGrain.Append(streamName, events, expectedVersion);
             }
 
             public Task<bool> Delete(int? expectedVersion = default(int?))

@@ -39,13 +39,13 @@ namespace Orleans.Runtime.Configuration
         public static void AddMemoryEventStorageProvider(
             this ClusterConfiguration config,
             string providerName = "MemoryEventStore",
-            int numStorageGrains = MemoryEventStorage.NumStorageGrainsDefaultValue)
+            int numStorageGrains = MemoryEventStorage.NumStorageGrainsPerTypeDefaultValue)
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
             var properties = new Dictionary<string, string>
             {
-                { MemoryEventStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
+                { MemoryEventStorage.NumStorageGrainsPerTypePropertyName, numStorageGrains.ToString() },
             };
 
             config.Globals.RegisterEventStorageProvider<MemoryEventStorage>(providerName, properties);

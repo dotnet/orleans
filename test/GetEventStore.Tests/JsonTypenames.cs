@@ -26,90 +26,89 @@ namespace GetEventStore.Tests
             this.fixture = fixture;
         }
 
-        private Task Store<E>(IEventStreamHandle stream, E obj)
+        private Task Store<E>(string streamName, E obj, bool storeAllTypenames = false)
         {
-            return stream.Append<E>(new KeyValuePair<Guid,E>[] { new KeyValuePair<Guid,E>(Guid.NewGuid(), obj) });
+            var provider = storeAllTypenames ? fixture.EventStoreAllTypenames : fixture.EventStoreDefault;
+            using (var stream = provider.GetEventStreamHandle<E>(streamName))
+            {
+                return stream.Append(new KeyValuePair<Guid, E>[] { new KeyValuePair<Guid, E>(Guid.NewGuid(), obj) });
+            }
         }
 
-        private async Task<E> Load<E>(IEventStreamHandle stream)
+        private async Task<E> Load<E>(string streamName)
         {
-            var rsp = await stream.Load<E>(0, 1);
-            return rsp.Events[0].Value;
+            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle<E>(streamName))
+            {
+                var rsp = await stream.Load(0, 1);
+                return rsp.Events[0].Value;
+            }
         }
-
 
         class F1 { public int A = 0; }
         class F2 { public int A = 0; public int B = 0; }
         class F3 { public int A = 0; public int B = 0; public int C = 0; }
 
-
         [Fact]
         public async Task StoreRuntimeType()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // typename is stored because runtime type <F2> is not identical to static type <object>
-                await Store<object>(stream, new F2() { A = 5, B = 6 });
+            var streamName = Guid.NewGuid().ToString();
 
-                // therefore deserialization into <object> produces same runtime type 
-                var f2 = (F2)await Load<object>(stream);
-                Assert.Equal(5, f2.A);
-                Assert.Equal(6, f2.B);
-                
-            }
+            // typename is stored because runtime type <F2> is not identical to static type <object>
+            await Store<object>(streamName, new F2() { A = 5, B = 6 });
+
+            // therefore deserialization into <object> produces same runtime type 
+            var f2 = (F2)await Load<object>(streamName);
+            Assert.Equal(5, f2.A);
+            Assert.Equal(6, f2.B);
         }
 
         [Fact]
         public async Task DeserializationError()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // typename is stored because runtime type <F2> is not identical to static type <object>
-                await Store<object>(stream, new F2() { A = 5, B = 6 });
+            var streamName = Guid.NewGuid().ToString();
 
-                // therefore deserialization into incompatible type <F3> causes error
-                var e = await Assert.ThrowsAsync<Newtonsoft.Json.JsonSerializationException>(async () =>
-                {
-                    var f3 = await Load<F3>(stream);
-                });
-            }
+            // typename is stored because runtime type <F2> is not identical to static type <object>
+            await Store<object>(streamName, new F2() { A = 5, B = 6 });
+
+            // therefore deserialization into incompatible type <F3> causes error
+            var e = await Assert.ThrowsAsync<Newtonsoft.Json.JsonSerializationException>(async () =>
+            {
+                var f3 = await Load<F3>(streamName);
+            });
         }
 
         [Fact]
         public async Task AlwaysStoreRuntimeType()
         {
-            using (var stream = fixture.EventStoreAllTypenames.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // for this provider config, typename is always stored, 
-                // even though runtime type matches static type
-                await Store<F2>(stream, new F2() { A = 5, B = 6 });
+            var streamName = Guid.NewGuid().ToString();
 
-                // therefore deserialization into incompatible type causes error
-                var e = await Assert.ThrowsAsync<Newtonsoft.Json.JsonSerializationException>(async () =>
-                {
-                    var f3 = await Load<F3>(stream);
-                });
-            }
+            // for this provider config, typename is always stored, 
+            // even though runtime type matches static type
+            await Store<F2>(streamName, new F2() { A = 5, B = 6 }, true);
+
+            // therefore deserialization into incompatible type causes error
+            var e = await Assert.ThrowsAsync<Newtonsoft.Json.JsonSerializationException>(async () =>
+            {
+                var f3 = await Load<F3>(streamName);
+            });
         }
 
         [Fact]
         public async Task StructuralSubtyping()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // typename is not stored because runtime type matches static type
-                await Store<F2>(stream, new F2() { A = 5, B = 6 });
+            var streamName = Guid.NewGuid().ToString();
+            // typename is not stored because runtime type matches static type
+            await Store<F2>(streamName, new F2() { A = 5, B = 6 });
 
-                // therefore we can deserialize into a different, larger class
-                var f3 = await Load<F3>(stream);
-                Assert.Equal(5, f3.A);
-                Assert.Equal(6, f3.B);
-                Assert.Equal(0, f3.C);
+            // therefore we can deserialize into a different, larger class
+            var f3 = await Load<F3>(streamName);
+            Assert.Equal(5, f3.A);
+            Assert.Equal(6, f3.B);
+            Assert.Equal(0, f3.C);
 
-                // or a different, smaller class
-                var f1 = await Load<F1>(stream);
-                Assert.Equal(5, f1.A);
-            }
+            // or a different, smaller class
+            var f1 = await Load<F1>(streamName);
+            Assert.Equal(5, f1.A);
         }
 
         class A1 { public int[] A; }
@@ -118,33 +117,27 @@ namespace GetEventStore.Tests
         [Fact]
         public async Task ArrayToList()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // typename is not stored because runtime type matches static type
-                await Store<A1>(stream, new A1() { A = new int[] { 1, 2 } });
+            var streamName = Guid.NewGuid().ToString();
+            // typename is not stored because runtime type matches static type
+            await Store<A1>(streamName, new A1() { A = new int[] { 1, 2 } });
 
-                // therefore we can deserialize into list instead of array
-                var a2 = await Load<A2>(stream);
-                Assert.Equal(1, a2.A[0]);
-                Assert.Equal(2, a2.A[1]);
-
-
-            }
+            // therefore we can deserialize into list instead of array
+            var a2 = await Load<A2>(streamName);
+            Assert.Equal(1, a2.A[0]);
+            Assert.Equal(2, a2.A[1]);
         }
 
         [Fact]
         public async Task ListToArray()
         {
-            using (var stream = fixture.EventStoreDefault.GetEventStreamHandle(Guid.NewGuid().ToString()))
-            {
-                // typename is not stored because runtime type matches static type
-                await Store<A2>(stream, new A2() { A = (new int[] { 1, 2 }).ToList() });
+            var streamName = Guid.NewGuid().ToString();
+            // typename is not stored because runtime type matches static type
+            await Store<A2>(streamName, new A2() { A = (new int[] { 1, 2 }).ToList() });
 
-                // therefore we can deserialize into array instead of list
-                var a1 = await Load<A1>(stream);
-                Assert.Equal(1, a1.A[0]);
-                Assert.Equal(2, a1.A[1]);
-            }
+            // therefore we can deserialize into array instead of list
+            var a1 = await Load<A1>(streamName);
+            Assert.Equal(1, a1.A[0]);
+            Assert.Equal(2, a1.A[1]);
         }
 
     }

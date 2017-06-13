@@ -13,15 +13,16 @@ namespace Orleans.Storage
     /// Implementation class for the Event-Storage Grain used by In-memory event-storage provider
     /// <c>Orleans.Storage.MemoryEventStorage</c>
     /// </summary>
+    /// <typeparam name="TEvent">The base class for the events</typeparam>
     [GlobalSingleInstance]
-    internal class MemoryEventStorageGrain : Grain, IMemoryEventStorageGrain
+    internal class MemoryEventStorageGrain<TEvent> : Grain, IMemoryEventStorageGrain<TEvent>
     {
-        private Dictionary<string, List<KeyValuePair<Guid, object>>> eventStore;
+        private Dictionary<string, List<KeyValuePair<Guid, TEvent>>> eventStore;
         private Logger logger;
 
         public override Task OnActivateAsync()
         {
-            eventStore = new Dictionary<string, List<KeyValuePair<Guid, object>>>();
+            eventStore = new Dictionary<string, List<KeyValuePair<Guid, TEvent>>>();
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for MemoryEventStorageGrain virtually indefinitely.
             logger = GetLogger(GetType().Name);
             logger.Info("OnActivateAsync");
@@ -42,7 +43,7 @@ namespace Orleans.Storage
 
         public Task<int> GetVersion(string streamName)
         {
-            List<KeyValuePair<Guid, object>> log;
+            List<KeyValuePair<Guid, TEvent>> log;
             if (!eventStore.TryGetValue(streamName, out log))
             {
                 return Task.FromResult(0);
@@ -50,7 +51,7 @@ namespace Orleans.Storage
             return Task.FromResult(log.Count);
         }
 
-        public Task<EventStreamSegment<object>> Load(string streamName, int startAtVersion = 0, int? endAtVersion = default(int?))
+        public Task<EventStreamSegment<TEvent>> Load(string streamName, int startAtVersion = 0, int? endAtVersion = default(int?))
         {
             // check for invalid range parameters
             if (startAtVersion < 0)
@@ -62,20 +63,20 @@ namespace Orleans.Storage
                 throw new ArgumentException("invalid range", nameof(endAtVersion));
             }
 
-            List<KeyValuePair<Guid, object>> log;
+            List<KeyValuePair<Guid, TEvent>> log;
             if (!eventStore.TryGetValue(streamName, out log))
             {
-                eventStore.Add(streamName, log = new List<KeyValuePair<Guid, object>>());
+                eventStore.Add(streamName, log = new List<KeyValuePair<Guid, TEvent>>());
             }
 
             if (startAtVersion > log.Count)
             {
                 // we were asked for not-yet-existing events... 
                 // return latest version and empty segment
-                return Task.FromResult(new EventStreamSegment<object>()
+                return Task.FromResult(new EventStreamSegment<TEvent>()
                 {
                     StreamName = streamName,
-                    Events = new List<KeyValuePair<Guid, object>>(),
+                    Events = new List<KeyValuePair<Guid, TEvent>>(),
                     FromVersion = log.Count,
                     ToVersion = log.Count
                 });
@@ -101,7 +102,7 @@ namespace Orleans.Storage
                 log = log.GetRange(startAtVersion, segmentLength);
             }
 
-            return Task.FromResult(new EventStreamSegment<object>() {
+            return Task.FromResult(new EventStreamSegment<TEvent>() {
                 StreamName = streamName,
                 Events = log,
                 FromVersion = startAtVersion,
@@ -109,12 +110,12 @@ namespace Orleans.Storage
             });
         }
 
-        public Task<bool> Append(string streamName, IEnumerable<KeyValuePair<Guid, object>> events, int? expectedVersion = null)
+        public Task<bool> Append(string streamName, IEnumerable<KeyValuePair<Guid, TEvent>> events, int? expectedVersion = null)
         {
-            List<KeyValuePair<Guid, object>> log;
+            List<KeyValuePair<Guid, TEvent>> log;
             if (!eventStore.TryGetValue(streamName, out log))
             {
-                eventStore.Add(streamName, log = new List<KeyValuePair<Guid, object>>());
+                eventStore.Add(streamName, log = new List<KeyValuePair<Guid, TEvent>>());
             }
 
             if (expectedVersion.HasValue && expectedVersion.Value != log.Count)
@@ -135,7 +136,7 @@ namespace Orleans.Storage
 
         public Task<bool> Delete(string streamName, int? expectedVersion = null)
         {
-            List<KeyValuePair<Guid, object>> log;
+            List<KeyValuePair<Guid, TEvent>> log;
             if (!eventStore.TryGetValue(streamName, out log))
             {
                 // a non-existent stream is treated to be equivalent to having version zero

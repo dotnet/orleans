@@ -38,15 +38,17 @@ namespace Orleans.Storage
         /// Returns a handle to an event stream that can be used to perform operations on it.
         /// </summary>
         /// <param name="streamName">The name of the stream</param>
+        /// <typeparam name="TEvent">The base class for the events read from and written to storage</typeparam>
         /// <returns>A handle for performing operations on the stream</returns>
-        IEventStreamHandle GetEventStreamHandle(string streamName);
+        IEventStreamHandle<TEvent> GetEventStreamHandle<TEvent>(string streamName);
     }
 
     /// <summary>
     /// The event stream interface, as implemented by event storage providers. 
     /// Should be disposed when no longer needed.
     /// </summary>
-    public interface IEventStreamHandle : IDisposable
+    /// <typeparam name="TEvent">The base class for the events</typeparam>
+    public interface IEventStreamHandle<TEvent> : IDisposable
     {
         /// <summary>
         /// The name of this event stream.
@@ -63,11 +65,10 @@ namespace Orleans.Storage
         /// <summary>
         /// Loads a sequence of events from the event stream.
         /// </summary>
-        /// <typeparam name="E">The base class for the events</typeparam>
         /// <param name="startAtVersion">The version (stream position) at which to start</param>
         /// <param name="endAtVersion">The version (stream position) at which to end, or null to return up and including the most recent</param>
-        /// <returns>A <see cref="EventStreamSegment{E}"/> structure containing a subrange of the event stream.</returns>
-        Task<EventStreamSegment<E>> Load<E>(int startAtVersion = 0, int? endAtVersion = null);
+        /// <returns>A <see cref="EventStreamSegment{TEvent}"/> structure containing a subrange of the event stream.</returns>
+        Task<EventStreamSegment<TEvent>> Load(int startAtVersion = 0, int? endAtVersion = null);
 
         /// <summary>
         /// Appends a sequence of events to the event stream.
@@ -76,7 +77,7 @@ namespace Orleans.Storage
         /// <param name="events">The sequence of events, including their Guids</param>
         /// <param name="expectedVersion">null for unconditional events, or the expected version (stream position) for conditional events</param>
         /// <returns>a boolean task that returns true if the append succeeded, or false if the version (stream position) did not match</returns>
-        Task<bool> Append<E>(IEnumerable<KeyValuePair<Guid, E>> events, int? expectedVersion = null);
+        Task<bool> Append(IEnumerable<KeyValuePair<Guid, TEvent>> events, int? expectedVersion = null);
 
 
         /// <summary>
@@ -89,13 +90,13 @@ namespace Orleans.Storage
     }
 
     /// <summary>
-    /// Response returned when loading events from an <see cref="IEventStreamHandle"/>.
+    /// Response returned when loading events from an <see cref="IEventStreamHandle{TEvent}"/>.
     /// The response is always guaranteed to be a valid subrange of the stream,
     /// but may not always match the interval that was requested.
     /// </summary>
-    /// <typeparam name="E">The base class for the events</typeparam>
+    /// <typeparam name="TEvent">The base class for the events</typeparam>
     [Serializable]
-    public struct EventStreamSegment<E>
+    public struct EventStreamSegment<TEvent>
     {
         /// <summary>The name of the stream.</summary>
         public string StreamName;
@@ -110,7 +111,7 @@ namespace Orleans.Storage
         /// The sequence of events, each with its Guid. 
         /// Never null. The length of this list is always equal to (ToVersion-FromVersion).
         /// </summary>
-        public IReadOnlyList<KeyValuePair<Guid, E>> Events;
+        public IReadOnlyList<KeyValuePair<Guid, TEvent>> Events;
     }
 
 

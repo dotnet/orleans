@@ -91,21 +91,21 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc/>
-        public IEventStreamHandle GetEventStreamHandle(string streamName)
+        public IEventStreamHandle<TEvent> GetEventStreamHandle<TEvent>(string streamName)
         {
-            return new EventStreamWrapper(wrappedProvider.GetEventStreamHandle(streamName), this);
+            return new EventStreamWrapper<TEvent>(wrappedProvider.GetEventStreamHandle<TEvent>(streamName), this);
         }
 
-        private class EventStreamWrapper : IEventStreamHandle
+        private class EventStreamWrapper<TEvent> : IEventStreamHandle<TEvent>
         {
 
-            public EventStreamWrapper(IEventStreamHandle wrappedHandle, FaultInjectionEventStorageProvider<TEventStorage> provider)
+            public EventStreamWrapper(IEventStreamHandle<TEvent> wrappedHandle, FaultInjectionEventStorageProvider<TEventStorage> provider)
             {
                 this.wrappedHandle = wrappedHandle;
                 this.provider = provider;
             }
 
-            private readonly IEventStreamHandle wrappedHandle;
+            private readonly IEventStreamHandle<TEvent> wrappedHandle;
             private readonly FaultInjectionEventStorageProvider<TEventStorage> provider;
 
             private Logger Log {  get { return provider.Log; } }
@@ -126,15 +126,15 @@ namespace Orleans.TestingHost
             }
 
             /// <inheritdoc/>
-            public async Task<EventStreamSegment<E>> Load<E>(int startAtVersion = 0, int? endAtVersion = default(int?))
+            public async Task<EventStreamSegment<TEvent>> Load(int startAtVersion = 0, int? endAtVersion = default(int?))
             {
                 Log.Info($"Load({wrappedHandle.StreamName},{startAtVersion},{endAtVersion})");
                 await provider.DelayAndInject(wrappedHandle.StreamName);
-                return await wrappedHandle.Load<E>(startAtVersion, endAtVersion);
+                return await wrappedHandle.Load(startAtVersion, endAtVersion);
             }
 
             /// <inheritdoc/>
-            public async Task<bool> Append<E>(IEnumerable<KeyValuePair<Guid, E>> events, int? expectedVersion = default(int?))
+            public async Task<bool> Append(IEnumerable<KeyValuePair<Guid, TEvent>> events, int? expectedVersion = default(int?))
             {
                 Log.Info($"Append({wrappedHandle.StreamName},{events.Count()} events,{expectedVersion})");
                 await provider.DelayAndInject(wrappedHandle.StreamName);
