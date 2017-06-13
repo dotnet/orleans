@@ -90,6 +90,7 @@
     <Compile Include="Core\IClientBuilder.cs" />
     <Compile Include="Core\IClusterConnectionStatusListener.cs" />
     <Compile Include="Core\IGrainCallContext.cs" />
+    <Compile Include="Core\IGrainCallFilter.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />

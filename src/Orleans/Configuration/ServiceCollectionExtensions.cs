@@ -53,7 +53,7 @@ namespace Orleans.Configuration
                 this.interceptor = interceptor;
             }
 
-            public Task Invoke(IGrainCallContext ctx) => this.interceptor.Invoke(ctx);
+            public Task Invoke(IGrainCallContext context) => this.interceptor.Invoke(context);
         }
     }
 }
