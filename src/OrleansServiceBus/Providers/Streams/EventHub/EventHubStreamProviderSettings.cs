@@ -24,7 +24,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Default statistic monitor write interval
         /// </summary>
-        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromSeconds(30);
+        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Statistic monitor write interval
@@ -81,24 +81,6 @@ namespace Orleans.ServiceBus.Providers
         public Type CheckpointerSettingsType { get; set; }
 
         /// <summary>
-        /// CacheSizeMb setting name.
-        /// </summary>
-        public const string CacheSizeMbName = "CacheSizeMb";
-        /// <summary>
-        /// Default cache size in MB
-        /// </summary>
-        public const int DefaultCacheSizeMb = 128; // default to 128mb cache.
-        private int? cacheSizeMb;
-        /// <summary>
-        /// Cache size in megabytes.
-        /// </summary>
-        public int CacheSizeMb
-        {
-            get { return cacheSizeMb ?? DefaultCacheSizeMb; }
-            set { cacheSizeMb = value; }
-        }
-
-        /// <summary>
         /// DataMinTimeInCache setting name.
         /// </summary>
         public const string DataMinTimeInCacheName = "DataMinTimeInCache";
@@ -106,15 +88,10 @@ namespace Orleans.ServiceBus.Providers
         /// Drfault DataMinTimeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
-        private TimeSpan? dataMinTimeInCache;
         /// <summary>
         /// Minimum time message will stay in cache before it is available for time based purge.
         /// </summary>
-        public TimeSpan DataMinTimeInCache
-        {
-            get { return dataMinTimeInCache ?? DefaultDataMinTimeInCache; }
-            set { dataMinTimeInCache = value; }
-        }
+        public TimeSpan DataMinTimeInCache = DefaultDataMinTimeInCache;
 
         /// <summary>
         /// DataMaxAgeInCache setting name.
@@ -124,15 +101,10 @@ namespace Orleans.ServiceBus.Providers
         /// Default DataMaxAgeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
-        private TimeSpan? dataMaxAgeInCache;
         /// <summary>
         /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
         /// </summary>
-        public TimeSpan DataMaxAgeInCache
-        {
-            get { return dataMaxAgeInCache ?? DefaultDataMaxAgeInCache; }
-            set { dataMaxAgeInCache = value; }
-        }
+        public TimeSpan DataMaxAgeInCache = DefaultDataMaxAgeInCache;
 
         /// <summary>
         /// Constructor.  Requires provider name.
@@ -154,18 +126,8 @@ namespace Orleans.ServiceBus.Providers
             if (CheckpointerSettingsType != null)
                 properties.Add(CheckpointerSettingsTypeName, CheckpointerSettingsType.AssemblyQualifiedName);
             properties.Add(StatisticMonitorWriteIntervalName, StatisticMonitorWriteInterval.ToString());
-            if (cacheSizeMb.HasValue)
-            {
-                properties.Add(CacheSizeMbName, CacheSizeMb.ToString(CultureInfo.InvariantCulture));
-            }
-            if (dataMinTimeInCache.HasValue)
-            {
-                properties.Add(DataMinTimeInCacheName, DataMinTimeInCache.ToString());
-            }
-            if (dataMaxAgeInCache.HasValue)
-            {
-                properties.Add(DataMaxAgeInCacheName, DataMaxAgeInCache.ToString());
-            }
+            properties.Add(DataMinTimeInCacheName, DataMinTimeInCache.ToString());
+            properties.Add(DataMaxAgeInCacheName, DataMaxAgeInCache.ToString());
             if (AveragingCachePressureMonitorFlowControlThreshold.HasValue)
             {
                 properties.Add(AveragingCachePressureMonitorFlowControlThresholdName, AveragingCachePressureMonitorFlowControlThreshold.ToString());
@@ -196,7 +158,6 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentOutOfRangeException(nameof(providerConfiguration), "StreamProviderName not set.");
             }
-            CacheSizeMb = providerConfiguration.GetIntProperty(CacheSizeMbName, DefaultCacheSizeMb);
             DataMinTimeInCache = providerConfiguration.GetTimeSpanProperty(DataMinTimeInCacheName, DefaultDataMinTimeInCache);
             DataMaxAgeInCache = providerConfiguration.GetTimeSpanProperty(DataMaxAgeInCacheName, DefaultDataMaxAgeInCache);
             StatisticMonitorWriteInterval = providerConfiguration.GetTimeSpanProperty(StatisticMonitorWriteIntervalName,

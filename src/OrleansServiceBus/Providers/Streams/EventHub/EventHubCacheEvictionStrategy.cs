@@ -18,8 +18,8 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval"></param>
         /// <param name="timePurage"></param>
-        public EventHubCacheEvictionStrategy(Logger logger, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval, TimePurgePredicate timePurage)
-            : base(logger.GetLogger(LogName), timePurage)
+        public EventHubCacheEvictionStrategy(Logger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            : base(logger.GetLogger(LogName), timePurage, cacheMonitor, monitorWriteInterval)
         {
         }
 

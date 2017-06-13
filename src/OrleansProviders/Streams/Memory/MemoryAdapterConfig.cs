@@ -39,15 +39,10 @@ namespace Orleans.Providers
         /// Drfault DataMinTimeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(3);
-        private TimeSpan? dataMinTimeInCache;
         /// <summary>
         /// Minimum time message will stay in cache before it is available for time based purge.
         /// </summary>
-        public TimeSpan DataMinTimeInCache
-        {
-            get { return dataMinTimeInCache ?? DefaultDataMinTimeInCache; }
-            set { dataMinTimeInCache = value; }
-        }
+        public TimeSpan DataMinTimeInCache = DefaultDataMinTimeInCache;
 
         /// <summary>
         /// DataMaxAgeInCache setting name.
@@ -57,20 +52,25 @@ namespace Orleans.Providers
         /// Default DataMaxAgeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(10);
-        private TimeSpan? dataMaxAgeInCache;
         /// <summary>
         /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
         /// </summary>
-        public TimeSpan DataMaxAgeInCache
-        {
-            get { return dataMaxAgeInCache ?? DefaultDataMaxAgeInCache; }
-            set { dataMaxAgeInCache = value; }
-        }
+        public TimeSpan DataMaxAgeInCache = DefaultDataMaxAgeInCache;
 
         /// <summary>
-        /// Cache size of FixedSizeObjectPool measured in Mb
+        /// Name of StatisticMonitorWriteInterval
         /// </summary>
-        public int CacheSizeMb { get; set; } = 10;
+        public const string StatisticMonitorWriteIntervalName = nameof(StatisticMonitorWriteInterval);
+
+        /// <summary>
+        /// Default statistic monitor write interval
+        /// </summary>
+        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Statistic monitor write interval
+        /// </summary>
+        public TimeSpan StatisticMonitorWriteInterval = DefaultStatisticMonitorWriteInterval;
 
         /// <summary>
         /// Constructor
@@ -98,6 +98,9 @@ namespace Orleans.Providers
         public void WriteProperties(Dictionary<string, string> properties)
         {
             properties.Add(TotalQueueCountName, TotalQueueCount.ToString(CultureInfo.InvariantCulture));
+            properties.Add(DataMinTimeInCacheName, DataMinTimeInCache.ToString());
+            properties.Add(DataMaxAgeInCacheName, DataMaxAgeInCache.ToString());
+            properties.Add(StatisticMonitorWriteIntervalName, StatisticMonitorWriteInterval.ToString());
         }
 
         /// <summary>
@@ -107,6 +110,9 @@ namespace Orleans.Providers
         public void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             TotalQueueCount = providerConfiguration.GetIntProperty(TotalQueueCountName, TotalQueueCountDefault);
+            DataMinTimeInCache = providerConfiguration.GetTimeSpanProperty(DataMinTimeInCacheName, DefaultDataMinTimeInCache);
+            DataMaxAgeInCache = providerConfiguration.GetTimeSpanProperty(DataMaxAgeInCacheName, DefaultDataMaxAgeInCache);
+            StatisticMonitorWriteInterval = providerConfiguration.GetTimeSpanProperty(StatisticMonitorWriteIntervalName, DefaultStatisticMonitorWriteInterval);
         }
     }
 }

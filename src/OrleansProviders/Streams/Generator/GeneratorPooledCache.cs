@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.Generator
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            var evictionStrategy = new ExplicitEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
+            var evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
         }
 
@@ -62,10 +62,10 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private class ExplicitEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
+        private class GenratorPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
         {
-            public ExplicitEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate)
-                : base(logger, purgePredicate)
+            public GenratorPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+                : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {            
             }
 
@@ -105,12 +105,12 @@ namespace Orleans.Providers.Streams.Generator
 
             public DateTime? GetMessageEnqueueTimeUtc(ref CachedMessage message)
             {
-                return null;
+                return message.EnqueueTimeUtc;
             }
 
             public DateTime? GetMessageDequeueTimeUtc(ref CachedMessage message)
             {
-                return null;
+                return message.DequeueTimeUtc;
             }
 
             public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)

@@ -15,8 +15,6 @@ namespace Orleans.Providers.Streams.Common
         /// Buffer size in Byte
         /// </summary>
         public readonly int SizeInByte;
-        private Action<IDisposable> purgeAction;
-
 
         /// <summary>
         /// Unique identifier of this buffer

@@ -53,6 +53,10 @@ namespace Orleans.Providers
         /// </summary>
         protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
 
+        protected Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> CacheMonitorFactory;
+
+        protected Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> BlockPoolMonitorFactory;
+
         /// <summary>
         /// Factory initialization.
         /// </summary>
@@ -73,7 +77,7 @@ namespace Orleans.Providers
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
             // 10 meg buffer pool.  10 1 meg blocks
-            bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), adapterConfig.CacheSizeMb);
+            bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20));
 
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }

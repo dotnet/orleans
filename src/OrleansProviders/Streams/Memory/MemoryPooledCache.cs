@@ -28,7 +28,7 @@ namespace Orleans.Providers
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
             cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger);
-            var evictionStrategy = new ExplicitEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
+            var evictionStrategy = new MemoryPooledCacheEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
         }
 
@@ -51,10 +51,10 @@ namespace Orleans.Providers
             }
         }
 
-        private class ExplicitEvictionStrategy : ChronologicalEvictionStrategy<MemoryMessageData>
+        private class MemoryPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<MemoryMessageData>
         {
-            public ExplicitEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate)
-                : base(logger, purgePredicate)
+            public MemoryPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+                : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {
             }
 
@@ -94,12 +94,12 @@ namespace Orleans.Providers
 
             public DateTime? GetMessageEnqueueTimeUtc(ref MemoryMessageData message)
             {
-                return null;
+                return message.EnqueueTimeUtc;
             }
 
             public DateTime? GetMessageDequeueTimeUtc(ref MemoryMessageData message)
             {
-                return null;
+                return message.DequeueTimeUtc;
             }
 
             public StreamPosition QueueMessageToCachedMessage(ref MemoryMessageData cachedMessage,
