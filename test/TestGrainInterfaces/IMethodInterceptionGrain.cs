@@ -1,16 +1,19 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 
 namespace UnitTests.GrainInterfaces
 {
     using Orleans;
+
+    [TypeCodeOverride(6548972)]
     public interface IMethodInterceptionGrain : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
         [MethodId(14142)]
         Task<string> One();
         Task<string> Echo(string someArg);
         Task<string> NotIntercepted();
+        Task<string> Throw();
+        Task<string> IncorrectResultType();
     }
 
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
@@ -35,7 +38,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface IGrainCallFilterTestGrain : IGrainWithIntegerKey
     { 
-        Task<string> Execute(bool early, bool mid, bool late);
+        Task<string> CallWithBadInterceptors(bool early, bool mid, bool late);
         Task<string> GetRequestContext();
     }
 }
