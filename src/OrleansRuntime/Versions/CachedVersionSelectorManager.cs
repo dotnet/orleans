@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Utilities;
@@ -9,9 +10,16 @@ namespace Orleans.Runtime.Versions
 {
     internal class CachedVersionSelectorManager
     {
+        internal struct CachedEntry
+        {
+            public List<SiloAddress> SuitableSilos { get; set; }
+
+            public IReadOnlyDictionary<ushort, IReadOnlyList<SiloAddress>> SuitableSilosByVersion { get; set; }
+        }
+
         private readonly GrainTypeManager grainTypeManager;
-        private readonly Func<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>> getSilosFunc;
-        private readonly CachedReadConcurrentDictionary<Tuple<int,int,ushort>, IReadOnlyList<SiloAddress>> suitableSilosCache;
+        private readonly Func<Tuple<int, int, ushort>, CachedEntry> getSilosFunc;
+        private readonly CachedReadConcurrentDictionary<Tuple<int,int,ushort>, CachedEntry> suitableSilosCache;
 
         public VersionSelectorManager VersionSelectorManager { get; }
 
@@ -23,10 +31,10 @@ namespace Orleans.Runtime.Versions
             this.VersionSelectorManager = versionSelectorManager;
             this.CompatibilityDirectorManager = compatibilityDirectorManager;
             this.getSilosFunc = GetSuitableSilosImpl;
-            this.suitableSilosCache = new CachedReadConcurrentDictionary<Tuple<int, int, ushort>, IReadOnlyList<SiloAddress>>();
+            this.suitableSilosCache = new CachedReadConcurrentDictionary<Tuple<int, int, ushort>, CachedEntry>();
         }
 
-        public IReadOnlyList<SiloAddress> GetSuitableSilos(int typeCode, int ifaceId, ushort requestedVersion)
+        public CachedEntry GetSuitableSilos(int typeCode, int ifaceId, ushort requestedVersion)
         {
             var key = Tuple.Create(typeCode, ifaceId, requestedVersion);
             return suitableSilosCache.GetOrAdd(key, getSilosFunc);
@@ -37,7 +45,7 @@ namespace Orleans.Runtime.Versions
             this.suitableSilosCache.Clear();
         }
 
-        private IReadOnlyList<SiloAddress> GetSuitableSilosImpl(Tuple<int, int, ushort> key)
+        private CachedEntry GetSuitableSilosImpl(Tuple<int, int, ushort> key)
         {
             var typeCode = key.Item1;
             var ifaceId = key.Item2;
@@ -50,7 +58,13 @@ namespace Orleans.Runtime.Versions
                 this.grainTypeManager.GetAvailableVersions(ifaceId), 
                 compatibilityDirector);
 
-            return this.grainTypeManager.GetSupportedSilos(typeCode, ifaceId, versions);
+            var result = this.grainTypeManager.GetSupportedSilos(typeCode, ifaceId, versions);
+
+            return new CachedEntry
+            {
+                SuitableSilos = result.SelectMany(sv => sv.Value).ToList(),
+                SuitableSilosByVersion = result,
+            };
         }
     }
 }

@@ -146,18 +146,21 @@ namespace Orleans.Runtime
             return supportedSilosByTypeCode[typeCode];
         }
 
-        internal IReadOnlyList<SiloAddress> GetSupportedSilos(int typeCode, int ifaceId, IReadOnlyList<ushort> versions)
+        internal IReadOnlyDictionary<ushort, IReadOnlyList<SiloAddress>> GetSupportedSilos(int typeCode, int ifaceId, IReadOnlyList<ushort> versions)
         {
-            var result = new List<SiloAddress>();
+            var result = new Dictionary<ushort, IReadOnlyList<SiloAddress>>();
             foreach (var version in versions)
             {
                 var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
-                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version].Intersect(silosWithTypeCode);
-                result.AddRange(silosWithCorrectVersion);
+                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version]
+                    .Intersect(silosWithTypeCode)
+                    .ToList();
+                // We need to sort this so the list of silos returned will
+                // be the same accross all silos in the cluster
+                silosWithCorrectVersion.Sort();
+                result[version] = silosWithCorrectVersion;
             }
-            // We need to sort this so the list of silos returned will
-            // be the same accross all silos in the cluster
-            result.Sort();
+            
             return result;
         }
 
