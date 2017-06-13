@@ -22,11 +22,16 @@ namespace UnitTests.Grains
 
         public Task<string> SayHello() => Task.FromResult("Hello");
 
-        public Task<string> Throw() => throw new MyDomainSpecificException("Oi!");
+        public Task<string> Throw()
+        {
+            throw new MyDomainSpecificException("Oi!");
+        }
+
+        public Task FilterThrows() => Task.CompletedTask;
 
         public Task<string> IncorrectResultType() => Task.FromResult("hop scotch");
 
-        public async Task Invoke(IGrainCallContext context)
+        async Task IGrainCallFilter.Invoke(IGrainCallContext context)
         {
             var methodInfo = context.Method;
             if (methodInfo.Name == nameof(One) && methodInfo.GetParameters().Length == 0)
@@ -42,6 +47,11 @@ namespace UnitTests.Grains
                 // This should result in an invalid cast exception.
                 context.Result = Guid.NewGuid();
                 return;
+            }
+
+            if (methodInfo.Name == nameof(FilterThrows))
+            {
+                throw new MyDomainSpecificException("Filter THROW!");
             }
 
             // Invoke the request.

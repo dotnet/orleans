@@ -9,6 +9,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.General
@@ -164,6 +165,20 @@ namespace UnitTests.General
             var result = await grain.Throw();
             Assert.NotNull(result);
             Assert.Equal("EXCEPTION! Oi!", result);
+        }
+
+        /// <summary>
+        /// Tests that grain call filters can throw exceptions.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Fact]
+        public async Task GrainCallFilter_FilterThrows_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+            
+            var exception = await Assert.ThrowsAsync<MethodInterceptionGrain.MyDomainSpecificException>(() => grain.FilterThrows());
+            Assert.NotNull(exception);
+            Assert.Equal("Filter THROW!", exception.Message);
         }
 
         /// <summary>

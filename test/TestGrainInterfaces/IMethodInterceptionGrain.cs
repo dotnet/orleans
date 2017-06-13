@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
         Task<string> NotIntercepted();
         Task<string> Throw();
         Task<string> IncorrectResultType();
+        Task FilterThrows();
     }
 
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
