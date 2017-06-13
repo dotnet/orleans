@@ -1,15 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>UnitTests.Grains</RootNamespace>
+    <AssemblyName>TestInternalGrains</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="      ..\..\..\test\TestInternalGrains\obj\**\*.cs;       ..\..\..\test\TestInternalGrains\bin\**\*.cs;       ..\..\..\test\TestInternalGrains\Properties\*.cs" />
+    <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="..\..\..\test\TestInternalGrains\obj\**\*.cs;..\..\..\test\TestInternalGrains\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
@@ -34,17 +37,11 @@
     <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to ClientGenerator.exe -->
   <PropertyGroup>
     <!-- Visual Studio or MsBuild .sln build -->
     <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
-    <!-- TFS build -->
-    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
   </PropertyGroup>
   <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
   <!--End Orleans -->
