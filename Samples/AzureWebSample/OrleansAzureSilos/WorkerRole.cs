@@ -15,11 +15,7 @@ namespace Orleans.Azure.Silos
         private const string DATA_CONNECTION_STRING_KEY = "DataConnectionString";
 
         private AzureSilo orleansAzureSilo;
-
-        public WorkerRole()
-        {
-            Console.WriteLine("OrleansAzureSilos-Constructor called");
-        }
+        private ClusterConfiguration clusterConfiguration;
 
         public override bool OnStart()
         {
@@ -33,9 +29,29 @@ namespace Orleans.Azure.Silos
             RoleEnvironment.Changing += RoleEnvironmentChanging;
             SetupEnvironmentChangeHandlers();
 
-            bool ok = base.OnStart();
+            var config = AzureSilo.DefaultConfiguration();
+            config.AddMemoryStorageProvider();
 
-            Trace.WriteLine("OrleansAzureSilos-OnStart called base.OnStart ok=" + ok, "Information");
+            // First example of how to configure an existing provider
+            Example_ConfigureNewStorageProvider(config);
+            Example_ConfigureExistingStorageProvider(config);
+            Example_ConfigureNewBootstrapProvider(config);
+
+            // It is IMPORTANT to start the silo not in OnStart but in Run.
+            // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
+            // Just validate that the configuration is OK (for example, that the storage used in membership is accessible)
+            var silo = new AzureSilo();
+            bool ok = silo.ValidateConfiguration(config).Result;
+            Trace.WriteLine("OrleansAzureSilos-OnStart called silo.ValidateConfiguration ok=" + ok, "Information");
+
+            if (ok)
+            {
+                this.orleansAzureSilo = silo;
+                this.clusterConfiguration = config;
+
+                ok = base.OnStart();
+                Trace.WriteLine("OrleansAzureSilos-OnStart called base.OnStart ok=" + ok, "Information");
+            }
 
             return ok;
         }
@@ -44,20 +60,8 @@ namespace Orleans.Azure.Silos
         {
             Trace.WriteLine("OrleansAzureSilos-Run entry point called", "Information");
 
-            Trace.WriteLine("OrleansAzureSilos-OnStart Starting Orleans silo", "Information");
-
-            var config = AzureSilo.DefaultConfiguration();
-            config.AddMemoryStorageProvider();
-            
-            // First example of how to configure an existing provider
-            Example_ConfigureExistingStorageProvider(config);
-            Example_ConfigureNewStorageProvider(config);
-            Example_ConfigureNewBootstrapProvider(config);
-
-            // It is IMPORTANT to start the silo not in OnStart but in Run.
-            // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
-            orleansAzureSilo = new AzureSilo();
-            bool ok = orleansAzureSilo.Start(config);
+            Trace.WriteLine("OrleansAzureSilos-Run Starting Orleans silo", "Information");
+            bool ok = orleansAzureSilo.Start(this.clusterConfiguration);
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Orleans silo started ok=" + ok, "Information");
 
@@ -95,6 +99,17 @@ namespace Orleans.Azure.Silos
         private static void SetupEnvironmentChangeHandlers()
         {
             // For information on handling configuration changes see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
+        }
+
+        // Below is an example of how to programmatically configure a new storage provider that is not already specified in the XML config file.
+        private void Example_ConfigureNewStorageProvider(ClusterConfiguration config)
+        {
+            config.AddAzureTableStorageProvider("MyNewAzureStoreProvider");
+
+            // Once silo starts you can see that it prints in the log:
+            //  Providers:
+            //      StorageProviders:
+            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, TableName, DeleteStateOnClear, UseJsonFormat]
         }
 
         // Storage Provider is already configured in the OrleansConfiguration.xml as:
@@ -139,25 +154,6 @@ namespace Orleans.Azure.Silos
             //   Providers:
             //      StorageProviders:
             //          Name=AzureStore, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty, MyCustomProperty1, MyCustomProperty3]
-        }
-
-        // Below is an example of how to define a full configuration for a new storage provider that is not already specified in the config file.
-        private void Example_ConfigureNewStorageProvider(ClusterConfiguration config)
-        {
-            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
-            const string myProviderName = "MyNewAzureStoreProvider"; // what ever arbitrary name you want to give to your provider
-
-            var properties = new Dictionary<string, string>();
-            string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
-            properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
-            properties.Add("MyCustomProperty4", "MyCustomPropertyValue4");
-
-            config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
-
-            // Once silo starts you can see that it prints in the log:
-            //  Providers:
-            //      StorageProviders:
-            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty4]
         }
 
         // Below is an example of how to define a full configuration for a new Bootstrap provider that is not already specified in the config file.
