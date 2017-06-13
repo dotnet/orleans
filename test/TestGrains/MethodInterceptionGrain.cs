@@ -13,7 +13,10 @@ namespace UnitTests.Grains
 {
     public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IGrainCallFilter
     {
-        public Task<string> One() => throw new InvalidOperationException("Not allowed to actually invoke this method!");
+        public Task<string> One()
+        {
+            throw new InvalidOperationException("Not allowed to actually invoke this method!");
+        }
 
         [MessWithResult]
         public Task<string> Echo(string someArg) => Task.FromResult(someArg);
