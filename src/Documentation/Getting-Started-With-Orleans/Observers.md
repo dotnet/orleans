@@ -110,7 +110,7 @@ Now whenever our grain on the server calls the `SendUpdateMessage` method, all s
 **Note:** Objects passed to `CreateObjectReference` are held via a [`WeakReference<T>`](https://msdn.microsoft.com/en-us/library/system.weakreference) and will therefore be garbage collected if no other references exist. Users should maintain a reference for each observer which they do not want to be collected.
 
 **Note:** Observers are inherently unreliable since you don't get any response back to know if the message is received and processed or simply failed due to any condition which might arise in a distributed system. Because of that your observers should pull the grain periodically or use any other mechanism to ensure that they received all messages which they should have received.
-In some situations you can afford losing some messages and you don't need any additional mechanism but if you need to make sure that all observers are always receiving the messages and are receiving all of them, both periodic resubscriptions and pulling can help to ensure eventual processing of all messages.
+In some situations you can afford losing some messages and you don't need any additional mechanism but if you need to make sure that all observers are always receiving the messages and are receiving all of them, both periodic resubscriptions and pulling the observer grain, can help to ensure eventual processing of all messages.
 
 ## Next
 
