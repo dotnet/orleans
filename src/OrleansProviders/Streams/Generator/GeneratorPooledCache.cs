@@ -16,7 +16,7 @@ namespace Orleans.Providers.Streams.Generator
     public class GeneratorPooledCache : IQueueCache
     {
         private readonly PooledQueueCache<GeneratedBatchContainer, CachedMessage> cache;
-        private GenratorPooledCacheEvictionStrategy evictionStrategy;
+        private GeneratorPooledCacheEvictionStrategy evictionStrategy;
         /// <summary>
         /// Pooled cache for generator stream provider
         /// </summary>
@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Generator
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            this.evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            this.evictionStrategy = new GeneratorPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
             EvictionStrategyCommonUtils.WireUpEvictionStrategy(cache, dataAdapter, this.evictionStrategy);
         }
 
@@ -64,9 +64,9 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private class GenratorPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
+        private class GeneratorPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
         {
-            public GenratorPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            public GeneratorPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
                 : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {            
             }
