@@ -7,6 +7,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Xunit;
+using Orleans.Runtime;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
@@ -25,6 +26,7 @@ namespace UnitTests.OrleansRuntime.Streams
             public string StreamNamespace;
             public long SequenceNumber;
             public readonly byte[] Data = FixedMessage;
+            public DateTime EnqueueTimeUtc = DateTime.UtcNow;
         }
 
         private struct TestCachedMessage
@@ -33,6 +35,8 @@ namespace UnitTests.OrleansRuntime.Streams
             public string StreamNamespace;
             public long SequenceNumber;
             public ArraySegment<byte> Payload;
+            public DateTime EnqueueTimeUtc;
+            public DateTime DequeueTimeUtc;
         }
 
         private class TestBatchContainer : IBatchContainer
@@ -77,76 +81,37 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        private class ExplicitEvictionStrategy : IEvictionStrategy<TestCachedMessage>
+        private class EvictionStrategy : ChronologicalEvictionStrategy<TestCachedMessage>
         {
-            private FixedSizeBuffer currentBuffer;
-            private Queue<FixedSizeBuffer> purgedBuffers;
-            public IPurgeObservable<TestCachedMessage> PurgeObservable { set; private get; }
-
-            public ExplicitEvictionStrategy()
+            public EvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+                : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {
-                this.purgedBuffers = new Queue<FixedSizeBuffer>();
-            }
-            public Action<TestCachedMessage?, TestCachedMessage?> OnPurged { get; set; }
-
-            //Explicitly purge all messages in purgeRequestBlock
-            public void PerformPurge(DateTime utcNow, FixedSizeBuffer purgeRequest)
-            {
-                //if the cache is empty, then nothing to purge, return
-                if (this.PurgeObservable.IsEmpty)
-                    return;
-                var itemCountBeforePurge = this.PurgeObservable.ItemCount;
-                TestCachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
-                TestCachedMessage? lastMessagePurged = null;
-                while (!this.PurgeObservable.IsEmpty)
-                {
-                    var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
-                    if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest))
-                    {
-                        break;
-                    }
-                    lastMessagePurged = oldestMessageInCache;
-                    this.PurgeObservable.RemoveOldestMessage();
-                }
-
-                //return purged buffer to the pool. except for the current buffer.
-                //if purgeCandidate is current buffer, put it in purgedBuffers and free it in next circle
-                this.purgedBuffers.Enqueue(purgeRequest);
-                while (this.purgedBuffers.Count > 0)
-                {
-                    if (this.purgedBuffers.Peek() != this.currentBuffer)
-                    {
-                        this.purgedBuffers.Dequeue().Dispose();
-                    }
-                    else { break; }
-                }
             }
 
-            public void OnBlockAllocated(FixedSizeBuffer newBlock)
+            protected override object GetBlockId(TestCachedMessage? cachedMessage)
             {
-                this.currentBuffer = newBlock;
+                return cachedMessage?.Payload.Array;
             }
 
-            private bool ShouldPurge(ref TestCachedMessage cachedMessage, ref TestCachedMessage newestCachedMessage, IDisposable purgeRequest)
+            protected override DateTime GetDequeueTimeUtc(ref TestCachedMessage cachedMessage)
             {
-                var purgedResource = (FixedSizeBuffer)purgeRequest;
-                return cachedMessage.Payload.Array == purgedResource.Id;
+                return cachedMessage.DequeueTimeUtc;
             }
 
-            private void PerformPurge(FixedSizeBuffer purgeRequest)
+            protected override DateTime GetEnqueueTimeUtc(ref TestCachedMessage cachedMessage)
             {
-                this.PerformPurge(DateTime.UtcNow, purgeRequest);
+                return cachedMessage.EnqueueTimeUtc;
             }
         }
 
         private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
         {
-            private readonly IObjectPool<FixedSizeBuffer> bufferPool;
+            private readonly Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool;
             private FixedSizeBuffer currentBuffer;
 
             public Action<FixedSizeBuffer> OnBlockAllocated { private get; set; }
 
-            public TestCacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
+            public TestCacheDataAdapter(Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool)
             {
                 if (bufferPool == null)
                 {
@@ -157,12 +122,12 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
             {
-                return null;
+                return message.EnqueueTimeUtc;
             }
 
             public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
             {
-                return null;
+                return message.DequeueTimeUtc;
             }
 
             public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
@@ -172,6 +137,8 @@ namespace UnitTests.OrleansRuntime.Streams
                 cachedMessage.StreamNamespace = streamPosition.StreamIdentity.Namespace;
                 cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
+                cachedMessage.EnqueueTimeUtc = queueMessage.EnqueueTimeUtc;
+                cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
                 return streamPosition;
             }
 
@@ -233,7 +200,7 @@ namespace UnitTests.OrleansRuntime.Streams
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
             var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new ExplicitEvictionStrategy();
+            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 
@@ -250,7 +217,7 @@ namespace UnitTests.OrleansRuntime.Streams
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
             var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new ExplicitEvictionStrategy();
+            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 
