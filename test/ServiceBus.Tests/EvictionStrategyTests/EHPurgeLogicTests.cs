@@ -19,6 +19,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
+using Orleans.ServiceBus.Providers.Testing;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -158,15 +159,43 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.InUseBuffers.Count > 0));
 
             //perform purge
+
+            //after purge, inUseBuffers should be purged and return to the pool, except for the current buffer
+            var expectedPurgedBuffers = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy =>
+            {
+                var purgedBufferList = strategy.InUseBuffers.ToArray<FixedSizeBuffer>();
+                //last one in purgedBufferList should be current buffer, which shouldn't be purged
+                for (int i = 0; i < purgedBufferList.Count() - 1; i++)
+                    expectedPurgedBuffers.Add(purgedBufferList[i]);
+            });
+
             IList<IBatchContainer> ignore;
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 
-            //Each cache should each have buffers purged, while current buffer stay in inUseBuffers
+            //Each cache should have all buffers purged, except for current buffer
             this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
-
-            //Purged buffers should be returned to the pool and used to allocate new buffer
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
+            var oldBuffersInCaches = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy => {
+                foreach (var inUseBuffer in strategy.InUseBuffers)
+                    oldBuffersInCaches.Add(inUseBuffer);
+                });
+            //add items into cache again
+            itemAddToCache = 100;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+            //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
+            var newBufferAllocated = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy => {
+                foreach (var inUseBuffer in strategy.InUseBuffers)
+                    newBufferAllocated.Add(inUseBuffer);
+            });
+            //remove old buffer in cache, to get newly allocated buffers after purge
+            newBufferAllocated.RemoveAll(buffer => oldBuffersInCaches.Contains(buffer));
+            //purged buffer should return to the pool after purge, and used to allocate new buffer
+            expectedPurgedBuffers.ForEach(buffer => Assert.True(newBufferAllocated.Contains(buffer)));
         }
 #endif
 
@@ -216,7 +245,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
         {
-            return Task.FromResult<IStreamQueueCheckpointer<string>>(new MockStreamQueueCheckpointer());
+            return Task.FromResult<IStreamQueueCheckpointer<string>>(new NoOpCheckpointer());
         }
 
         private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)

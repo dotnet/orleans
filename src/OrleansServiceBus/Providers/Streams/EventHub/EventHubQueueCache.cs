@@ -49,7 +49,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheMonitorWriteInterval"></param>
         protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, 
             ICacheDataComparer<TCachedMessage> comparer, Logger logger, IEvictionStrategy<TCachedMessage> evictionStrategy, 
-            ICacheMonitor cacheMonitor = null, TimeSpan? cacheMonitorWriteInterval = null)
+            ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             this.defaultMaxAddCount = defaultMaxAddCount;
             Checkpointer = checkpointer;
@@ -199,7 +199,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
         public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger, 
-            SerializationManager serializationManager, ICacheMonitor cacheMonitor = null, TimeSpan? cacheMonitorWriteInterval = null)
+            SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
             : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), EventHubDataComparer.Instance, logger, 
                   new EventHubCacheEvictionStrategy(logger, timePurge, cacheMonitor, cacheMonitorWriteInterval), cacheMonitor, cacheMonitorWriteInterval)
         {
@@ -217,7 +217,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheMonitorWriteInterval"></param>
         public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, 
             ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy, 
-            ICacheMonitor cacheMonitor = null, TimeSpan? cacheMonitorWriteInterval = null)
+            ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
             : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, cacheMonitor, cacheMonitorWriteInterval)
         {
             log = logger.GetSubLogger(this.GetType().Name);
@@ -236,7 +236,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheMonitorWriteInterval"></param>
         public EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, 
             ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy, 
-            ICacheMonitor cacheMonitor = null, TimeSpan? cacheMonitorWriteInterval = null)
+            ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
             : base(defaultMaxAddCount, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, cacheMonitor, cacheMonitorWriteInterval)
         {
             log = logger.GetSubLogger(this.GetType().Name);

@@ -18,7 +18,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     {
         public EventHubQueueCacheForTesting(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
             ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
-            :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy)
+            :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, null, null)
             { }
         
         public int ItemCount => this.cache.ItemCount;
@@ -46,22 +46,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var steamIdentity = new StreamIdentity(Guid.NewGuid(), "EmptySpace");
             var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);
             return new StreamPosition(steamIdentity, sequenceToken);
-        }
-    }
-
-    internal class MockStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
-    {
-        public bool CheckpointExists => true;
-
-        public Task<string> Load()
-        {
-            //do nothing
-            return Task.FromResult<string>("");
-        }
-
-        public void Update(string offset, DateTime utcNow)
-        {
-            //do nothing
         }
     }
 
