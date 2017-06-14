@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// Queue adapter receiver monitor used as a default option in GeneratorStreamprovider and MemoryStreamProvider
+    /// </summary>
     public class DefaultQueueAdapterReceiverMonitor : IQueueAdapterReceiverMonitor
     {
         protected Logger Logger;

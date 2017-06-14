@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// block pool monitor used as a default option in GeneratorStreamprovider and MemoryStreamProvider
+    /// </summary>
     public class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
         protected Logger Logger;
@@ -26,6 +29,7 @@ namespace Orleans.Providers.Streams.Common
                 {"HostName", dimensions.NodeConfig.HostNameOrIPAddress }
             };
         }
+        /// <inheritdoc cref="IBlockPoolMonitor"/>
         public virtual void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
             this.Logger.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.LogProperties);
@@ -33,13 +37,13 @@ namespace Orleans.Providers.Streams.Common
             this.Logger.TrackMetric("ClaimedMemoryInByte", claimedMemoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="IObjectPoolMonitor"/>
+        /// <inheritdoc cref="IBlockPoolMonitor"/>
         public virtual void TrackMemoryReleased(long releasedMemoryInByte)
         {
             this.Logger.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="IObjectPoolMonitor"/>
+        /// <inheritdoc cref="IBlockPoolMonitor"/>
         public virtual void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             this.Logger.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.LogProperties);

@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// Base class for holding monitor aggregation dimensions
+    /// </summary>
     public class MonitorAggregationDimensions
     {
         /// <summary>
@@ -37,6 +40,9 @@ namespace Orleans.Providers.Streams.Common
         { }
     }
 
+    /// <summary>
+    /// Aggregation dimensions for receiver monitor
+    /// </summary>
     public class ReceiverMonitorDimensions : MonitorAggregationDimensions
     {
         /// <summary>
@@ -63,8 +69,14 @@ namespace Orleans.Providers.Streams.Common
         }
     }
 
+    /// <summary>
+    /// Aggregation dimensions for cache monitor
+    /// </summary>
     public class CacheMonitorDimensions : ReceiverMonitorDimensions
     {
+        /// <summary>
+        /// Block pool Id
+        /// </summary>
         public string BlockPoolId { get; set; }
 
         public CacheMonitorDimensions(MonitorAggregationDimensions dimensions, string queueId, string blockPoolId)
@@ -74,8 +86,14 @@ namespace Orleans.Providers.Streams.Common
         }
     }
 
+    /// <summary>
+    /// Aggregation dimensions for block pool monitors
+    /// </summary>
     public class BlockPoolMonitorDimensions : MonitorAggregationDimensions
     {
+        /// <summary>
+        /// Block pool Id
+        /// </summary>
         public string BlockPoolId { get; set; }
 
         public BlockPoolMonitorDimensions(MonitorAggregationDimensions dimensions, string blockPoolId)

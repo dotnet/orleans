@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// Common stream provider settings shared by EventHubStreamProvider, MemoryStreamProvider and GeneratorStreamProvider
+    /// </summary>
     public class CommonStreamProviderSettings
     {
         /// <summary>

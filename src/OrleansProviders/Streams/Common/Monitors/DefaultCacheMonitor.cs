@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// cache monitor used as a default option in GeneratorStreamprovider and MemoryStreamProvider
+    /// </summary>
     public class DefaultCacheMonitor : ICacheMonitor
     {
         protected Logger Logger;
