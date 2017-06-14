@@ -97,7 +97,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void PerformPurge(DateTime nowUtc, FixedSizeBuffer purgeRequest)
+        public void PerformPurge(DateTime nowUtc)
         {
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.IsEmpty)

@@ -16,7 +16,7 @@ namespace Orleans.Providers
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         private readonly PooledQueueCache<MemoryMessageData, MemoryMessageData> cache;
-
+        private MemoryPooledCacheEvictionStrategy evictionStrategy;
         /// <summary>
         /// Pooled cache for memory stream provider
         /// </summary>
@@ -30,7 +30,7 @@ namespace Orleans.Providers
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
             cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
-            var evictionStrategy = new MemoryPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            this.evictionStrategy = new MemoryPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
             EvictionStrategyCommonUtils.WireUpEvictionStrategy<MemoryMessageData, MemoryMessageData>(cache, dataAdapter, evictionStrategy);
         }
 
@@ -235,6 +235,7 @@ namespace Orleans.Providers
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
+            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 

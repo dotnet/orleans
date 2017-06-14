@@ -16,7 +16,7 @@ namespace Orleans.Providers.Streams.Generator
     public class GeneratorPooledCache : IQueueCache
     {
         private readonly PooledQueueCache<GeneratedBatchContainer, CachedMessage> cache;
-
+        private GenratorPooledCacheEvictionStrategy evictionStrategy;
         /// <summary>
         /// Pooled cache for generator stream provider
         /// </summary>
@@ -30,8 +30,8 @@ namespace Orleans.Providers.Streams.Generator
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            var evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
-            EvictionStrategyCommonUtils.WireUpEvictionStrategy(cache, dataAdapter, evictionStrategy);
+            this.evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            EvictionStrategyCommonUtils.WireUpEvictionStrategy(cache, dataAdapter, this.evictionStrategy);
         }
 
         // For fast GC this struct should contain only value types.  I included streamNamespace because I'm lasy and this is test code, but it should not be in here.
@@ -245,6 +245,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
+            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 
