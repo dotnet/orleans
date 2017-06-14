@@ -282,8 +282,8 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
         {
-            var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-            var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
+            var globalConfig = this.serviceProvider.GetService<GlobalConfiguration>();
+            var nodeConfig = this.serviceProvider.GetService<NodeConfiguration>();
             var eventHubPath = hubSettings.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
             return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimensions);
