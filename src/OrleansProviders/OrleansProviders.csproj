@@ -48,10 +48,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
+    <Compile Include="Streams\Common\CommonStreamProviderSettings.cs" />
     <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
+    <Compile Include="Streams\Common\Monitors\DefaultBlockPoolMonitor.cs" />
+    <Compile Include="Streams\Common\Monitors\DefaultCacheMonitor.cs" />
+    <Compile Include="Streams\Common\Monitors\DefaultQueueAdapterReceiverMonitor.cs" />
     <Compile Include="Streams\Common\Monitors\IBlockPoolMonitor.cs" />
     <Compile Include="Streams\Common\Monitors\IObjectPoolMonitor.cs" />
     <Compile Include="Streams\Common\Monitors\ICacheMonitor.cs" />
+    <Compile Include="Streams\Common\Monitors\IQueueAdapterReceiverMonitor.cs" />
+    <Compile Include="Streams\Common\Monitors\MonitorAggregationDimensions.cs" />
     <Compile Include="Streams\Common\PooledCache\ChronologicalEvictionStrategy.cs" />
     <Compile Include="Streams\Common\PooledCache\IEvictionStrategy.cs" />
     <Compile Include="Streams\Common\PooledCache\TimePurgePredicate.cs" />

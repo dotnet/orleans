@@ -38,6 +38,7 @@ namespace Orleans.Providers.Streams.Common
             this.logger = logger;
             this.timePurge = timePurage;
             this.inUseBuffers = new Queue<FixedSizeBuffer>();
+            this.cacheMonitor = cacheMonitor;
             if (cacheMonitor != null && monitorWriteInterval.HasValue)
             {
                 this.timer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
@@ -120,6 +121,7 @@ namespace Orleans.Providers.Streams.Common
                 return;
 
             //items got purged, time to conduct follow up actions 
+            this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
             ReportPurge(this.logger, this.PurgeObservable, itemsPurged);

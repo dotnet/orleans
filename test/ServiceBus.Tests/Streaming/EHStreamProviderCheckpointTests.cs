@@ -42,7 +42,7 @@ namespace ServiceBus.Tests.StreamingTests
                 EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName) { CacheSizeMb = 3 };
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         public override TestCluster CreateTestCluster()
         {

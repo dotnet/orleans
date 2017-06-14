@@ -3,33 +3,19 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
     /// Settings class for EventHubStreamProvider.
     /// </summary>
-    public class EventHubStreamProviderSettings
+    public class EventHubStreamProviderSettings : CommonStreamProviderSettings
     {
         /// <summary>
         /// Stream provider name.  This setting is required.
         /// </summary>
         public string StreamProviderName { get; }
-
-        /// <summary>
-        /// Name of StatisticMonitorWriteInterval
-        /// </summary>
-        public const string StatisticMonitorWriteIntervalName = nameof(StatisticMonitorWriteInterval);
-
-        /// <summary>
-        /// Default statistic monitor write interval
-        /// </summary>
-        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromMinutes(5);
-
-        /// <summary>
-        /// Statistic monitor write interval
-        /// </summary>
-        public TimeSpan StatisticMonitorWriteInterval = DefaultStatisticMonitorWriteInterval;
 
         /// <summary>
         /// SlowConsumingMonitorFlowControlThresholdName
@@ -81,32 +67,6 @@ namespace Orleans.ServiceBus.Providers
         public Type CheckpointerSettingsType { get; set; }
 
         /// <summary>
-        /// DataMinTimeInCache setting name.
-        /// </summary>
-        public const string DataMinTimeInCacheName = "DataMinTimeInCache";
-        /// <summary>
-        /// Drfault DataMinTimeInCache
-        /// </summary>
-        public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
-        /// <summary>
-        /// Minimum time message will stay in cache before it is available for time based purge.
-        /// </summary>
-        public TimeSpan DataMinTimeInCache = DefaultDataMinTimeInCache;
-
-        /// <summary>
-        /// DataMaxAgeInCache setting name.
-        /// </summary>
-        public const string DataMaxAgeInCacheName = "DataMaxAgeInCache";
-        /// <summary>
-        /// Default DataMaxAgeInCache
-        /// </summary>
-        public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
-        /// <summary>
-        /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
-        /// </summary>
-        public TimeSpan DataMaxAgeInCache = DefaultDataMaxAgeInCache;
-
-        /// <summary>
         /// Constructor.  Requires provider name.
         /// </summary>
         /// <param name="streamProviderName"></param>
@@ -119,15 +79,13 @@ namespace Orleans.ServiceBus.Providers
         /// Writes settings into a property bag.
         /// </summary>
         /// <param name="properties"></param>
-        public void WriteProperties(Dictionary<string, string> properties)
+        public override void WriteProperties(Dictionary<string, string> properties)
         {
+            base.WriteProperties(properties);
             if (EventHubSettingsType != null)
                 properties.Add(EventHubConfigTypeName, EventHubSettingsType.AssemblyQualifiedName);
             if (CheckpointerSettingsType != null)
                 properties.Add(CheckpointerSettingsTypeName, CheckpointerSettingsType.AssemblyQualifiedName);
-            properties.Add(StatisticMonitorWriteIntervalName, StatisticMonitorWriteInterval.ToString());
-            properties.Add(DataMinTimeInCacheName, DataMinTimeInCache.ToString());
-            properties.Add(DataMaxAgeInCacheName, DataMaxAgeInCache.ToString());
             if (AveragingCachePressureMonitorFlowControlThreshold.HasValue)
             {
                 properties.Add(AveragingCachePressureMonitorFlowControlThresholdName, AveragingCachePressureMonitorFlowControlThreshold.ToString());
@@ -150,7 +108,7 @@ namespace Orleans.ServiceBus.Providers
         /// Read settings from provider configuration.
         /// </summary>
         /// <param name="providerConfiguration"></param>
-        public void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
+        public override void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             EventHubSettingsType = providerConfiguration.GetTypeProperty(EventHubConfigTypeName, null);
             CheckpointerSettingsType = providerConfiguration.GetTypeProperty(CheckpointerSettingsTypeName, null);
@@ -158,10 +116,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentOutOfRangeException(nameof(providerConfiguration), "StreamProviderName not set.");
             }
-            DataMinTimeInCache = providerConfiguration.GetTimeSpanProperty(DataMinTimeInCacheName, DefaultDataMinTimeInCache);
-            DataMaxAgeInCache = providerConfiguration.GetTimeSpanProperty(DataMaxAgeInCacheName, DefaultDataMaxAgeInCache);
-            StatisticMonitorWriteInterval = providerConfiguration.GetTimeSpanProperty(StatisticMonitorWriteIntervalName,
-                DefaultStatisticMonitorWriteInterval);
+            base.PopulateFromProviderConfig(providerConfiguration);
             double flowControlThreshold = 0;
             if (providerConfiguration.TryGetDoubleProperty(SlowConsumingMonitorFlowControlThresholdName, out flowControlThreshold))
             {

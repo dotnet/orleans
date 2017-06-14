@@ -1,12 +1,12 @@
 ﻿
 using System;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Responsible for monitoring receiver performance metrics.
     /// </summary>
-    public interface IEventHubReceiverMonitor
+    public interface IQueueAdapterReceiverMonitor
     {
         #region event driven metrics
         /// <summary>

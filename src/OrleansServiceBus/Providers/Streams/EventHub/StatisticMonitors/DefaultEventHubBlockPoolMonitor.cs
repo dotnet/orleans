@@ -10,22 +10,23 @@ using Orleans.ServiceBus.Providers;
 namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
 {
     /// <summary>
-    /// Default cache monitor for eventhub streaming provider ecosystem
+    /// Default monitor for Object pool used by EventHubStreamProvider
     /// </summary>
-    public class DefaultEventHubCacheMonitor : DefaultCacheMonitor
+    public class DefaultEventHubBlockPoolMonitor : DefaultBlockPoolMonitor
     {
+
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="dimensions"></param>
         /// <param name="logger"></param>
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions, Logger logger)
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Logger logger)
             :base(logger)
         {
             this.LogProperties = new Dictionary<string, string>
             {
                 {"Path", dimensions.EventHubPath},
-                {"Partition", dimensions.EventHubPartition}
+                {"ObjectPoolId", dimensions.BlockPoolId}
             };
         }
     }

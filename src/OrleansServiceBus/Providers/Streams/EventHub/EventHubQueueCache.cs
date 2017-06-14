@@ -57,11 +57,10 @@ namespace Orleans.ServiceBus.Providers
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
-            this.evictionStrategy.PurgeObservable = cache;
-            cacheDataAdapter.OnBlockAllocated = this.evictionStrategy.OnBlockAllocated;
             this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
+            EvictionStrategyCommonUtils.WireUpEvictionStrategy<EventData, TCachedMessage>(this.cache, cacheDataAdapter, this.evictionStrategy);
         }
-    
+
         /// <inheritdoc />
         public void SignalPurge()
         {
@@ -202,7 +201,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger, 
             SerializationManager serializationManager, ICacheMonitor cacheMonitor = null, TimeSpan? cacheMonitorWriteInterval = null)
             : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), EventHubDataComparer.Instance, logger, 
-                  new EventHubCacheEvictionStrategy(logger, cacheMonitor, cacheMonitorWriteInterval, timePurge), cacheMonitor, cacheMonitorWriteInterval)
+                  new EventHubCacheEvictionStrategy(logger, timePurge, cacheMonitor, cacheMonitorWriteInterval), cacheMonitor, cacheMonitorWriteInterval)
         {
         }
 

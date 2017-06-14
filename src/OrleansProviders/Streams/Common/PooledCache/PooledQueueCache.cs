@@ -315,7 +315,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 streamPosisions.Add(this.Add(message, dequeueTime));
             }
-            this.cacheMonitor.TrackMessagesAdded(messages.Count);
+            this.cacheMonitor?.TrackMessagesAdded(messages.Count);
             return streamPosisions;
         }
 

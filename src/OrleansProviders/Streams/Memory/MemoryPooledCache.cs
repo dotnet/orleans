@@ -24,12 +24,14 @@ namespace Orleans.Providers
         /// <param name="purgePredicate"></param>
         /// <param name="logger"></param>
         /// <param name="serializer"></param>
-        public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, Logger logger, TSerializer serializer)
+        /// <param name="cacheMonitor"></param>
+        /// <param name="monitorWriteInterval"></param>
+        public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, Logger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
-            cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger);
-            var evictionStrategy = new MemoryPooledCacheEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
-            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+            cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
+            var evictionStrategy = new MemoryPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            EvictionStrategyCommonUtils.WireUpEvictionStrategy<MemoryMessageData, MemoryMessageData>(cache, dataAdapter, evictionStrategy);
         }
 
         private class CacheDataComparer : ICacheDataComparer<MemoryMessageData>

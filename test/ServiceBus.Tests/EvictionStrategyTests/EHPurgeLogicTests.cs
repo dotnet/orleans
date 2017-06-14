@@ -31,7 +31,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private EventHubAdapterReceiver receiver1;
         private EventHubAdapterReceiver receiver2;
         private ObjectPool<FixedSizeBuffer> bufferPool;
-        private int bufferPoolSizeInMB;
         private Logger logger;
         private TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private EventHubPartitionSettings ehSettings;
@@ -53,7 +52,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.serializationManager = environment.SerializationManager;
 
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
-            this.bufferPoolSizeInMB = EventHubStreamProviderSettings.DefaultCacheSizeMb;
             var oneKB = 1024;
             this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB));
 
@@ -139,34 +137,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             int expectedItemCountInCaches = 0;
             //items got purged
             Assert.Equal(expectedItemCountInCaches, GetItemCountInAllCache(this.cacheList));
-        }
-
-        [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_BufferPoolFull_WontCauseCacheMiss()
-        {
-            InitForTesting();
-            var tasks = new List<Task>();
-            //add items into cache
-            int itemAddToCache = 100;
-            foreach (var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
-            await Task.WhenAll(tasks);
-
-            //set up condition so that purge shouldn't be performed
-            this.cachePressureInjectionMonitor.isUnderPressure = false;
-            this.purgePredicate.ShouldPurge = false;
-
-            //keep allocate buffer on buffer pool to make it full
-            int bufferToAllocate = EventHubStreamProviderSettings.DefaultCacheSizeMb;
-            while (bufferToAllocate > 0)
-            {
-                this.bufferPool.Allocate();
-                bufferToAllocate--;
-            }
-
-            //Assert, no item got purged
-            int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
-            Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
         [Fact, TestCategory("BVT")]

@@ -23,13 +23,15 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="bufferPool"></param>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger, SerializationManager serializationManager)
+        /// <param name="cacheMonitor"></param>
+        /// <param name="monitorWriteInterval"></param>
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
-            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
+            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            var evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate) {PurgeObservable = cache};
-            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+            var evictionStrategy = new GenratorPooledCacheEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            EvictionStrategyCommonUtils.WireUpEvictionStrategy(cache, dataAdapter, evictionStrategy);
         }
 
         // For fast GC this struct should contain only value types.  I included streamNamespace because I'm lasy and this is test code, but it should not be in here.

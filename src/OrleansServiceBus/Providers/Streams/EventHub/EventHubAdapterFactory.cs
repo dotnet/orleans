@@ -105,7 +105,7 @@ namespace Orleans.ServiceBus.Providers
         /// Create a receiver monitor to report performance metrics.
         /// Factory funciton should return an IEventHubReceiverMonitor.
         /// </summary>
-        protected Func<EventHubReceiverMonitorDimensions, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
+        protected Func<EventHubReceiverMonitorDimensions, Logger, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
@@ -162,7 +162,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (ReceiverMonitorFactory == null)
             {
-                ReceiverMonitorFactory = (dimensions, receiverLogger) => new DefaultEventHubReceiverMonitor(dimensions, receiverLogger.GetSubLogger("monitor", "-"));
+                ReceiverMonitorFactory = (dimensions, receiverLogger) => new DefaultEventHubReceiverMonitor(dimensions, receiverLogger.GetSubLogger(typeof(DefaultEventHubReceiverMonitor).Name));
             }
 
             logger = log.GetLogger($"EventHub.{hubSettings.Path}");

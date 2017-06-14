@@ -32,6 +32,17 @@ namespace Orleans.Providers.Streams.Common
         void OnBlockAllocated(FixedSizeBuffer newBlock);
     }
 
+    public static class EvictionStrategyCommonUtils
+    {
+        public static void WireUpEvictionStrategy<TQueueMessage, TCachedMessage>(PooledQueueCache<TQueueMessage, TCachedMessage> cache,
+            ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, IEvictionStrategy<TCachedMessage> evictionStrategy)
+            where TCachedMessage : struct
+        {
+            evictionStrategy.PurgeObservable = cache;
+            cacheDataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+        }
+    }
+
     /// <summary>
     /// IPurgeObservable is implemented by the cache to do purge related actions, and invoked by EvictionStrategy
     /// </summary>

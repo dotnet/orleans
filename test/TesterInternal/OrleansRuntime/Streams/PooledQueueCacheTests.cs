@@ -230,9 +230,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void GoldenPathTest()
         {
-            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize), PooledBufferCount);
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
             var evictionStrategy = new ExplicitEvictionStrategy();
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
@@ -247,9 +247,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void CacheDrainTest()
         {
-            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize), PooledBufferCount);
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
             var evictionStrategy = new ExplicitEvictionStrategy();
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
