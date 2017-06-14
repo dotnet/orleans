@@ -27,4 +27,13 @@ namespace TestVersionGrains
             return true;
         }
     }
+
+    [VersionAwareStrategy]
+    public class VersionPlacementTestGrain : Grain, IVersionPlacementTestGrain
+    {
+        public Task<int> GetVersion()
+        {
+            return Task.FromResult(1);
+        }
+    }
 }

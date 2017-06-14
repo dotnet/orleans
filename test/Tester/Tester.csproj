@@ -63,6 +63,7 @@
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\RuntimeStrategyChangeTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTestsBase.cs" />
+    <Compile Include="HeterogeneousSilosTests\UpgradeTests\VersionPlacementTests.cs" />
     <Compile Include="Placement\CustomPlacementTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />

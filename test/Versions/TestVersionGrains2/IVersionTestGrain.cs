@@ -14,4 +14,10 @@ namespace TestVersionGrainInterfaces
 
         Task<bool> LongRunningTask(TimeSpan taskTime);
     }
+
+    [Version(2)]
+    public interface IVersionPlacementTestGrain : IGrainWithIntegerKey
+    {
+        Task<int> GetVersion();
+    }
 }

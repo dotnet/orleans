@@ -18,7 +18,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IVersionUpgradeTestGrain));
 
-            await DeployCluster();
+            await StartSiloV1();
 
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grainV1.GetVersion());
@@ -63,7 +63,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IVersionUpgradeTestGrain));
 
-            await DeployCluster();
+            await StartSiloV1();
 
             // Only V1 exists
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
@@ -102,7 +102,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             Assert.Equal(AllVersionsCompatible.Singleton, CompatibilityStrategy);
 
-            await DeployCluster();
+            await StartSiloV1();
 
             // Only V1 exists
             var grainV1 = new IVersionUpgradeTestGrain[2];
@@ -136,7 +136,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             Assert.Equal(LatestVersion.Singleton, VersionSelectorStrategy);
 
-            await DeployCluster();
+            await StartSiloV1();
 
             // Only V1 exists
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);

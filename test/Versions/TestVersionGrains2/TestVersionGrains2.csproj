@@ -42,6 +42,9 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\TestVersionGrains\Startup.cs">
+      <Link>Startup.cs</Link>
+    </Compile>
     <Compile Include="IVersionTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="VersionTestGrain.cs" />
