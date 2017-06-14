@@ -160,7 +160,7 @@ namespace Orleans.Streams
             {
                 foreach (PubSubPublisherState producerState in producers)
                 {
-                    tasks.Add(HandleProducerErrors(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)));
+                    tasks.Add(ExecuteProducerTask(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)));
                 }
 
                 Exception exception = null;
@@ -370,7 +370,7 @@ namespace Orleans.Streams
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers
-                    .Select(producerState => HandleProducerErrors(producerState, producerState.Producer.RemoveSubscriber(subscriptionId, streamId)))
+                    .Select(producerState => ExecuteProducerTask(producerState, producerState.Producer.RemoveSubscriber(subscriptionId, streamId)))
                     .ToList();
                 await Task.WhenAll(tasks);
                 //if producers got removed
@@ -393,7 +393,7 @@ namespace Orleans.Streams
             return false;
         }
 
-        private async Task HandleProducerErrors(PubSubPublisherState producer, Task producerTask)
+        private async Task ExecuteProducerTask(PubSubPublisherState producer, Task producerTask)
         {
             try
             {
