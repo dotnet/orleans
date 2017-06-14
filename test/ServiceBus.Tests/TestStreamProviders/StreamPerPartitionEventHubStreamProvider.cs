@@ -16,35 +16,31 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class StreamPerPartitionEventHubStreamProvider : PersistentStreamProvider<StreamPerPartitionEventHubStreamProvider.AdapterFactory>
     {
-        private class CacheFactory : EventHubQueueCacheFactory
-        { 
+        private class CacheFactory : IEventHubQueueCacheFactory
+        {
+            private readonly EventHubStreamProviderSettings adapterSettings;
+            private readonly SerializationManager serializationManager;
+            private readonly TimePurgePredicate timePurgePredicate;
 
-            public CacheFactory(EventHubStreamProviderSettings providerSettings,
-            SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
-            Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = null,
-            Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                :base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+            public CacheFactory(EventHubStreamProviderSettings adapterSettings, SerializationManager serializationManager)
             {
+                this.adapterSettings = adapterSettings;
+                this.serializationManager = serializationManager;
+                timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
             }
 
-            protected override IObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings, Logger logger, EventHubMonitorAggregationDimensions sharedDimensions, out string blockPoolId)
+            public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
             {
-                var bufferSize = 1 << 20;
-                var bufferPoolId = $"BlockPool-{new Guid().ToString()}-BlockSize-{bufferSize}";
-                var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, bufferPoolId);
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(monitorDimensions, logger), bufferSize);
-                var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(bufferSize),
-                    objectPoolMonitor, providerSettings.StatisticMonitorWriteInterval);
-                blockPoolId = bufferPoolId;
-                return bufferPool;
+                var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), null, null);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger, 
+                    new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate, null, null), null, null);
             }
         }
 
@@ -52,11 +48,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
-                var eventHubPath = hubSettings.Path;
-                var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
-                return new CacheFactory(providerSettings, SerializationManager, sharedDimensions);
+                return new CacheFactory(providerSettings, SerializationManager);
             }
         }
 
