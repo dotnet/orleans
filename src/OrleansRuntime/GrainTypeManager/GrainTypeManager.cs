@@ -152,12 +152,12 @@ namespace Orleans.Runtime
             foreach (var version in versions)
             {
                 var silosWithTypeCode = supportedSilosByTypeCode[typeCode];
-                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version]
-                    .Intersect(silosWithTypeCode)
-                    .ToList();
                 // We need to sort this so the list of silos returned will
                 // be the same accross all silos in the cluster
-                silosWithCorrectVersion.Sort();
+                var silosWithCorrectVersion = supportedSilosByInterface[ifaceId][version]
+                    .Intersect(silosWithTypeCode)
+                    .OrderBy(addr => addr)
+                    .ToList();
                 result[version] = silosWithCorrectVersion;
             }
             

@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Versions
 
             return new CachedEntry
             {
-                SuitableSilos = result.SelectMany(sv => sv.Value).ToList(),
+                SuitableSilos = result.SelectMany(sv => sv.Value).OrderBy(addr => addr).ToList(),
                 SuitableSilosByVersion = result,
             };
         }
