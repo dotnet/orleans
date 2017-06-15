@@ -247,9 +247,12 @@ namespace Orleans.Providers.Streams.Generator
                 }
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, null);
-                var oldestMessage = batches[0] as GeneratedBatchContainer;
-                var newestMessage = batches[batches.Count - 1] as GeneratedBatchContainer;
-                this.receiverMonitor?.TrackMessagesReceived(batches.Count, oldestMessage?.EnqueueTimeUtc, newestMessage?.EnqueueTimeUtc);
+                if (batches.Count > 0)
+                {
+                    var oldestMessage = batches[0] as GeneratedBatchContainer;
+                    var newestMessage = batches[batches.Count - 1] as GeneratedBatchContainer;
+                    this.receiverMonitor?.TrackMessagesReceived(batches.Count, oldestMessage?.EnqueueTimeUtc, newestMessage?.EnqueueTimeUtc);
+                }
                 return batches;
             }
 

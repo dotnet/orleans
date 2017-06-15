@@ -10,7 +10,7 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// Settings class for EventHubStreamProvider.
     /// </summary>
-    public class EventHubStreamProviderSettings : CommonStreamProviderSettings
+    public class EventHubStreamProviderSettings : RecoverableStreamProviderSettings
     {
         /// <summary>
         /// Stream provider name.  This setting is required.

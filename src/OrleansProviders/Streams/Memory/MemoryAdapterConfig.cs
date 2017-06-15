@@ -9,7 +9,7 @@ namespace Orleans.Providers
     /// This configuration class is used to configure the MemoryStreamProvider.
     /// It tells the stream provider how many queues to create.
     /// </summary>
-    public class MemoryAdapterConfig : CommonStreamProviderSettings
+    public class MemoryAdapterConfig : RecoverableStreamProviderSettings
     {
         /// <summary>
         /// Stream provider name.

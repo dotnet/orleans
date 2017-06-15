@@ -48,7 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
-    <Compile Include="Streams\Common\CommonStreamProviderSettings.cs" />
+    <Compile Include="Streams\Common\RecoverableStreamProviderSettings.cs" />
     <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
     <Compile Include="Streams\Common\Monitors\DefaultBlockPoolMonitor.cs" />
     <Compile Include="Streams\Common\Monitors\DefaultCacheMonitor.cs" />

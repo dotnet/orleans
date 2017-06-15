@@ -43,13 +43,16 @@ namespace Orleans.Providers
             {
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
-                IEnumerable<MemoryMessageData> eventData = await task;
+                List<MemoryMessageData> eventData = await task;
                 batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, null);
-                var oldestMessage = eventData.ElementAt(0);
-                var newestMessage = eventData.ElementAt(eventData.Count() - 1);
-                this.receiverMonitor?.TrackMessagesReceived(eventData.Count(), oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
+                if (eventData.Count > 0)
+                {
+                    var oldestMessage = eventData[0];
+                    var newestMessage = eventData[eventData.Count() - 1];
+                    this.receiverMonitor?.TrackMessagesReceived(eventData.Count(), oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
+                }
             }
             catch (Exception exc)
             {

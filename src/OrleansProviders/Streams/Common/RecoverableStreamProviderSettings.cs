@@ -9,7 +9,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Common stream provider settings shared by EventHubStreamProvider, MemoryStreamProvider and GeneratorStreamProvider
     /// </summary>
-    public class CommonStreamProviderSettings
+    public class RecoverableStreamProviderSettings
     {
         /// <summary>
         /// DataMinTimeInCache setting name.
@@ -22,7 +22,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Minimum time message will stay in cache before it is available for time based purge.
         /// </summary>
-        public TimeSpan DataMinTimeInCache = DefaultDataMinTimeInCache;
+        public TimeSpan DataMinTimeInCache { get; set; } = DefaultDataMinTimeInCache;
 
         /// <summary>
         /// DataMaxAgeInCache setting name.
@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
         /// </summary>
-        public TimeSpan DataMaxAgeInCache = DefaultDataMaxAgeInCache;
+        public TimeSpan DataMaxAgeInCache { get; set; } = DefaultDataMaxAgeInCache;
 
         /// <summary>
         /// Name of StatisticMonitorWriteInterval
@@ -50,7 +50,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Statistic monitor write interval
         /// </summary>
-        public TimeSpan StatisticMonitorWriteInterval = DefaultStatisticMonitorWriteInterval;
+        public TimeSpan StatisticMonitorWriteInterval { get; set; } = DefaultStatisticMonitorWriteInterval;
 
         public virtual void WriteProperties(Dictionary<string, string> properties)
         {
