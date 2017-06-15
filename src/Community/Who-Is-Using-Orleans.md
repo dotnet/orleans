@@ -61,3 +61,5 @@ Community contribution projects, including Orleans Monitoring, Design Patterns, 
 More Info [here](http://pegasusmission.com/2015/03/04/orleans-above-the-cloud-piraeus-overview/) and [here](https://github.com/dotnet/orleans/issues/99#issuecomment-74697629)
 * <a href="https://github.com/SyncToday/synctoday2015" target="_blank">__Sync.Today 2015__</a>
 .NET Business Processes Automation Platform. More info [here](http://www.naseukoly.cz/home/synctoday)
+* <a href="https://github.com/gigya/microdot" target="_blank">__Microdot__</a>
+A microservices framework by Gigya, for writing Orleans based microservices
