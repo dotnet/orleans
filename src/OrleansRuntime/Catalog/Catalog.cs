@@ -529,18 +529,19 @@ namespace Orleans.Runtime
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation
             var initStage = ActivationInitializationStage.None;
-            Exception exception = null;
-            var registrationResult = default(ActivationRegistrationResult);
 
             // A chain of promises that will have to complete in order to complete the activation
             // Register with the grain directory, register with the store if necessary and call the Activate method on the new activation.
             try
             {
                 initStage = ActivationInitializationStage.Register;
-                registrationResult = await RegisterActivationInGrainDirectoryAndValidate(activation);
-
-                // If registration failed, recover from within the finally block.
-                if (!registrationResult.IsSuccess) return;
+                var registrationResult = await RegisterActivationInGrainDirectoryAndValidate(activation);
+                if (!registrationResult.IsSuccess)
+                {
+                    // If registration failed, recover and bail out.
+                    RecoverFailedInitActivation(activation, initStage, registrationResult);
+                    return;
+                }
 
                 initStage = ActivationInitializationStage.SetupState;
                 await SetupActivationState(activation,
@@ -557,17 +558,8 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                // Store and re-throw the exception.
-                exception = ex;
+                RecoverFailedInitActivation(activation, initStage, exception: ex);
                 throw;
-            }
-            finally
-            {
-                // If activation initialization was not successful, recover from the failing stage.
-                if (initStage != ActivationInitializationStage.Completed)
-                {
-                    RecoverFailedInitActivation(activation, initStage, registrationResult, exception);
-                }
             }
         }
 
@@ -578,8 +570,11 @@ namespace Orleans.Runtime
         /// <param name="initStage">The initialization stage at which initialization failed.</param>
         /// <param name="registrationResult">The result of registering the activation with the grain directory.</param>
         /// <param name="exception">The exception, if present, for logging purposes.</param>
-        private void RecoverFailedInitActivation(ActivationData activation, ActivationInitializationStage initStage,
-            ActivationRegistrationResult registrationResult, Exception exception = null)
+        private void RecoverFailedInitActivation(
+            ActivationData activation,
+            ActivationInitializationStage initStage,
+            ActivationRegistrationResult registrationResult = default(ActivationRegistrationResult),
+            Exception exception = null)
         {
             ActivationAddress address = activation.Address;
             lock (activation)
@@ -591,8 +586,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget4,
-                        string.Format("UnregisterMessageTarget failed on {0}.", activation), exc);
+                    logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget4, $"UnregisterMessageTarget failed on {activation}.", exc);
                 }
 
                 switch (initStage)
@@ -600,36 +594,28 @@ namespace Orleans.Runtime
                     case ActivationInitializationStage.Register: // failed to RegisterActivationInGrainDirectory
 
                         // Failure!! Could it be that this grain uses single activation placement, and there already was an activation?
+                        // If the registration result is not set, the forwarding address will be null.
                         activation.ForwardingAddress = registrationResult.ExistingActivationAddress;
                         if (activation.ForwardingAddress != null)
                         {
                             CounterStatistic
-                                .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DUPLICATE_ACTIVATIONS)
+                                .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
                                 .Increment();
                             var primary = directory.GetPrimaryForGrain(activation.ForwardingAddress.Grain);
                             if (logger.IsInfo)
                             {
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
-                                string logMsg =
-                                    string.Format(
-                                        "Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
-                                        "GrainInstanceType is {2}. " +
-                                        "{3}" +
-                                        "Full activation address is {4}. We have {5} messages to forward.",
-                                        address,
-                                        activation.ForwardingAddress,
-                                        activation.GrainInstanceType,
-                                        primary != null
-                                            ? "Primary Directory partition for this grain is " + primary + ". "
-                                            : String.Empty,
-                                        address.ToFullString(),
-                                        activation.WaitingCount);
+                                var logMsg =
+                                    $"Tried to create a duplicate activation {address}, but we'll use {activation.ForwardingAddress} instead. " +
+                                    $"GrainInstanceType is {activation.GrainInstanceType}. " +
+                                    $"{(primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty)}" +
+                                    $"Full activation address is {address.ToFullString()}. We have {activation.WaitingCount} messages to forward.";
                                 if (activation.IsUsingGrainDirectory)
                                 {
                                     logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
                                 }
-                                else if (logger.IsVerbose)
+                                else
                                 {
                                     logger.Verbose(ErrorCode.Catalog_DuplicateActivation, logMsg);
                                 }
@@ -640,8 +626,7 @@ namespace Orleans.Runtime
                         else
                         {
                             logger.Warn(ErrorCode.Runtime_Error_100064,
-                                string.Format("Failed to RegisterActivationInGrainDirectory for {0}.",
-                                    activation), exception);
+                                $"Failed to RegisterActivationInGrainDirectory for {activation}.", exception);
                             // Need to undo the registration we just did earlier
                             if (activation.IsUsingGrainDirectory)
                             {
