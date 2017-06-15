@@ -99,18 +99,20 @@ namespace Orleans.Providers
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
-            // 1 meg block size pool
-            CreateBufferPool();
+            this.sharedDimensions = new MonitorAggregationDimensions(serviceProvider.GetService<GlobalConfiguration>(), serviceProvider.GetService<NodeConfiguration>());
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }
 
-        private void CreateBufferPool()
+        private void CreateBufferPoolIfNotCreatedYet()
         {
-            this.sharedDimensions = new MonitorAggregationDimensions(serviceProvider.GetService<GlobalConfiguration>(), serviceProvider.GetService<NodeConfiguration>());
-            this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
-            var oneMb = 1 << 20;
-            var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.logger.GetSubLogger(typeof(DefaultBlockPoolMonitor).Name)), oneMb);
-            this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+            if (this.bufferPool == null)
+            {
+                // 1 meg block size pool
+                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
+                var oneMb = 1 << 20;
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.logger.GetSubLogger(typeof(DefaultBlockPoolMonitor).Name)), oneMb);
+                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+            }
         }
 
         /// <summary>
@@ -187,6 +189,8 @@ namespace Orleans.Providers
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
+            //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
+            CreateBufferPoolIfNotCreatedYet();
             var logger = this.logger.GetSubLogger(typeof(MemoryPooledCache<TSerializer>).Name);
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), logger.GetSubLogger(typeof(ICacheMonitor).Name));
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.adapterConfig.StatisticMonitorWriteInterval);

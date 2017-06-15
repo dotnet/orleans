@@ -43,7 +43,7 @@ namespace Orleans.Providers
             {
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
-                List<MemoryMessageData> eventData = await task;
+                var eventData = await task;
                 batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, null);
