@@ -83,11 +83,14 @@
     <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
     <Compile Include="CodeGeneration\GenericMethodInvoker.cs" />
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
+    <Compile Include="Configuration\ServiceCollectionExtensions.cs" />
     <Compile Include="Core\ClientBuilder.cs" />
     <Compile Include="Core\ClientBuilderExtensions.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IClientBuilder.cs" />
     <Compile Include="Core\IClusterConnectionStatusListener.cs" />
+    <Compile Include="Core\IGrainCallContext.cs" />
+    <Compile Include="Core\IGrainCallFilter.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
@@ -115,8 +118,7 @@
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
     <Compile Include="Configuration\ConfigurationExtensions.cs" />
     <Compile Include="Core\IGrainInvokeInterceptor.cs" />
-    <Compile Include="Core\InterceptedMethodInvoker.cs" />
-    <Compile Include="Core\InterceptedMethodInvokerCache.cs" />
+    <Compile Include="Core\InterfaceToImplementationMappingCache.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="LogConsistency\ILogViewAdaptorHost.cs" />

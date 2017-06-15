@@ -64,12 +64,16 @@ namespace Orleans.Runtime.Storage
         public IServiceProvider ServiceProvider { get; private set; }
         public void SetInvokeInterceptor(InvokeInterceptor interceptor)
         {
+#pragma warning disable 618
             providerRuntime.SetInvokeInterceptor(interceptor);
+#pragma warning restore 618
         }
 
         public InvokeInterceptor GetInvokeInterceptor()
         {
+#pragma warning disable 618
             return providerRuntime.GetInvokeInterceptor();
+#pragma warning restore 618
         }
 
         /// <summary>
