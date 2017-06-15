@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Common
             };
         }
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
+        public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)
         {
             this.Logger.TrackMetric($"{pressureMonitorType}-UnderPressure", underPressure ? 1 : 0, this.LogProperties);
@@ -41,13 +41,13 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void ReportCacheSize(long totalCacheSizeInByte)
+        public void ReportCacheSize(long totalCacheSizeInByte)
         {
             this.Logger.TrackMetric("TotalCacheSizeInByte", totalCacheSizeInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
+        public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
         {
             if (oldestMessageEnqueueTimeUtc.HasValue && newestMessageEnqueueTimeUtc.HasValue)
                 this.Logger.TrackMetric("OldestMessageRelativeAgeToNewestMessage", newestMessageEnqueueTimeUtc.Value - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
@@ -59,25 +59,25 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void TrackMemoryAllocated(int memoryInByte)
+        public void TrackMemoryAllocated(int memoryInByte)
         {
             this.Logger.TrackMetric("MemoryAllocatedInByte", memoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void TrackMemoryReleased(int memoryInByte)
+        public void TrackMemoryReleased(int memoryInByte)
         {
             this.Logger.TrackMetric("MemoryReleasedInByte", memoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void TrackMessagesAdded(long mesageAdded)
+        public void TrackMessagesAdded(long mesageAdded)
         {
             this.Logger.TrackMetric("MessageAdded", mesageAdded, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
-        public virtual void TrackMessagesPurged(long messagePurged)
+        public void TrackMessagesPurged(long messagePurged)
         {
             this.Logger.TrackMetric("MessagePurged", messagePurged, this.LogProperties);
         }

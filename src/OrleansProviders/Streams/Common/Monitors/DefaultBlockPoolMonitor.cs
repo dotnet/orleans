@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Common
             };
         }
         /// <inheritdoc cref="IBlockPoolMonitor"/>
-        public virtual void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
+        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
             this.Logger.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.LogProperties);
             this.Logger.TrackMetric("AvailableMemoryInByte", availableMemoryInByte, this.LogProperties);
@@ -38,13 +38,13 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc cref="IBlockPoolMonitor"/>
-        public virtual void TrackMemoryReleased(long releasedMemoryInByte)
+        public void TrackMemoryReleased(long releasedMemoryInByte)
         {
             this.Logger.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="IBlockPoolMonitor"/>
-        public virtual void TrackMemoryAllocated(long allocatedMemoryInByte)
+        public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             this.Logger.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.LogProperties);
         }

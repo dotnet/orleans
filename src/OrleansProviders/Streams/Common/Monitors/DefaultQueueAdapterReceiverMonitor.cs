@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime"></param>
         /// <param name="exception"></param>
-        public virtual void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
+        public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
             this.Logger.TrackMetric("InitializationFailure", success ? 0 : 1, this.LogProperties);
             this.Logger.TrackMetric("InitializationCallTime", callTime, this.LogProperties);
@@ -48,7 +48,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime"></param>
         /// <param name="exception"></param>
-        public virtual void TrackRead(bool success, TimeSpan callTime, Exception exception)
+        public void TrackRead(bool success, TimeSpan callTime, Exception exception)
         {
             this.Logger.TrackMetric("ReadFailure", success ? 0 : 1, this.LogProperties);
             this.Logger.TrackMetric("ReadCallTime", callTime, this.LogProperties);
@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="count">Messages read.</param>
         /// <param name="oldestMessageEnqueueTimeUtc"></param>
         /// <param name="newestMessageEnqueueTimeUtc"></param>
-        public virtual void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
+        public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             var now = DateTime.UtcNow;
             this.Logger.TrackMetric("MessagesRecieved", count, this.LogProperties);
@@ -77,7 +77,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="success">True if read succeeded, false if read failed.</param>
         /// <param name="callTime"></param>
         /// <param name="exception"></param>
-        public virtual void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
+        public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
         {
             this.Logger.TrackMetric("ShutdownFailure", success ? 0 : 1, this.LogProperties);
             this.Logger.TrackMetric("ShutdownCallTime", callTime, this.LogProperties);

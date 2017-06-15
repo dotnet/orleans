@@ -50,7 +50,7 @@ namespace Orleans.Providers
                 if (eventData.Count > 0)
                 {
                     var oldestMessage = eventData[0];
-                    var newestMessage = eventData[eventData.Count() - 1];
+                    var newestMessage = eventData[eventData.Count - 1];
                     this.receiverMonitor?.TrackMessagesReceived(eventData.Count(), oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
                 }
             }
