@@ -225,10 +225,14 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         public void Dispose()
         {
-            foreach (var silo in this.deployedSilos)
+            if (!deployedSilos.Any()) return;
+
+            var primarySilo = this.deployedSilos[0];
+            foreach (var silo in this.deployedSilos.Skip(1))
             {
                 silo.Dispose();
             }
+            primarySilo.Dispose();
             this.Client?.Dispose();
         }
     }
