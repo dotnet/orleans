@@ -14,6 +14,7 @@ The idea is to track end-user facing changes as they occur.*
   - Allow `IGrainWithGuidCompoundKey` as implicit subscription grain, and sets the stream namespace as the grain key extension (subtle breaking change: previous to 1.5 `IGrainWithGuidCompoundKey` wasn't technically supported, but if you did use it, the grain key extension would have had a `null` string) #3011
 - Non-breaking improvements
   - Enable runtime policy change for Silo versioning #3055
+  - Expose available versions information in placement context #3136
   - Add support for hash-based grain placement #2944
   - Allow complex streaming filters in `ImplicitStreamSubscriptionAttribute` #2988
   - Support fire and forget one-way grain calls using `[OneWay]` method attribute #2993
