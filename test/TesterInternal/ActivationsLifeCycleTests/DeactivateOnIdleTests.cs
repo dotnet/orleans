@@ -209,7 +209,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             else
             {
                 Assert.NotNull(thrownException);
-                Assert.IsType<OrleansException>(thrownException);
+                Assert.IsType<OrleansMessageRejectionException>(thrownException);
                 Assert.Contains("Non-existent activation", thrownException.Message);
                 output.WriteLine("\nThe 1st call after DeactivateSelf has thrown Non-existent activation exception as expected, since forwardCount is {0}.\n", forwardCount);
 
@@ -407,7 +407,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             // Now send a message again; it should fail);
-            var firstEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
+            var firstEx = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => grain.GetLabel());
             Assert.Contains("Non-existent activation", firstEx.Message);
             output.WriteLine("Got 1st Non-existent activation Exception, as expected.");
 
@@ -435,7 +435,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             else
             {
-                var secondEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
+                var secondEx = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => grain.GetLabel());
                 output.WriteLine("Got 2nd exception - " + secondEx.GetBaseException().Message);
                 Assert.True(
                     secondEx.Message.Contains("duplicate activation")

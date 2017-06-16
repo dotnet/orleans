@@ -41,5 +41,13 @@
         {
             return siloStatus == SiloStatus.ShuttingDown || siloStatus == SiloStatus.Stopping || siloStatus == SiloStatus.Dead;
         }
+
+        /// <summary>
+        /// Return true if silo is terminating or missing.
+        /// </summary>
+        public static bool IsUnavailable(this SiloStatus siloStatus)
+        {
+            return siloStatus.IsTerminating() || siloStatus == SiloStatus.None;
+        }
     }
 }

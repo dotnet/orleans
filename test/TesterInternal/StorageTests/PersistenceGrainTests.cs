@@ -179,7 +179,7 @@ namespace UnitTests.StorageTests
 
             SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
-            await Assert.ThrowsAsync<OrleansException>(() =>
+            await Assert.ThrowsAsync<OrleansMessageRejectionException>(() =>
                 grain.GetValue());
         }
 
