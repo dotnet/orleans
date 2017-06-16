@@ -5,7 +5,41 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
-### [v1.4.2]
+### [1.5.0-rc]  (changes since 1.5.0-beta1)
+- Breaking changes
+  - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
+  - Renamed the `Catalog.Activation.DuplicateActivations` counter to `Catalog.Activation.ConcurrentRegistrationAttempts` to more accurately reflect what it tracks and its benign nature #3130
+  - Upgraded `WindowsAzure.ServiceBus` package dependency to 4.1.0 #3127
+  - Replaced `CacheSizeInMb` setting with `DataMaxAgeInCache` and `DataMinTimeInCache` in stream providers #3126
+  - Allow `IGrainWithGuidCompoundKey` as implicit subscription grain, and sets the stream namespace as the grain key extension (subtle breaking change: previous to 1.5 `IGrainWithGuidCompoundKey` wasn't technically supported, but if you did use it, the grain key extension would have had a `null` string) #3011
+- Non-breaking improvements
+  - Enable runtime policy change for Silo versioning #3055
+  - Add support for hash-based grain placement #2944
+  - Allow complex streaming filters in `ImplicitStreamSubscriptionAttribute` #2988
+  - Support fire and forget one-way grain calls using `[OneWay]` method attribute #2993
+  - Support exceptions with reference cycles in ILBasedExceptionSerializer #2999
+  - Add extensibility point to replace the grain activator and finalizer #3002
+  - Generate serializers for more types #3035
+  - Expose IsOrleansShallowCopyable for external custom serializers #3077
+  - Detect if activation is in `Deactivating` state for too long and remove it from the directory if needed #3082
+  - Support grains with key extensions containing `+` symbols #2956
+  - Allow `TimeSpan.MaxValue` in configuration #2985
+  - Add statistics to EventHub stream provider ecosystem
+  - Support for us-gov-west-1 as a possible AWS region endpoint #3017
+  - Support `CultureInfo` via built-in serializer #3036
+  - Support multiple silo request interceptors #3083
+  - Add flag to disable FastKill on CTRL-C #3109
+  - Avoid benign `DuplicateActivationException` from showing up in the logs #3130
+- Non-breaking bug fixes
+  - Fix various unhandled exceptions happening during client closing #2962
+  - Improve resiliency in stream PubSub when facing ungraceful shutdown of producers and silos #3003 #3128
+  - SMS: Ensure items are copied before yielding the thread in OnNextAsync #3048 #3058
+  - Remove unneeded extra constructors to play nicer with some non fully-conforming 3rd party containers #2996 #3074
+  - Fixes to local IP address resolution #3069
+  - Fixed a few issues with the Service Fabric membership provider #3059 #3061 #3128
+  - Fixes and improvements for the Event Hub stream provider #3014 #3096 #3041 #3052 #2989
+
+### [v1.4.2] (changes since 1.4.1)
 - Non-breaking improvements
   - Generate serializers for more types #3035
   - Improvements to GrainServices API #2839
@@ -34,7 +68,6 @@ The idea is to track end-user facing changes as they occur.*
   - Automatically deactivate a grain if it bubbles up `InconsistentStateException` (thrown when there is an optimistic concurrency conflict when writing to storage) #2959
   - Providers are now constructed using Dependency Injection. The result is that custom providers must have a single public constructor with either no arguments or arguments which can all be injected, or they need to be explicitly registered in the ServiceCollection. #2721 #2980
   - Change default stream subscription faulting to false in EventHub and Memory stream providers, as is in other providers #2974
-  - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
 - Non-breaking improvements
   - Grain interface versioning to enable no-downtime upgrades #2837 2837
   - Programmable stream subscribe API #2741 #2796 #2909
