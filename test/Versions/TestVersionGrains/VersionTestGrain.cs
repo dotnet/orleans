@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using TestVersionGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
 namespace TestVersionGrains
 {

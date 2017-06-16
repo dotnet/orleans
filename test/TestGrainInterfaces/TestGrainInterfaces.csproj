@@ -142,6 +142,7 @@
     <Compile Include="SQLAdapter\ICustomerGrain.cs" />
     <Compile Include="SQLAdapter\IDeviceGrain.cs" />
     <Compile Include="UnitTestGrainInterfaces.cs" />
+    <Compile Include="VersionAwarePlacementDirector.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
