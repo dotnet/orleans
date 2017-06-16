@@ -161,7 +161,7 @@ namespace Orleans.Runtime
     /// Signifies that an request was cancelled due to target silo unavailability.
     /// </summary>
     [Serializable]
-    public class SiloUnavailableException : OrleansException
+    public class SiloUnavailableException : OrleansMessageRejectionException
     {
         public SiloUnavailableException() : base("SiloUnavailableException") { }
         public SiloUnavailableException(string msg) : base(msg) { }
@@ -227,6 +227,28 @@ namespace Orleans.Runtime
 
 #if !NETSTANDARD
         protected GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+#endif
+    }
+
+    /// <summary>
+    /// Indicates that an Orleans message was rejected.
+    /// </summary>
+    [Serializable]
+    public class OrleansMessageRejectionException : OrleansException
+    {
+        internal OrleansMessageRejectionException(string message)
+            : base(message)
+        {
+        }
+
+        internal OrleansMessageRejectionException(string message,
+            Exception innerException) : base(message, innerException)
+        {
+        }
+#if !NETSTANDARD
+        protected OrleansMessageRejectionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
 #endif

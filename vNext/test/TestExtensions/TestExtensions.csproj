@@ -1,21 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>TestExtensions</AssemblyName>
+    <RootNamespace>TestExtensions</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-  </ItemGroup>
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="1.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="1.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.1.1" />
     <PackageReference Include="xunit.abstractions" Version="2.0.1" />
     <PackageReference Include="xunit.core" Version="2.2.0" />
     <PackageReference Include="xunit.extensibility.core" Version="2.2.0" />
@@ -29,42 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestExtensions\BaseClusterFixture.cs">
-      <Link>BaseClusterFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TestEnvironmentFixture.cs">
-      <Link>TestEnvironmentFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\SerializationTestEnvironment.cs">
-      <Link>SerializationTestEnvironment.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\DefaultClusterFixture.cs">
-      <Link>DefaultClusterFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\HostedTestClusterBase.cs">
-      <Link>HostedTestClusterBase.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\MockStorageProvider.cs">
-      <Link>MockStorageProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\OrleansTestingBase.cs">
-      <Link>OrleansTestingBase.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TestCategory.cs">
-      <Link>TestCategory.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TestConstants.cs">
-      <Link>TestConstants.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TestDefaultConfiguration.cs">
-      <Link>TestDefaultConfiguration.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TestOutputHelperExtensions.cs">
-      <Link>TestOutputHelperExtensions.cs</Link>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+    <Compile Include="..\..\..\test\TestExtensions\**\*.cs" Exclude="..\..\..\test\TestExtensions\obj\**\*.cs;..\..\..\test\TestExtensions\bin\**\*.cs" />
   </ItemGroup>
 </Project>

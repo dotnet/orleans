@@ -453,7 +453,7 @@ namespace Orleans.Runtime
                             {
                                 message.RejectionInfo = "Unable to send request - no rejection info available";
                             } 
-                            rejection = new OrleansException(message.RejectionInfo);
+                            rejection = new OrleansMessageRejectionException(message.RejectionInfo);
                         }
                         break;
                 }
