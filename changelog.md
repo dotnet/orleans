@@ -11,6 +11,7 @@ The idea is to track end-user facing changes as they occur.*
   - Renamed the `Catalog.Activation.DuplicateActivations` counter to `Catalog.Activation.ConcurrentRegistrationAttempts` to more accurately reflect what it tracks and its benign nature #3130
   - Upgraded `WindowsAzure.ServiceBus` package dependency to 4.1.0 #3127
   - Replaced `CacheSizeInMb` setting with `DataMaxAgeInCache` and `DataMinTimeInCache` in stream providers #3126
+  - Allow `IGrainWithGuidCompoundKey` as implicit subscription grain, and sets the stream namespace as the grain key extension (subtle breaking change: previous to 1.5 `IGrainWithGuidCompoundKey` wasn't technically supported, but if you did use it, the grain key extension would have had a `null` string) #3011
 - Non-breaking improvements
   - Enable runtime policy change for Silo versioning #3055
   - Add support for hash-based grain placement #2944
@@ -18,7 +19,6 @@ The idea is to track end-user facing changes as they occur.*
   - Support fire and forget one-way grain calls using `[OneWay]` method attribute #2993
   - Support exceptions with reference cycles in ILBasedExceptionSerializer #2999
   - Add extensibility point to replace the grain activator and finalizer #3002
-  - Allow `IGrainWithGuidCompoundKey` as implicit subscription grain #3011
   - Generate serializers for more types #3035
   - Expose IsOrleansShallowCopyable for external custom serializers #3077
   - Detect if activation is in `Deactivating` state for too long and remove it from the directory if needed #3082
