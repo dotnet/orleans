@@ -5,6 +5,8 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>TestVersionGrains</AssemblyName>
+    <RootNamespace>TestVersionGrains</RootNamespace>
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
@@ -23,9 +25,13 @@
     <Compile Include="..\..\..\..\test\Versions\TestVersionGrains2\**\*.cs" Exclude="..\..\..\..\test\Versions\TestVersionGrains2\bin\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains2\obj\**\*.cs;..\..\..\..\test\Versions\TestVersionGrains2\Properties\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\..\test\Versions\TestVersionGrains\Startup.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
 </Project>
