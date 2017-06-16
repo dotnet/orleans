@@ -11,11 +11,15 @@
     <OutputPath>$(OutDir)</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\TestVersionGrains\Startup.cs" Link="Startup.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.2017.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.2017.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.2017.csproj" />
+    <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
   </ItemGroup>
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to ClientGenerator.exe -->
