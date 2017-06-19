@@ -702,8 +702,7 @@ namespace Orleans.Runtime
            return AddressMessageAsync(message, target, strategy, targetAddress);
         }
 
-        private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy,
-            ActivationAddress targetAddress)
+        private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy, ActivationAddress targetAddress)
         {
             var placementResult = await placementDirectorsManager.SelectOrAddActivation(
                 message.SendingAddress, target, this.catalog, strategy);

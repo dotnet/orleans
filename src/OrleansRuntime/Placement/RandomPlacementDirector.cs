@@ -16,8 +16,7 @@ namespace Orleans.Runtime.Placement
             return ChooseRandomActivation(places, context);
         }
 
-        public bool TrySelectActivationSynchronously(PlacementStrategy strategy, GrainId target, IPlacementRuntime context,
-            out PlacementResult placementResult)
+        public bool TrySelectActivationSynchronously(PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
         {
             AddressesAndTag addressesAndTag;
             if (context.FastLookup(target, out addressesAndTag))
