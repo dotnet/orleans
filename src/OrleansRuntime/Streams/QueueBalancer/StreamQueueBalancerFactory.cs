@@ -1,6 +1,7 @@
 using System;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Streams
 {
@@ -19,6 +20,7 @@ namespace Orleans.Streams
         /// <param name="runtime">stream provider runtime environment to run in</param>
         /// <param name="queueMapper">queue mapper of requesting stream provider</param>
         /// <param name="siloMaturityPeriod">Maturity Period of a silo for queue rebalancing purposes</param>
+        /// <param name="customStreamQueueBalancerFactoryName">Name for injected custom StreamQueueBalancerFactory name which is configured for current stream provider</param>
         /// <returns>Constructed stream queue balancer</returns>
         public static IStreamQueueBalancer Create(
             StreamQueueBalancerType balancerType,
@@ -27,7 +29,8 @@ namespace Orleans.Streams
             ClusterConfiguration clusterConfiguration,
             IStreamProviderRuntime runtime,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod)
+            TimeSpan siloMaturityPeriod,
+            string customStreamQueueBalancerFactoryName)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -72,6 +75,12 @@ namespace Orleans.Streams
                     IDeploymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
                     isFixed = balancerType == StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper, siloMaturityPeriod, isFixed);
+                }
+                case StreamQueueBalancerType.CustomBalancer:
+                {
+                    var serviceProvider = runtime.ServiceProvider;
+                    var factory = serviceProvider.GetServiceByName<IStreamQueueBalancerFactory>(customStreamQueueBalancerFactoryName);
+                    return factory.Create(strProviderName, siloStatusOracle, clusterConfiguration, runtime, queueMapper, siloMaturityPeriod); 
                 }
                 default:
                 {

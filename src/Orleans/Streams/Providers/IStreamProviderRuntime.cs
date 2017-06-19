@@ -99,6 +99,9 @@ namespace Orleans.Streams
         public const string SILO_MATURITY_PERIOD = "SiloMaturityPeriod";
         public static readonly TimeSpan DEFAULT_SILO_MATURITY_PERIOD = TimeSpan.FromMinutes(2);
 
+        //optional param. user need to set this when they use Custom StreamQueueBalancer
+        public const string QUEUE_BALANCER_FACTORY_NAME = nameof(QueueBalancerFactoryName);
+        public string QueueBalancerFactoryName { get; set; }
 
         public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
         public TimeSpan InitQueueTimeout { get; set; } = DEFAULT_INIT_QUEUE_TIMEOUT;
@@ -144,6 +147,10 @@ namespace Orleans.Streams
             if (config.Properties.TryGetValue(SILO_MATURITY_PERIOD, out immaturityPeriod))
                 SiloMaturityPeriod = ConfigUtilities.ParseTimeSpan(immaturityPeriod,
                     "Invalid time value for the " + SILO_MATURITY_PERIOD + " property in the provider config values.");
+
+            string streamQueueBalancerFactoryName;
+            if (config.Properties.TryGetValue(QUEUE_BALANCER_FACTORY_NAME, out streamQueueBalancerFactoryName))
+                this.QueueBalancerFactoryName = streamQueueBalancerFactoryName;
         }
 
         /// <summary>
@@ -159,18 +166,20 @@ namespace Orleans.Streams
             properties[STREAM_INACTIVITY_PERIOD] = ConfigUtilities.ToParseableTimeSpan(StreamInactivityPeriod);
             properties[STREAM_PUBSUB_TYPE] = PubSubType.ToString();
             properties[SILO_MATURITY_PERIOD] = ConfigUtilities.ToParseableTimeSpan(SiloMaturityPeriod);
+            properties[QUEUE_BALANCER_FACTORY_NAME] = this.QueueBalancerFactoryName;
         }
 
         public override string ToString()
         {
-            return String.Format("{0}={1}, {2}={3}, {4}={5}, {6}={7}, {8}={9}, {10}={11}, {12}={13}",
+            return String.Format("{0}={1}, {2}={3}, {4}={5}, {6}={7}, {8}={9}, {10}={11}, {12}={13}, {14}={15}",
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, GetQueueMsgsTimerPeriod,
                 INIT_QUEUE_TIMEOUT, InitQueueTimeout,
                 MAX_EVENT_DELIVERY_TIME, MaxEventDeliveryTime,
                 STREAM_INACTIVITY_PERIOD, StreamInactivityPeriod,
                 QUEUE_BALANCER_TYPE, BalancerType,
                 STREAM_PUBSUB_TYPE, PubSubType,
-                SILO_MATURITY_PERIOD, SiloMaturityPeriod);
+                SILO_MATURITY_PERIOD, SiloMaturityPeriod,
+                QUEUE_BALANCER_FACTORY_NAME, this.QueueBalancerFactoryName);
         }
     }
 

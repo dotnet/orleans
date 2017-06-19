@@ -76,7 +76,7 @@ namespace Orleans.Streams
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
         }
 
-        public Task Initialize(Immutable<IQueueAdapter> qAdapter)
+        public async Task Initialize(Immutable<IQueueAdapter> qAdapter)
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
 
@@ -84,16 +84,15 @@ namespace Orleans.Streams
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-
+            await this.queueBalancer.Initialize();
             var meAsQueueBalanceListener = this.AsReference<IStreamQueueBalanceListener>();
-            queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
+            await queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
 
-            List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            List<QueueId> myQueues = (await queueBalancer.GetMyQueues()).ToList();
             Log(ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
 
             queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
             managerState = PersistentStreamProviderState.Initialized;
-            return Task.CompletedTask;
         }
 
         public async Task Stop()
@@ -108,7 +107,7 @@ namespace Orleans.Streams
         public async Task StartAgents()
         {
             managerState = PersistentStreamProviderState.AgentsStarted;
-            List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            List<QueueId> myQueues = (await queueBalancer.GetMyQueues()).ToList();
 
             Log(ErrorCode.PersistentStreamPullingManager_Starting, "Starting agents for {0} queues: {1}", myQueues.Count, PrintQueues(myQueues));
             await AddNewQueues(myQueues, true);
@@ -166,7 +165,7 @@ namespace Orleans.Streams
 
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
-            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
+            HashSet<QueueId> currentQueues = (await queueBalancer.GetMyQueues()).ToSet();
             Log(ErrorCode.PersistentStreamPullingManager_06,
                 "Executing QueueChangeNotification number {0}. Queue balancer says I should now own {1} queues: {2}", notificationSeqNumber, currentQueues.Count, PrintQueues(currentQueues));
 

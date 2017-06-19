@@ -39,5 +39,10 @@ namespace Orleans.Streams
         /// That is, it does not rebalance queues based on dymanic changes in the cluster Membership.
         /// </summary>
         StaticClusterConfigDeploymentBalancer,
+
+        /// <summary>
+        /// Use user configured custom queue balancer
+        /// </summary>
+        CustomBalancer
     }
 }

@@ -35,6 +35,11 @@ namespace Orleans.Streams
             ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
+        public Task Initialize()
+        {
+            return Task.CompletedTask;
+        }
+
         public Task RangeChangeNotification(IRingRange old, IRingRange now)
         {
             myRange = now;
@@ -51,12 +56,12 @@ namespace Orleans.Streams
             return Task.WhenAll(notificatioTasks);
         }
 
-        public IEnumerable<QueueId> GetMyQueues()
+        public Task<IEnumerable<QueueId>> GetMyQueues()
         {
-            return streamQueueMapper.GetQueuesForRange(myRange);
+            return Task.FromResult(streamQueueMapper.GetQueuesForRange(myRange));
         }
 
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -64,14 +69,14 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                if (queueBalanceListeners.Contains(observer)) return false;
+                if (queueBalanceListeners.Contains(observer)) return Task.FromResult(false);
                 
                 queueBalanceListeners.Add(observer);
-                return true;
+                return Task.FromResult(true);
             }
         }
 
-        public bool UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -79,7 +84,7 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
+                return Task.FromResult(queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer));
             }
         }
     }

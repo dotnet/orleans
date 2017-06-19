@@ -69,6 +69,11 @@ namespace Orleans.Streams
             NotifyAfterStart().Ignore();
         }
 
+        public Task Initialize()
+        {
+            return Task.CompletedTask;
+        }
+
         private async Task NotifyAfterStart()
         {
             await Task.Delay(siloMaturityPeriod);
@@ -124,7 +129,7 @@ namespace Orleans.Streams
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 
-        public IEnumerable<QueueId> GetMyQueues()
+        public Task<IEnumerable<QueueId>> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
             bool useIdealDistribution = isFixed || isStarting;
@@ -141,12 +146,12 @@ namespace Orleans.Streams
                     // filter queues that belong to immature silos
                     myQueues.RemoveAll(queue => queuesOfImmatureSilos.Contains(queue));
                 }
-                return myQueues;
+                return Task.FromResult(myQueues.AsEnumerable<QueueId>());
             }
-            return Enumerable.Empty<QueueId>();
+            return Task.FromResult(Enumerable.Empty<QueueId>());
         }
 
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -156,14 +161,14 @@ namespace Orleans.Streams
             {
                 if (queueBalanceListeners.Contains(observer))
                 {
-                    return false;
+                    return Task.FromResult(false);
                 }
                 queueBalanceListeners.Add(observer);
-                return true;
+                return Task.FromResult(true);
             }
         }
 
-        public bool UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -171,7 +176,7 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
+                return Task.FromResult(queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer));
             }
         }
         
