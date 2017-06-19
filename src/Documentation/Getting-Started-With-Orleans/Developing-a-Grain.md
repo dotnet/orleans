@@ -12,7 +12,7 @@ Grains interact with each other by invoking methods declared as part of the resp
 A grain class implements one or more previously declared grain interfaces.
 All methods of a grain interface must return a `Task` (for `void` methods) or a `Task<T>` (for methods returning values of type `T`).
 
-The following is an excerpt from the [Presence Service](/orleans/Samples-Overview/Presence-Service) sample:
+The following is an excerpt from the [Presence Service](/orleans/Documentation/Samples-Overview/Presence-Service) sample:
 
 ``` csharp
 //an example of a Grain Interface
