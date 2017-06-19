@@ -598,7 +598,7 @@ namespace Orleans.Runtime
         #region Send path
 
         /// <summary>
-        /// Send an outgoing message
+        /// Send an outgoing message, may complete synchronously
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
         /// - add ordering info and maintain send order
@@ -606,24 +606,52 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="message"></param>
         /// <param name="sendingActivation"></param>
-        public async Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
+        public Task SendMessageAsync(Message message, ActivationData sendingActivation = null)
         {
-            try
-            {
-                await AddressMessage(message);
-                TransportMessage(message);
-            }
-            catch (Exception ex)
+            void OnAddressingFailure(Exception ex)
             {
                 if (ShouldLogError(ex))
                 {
-                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed,
-                        String.Format("SelectTarget failed with {0}", ex.Message),
-                        ex);
+                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed, $"SelectTarget failed with {ex.Message}", ex);
                 }
+
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
                 RejectMessage(message, Message.RejectionTypes.Unrecoverable, ex);
             }
+
+            async Task TransportMessageAfterAddressing(Task addressMessageTask)
+            {
+                try
+                {
+                    await addressMessageTask;
+                }
+                catch (Exception ex)
+                {
+                    OnAddressingFailure(ex);
+                    return;
+                }
+
+                TransportMessage(message);
+            }
+
+            try
+            {
+                var messageAddressingTask = AddressMessage(message);
+                if (messageAddressingTask.Status == TaskStatus.RanToCompletion)
+                {
+                    TransportMessage(message);
+                }
+                else
+                {
+                    return TransportMessageAfterAddressing(messageAddressingTask);
+                }
+            }
+            catch (Exception ex)
+            {
+                OnAddressingFailure(ex);
+            }
+
+            return Task.CompletedTask;
         }
 
         private bool ShouldLogError(Exception ex)
@@ -637,30 +665,7 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
-            if (TryAddressMessageFast(message))
-            {
-                TransportMessage(message);
-                return;
-            }
-
-            AsyncSendMessage(message, sendingActivation).Ignore();
-        }
-
-        private bool TryAddressMessageFast(Message message)
-        {
-            var targetAddress = message.TargetAddress;
-            if (targetAddress.IsComplete) return true;
-
-            AddressesAndTag addressesAndTag;
-
-            if (catalog.FastLookup(message.TargetGrain, out addressesAndTag))
-            {
-                // todo: consolidate with placement directors
-                message.TargetAddress = addressesAndTag.Addresses[0];
-                return true;
-            }
-
-            return false;
+            SendMessageAsync(message, sendingActivation).Ignore();
         }
 
         /// <summary>
@@ -671,26 +676,51 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="message"></param>
         /// <returns>Resolve when message is addressed (modifies message fields)</returns>
-        private async Task AddressMessage(Message message)
+        private Task AddressMessage(Message message)
         {
             var targetAddress = message.TargetAddress;
-            if (targetAddress.IsComplete) return;
+            if (targetAddress.IsComplete) return Task.CompletedTask;
 
             // placement strategy is determined by searching for a specification. first, we check for a strategy associated with the grain reference,
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
+         
             var request = message.IsUsingInterfaceVersions
                 ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
                 : null;
             var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
-            var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, target, this.catalog, strategy);
 
+            PlacementResult placementResult;
+            if (placementDirectorsManager.TrySelectActivationSynchronously(
+                message.SendingAddress, target, this.catalog, strategy, out placementResult) && placementResult != null)
+            {
+                SetMessageTargetPlacement(message, placementResult, targetAddress);
+                return Task.CompletedTask;
+            }
+
+           return AddressMessageAsync(message, target, strategy, targetAddress);
+        }
+
+        private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy,
+            ActivationAddress targetAddress)
+        {
+            var placementResult = await placementDirectorsManager.SelectOrAddActivation(
+                message.SendingAddress, target, this.catalog, strategy);
+            SetMessageTargetPlacement(message, placementResult, targetAddress);
+        }
+
+
+        private void SetMessageTargetPlacement(Message message, PlacementResult placementResult,
+            ActivationAddress targetAddress)
+        {
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
-                logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException(String.Format("Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message, targetAddress.Grain));
+                logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient,
+                    String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
+                throw new KeyNotFoundException(String.Format(
+                    "Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message,
+                    targetAddress.Grain));
             }
 
             message.SetTargetPlacement(placementResult);
@@ -698,8 +728,10 @@ namespace Orleans.Runtime
             {
                 CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
             }
-            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
-       }
+            if (logger.IsVerbose2)
+                logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}",
+                    message);
+        }
 
         internal void SendResponse(Message request, Response response)
         {
