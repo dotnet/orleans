@@ -608,7 +608,7 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public Task SendMessageAsync(Message message, ActivationData sendingActivation = null)
         {
-            void OnAddressingFailure(Exception ex)
+            Action<Exception> onAddressingFailure = ex =>
             {
                 if (ShouldLogError(ex))
                 {
@@ -617,9 +617,9 @@ namespace Orleans.Runtime
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
                 RejectMessage(message, Message.RejectionTypes.Unrecoverable, ex);
-            }
+            };
 
-            async Task TransportMessageAfterAddressing(Task addressMessageTask)
+            Func<Task, Task> transportMessageAfterAddressing = async addressMessageTask =>
             {
                 try
                 {
@@ -627,12 +627,12 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(ex);
+                    onAddressingFailure(ex);
                     return;
                 }
 
                 TransportMessage(message);
-            }
+            };
 
             try
             {
@@ -643,12 +643,12 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    return TransportMessageAfterAddressing(messageAddressingTask);
+                    return transportMessageAfterAddressing(messageAddressingTask);
                 }
             }
             catch (Exception ex)
             {
-                OnAddressingFailure(ex);
+                onAddressingFailure(ex);
             }
 
             return Task.CompletedTask;
