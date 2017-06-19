@@ -22,30 +22,28 @@ namespace UnitTests.OrleansRuntime
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_DotNet()
         {
-            ActivationAddress activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());
-            SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
+            var activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());
            
-            Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory, this.fixture.SerializationManager);
+            var original = new Catalog.NonExistentActivationException("Some message", activationAddress, false);
+            var output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory, this.fixture.SerializationManager);
 
             Assert.Equal(original.Message, output.Message);
-            Assert.Equal(original.ActivationToUse, output.ActivationToUse);
-            Assert.Equal(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
+            Assert.Equal(original.NonExistentActivation, output.NonExistentActivation);
+            Assert.Equal(original.IsStatelessWorker, output.IsStatelessWorker);
         }
 #endif
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_Orleans()
         {
-            ActivationAddress activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());
-            SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
+            var activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());
 
-            Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
+            var original = new Catalog.NonExistentActivationException("Some message", activationAddress, false);
+            var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
 
             Assert.Equal(original.Message, output.Message);
-            Assert.Equal(original.ActivationToUse, output.ActivationToUse);
-            Assert.Equal(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
+            Assert.Equal(original.NonExistentActivation, output.NonExistentActivation);
+            Assert.Equal(original.IsStatelessWorker, output.IsStatelessWorker);
         }
     }
 }

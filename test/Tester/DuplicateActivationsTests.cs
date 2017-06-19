@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -34,16 +35,16 @@ namespace UnitTests.CatalogTests
         public async Task DuplicateActivations()
         {
             const int nRunnerGrains = 100;
-            const int nTargetGRain = 10;
+            const int nTargetGrain = 10;
             const int startingKey = 1000;
             const int nCallsToEach = 100;
 
             var runnerGrains = new ICatalogTestGrain[nRunnerGrains];
 
-            var promises = new List<Task>();
+            var promises = new List<Task>(nRunnerGrains);
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(i.ToString(CultureInfo.InvariantCulture));
+                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
                 promises.Add(runnerGrains[i].Initialize());
             }
 
@@ -52,7 +53,7 @@ namespace UnitTests.CatalogTests
 
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                promises.Add(runnerGrains[i].BlastCallNewGrains(nTargetGRain, startingKey, nCallsToEach));
+                promises.Add(runnerGrains[i].BlastCallNewGrains(nTargetGrain, startingKey, nCallsToEach));
             }
 
             await Task.WhenAll(promises);
