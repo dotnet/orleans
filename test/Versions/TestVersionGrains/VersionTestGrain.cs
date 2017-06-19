@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using TestVersionGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
 namespace TestVersionGrains
 {
@@ -25,6 +26,15 @@ namespace TestVersionGrains
         {
             await Task.Delay(taskTime);
             return true;
+        }
+    }
+
+    [VersionAwareStrategy]
+    public class VersionPlacementTestGrain : Grain, IVersionPlacementTestGrain
+    {
+        public Task<int> GetVersion()
+        {
+            return Task.FromResult(1);
         }
     }
 }

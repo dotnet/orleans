@@ -41,5 +41,6 @@
     <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
 </Project>
