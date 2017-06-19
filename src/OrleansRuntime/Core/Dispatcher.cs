@@ -711,16 +711,12 @@ namespace Orleans.Runtime
         }
 
 
-        private void SetMessageTargetPlacement(Message message, PlacementResult placementResult,
-            ActivationAddress targetAddress)
+        private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
-                logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient,
-                    String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException(String.Format(
-                    "Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message,
-                    targetAddress.Grain));
+                logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, $"AddressMessage could not find target for client pseudo-grain {message}");
+                throw new KeyNotFoundException($"Attempting to send a message {message} to an unregistered client pseudo-grain {targetAddress.Grain}");
             }
 
             message.SetTargetPlacement(placementResult);
@@ -728,9 +724,7 @@ namespace Orleans.Runtime
             {
                 CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
             }
-            if (logger.IsVerbose2)
-                logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}",
-                    message);
+            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
         }
 
         internal void SendResponse(Message request, Response response)

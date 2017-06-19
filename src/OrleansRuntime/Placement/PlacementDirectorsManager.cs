@@ -66,9 +66,11 @@ namespace Orleans.Runtime.Placement
         {
             if (targetGrain.IsClient)
             {
-                return clientObserversPlacementDirector
-                    .TrySelectActivationSynchronously(strategy, (GrainId) targetGrain.GrainIdentity, context, out
-                        placementResult);
+                return clientObserversPlacementDirector.TrySelectActivationSynchronously(
+                    strategy, 
+                    (GrainId) targetGrain.GrainIdentity, 
+                    context, 
+                    out placementResult);
             }
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;

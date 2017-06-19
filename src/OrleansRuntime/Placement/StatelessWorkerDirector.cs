@@ -19,8 +19,8 @@ namespace Orleans.Runtime.Placement
             out PlacementResult placementResult)
         {
             placementResult = SelectActivationCore(strategy, target, context);
-            // stateless workers are always local, and if SelectActivationCore returned null - 
-            // request for creation of a new activation will be created by PlacementDirectorsManager
+            // stateless workers are always local, and  request for creation of a new activation will be created by PlacementDirectorsManager 
+            // in case of null returned by SelectActivationCore  
             return true;
         }
 
@@ -51,9 +51,7 @@ namespace Orleans.Runtime.Placement
                 if (!context.TryGetActivationData(activation.ActivationId, out info) ||
                     info.State != ActivationState.Valid || !info.IsInactive) continue;
 
-                return
-                    PlacementResult.IdentifySelection(
-                        ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId));
+                return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId));
             }
 
             if (local.Count >= placement.MaxLocal)
