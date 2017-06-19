@@ -1,4 +1,5 @@
 ﻿using Orleans;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
 using System;
@@ -12,7 +13,7 @@ using UnitTests.Grains;
 
 namespace ServiceBus.Tests.MonitorTests
 {
-    public class EventHubReceiverMonitorForTesting : IEventHubReceiverMonitor
+    public class EventHubReceiverMonitorForTesting : IQueueAdapterReceiverMonitor
     {
         public static EventHubReceiverMonitorForTesting Instance = new EventHubReceiverMonitorForTesting(null, null);
         public EventHubReceiverMonitorCounters CallCounters;

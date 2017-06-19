@@ -15,7 +15,6 @@ namespace Orleans.Providers.Streams.Common
         /// Buffer size in Byte
         /// </summary>
         public readonly int SizeInByte;
-        private Action<IDisposable> purgeAction;
 
         /// <summary>
         /// Unique identifier of this buffer
@@ -30,30 +29,11 @@ namespace Orleans.Providers.Streams.Common
         {
             if (blockSizeInByte < 0)
             {
-                throw new ArgumentOutOfRangeException("blockSize", "blockSize must be positive value.");
+                throw new ArgumentOutOfRangeException(nameof(blockSizeInByte), "blockSize must be positive value.");
             }
             count = 0;
             this.SizeInByte = blockSizeInByte;
             buffer = new byte[this.SizeInByte];
-        }
-
-        /// <summary>
-        /// Sets the purge callback that will be called when this buffer is being purged.  It notifies
-        ///   users of the buffer that the buffer is no longer valid.  This class is passed to the purge as a
-        ///   disposable.  When all resources referencing this buffer are released, this buffer needs be disposed.
-        /// </summary>
-        /// <param name="purge"></param>
-        public void SetPurgeAction(Action<IDisposable> purge)
-        {
-            if (purge == null)
-            {
-                throw new ArgumentNullException("purge");
-            }
-            if (purgeAction != null)
-            {
-                throw new InvalidOperationException("Purge action is already set.");
-            }
-            purgeAction = purge;
         }
 
         /// <summary>
@@ -75,19 +55,10 @@ namespace Orleans.Providers.Streams.Common
             return true;
         }
 
-        /// <summary>
-        /// Reset state and calls purge with its buffer, indicating that any segments using that address are no longer valid.
-        /// </summary>
-        public override void SignalPurge()
-        {
-            purgeAction?.Invoke(this);
-        }
-
         /// <inheritdoc />
         public override void OnResetState()
         {
             count = 0;
-            purgeAction = null;
         }
     }
 }

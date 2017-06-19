@@ -42,7 +42,7 @@ namespace Orleans.ServiceBus.Providers
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly Logger baseLogger;
         private readonly Logger logger;
-        private readonly IEventHubReceiverMonitor monitor;
+        private readonly IQueueAdapterReceiverMonitor monitor;
 
         private IEventHubQueueCache cache;
 
@@ -69,7 +69,7 @@ namespace Orleans.ServiceBus.Providers
             Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
-            IEventHubReceiverMonitor monitor,
+            IQueueAdapterReceiverMonitor monitor,
             Func<NodeConfiguration> getNodeConfig,
             Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
@@ -209,6 +209,7 @@ namespace Orleans.ServiceBus.Providers
             purgedItems = null;
 
             //if not under pressure, signal the cache to do a time based purge
+            //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
             if (!this.IsUnderPressure())
                 this.cache.SignalPurge();
             return false;

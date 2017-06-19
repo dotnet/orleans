@@ -12,12 +12,14 @@ namespace Orleans.Providers.Streams.Generator
         public string StreamNamespace { get; }
         public StreamSequenceToken SequenceToken => RealToken;
         public EventSequenceTokenV2 RealToken { get;  }
+        public DateTime EnqueueTimeUtc { get; }
         public object Payload { get; }
 
         public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, EventSequenceTokenV2 token)
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
+            EnqueueTimeUtc = DateTime.UtcNow;
             this.Payload = payload;
             this.RealToken = token;
         }

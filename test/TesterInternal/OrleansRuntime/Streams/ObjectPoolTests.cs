@@ -38,7 +38,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc1Free1Test()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 0);
+            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
             // Allocate and free 10 items
             for (int i = 0; i < 10; i++)
             {
@@ -53,7 +53,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void Alloc10Free1Test()
         {
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), 10);
+            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
 
             // Allocate 10 items
             var resources = Enumerable.Range(0, 10).Select(i => pool.Allocate()) .ToList();
@@ -78,10 +78,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void ReuseResourceTest()
         {
-            const int DefaultPoolSize = 10;
             const int WorkngSet = 20;
             var accumulator = new Accumulator();
-            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator), DefaultPoolSize);
+            IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
 
             for (int i = 0; i < 5; i++)
             {

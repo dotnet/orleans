@@ -60,7 +60,7 @@
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\AveragingCachePressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\ICachePressureMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\CachePressureMonitors\SlowConsumingPressureMonitor.cs" />
-    <Compile Include="Providers\Streams\EventHub\StatisticMonitors\DefaultEventHubObjectPoolMonitor.cs" />
+    <Compile Include="Providers\Streams\EventHub\StatisticMonitors\DefaultEventHubBlockPoolMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\StatisticMonitors\DefaultEventHubCacheMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\StatisticMonitors\DefaultEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\EventDataExtensions.cs" />
@@ -84,12 +84,10 @@
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueCacheFactory.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubReceiver.cs" />
-    <Compile Include="Providers\Streams\EventHub\StatisticMonitors\IEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\SegmentBuilder.cs" />
     <Compile Include="Providers\Streams\EventHub\StatisticMonitors\MonitorAggregationDimentions.cs" />
-    <Compile Include="Providers\Streams\EventHub\TimePurgePredicate.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">

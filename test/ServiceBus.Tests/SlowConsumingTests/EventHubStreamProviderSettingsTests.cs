@@ -64,7 +64,6 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 actualSettings.AveragingCachePressureMonitorFlowControlThreshold));
             Assert.Equal(expectedSettings.EventHubSettingsType, actualSettings.EventHubSettingsType);
             Assert.Equal(expectedSettings.CheckpointerSettingsType, actualSettings.CheckpointerSettingsType);
-            Assert.Equal(expectedSettings.CacheSizeMb, actualSettings.CacheSizeMb);
             Assert.Equal(expectedSettings.DataMinTimeInCache, actualSettings.DataMinTimeInCache);
             Assert.Equal(expectedSettings.DataMaxAgeInCache, actualSettings.DataMaxAgeInCache);
         }

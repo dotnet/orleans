@@ -169,7 +169,7 @@ namespace Orleans.ServiceBus.Providers
         private FixedSizeBuffer currentBuffer;
 
         /// <inheritdoc />
-        public Action<IDisposable> OnBlockAllocated { set; private get; }
+        public Action<FixedSizeBuffer> OnBlockAllocated { set; private get; }
 
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache

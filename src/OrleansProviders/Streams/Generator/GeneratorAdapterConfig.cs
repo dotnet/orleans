@@ -1,4 +1,5 @@
 
+using Orleans.Providers.Streams.Common;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -9,7 +10,7 @@ namespace Orleans.Providers.Streams.Generator
     /// This configuration class is used to configure the GeneratorStreamProvider.
     /// It tells the stream provider how many queues to create, and which generator to use to generate event streams.
     /// </summary>
-    public class GeneratorAdapterConfig
+    public class GeneratorAdapterConfig : RecoverableStreamProviderSettings
     {
         /// <summary>
         /// Configuration property name for generator configuration type
@@ -48,8 +49,9 @@ namespace Orleans.Providers.Streams.Generator
         /// Utility function to convert config to property bag for use in stream provider configuration
         /// </summary>
         /// <returns></returns>
-        public void WriteProperties(Dictionary<string, string> properties)
+        public override void WriteProperties(Dictionary<string, string> properties)
         {
+            base.WriteProperties(properties);
             if (GeneratorConfigType != null)
             {
                 properties.Add(GeneratorConfigTypeName, GeneratorConfigType.AssemblyQualifiedName);
@@ -61,8 +63,9 @@ namespace Orleans.Providers.Streams.Generator
         /// Utility function to populate config from provider config
         /// </summary>
         /// <param name="providerConfiguration"></param>
-        public virtual void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
+        public override void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
+            base.PopulateFromProviderConfig(providerConfiguration);
             GeneratorConfigType = providerConfiguration.GetTypeProperty(GeneratorConfigTypeName, null);
             if (string.IsNullOrWhiteSpace(StreamProviderName))
             {
