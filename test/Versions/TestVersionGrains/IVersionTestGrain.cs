@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
+using TestVersionGrains;
 
 namespace TestVersionGrainInterfaces
 {
@@ -13,5 +14,11 @@ namespace TestVersionGrainInterfaces
         Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other);
 
         Task<bool> LongRunningTask(TimeSpan taskTime);
+    }
+
+    [Version(1)]
+    public interface IVersionPlacementTestGrain : IGrainWithIntegerKey
+    {
+        Task<int> GetVersion();
     }
 }

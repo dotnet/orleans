@@ -1,11 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>Tester.ZooKeeperUtils</RootNamespace>
+    <AssemblyName>Tester.ZooKeeperUtils</AssemblyName>
   </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -17,10 +23,10 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.3.1" />
     <PackageReference Include="System.Data.SqlClient" Version="4.3.0" />
     <PackageReference Include="FluentAssertions" Version="4.19.0" />
   </ItemGroup>
@@ -34,16 +40,16 @@
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
-   <ItemGroup>
-    <Compile Include="..\..\..\test\TesterZooKeeperUtils\**\*.cs" Exclude="..\..\..\test\TesterZooKeeperUtils\obj\**\*.cs;..\..\..\test\TesterZooKeeperUtils\bin\**\*.cs;..\..\..\test\TesterZooKeeperUtils\Properties\*.cs" />
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TesterZooKeeperUtils\**\*.cs" Exclude="..\..\..\test\TesterZooKeeperUtils\obj\**\*.cs;..\..\..\test\TesterZooKeeperUtils\bin\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
-    <None Include="Tester.ZooKeeperUtils.xunit.runner.json">
+    <None Include="..\..\..\test\TesterZooKeeperUtils\App.config">
+      <Link>App.config</Link>
+    </None>
+    <None Include="..\..\..\test\TesterZooKeeperUtils\Tester.ZooKeeperUtils.xunit.runner.json">
+      <Link>Tester.ZooKeeperUtils.xunit.runner.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
 </Project>

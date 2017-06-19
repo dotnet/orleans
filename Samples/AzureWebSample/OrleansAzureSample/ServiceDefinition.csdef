@@ -9,11 +9,17 @@
       <InternalEndpoint name="OrleansSiloEndpoint" protocol="tcp" port="22222" />
       <InternalEndpoint name="OrleansProxyEndpoint" protocol="tcp" port="40000" />
     </Endpoints>
-    <!--
     <Startup>
-      <Task commandLine="CounterControl.exe" executionContext="elevated" taskType="simple" />
+      <!-- Eneble Server GC in the worker role, as the app.config will impose the gcServer settings in the WaWorkerHost.exe process.
+           More information: https://blogs.msdn.microsoft.com/cclayton/2014/06/05/server-garbage-collection-mode-in-microsoft-azure/ -->
+      <Task commandLine="ServerGC.cmd" executionContext="elevated" taskType="simple">
+        <Environment>
+          <Variable name="UseServerGC" value="True" />
+          <Variable name="UseBackgroundGC" value="True" />
+        </Environment>
+      </Task>
+      <!--<Task commandLine="CounterControl.exe" executionContext="elevated" taskType="simple" />-->
     </Startup>
-    -->
   </WorkerRole>
   <WebRole name="WebRole" vmsize="ExtraSmall">
     <Sites>

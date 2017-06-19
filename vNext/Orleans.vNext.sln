@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.7
+VisualStudioVersion = 15.0.26228.9
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans", "src\Orleans\Orleans.csproj", "{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}"
 EndProject
@@ -20,11 +20,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NonSilo.Tests", "test\NonSilo.Tests\NonSilo.Tests.csproj", "{A03DFE72-F1CA-4E79-8A84-EDF5D277EB1A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "test\TestExtensions\TestExtensions.csproj", "{AFD242B4-EDA9-42CD-BA39-E410B98ADD2A}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5478B454-0E48-4631-B338-D45DD21124BF}"
-	ProjectSection(SolutionItems) = preProject
-		.nuget\NuGet.Config = .nuget\NuGet.Config
-	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrains", "test\TestInternalGrains\TestInternalGrains.csproj", "{A682ABC1-1A51-4794-8012-DA8E59EBC72A}"
 EndProject
@@ -102,6 +97,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceBus.Tests", "test\Se
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{9B457DC7-BA13-4FE2-B61B-DB02DE406C8F}"
 	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+		NuGet.Config = NuGet.Config
 		Build\Tools.csproj = Build\Tools.csproj
 	EndProjectSection
 EndProject

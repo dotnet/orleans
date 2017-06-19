@@ -63,6 +63,7 @@
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\RuntimeStrategyChangeTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTests.cs" />
     <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTestsBase.cs" />
+    <Compile Include="HeterogeneousSilosTests\UpgradeTests\VersionPlacementTests.cs" />
     <Compile Include="Placement\CustomPlacementTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
@@ -79,7 +80,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="InvocationInterceptTests.cs" />
+    <Compile Include="GrainCallFilterTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="StreamingTests\ControllableStreamGeneratorProviderTests.cs" />

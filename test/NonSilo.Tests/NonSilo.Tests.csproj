@@ -57,6 +57,7 @@
     <Compile Include="General\LruTest.cs" />
     <Compile Include="General\RequestContextTestsNonSiloRequired.cs" />
     <Compile Include="General\RingTests_Standalone.cs" />
+    <Compile Include="General\TypeCodeOverrideTests.cs" />
     <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />

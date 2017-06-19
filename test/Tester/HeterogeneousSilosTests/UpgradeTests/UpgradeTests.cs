@@ -85,7 +85,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             const float numberOfGrains = 300;
 
-            await DeployCluster();
+            await StartSiloV1();
             await StartSiloV2();
 
             var versionCounter = new int[2];

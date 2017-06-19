@@ -71,7 +71,6 @@
     <Compile Include="LocalErrorGrain.cs" />
     <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="MemoryStorageProviderTests.cs" />
-    <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
     <Compile Include="ObserverTests.cs" />
     <Compile Include="OneWayCallTests.cs" />

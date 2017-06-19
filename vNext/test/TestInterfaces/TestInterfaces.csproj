@@ -1,15 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>netstandard1.5</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>UnitTests.Interfaces</RootNamespace>
+    <AssemblyName>TestInterfaces</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestInterfaces\**\*.cs" Exclude="..\..\..\test\TestInterfaces\obj\**\*.cs;..\..\..\TestInterfaces\bin\**\*.cs;..\..\..\test\TestInterfaces\Properties\*.cs" />
+    <Compile Include="..\..\..\test\TestInterfaces\**\*.cs" Exclude="..\..\..\test\TestInterfaces\obj\**\*.cs;..\..\..\TestInterfaces\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -237,7 +238,7 @@ namespace Orleans.Runtime
 
             var typeCode = target.GrainIdentity.TypeCode;
             var silos = target.InterfaceVersion > 0
-                ? versionSelectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
+                ? versionSelectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion).SuitableSilos
                 : GrainTypeManager.GetSupportedSilos(typeCode);
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
@@ -245,6 +246,19 @@ namespace Orleans.Runtime
                 throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
 
             return compatibleSilos;
+        }
+
+        public IReadOnlyDictionary<ushort, IReadOnlyList<SiloAddress>> GetCompatibleSilosWithVersions(PlacementTarget target)
+        {
+            if (target.InterfaceVersion == 0)
+                throw new ArgumentException("Interface version not provided", nameof(target));
+
+            var typeCode = target.GrainIdentity.TypeCode;
+            var silos = versionSelectorManager
+                .GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
+                .SuitableSilosByVersion;
+
+            return silos;
         }
 
         internal void SetStorageManager(IStorageProviderManager storageManager)

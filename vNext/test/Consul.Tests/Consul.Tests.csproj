@@ -1,23 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>Consul.Tests</RootNamespace>
+    <AssemblyName>Consul.Tests</AssemblyName>
   </PropertyGroup>
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
     <PackageReference Include="xunit.runner.utility" Version="2.2.0" />
-    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.3.1" />
     <PackageReference Include="FluentAssertions" Version="4.19.0" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansConsulUtils\OrleansConsulUtils.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
@@ -28,12 +28,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\test\Consul.Tests\**\*.cs" Exclude="..\..\..\test\Consul.Tests\obj\**\*.cs;..\..\..\test\Consul.Tests\bin\**\*.cs;..\..\..\test\Consul.Tests\Properties\*.cs" />
+    <Compile Include="..\..\..\test\Consul.Tests\**\*.cs" Exclude="..\..\..\test\Consul.Tests\obj\**\*.cs;..\..\..\test\Consul.Tests\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="App.config" />
-    <None Include="Consul.Tests.xunit.runner.json">
+    <None Include="..\..\..\test\Consul.Tests\App.config">
+      <Link>App.config</Link>
+    </None>
+    <None Include="..\..\..\test\Consul.Tests\Consul.Tests.xunit.runner.json">
+      <Link>Consul.Tests.xunit.runner.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
