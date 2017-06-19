@@ -223,7 +223,7 @@ Note: When a large number of asynchronous actions need to happen simultaneously 
 
 ## External Tasks
 
-It's tempting to use the [Task Parallel Library](https://msdn.microsoft.com/en-us/library/dd460717) _"TPL"_ for executing parallel tasks in Orleans, but TPL uses the .NET thread pool to dispatch tasks. This is prohibited within grain code.
+It's tempting to use the [Task Parallel Library](https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl) _"TPL"_ for executing parallel tasks in Orleans, but TPL uses the .NET thread pool to dispatch tasks. This is prohibited within grain code.
 
 Orleans has its own task scheduler which provides the single threaded execution model used within grains. 
 It's important that when running tasks the Orleans scheduler is used, and not the .NET thread pool.

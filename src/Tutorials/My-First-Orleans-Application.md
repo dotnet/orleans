@@ -28,7 +28,7 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 ## Getting Started
 
 Before getting started, make sure the Microsoft Orleans Tools for Visual Studio is installed. The plugin can be downloaded from:
-https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4
+https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio
 
 After starting Visual Studio, go to create a new project.
 Under "Visual C#," you should see the following:

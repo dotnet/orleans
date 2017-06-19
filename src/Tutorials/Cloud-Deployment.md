@@ -18,9 +18,9 @@ The  [Azure Web Sample](https://github.com/dotnet/orleans/tree/master/Samples/Az
 The following prerequisites are required:
 
 * Visual Studio 2013 or 2015
-* [Windows Azure SDK v2.4 or higher](http://azure.microsoft.com/en-us/downloads/)
+* [Windows Azure SDK v2.4 or higher](https://azure.microsoft.com/en-us/downloads/)
 
-For more info on installing and working with Windows Azure in general, see the Microsoft Developer Network (MSDN) web site: (http://msdn.microsoft.com/en-us/windowsazure/)
+For more info on installing and working with Windows Azure in general, see the Microsoft Azure documentation web site: (https://docs.microsoft.com/en-us/azure/)
 
 ## Create Azure Worker Role for Orleans Silos
 Right click on your solution, and select 'Add | New Project...'.
@@ -121,7 +121,7 @@ This will be a normal Azure storage connection – either for the development st
 
 In general, this connection string is likely to use the same configuration values as the `Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString` diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.
 
-See the [Configure Azure Storage Connection Strings](http://azure.microsoft.com/en-us/documentation/articles/storage-configure-connection-string/) for more information.
+See the [Configure Azure Storage Connection Strings](https://docs.microsoft.com/en-us/azure/storage/storage-configure-connection-string) for more information.
 
 For example, to use local Developer Storage emulator (for local testing only)
 
