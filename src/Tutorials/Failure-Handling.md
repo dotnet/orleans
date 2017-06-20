@@ -53,7 +53,7 @@ As described in the section above, choosing a strategy is application and contex
 For example you might want to retry a request maximum 5 times per minute and can deal with it being done eventually but for some other action you might not be able to continue if something is not working.
 If your Login grain fails , you can not process any other requests from the user as an example.
 
-There is a guide [on MSDN](https://msdn.microsoft.com/en-us/library/dn568099.aspx) about good patterns and practices for the cloud which applies to Orleans in most cases as well.
+There is a guide [in the Azure documentation](https://docs.microsoft.com/en-us/azure/architecture/patterns/) about good patterns and practices for the cloud which applies to Orleans in most cases as well.
 
 ## A fairly complex example
 

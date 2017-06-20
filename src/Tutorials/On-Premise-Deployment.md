@@ -27,12 +27,12 @@ The following table lists the prerequisites for deploying and running Orleans on
 
 ### .Net Framework 4.5
 
-Orleans runs under the .Net Framework 4.5, which can be installed from this link: (http://www.microsoft.com/en-us/download/details.aspx?id=30653)
+Orleans runs under the .Net Framework 4.5, which can be installed from this link: (https://www.microsoft.com/en-us/download/details.aspx?id=30653)
 
 ### Powershell 2.0 with WinRM
 
 Windows 7 and Windows Server 2008 R2 should have these installed by default.
-For earlier versions of Windows, select the appropriate download from this article: (http://support.microsoft.com/kb/968929).
+For earlier versions of Windows, select the appropriate download from this article: (https://support.microsoft.com/en-us/help/968929/windows-management-framework-windows-powershell-2.0,-winrm-2.0,-and-bits-4.0).
 To confirm you are running the required version of PowerShell, start a PowerShell window and type `Get-Host` – the resulting output needs to say "Version: 2.0"
 
 ### WinRM Configuration

@@ -39,4 +39,4 @@ The Orleans runtime manages the location and activation of grains similarly to t
 If a message is sent to the grain and there is no activation on any server, then the runtime will pick a location and create a new activation there. Because grains are virtual, they never fail, even if the server that currently hosts all of their activations fails.
 This eliminates the need to test to see if a grain exists, as well as the need to track failures and recreate grains as needed; the Orleans runtime does all this automatically.
 
-[Read the MSR Technical Report on Orleans](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf)
+[Read the MSR Technical Report on Orleans](https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability)
