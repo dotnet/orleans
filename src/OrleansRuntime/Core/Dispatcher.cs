@@ -606,7 +606,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="message"></param>
         /// <param name="sendingActivation"></param>
-        public Task SendMessageAsync(Message message, ActivationData sendingActivation = null)
+        public Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
         {
             Action<Exception> onAddressingFailure = ex =>
             {
@@ -665,7 +665,7 @@ namespace Orleans.Runtime
         // Task returned by AsyncSendMessage()
         internal void SendMessage(Message message, ActivationData sendingActivation = null)
         {
-            SendMessageAsync(message, sendingActivation).Ignore();
+            AsyncSendMessage(message, sendingActivation).Ignore();
         }
 
         /// <summary>

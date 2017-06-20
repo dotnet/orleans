@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal interface IActivationSelector
     {
-        Task<PlacementResult> SelectActivation(
+        Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context);
 
         bool TrySelectActivationSynchronously(

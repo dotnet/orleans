@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Placement
         {
             if (targetGrain.IsClient)
             {
-                var res = await clientObserversPlacementDirector.SelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
+                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
                 if (res == null)
                 {
                     throw new ClientNotAvailableException(targetGrain.GrainIdentity);
@@ -96,7 +96,7 @@ namespace Orleans.Runtime.Placement
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;
             var director = ResolveSelector(actualStrategy);
-            var result = await director.SelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
+            var result = await director.OnSelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
             if (result != null) return result;
 
             return await AddActivation(targetGrain, context, actualStrategy);

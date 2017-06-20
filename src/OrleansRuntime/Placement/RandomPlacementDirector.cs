@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Placement
     {
         private readonly SafeRandom random = new SafeRandom();
 
-        public virtual async Task<PlacementResult> SelectActivation(
+        public virtual async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
             List<ActivationAddress> places = (await context.Lookup(target)).Addresses;

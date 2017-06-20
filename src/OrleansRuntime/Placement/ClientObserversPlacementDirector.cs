@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        public override async Task<PlacementResult> SelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
+        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
             // first, check if we can find an activation for this client in the cache or local directory partition
             AddressesAndTag addresses;
