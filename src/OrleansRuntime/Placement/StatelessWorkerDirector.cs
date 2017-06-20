@@ -15,7 +15,8 @@ namespace Orleans.Runtime.Placement
             return Task.FromResult(SelectActivationCore(strategy, target, context));
         }
 
-        public bool TrySelectActivationSynchronously(PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
+        public bool TrySelectActivationSynchronously(
+            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
         {
             placementResult = SelectActivationCore(strategy, target, context);
             // stateless workers are always local, and  request for creation of a new activation will be created by PlacementDirectorsManager 

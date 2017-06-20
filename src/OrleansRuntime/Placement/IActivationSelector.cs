@@ -11,7 +11,8 @@ namespace Orleans.Runtime.Placement
         Task<PlacementResult> SelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context);
 
-        bool TrySelectActivationSynchronously(PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult);
+        bool TrySelectActivationSynchronously(
+            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult);
     }
 
     /// <summary>
