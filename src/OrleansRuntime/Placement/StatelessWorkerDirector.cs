@@ -19,9 +19,7 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
         {
             placementResult = SelectActivationCore(strategy, target, context);
-            // stateless workers are always local, and  request for creation of a new activation will be created by PlacementDirectorsManager 
-            // in case of null returned by SelectActivationCore  
-            return true;
+            return placementResult != null;
         }
 
 
