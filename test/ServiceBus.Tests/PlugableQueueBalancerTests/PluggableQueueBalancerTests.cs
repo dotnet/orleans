@@ -65,8 +65,8 @@ namespace Tester.StreamingTests
             fixture.EnsurePreconditionsMet();
         }
 
-        [Fact, TestCategory("Functional")]
-        public async Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancer()
+        [Fact, TestCategory("BVT")]
+        public async Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             var leaseManager = this.fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(StreamProviderName);
             var responsibilityMap = await leaseManager.GetResponsibilityMap();

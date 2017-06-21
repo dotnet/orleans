@@ -18,13 +18,13 @@ namespace Tester.StreamingTests
     public interface IQueueBalancerGrain : IStreamQueueBalancer
     { }
 
-    public class QueueBalancer : IStreamQueueBalancer
+    public class LeasedBasedQueueBalancer : IStreamQueueBalancer
     {
         private ILeaseManagerGrain leaseManagerGrain;
         private string id;
         private List<QueueId> ownedQueues;
 
-        public QueueBalancer(ILeaseManagerGrain leaseGrain, string id)
+        public LeasedBasedQueueBalancer(ILeaseManagerGrain leaseGrain, string id)
         {
             this.leaseManagerGrain = leaseGrain;
             this.id = id;
