@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Orleans.ServiceFabric;
@@ -168,7 +169,7 @@ namespace TestServiceFabric
 
             // Remove a silo and verify that it's been removed.
             this.resolver.Notify(new FabricSiloInfo[0]);
-            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
+            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(2));
 
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
@@ -193,6 +194,7 @@ namespace TestServiceFabric
             AssertStatus(this.siloDetails.SiloAddress, expected);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private void AssertStatus(SiloAddress address, SiloStatus expected)
         {
             var localStatus = this.oracle.GetApproximateSiloStatus(address);
