@@ -9,7 +9,7 @@ An Orleans silo is a server that hosts and executes Orleans grains. It has one l
 ## Cluster
 A number of silos can work together by forming an Orleans cluster. Orleans runtime fully automates cluster management.
 All silos use a shared membership store that is updated dynamically and helps coordinate cluster management.
-Silos learn about each others' status by reading the shared store. At any time, a silo can join a cluster by registering in a the shared store. This way the cluster can can scale-out dynamically at runtime.
+Silos learn about each others' status by reading the shared store. At any time, a silo can join a cluster by registering in a the shared store. This way the cluster can scale-out dynamically at runtime.
 Orleans provides resilience and availability by removing unresponsive silos from the cluster.
 
 For an in-depth detailed documentation of how Orleans manages a cluster, read about [Cluster Management](/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management).
