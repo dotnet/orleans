@@ -882,7 +882,7 @@ namespace Orleans.Runtime
                     SetupStorageProvider(grainType, data);
 
                 string msg = string.Format("Assigned log consistency provider with Name={0} to grain type {1}",
-                    attr.ProviderName, grainType.FullName);
+                    consistencyProvider.Name, grainType.FullName);
                 logger.Verbose2(ErrorCode.Provider_CatalogLogConsistencyProviderAllocated, msg);
 
                 return consistencyProvider;
