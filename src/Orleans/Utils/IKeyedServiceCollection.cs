@@ -31,8 +31,7 @@ namespace Orleans.Runtime
         public static TService GetServiceByName<TService>(this IServiceProvider services, string name)
             where TService : class
         {
-            var service = services.GetServiceByKey<string,TService>(name);
-            return service;
+            return services.GetServiceByKey<string,TService>(name);
         }
     }
 }
