@@ -105,8 +105,11 @@ namespace Orleans.SqlUtils
         /// <returns></returns>
         public static bool IsSynchronousAdoNetImplementation(string adoNetProvider)
         {
-            //Currently the assumption is all but MySQL support DbCommand cancellation.            
-            return adoNetProvider.Equals(AdoNetInvariants.InvariantNameMySql, StringComparison.OrdinalIgnoreCase);
+            //MySQL ADO.NET provider seem to behave synchronously (especially in cancellation) and it looks like
+            //there are some intermittent PostgreSQL problems too, see more discussion
+            //at https://github.com/dotnet/orleans/pull/2949.
+            return adoNetProvider.Equals(AdoNetInvariants.InvariantNameMySql, StringComparison.OrdinalIgnoreCase)
+                || adoNetProvider.Equals(AdoNetInvariants.InvariantNamePostgreSql, StringComparison.OrdinalIgnoreCase);
         }        
     }
 
