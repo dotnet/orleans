@@ -66,6 +66,9 @@ namespace Microsoft.Orleans.ServiceFabric
                         sp.GetService<IFabricQueryManager>(),
                         sp.GetService<Factory<string, Logger>>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
+
+            serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
+
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
 
