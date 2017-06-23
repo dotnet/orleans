@@ -288,6 +288,7 @@ namespace Orleans.Runtime
         internal void SetupContext(GrainTypeData typeData, IServiceProvider grainServices)
         {
             this.GrainTypeData = typeData;
+            this.Items = new Dictionary<object, object>();
             this.serviceScope = grainServices.CreateScope();
 
             SetGrainActivationContextInScopedServices(this.ActivationServices, this);
@@ -358,6 +359,8 @@ namespace Orleans.Runtime
         public ActivationAddress Address { get; private set; }
 
         public IServiceProvider ServiceProvider => this.serviceScope?.ServiceProvider;
+
+        public IDictionary<object, object> Items { get; private set; }
 
         public void OnTimerCreated(IGrainTimer timer)
         {

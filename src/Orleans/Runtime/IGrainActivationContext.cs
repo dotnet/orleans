@@ -1,5 +1,6 @@
 ﻿using System;
 using Orleans.Core;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -16,5 +17,12 @@ namespace Orleans.Runtime
 
         /// <summary>Gets the <see cref="IServiceProvider"/> that provides access to the grain activation's service container.</summary>
         IServiceProvider ActivationServices { get; }
+
+        /// <summary>Gets the instance of the grain associated with this activation context. 
+        /// The value will be <see langword="null"/> if the grain is being created.</summary>
+        Grain GrainInstance { get; }
+
+        /// <summary>Gets a key/value collection that can be used to share data within the scope of the grain activation.</summary>
+        IDictionary<object, object> Items { get; }
     }
 }
