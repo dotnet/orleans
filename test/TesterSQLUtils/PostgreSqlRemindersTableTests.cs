@@ -51,7 +51,7 @@ namespace UnitTests.RemindersTest
         [SkippableFact]
         public async Task RemindersTable_PostgreSql_RemindersRange()
         {
-            await RemindersRange();
+            await RemindersRange(iterations: 50);
         }
 
         [SkippableFact]

@@ -75,7 +75,7 @@ namespace UnitTests.RemindersTest
 
         protected async Task RemindersParallelUpsert()
         {
-            var upserts = await Task.WhenAll(Enumerable.Range(0, 50).Select(i =>
+            var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
             {
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j => remindersTable.UpsertRow(reminder)));
