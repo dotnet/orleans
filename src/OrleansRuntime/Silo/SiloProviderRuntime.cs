@@ -115,7 +115,7 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config)
         {
-            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(config.BalancerType, streamProviderName, this.siloStatusOracle, this.siloDetails.ClusterConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod, config.QueueBalancerFactoryName);
+            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(config.BalancerType, streamProviderName, this.siloStatusOracle, this.siloDetails.ClusterConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);

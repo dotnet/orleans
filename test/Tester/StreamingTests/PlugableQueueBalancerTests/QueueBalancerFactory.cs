@@ -27,7 +27,7 @@ namespace Tester.StreamingTests
         {
             var keyedStreamQueueMapperCollection = runtime.ServiceProvider.GetService<IKeyedServiceCollection<string, IStreamQueueMapper>>() as KeyedStreamQueueMapperCollection;
             keyedStreamQueueMapperCollection.AddService(strProviderName, queueMapper);
-            return new LeasedBasedQueueBalancer(runtime.GrainFactory.GetGrain<ILeaseManagerGrain>(strProviderName), $"{strProviderName}-{Guid.NewGuid()}");
+            return new LeaseBasedQueueBalancer(runtime.GrainFactory.GetGrain<ILeaseManagerGrain>(strProviderName), $"{strProviderName}-{Guid.NewGuid()}");
         }
     }
 

@@ -189,7 +189,7 @@ namespace ServiceBus.Tests.StreamingTests
             CheckpointerSettings.WriteProperties(settings);
 
             // add queue balancer setting
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, BuiltInStreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
             // add pub/sub settting
             settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());

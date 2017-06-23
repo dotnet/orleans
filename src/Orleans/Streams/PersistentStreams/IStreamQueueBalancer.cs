@@ -11,7 +11,7 @@ namespace Orleans.Streams
     public interface IStreamQueueBalancer
     {
         /// <summary>
-        /// Async Initialize logic
+        /// Initialize this instance
         /// </summary>
         /// <returns></returns>
         Task Initialize();
@@ -33,7 +33,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="observer">An observer interface to receive queue distribution change notifications.</param>
         /// <returns>Bool value indicating that unsubscription succeeded or not</returns>
-        Task<bool> UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
+        Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
     }
 
     /// <summary>
@@ -42,7 +42,7 @@ namespace Orleans.Streams
     /// It should be implemented by components interested in stream queue load balancing.
     /// When change notification is received, listener should request updated list of queues from the queue balancer.
     /// </summary>
-    public interface IStreamQueueBalanceListener : IAddressable
+    public interface IStreamQueueBalanceListener :IAddressable
     {
         /// <summary>
         /// Receive notifications about adapter queue responsibility changes. 

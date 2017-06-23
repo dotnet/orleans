@@ -20,17 +20,15 @@ namespace Orleans.Streams
         /// <param name="runtime">stream provider runtime environment to run in</param>
         /// <param name="queueMapper">queue mapper of requesting stream provider</param>
         /// <param name="siloMaturityPeriod">Maturity Period of a silo for queue rebalancing purposes</param>
-        /// <param name="customStreamQueueBalancerFactoryName">Name for injected custom StreamQueueBalancerFactory name which is configured for current stream provider</param>
         /// <returns>Constructed stream queue balancer</returns>
         public static IStreamQueueBalancer Create(
-            StreamQueueBalancerType balancerType,
+            string balancerType,
             string strProviderName,
             ISiloStatusOracle siloStatusOracle,
             ClusterConfiguration clusterConfiguration,
             IStreamProviderRuntime runtime,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod,
-            string customStreamQueueBalancerFactoryName)
+            TimeSpan siloMaturityPeriod)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -55,37 +53,37 @@ namespace Orleans.Streams
             bool isFixed;
             switch (balancerType)
             {
-                case StreamQueueBalancerType.ConsistentRingBalancer:
+                case BuiltInStreamQueueBalancerType.ConsistentRingBalancer:
                 {
                     // Consider: for now re-use the same ConsistentRingProvider with 1 equally devided range. Remove later.
                     IConsistentRingProviderForGrains ringProvider = runtime.GetConsistentRingProvider(0, 1);
                     return new ConsistentRingQueueBalancer(ringProvider, queueMapper);
                 }
-                case StreamQueueBalancerType.DynamicAzureDeploymentBalancer:
-                case StreamQueueBalancerType.StaticAzureDeploymentBalancer:
+                case BuiltInStreamQueueBalancerType.DynamicAzureDeploymentBalancer:
+                case BuiltInStreamQueueBalancerType.StaticAzureDeploymentBalancer:
                 {
                     Logger logger = LogManager.GetLogger(typeof(StreamQueueBalancerFactory).Name, LoggerType.Runtime);
                     var wrapper = AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, runtime.ServiceProvider);
-                    isFixed = balancerType == StreamQueueBalancerType.StaticAzureDeploymentBalancer;
+                    isFixed = balancerType == BuiltInStreamQueueBalancerType.StaticAzureDeploymentBalancer;
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper, siloMaturityPeriod, isFixed);
                 }
-                case StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer:
-                case StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer:
+                case BuiltInStreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer:
+                case BuiltInStreamQueueBalancerType.StaticClusterConfigDeploymentBalancer:
                 {
                     IDeploymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
-                    isFixed = balancerType == StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
+                    isFixed = balancerType == BuiltInStreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper, siloMaturityPeriod, isFixed);
-                }
-                case StreamQueueBalancerType.CustomBalancer:
-                {
-                    var serviceProvider = runtime.ServiceProvider;
-                    var factory = serviceProvider.GetServiceByName<IStreamQueueBalancerFactory>(customStreamQueueBalancerFactoryName);
-                    return factory.Create(strProviderName, siloStatusOracle, clusterConfiguration, runtime, queueMapper, siloMaturityPeriod); 
                 }
                 default:
                 {
-                    string error = string.Format("Unsupported balancerType for stream provider. BalancerType: {0}, StreamProvider: {1}", balancerType, strProviderName);
-                    throw new ArgumentOutOfRangeException("balancerType", error);
+                    var serviceProvider = runtime.ServiceProvider;
+                    var factory = serviceProvider.GetServiceByName<IStreamQueueBalancerFactory>(balancerType);
+                    if (factory == null)
+                    {
+                        string error = $"Unsupported balancerType for stream provider. BalancerType: {balancerType}, StreamProvider: {strProviderName}";
+                        throw new ArgumentOutOfRangeException("balancerType", error);
+                    }
+                    return factory.Create(strProviderName, siloStatusOracle, clusterConfiguration, runtime, queueMapper, siloMaturityPeriod); 
                 }
             }
         }

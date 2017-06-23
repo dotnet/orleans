@@ -168,7 +168,7 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<bool> UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {

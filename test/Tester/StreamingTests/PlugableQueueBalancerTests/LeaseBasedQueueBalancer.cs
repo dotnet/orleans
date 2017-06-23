@@ -14,17 +14,14 @@ using System.Threading.Tasks;
 
 namespace Tester.StreamingTests
 {
-    //Dumb queue balancer grain only acquire leases onece, never renew it, just for testing
-    public interface IQueueBalancerGrain : IStreamQueueBalancer
-    { }
-
-    public class LeasedBasedQueueBalancer : IStreamQueueBalancer
+    //Dumb queue balancer only acquire leases once, never renew it, just for testing
+    public class LeaseBasedQueueBalancer : IStreamQueueBalancer
     {
         private ILeaseManagerGrain leaseManagerGrain;
         private string id;
         private List<QueueId> ownedQueues;
 
-        public LeasedBasedQueueBalancer(ILeaseManagerGrain leaseGrain, string id)
+        public LeaseBasedQueueBalancer(ILeaseManagerGrain leaseGrain, string id)
         {
             this.leaseManagerGrain = leaseGrain;
             this.id = id;
@@ -62,7 +59,7 @@ namespace Tester.StreamingTests
             return Task.FromResult(true);
         }
 
-        public Task<bool> UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             //no op operation
             return Task.FromResult(true);
