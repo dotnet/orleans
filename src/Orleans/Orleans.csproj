@@ -105,7 +105,6 @@
     <Compile Include="Messaging\MessageFactory.cs" />
     <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
-    <Compile Include="CodeGeneration\GrainState.cs" />
     <Compile Include="CodeGeneration\ICodeGeneratorCache.cs" />
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
     <Compile Include="CodeGeneration\IRuntimeCodeGenerator.cs" />
