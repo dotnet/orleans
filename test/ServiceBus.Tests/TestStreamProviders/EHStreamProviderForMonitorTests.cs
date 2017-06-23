@@ -13,6 +13,7 @@ using Orleans;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
+using System.Threading;
 #if NETSTANDARD
 using Microsoft.Azure.EventHubs;
 #else
@@ -25,12 +26,20 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     public class EHStreamProviderForMonitorTests : PersistentStreamProvider<EHStreamProviderForMonitorTests.AdapterFactory>
     {
-        public class AdapterFactory : EHStreamProviderWithCreatedCacheList.AdapterFactory
+        public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
+            private CachePressureInjectionMonitor cachePressureInjectionMonitor;
+            
             public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
             {
                 this.ReceiverMonitorFactory = (dimensions, logger) => EventHubReceiverMonitorForTesting.Instance;
+                this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
                 base.Init(providerCfg, providerName, log, svcProvider);
+            }
+
+            private void ChangeCachePressure()
+            {
+                cachePressureInjectionMonitor.isUnderPressure = !cachePressureInjectionMonitor.isUnderPressure;
             }
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
@@ -41,15 +50,34 @@ namespace ServiceBus.Tests.TestStreamProviders
                 var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
                 Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => CacheMonitorForTesting.Instance;
                 Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) =>BlockPoolMonitorForTesting.Instance;
-                return new EHStreamProviderWithCreatedCacheList.AdapterFactory.CacheFactoryForTesting(providerSettings, SerializationManager, this.createdCaches,
+                return new CacheFactoryForMonitorTesting(this.cachePressureInjectionMonitor, providerSettings, SerializationManager,
                     sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory);
             }
 
+            private class CacheFactoryForMonitorTesting : EventHubQueueCacheFactory
+            {
+                private CachePressureInjectionMonitor cachePressureInjectionMonitor;
+                public CacheFactoryForMonitorTesting(CachePressureInjectionMonitor cachePressureInjectionMonitor, EventHubStreamProviderSettings providerSettings,
+                   SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
+                   Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = null,
+                   Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                    : base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                {
+                    this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
+                }
+
+                protected override void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamProviderSettings providerSettings,
+                        Logger cacheLogger)
+                {
+                    cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
+                }
+            }
             public enum QueryCommands
             {
                 GetCacheMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 10, 
                 GetReceiverMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 11,
-                GetObjectPoolMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 12
+                GetObjectPoolMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 12,
+                ChangeCachePressure = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 13
             }
 
             public override Task<object> ExecuteCommand(int command, object arg)
@@ -66,11 +94,41 @@ namespace ServiceBus.Tests.TestStreamProviders
                     case (int)QueryCommands.GetObjectPoolMonitorCallCounters:
                         re = BlockPoolMonitorForTesting.Instance.CallCounters;
                         break;
+                    case (int)QueryCommands.ChangeCachePressure:
+                        ChangeCachePressure();
+                        break;
                     default: return base.ExecuteCommand(command, arg);
 
                 }
                 return Task.FromResult(re);
             }
+        }
+    }
+
+    public class CachePressureInjectionMonitor : ICachePressureMonitor
+    {
+        public bool isUnderPressure { get; set; }
+        private bool wasUnderPressur;
+        public ICacheMonitor CacheMonitor { set; private get; }
+        public CachePressureInjectionMonitor()
+        {
+            this.isUnderPressure = false;
+            this.wasUnderPressur = this.isUnderPressure;
+        }
+
+        public void RecordCachePressureContribution(double cachePressureContribution)
+        {
+
+        }
+
+        public bool IsUnderPressure(DateTime utcNow)
+        {
+            if (this.wasUnderPressur != this.isUnderPressure)
+            {
+                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.isUnderPressure, null, null, null);
+                this.wasUnderPressur = this.isUnderPressure;
+            }
+            return this.isUnderPressure;
         }
     }
 }
