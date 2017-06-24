@@ -93,8 +93,9 @@ namespace Orleans
         }
 
         // There might be races between cancelling of the token and it's actual arriving to the target grain
-        // as token on arriving causes installing of GCT extension, the GrainExtensionNotInstalledException 
-        // means existence of race condition, so just retry in that case. It's safe, as existing mechanism in .Net
+        // as token on arriving causes installing of GCT extension, and without such extension the cancelling 
+        // attept wiil result in GrainExtensionNotInstalledException exception that will mean
+        // existence of race condition, so just retry in that case. It's safe, as existing mechanism in .Net
         // prevents double cancelling.
         private Task CancelTokenWithRetries(ICancellationSourcesExtension tokenExtension)
         {
