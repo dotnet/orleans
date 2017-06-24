@@ -18,7 +18,7 @@ namespace Orleans
 #region cancelCallProperties
         private const int MaxNumCancelErrorTries = 3;
         private readonly TimeSpan _cancelCallMaxWaitTime = TimeSpan.FromSeconds(30);
-        private readonly IBackoffProvider _cancelCallRBackoffProvider = new FixedBackoff(TimeSpan.FromSeconds(1));
+        private readonly IBackoffProvider _cancelCallBackoffProvider = new FixedBackoff(TimeSpan.FromSeconds(1));
         private readonly Func<Exception, int, bool> _cancelCallRetryExceptionFilter =
             (exception, i) => exception is GrainExtensionNotInstalledException;
 #endregion
@@ -104,7 +104,7 @@ namespace Orleans
                 MaxNumCancelErrorTries,
                 _cancelCallRetryExceptionFilter,
                 _cancelCallMaxWaitTime,
-                _cancelCallRBackoffProvider);
+                _cancelCallBackoffProvider);
         }
 
         /// <inheritdoc />
