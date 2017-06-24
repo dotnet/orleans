@@ -15,6 +15,14 @@ namespace Orleans
     [Serializable]
     public sealed class GrainCancellationToken : IDisposable
     {
+#region cancelCallProperties
+        private const int MaxNumCancelErrorTries = 3;
+        private readonly TimeSpan _cancelCallMaxWaitTime = TimeSpan.FromSeconds(30);
+        private readonly IBackoffProvider _cancelCallRBackoffProvider = new FixedBackoff(TimeSpan.FromSeconds(1));
+        private readonly Func<Exception, int, bool> _cancelCallRetryExceptionFilter =
+            (exception, i) => exception is GrainExtensionNotInstalledException;
+#endregion
+
         [NonSerialized]
         private readonly CancellationTokenSource _cancellationTokenSource;
 
@@ -64,15 +72,16 @@ namespace Orleans
             // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
             // but also cancel _targetGrainReferences. 
             Task task = OrleansTaskExtentions.WrapInTask(_cancellationTokenSource.Cancel);
-            
+
             if (_targetGrainReferences.IsEmpty)
             {
                 return task;
             }
+
             var cancellationTasks = _targetGrainReferences
-                .Select(pair => pair.Value.AsReference<ICancellationSourcesExtension>()
-                .CancelRemoteToken(this))
-                .ToList();
+                 .Select(pair => pair.Value.AsReference<ICancellationSourcesExtension>())
+                 .Select(CancelTokenWithRetries)
+                 .ToList();
             cancellationTasks.Add(task);
 
             return Task.WhenAll(cancellationTasks);
@@ -81,6 +90,16 @@ namespace Orleans
         internal void AddGrainReference(GrainReference grainReference)
         {
             _targetGrainReferences.TryAdd(grainReference.GrainId, grainReference);
+        }
+
+        private Task CancelTokenWithRetries(ICancellationSourcesExtension tokenExtension)
+        {
+            return AsyncExecutorWithRetries.ExecuteWithRetries(
+                i => tokenExtension.CancelRemoteToken(Id),
+                MaxNumCancelErrorTries,
+                _cancelCallRetryExceptionFilter,
+                _cancelCallMaxWaitTime,
+                _cancelCallRBackoffProvider);
         }
 
         /// <inheritdoc />
