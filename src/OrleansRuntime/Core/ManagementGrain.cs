@@ -361,7 +361,6 @@ namespace Orleans.Runtime.Management
 
         private Task<IMembershipTable> GetMembershipTable()
         {
-            var membershipOracle = this.siloStatusOracle as MembershipOracle;
             if (!(this.siloStatusOracle is MembershipOracle)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
             return this.membershipTableFactory.GetMembershipTable();
         }
