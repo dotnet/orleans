@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Placement
         public virtual async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            List<ActivationAddress> places = (await context.Lookup(target)).Addresses;
+            List<ActivationAddress> places = (await context.FullLookup(target)).Addresses;
             return ChooseRandomActivation(places, context);
         }
 
