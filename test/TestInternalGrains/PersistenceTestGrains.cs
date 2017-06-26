@@ -202,6 +202,17 @@ namespace UnitTests.Grains
         }
     }
 
+    public class PersistenceProviderErrorProxyGrain : Grain, IPersistenceProviderErrorProxyGrain
+    {
+        public Task<int> GetValue(IPersistenceProviderErrorGrain other) => other.GetValue();
+
+        public Task DoWrite(int val, IPersistenceProviderErrorGrain other) => other.DoWrite(val);
+
+        public Task<int> DoRead(IPersistenceProviderErrorGrain other) => other.DoRead();
+
+        public Task<string> GetActivationId() => Task.FromResult(this.Data.ActivationId.ToString());
+    }
+
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceErrorGrain
     {

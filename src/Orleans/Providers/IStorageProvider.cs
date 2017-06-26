@@ -77,11 +77,16 @@ namespace Orleans.Storage
     }
 
     /// <summary>
-    /// Exception thrown when a storage provider detects an Etag inconsistency when attemptiong to perform a WriteStateAsync operation.
+    /// Exception thrown when a storage provider detects an Etag inconsistency when attempting to perform a WriteStateAsync operation.
     /// </summary>
     [Serializable]
     public class InconsistentStateException : OrleansException
     {
+        /// <summary>
+        /// Whether or not this exception occurred on the current activation.
+        /// </summary>
+        internal bool IsSourceActivation { get; set; } = true;
+
         /// <summary>The Etag value currently held in persistent storage.</summary>
         public string StoredEtag { get; private set; }
 
@@ -102,6 +107,7 @@ namespace Orleans.Storage
         {
             this.StoredEtag = info.GetString(nameof(StoredEtag));
             this.CurrentEtag = info.GetString(nameof(CurrentEtag));
+            this.IsSourceActivation = info.GetBoolean(nameof(this.IsSourceActivation));
         }
 #endif
 
@@ -141,6 +147,7 @@ namespace Orleans.Storage
 
             info.AddValue(nameof(StoredEtag), this.StoredEtag);
             info.AddValue(nameof(CurrentEtag), this.CurrentEtag);
+            info.AddValue(nameof(this.IsSourceActivation), this.IsSourceActivation);
             base.GetObjectData(info, context);
         }
 #endif
