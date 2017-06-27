@@ -67,9 +67,9 @@ namespace TestServiceFabric
 
             await this.oracle.Stop();
             AssertStatus(SiloStatus.Stopping);
-            Assert.DoesNotContain(this.oracle, this.resolver.Handlers);
             
             await this.oracle.KillMyself();
+            Assert.DoesNotContain(this.oracle, this.resolver.Handlers);
             AssertStatus(SiloStatus.Dead);
         }
 
@@ -215,15 +215,19 @@ namespace TestServiceFabric
         private class MockStatusListener : ISiloStatusListener
         {
             private AutoResetEvent versionUpdated = new AutoResetEvent(false);
-
-            public int Version => this.Notifications.Count;
             public Dictionary<SiloAddress, SiloStatus> Silos { get; } = new Dictionary<SiloAddress, SiloStatus>();
             public List<Tuple<SiloAddress, SiloStatus>> Notifications { get; } = new List<Tuple<SiloAddress, SiloStatus>>();
+            private int Version => this.Notifications.Count;
 
             public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
             {
-                this.Notifications.Add(Tuple.Create(updatedSilo, status));
+                SiloStatus existingStatus;
+                if (this.Silos.TryGetValue(updatedSilo, out existingStatus))
+                {
+                    if (existingStatus == status) throw new InvalidOperationException($"Silo {updatedSilo} already has status {status}.");
+                }
                 this.Silos[updatedSilo] = status;
+                this.Notifications.Add(Tuple.Create(updatedSilo, status));
                 this.versionUpdated.Set();
             }
 
@@ -238,7 +242,7 @@ namespace TestServiceFabric
                     }
 
                     // Wait to be pulsed by an incoming update.
-                    this.versionUpdated.WaitOne(TimeSpan.FromMinutes(1));
+                    this.versionUpdated.WaitOne(TimeSpan.FromSeconds(1));
                 }
 
                 // Wake up any waiters to check the current version.
