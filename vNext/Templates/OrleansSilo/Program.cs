@@ -24,17 +24,7 @@ namespace OrleansSilo
 
         private static int InitializeOrleans()
         {
-            var config = new ClusterConfiguration();
-            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
-            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
-            var ep = new IPEndPoint(IPAddress.Loopback, 10300);
-            config.Globals.SeedNodes.Add(ep);
-            config.PrimaryNode = ep;
-            config.Defaults.PropagateActivityId = true;
-            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Any, 10400);
-            config.Defaults.Port = 10300;
-            var ips = Dns.GetHostAddressesAsync(Dns.GetHostName()).Result;
-            config.Defaults.HostNameOrIPAddress = ips.FirstOrDefault()?.ToString();
+            var config = ClusterConfiguration.LocalhostSilo();
             config.UseStartupType<Startup>();
             hostWrapper = new OrleansHostWrapper(config);
             return hostWrapper.Run();

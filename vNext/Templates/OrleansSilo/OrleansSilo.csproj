@@ -5,7 +5,7 @@
     <TargetFramework>netcoreapp1.1</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Core" Version="2.0.0-preview2-201705020000" />
-    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.0.0-preview2-201705020000" />
+    <PackageReference Include="Microsoft.Orleans.Core" Version="2.0.0-*" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.0.0-*" />
   </ItemGroup>
 </Project>
