@@ -106,7 +106,8 @@
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
     <Compile Include="Catalog\IActivationCollector.cs" />
-    <Compile Include="Streams\QueueBalancer\IStreamQueueBalancerFactory.cs" />
+    <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
+    <Compile Include="Streams\QueueBalancer\StreamQueueBalancerType.cs" />
     <Compile Include="Timers\GrainTimer.cs" />
     <Compile Include="Counters\SiloStatisticsManager.cs" />
     <Compile Include="ConsistentRing\IConsistentRingProvider.cs" />
@@ -208,7 +209,6 @@
     <Compile Include="Streams\QueueBalancer\StaticClusterDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
-    <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
     <Compile Include="Utilities\FactoryUtility.cs" />

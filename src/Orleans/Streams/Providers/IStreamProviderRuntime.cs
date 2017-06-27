@@ -55,7 +55,7 @@ namespace Orleans.Streams
         IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
     }
 
-        /// <summary>
+    /// <summary>
     /// Provider-facing interface for manager of streaming providers
     /// </summary>
     internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
@@ -91,7 +91,8 @@ namespace Orleans.Streams
         public static readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
 
         public const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
-        public const string DEFAULT_STREAM_QUEUE_BALANCER_TYPE = BuiltInStreamQueueBalancerType.ConsistentRingBalancer;
+        //default balancer type if ConsistentRingBalancer
+        public static Type DEFAULT_STREAM_QUEUE_BALANCER_TYPE = null;
 
         public const string STREAM_PUBSUB_TYPE = "PubSubType";
         public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
@@ -108,7 +109,7 @@ namespace Orleans.Streams
         /// The queue balancer type for your stream provider. If you are using a custom queue balancer by injecting IStreamQueueBalancerFactory as a named service in DI,
         /// you should use the same name in BalancerType as the name for your IStreamQueueBalancerFactory
         /// </summary>
-        public string BalancerType { get; set; } = DEFAULT_STREAM_QUEUE_BALANCER_TYPE;
+        public Type BalancerType { get; set; } = DEFAULT_STREAM_QUEUE_BALANCER_TYPE;
         public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
         public TimeSpan SiloMaturityPeriod { get; set; } = DEFAULT_SILO_MATURITY_PERIOD;
 
@@ -128,9 +129,7 @@ namespace Orleans.Streams
                 InitQueueTimeout = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + INIT_QUEUE_TIMEOUT + " property in the provider config values.");
 
-            string balanceTypeString;
-            if (config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString))
-                BalancerType = balanceTypeString;
+            BalancerType = config.GetTypeProperty(QUEUE_BALANCER_TYPE, DEFAULT_STREAM_QUEUE_BALANCER_TYPE);
 
             if (config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
                 MaxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
@@ -158,7 +157,7 @@ namespace Orleans.Streams
         {
             properties[GET_QUEUE_MESSAGES_TIMER_PERIOD] = ConfigUtilities.ToParseableTimeSpan(GetQueueMsgsTimerPeriod);
             properties[INIT_QUEUE_TIMEOUT] = ConfigUtilities.ToParseableTimeSpan(InitQueueTimeout);
-            properties[QUEUE_BALANCER_TYPE] = BalancerType.ToString();
+            properties[QUEUE_BALANCER_TYPE] = BalancerType.AssemblyQualifiedName;
             properties[MAX_EVENT_DELIVERY_TIME] = ConfigUtilities.ToParseableTimeSpan(MaxEventDeliveryTime);
             properties[STREAM_INACTIVITY_PERIOD] = ConfigUtilities.ToParseableTimeSpan(StreamInactivityPeriod);
             properties[STREAM_PUBSUB_TYPE] = PubSubType.ToString();

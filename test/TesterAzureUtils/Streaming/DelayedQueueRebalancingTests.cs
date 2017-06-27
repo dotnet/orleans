@@ -34,7 +34,7 @@ namespace Tester.AzureUtils.Streaming
             var persistentStreamProviderConfig = new PersistentStreamProviderConfig
             {
                 SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
-                BalancerType = BuiltInStreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
+                BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
             };
 
             options.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);

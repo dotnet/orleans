@@ -8,6 +8,42 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    public class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public StaticClusterConfigDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IDeploymentConfiguration deploymentConfig)
+            : base(siloStatusOracle, deploymentConfig, true)
+        { }
+    }
+
+    public class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public DynamicClusterConfigDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IDeploymentConfiguration deploymentConfig)
+            : base(siloStatusOracle, deploymentConfig, false)
+        { }
+    }
+
+    public class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public DynamicAzureDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IDeploymentConfiguration deploymentConfig)
+            : base(siloStatusOracle, deploymentConfig, false)
+        { }
+    }
+
+    public class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public StaticAzureDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IDeploymentConfiguration deploymentConfig)
+            : base(siloStatusOracle, deploymentConfig, true)
+        { }
+    }
+
     /// <summary>
     /// DeploymentBasedQueueBalancer is a stream queue balancer that uses deployment information to
     /// help balance queue distribution.
@@ -15,23 +51,20 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    internal class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
+    public class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
     {
-        private readonly TimeSpan siloMaturityPeriod;
+        private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
-        private readonly ReadOnlyCollection<QueueId> allQueues;
+        private ReadOnlyCollection<QueueId> allQueues;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private readonly bool isFixed;
         private bool isStarting;
 
-        
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
-            IStreamQueueMapper queueMapper,
-            TimeSpan maturityPeriod,
             bool isFixed)
         {
             if (siloStatusOracle == null)
@@ -42,18 +75,12 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("deploymentConfig");
             }
-            if (queueMapper == null)
-            {
-                throw new ArgumentNullException("queueMapper");
-            }
 
             this.siloStatusOracle = siloStatusOracle;
             this.deploymentConfig = deploymentConfig;
-            allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
             queueBalanceListeners = new List<IStreamQueueBalanceListener>();
             immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.isFixed = isFixed;
-            siloMaturityPeriod = maturityPeriod;
             isStarting = true;
 
             // register for notification of changes to silo status for any silo in the cluster
@@ -69,8 +96,16 @@ namespace Orleans.Streams
             NotifyAfterStart().Ignore();
         }
 
-        public Task Initialize()
+        public Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
         {
+            if (queueMapper == null)
+            {
+                throw new ArgumentNullException("queueMapper");
+            }
+            this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
+            this.siloMaturityPeriod = siloMaturityPeriod;
             return Task.CompletedTask;
         }
 
@@ -129,7 +164,7 @@ namespace Orleans.Streams
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 
-        public Task<IEnumerable<QueueId>> GetMyQueues()
+        public IEnumerable<QueueId> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
             bool useIdealDistribution = isFixed || isStarting;
@@ -146,12 +181,12 @@ namespace Orleans.Streams
                     // filter queues that belong to immature silos
                     myQueues.RemoveAll(queue => queuesOfImmatureSilos.Contains(queue));
                 }
-                return Task.FromResult(myQueues.AsEnumerable<QueueId>());
+                return myQueues;
             }
-            return Task.FromResult(Enumerable.Empty<QueueId>());
+            return Enumerable.Empty<QueueId>();
         }
 
-        public Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -161,14 +196,14 @@ namespace Orleans.Streams
             {
                 if (queueBalanceListeners.Contains(observer))
                 {
-                    return Task.FromResult(false);
+                    return false;
                 }
                 queueBalanceListeners.Add(observer);
-                return Task.FromResult(true);
+                return true;
             }
         }
 
-        public Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -176,7 +211,7 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                return Task.FromResult(queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer));
+                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
             }
         }
         

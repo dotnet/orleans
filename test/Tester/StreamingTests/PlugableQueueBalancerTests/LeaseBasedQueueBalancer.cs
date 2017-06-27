@@ -18,23 +18,27 @@ namespace Tester.StreamingTests
     public class LeaseBasedQueueBalancer : IStreamQueueBalancer
     {
         private ILeaseManagerGrain leaseManagerGrain;
+        private IGrainFactory grainFactory;
         private string id;
         private List<QueueId> ownedQueues;
 
-        public LeaseBasedQueueBalancer(ILeaseManagerGrain leaseGrain, string id)
+        public LeaseBasedQueueBalancer(IGrainFactory grainFactory)
         {
-            this.leaseManagerGrain = leaseGrain;
-            this.id = id;
+            this.grainFactory = grainFactory;
         }
 
-        public Task Initialize()
+        public async Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
         {
-            return GetInitialLease();
+            this.leaseManagerGrain = this.grainFactory.GetGrain<ILeaseManagerGrain>(strProviderName);
+            await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
+            this.id = $"{strProviderName}-{Guid.NewGuid()}";
+            await GetInitialLease();
         }
 
-        public async Task<IEnumerable<QueueId>> GetMyQueues()
+        public IEnumerable<QueueId> GetMyQueues()
         {
-            await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
             return this.ownedQueues;
         }
 
@@ -51,18 +55,19 @@ namespace Tester.StreamingTests
                 catch (KeyNotFoundException)
                 { }   
             }
+            await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
         }
 
-        public Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             //no op operation
-            return Task.FromResult(true);
+            return true;
         }
 
-        public Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             //no op operation
-            return Task.FromResult(true);
+            return true;
         }
     }
 

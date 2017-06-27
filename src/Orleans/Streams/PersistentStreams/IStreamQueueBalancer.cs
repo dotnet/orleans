@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using System;
 
 namespace Orleans.Streams
 {
@@ -13,27 +14,33 @@ namespace Orleans.Streams
         /// <summary>
         /// Initialize this instance
         /// </summary>
+        /// <param name="strProviderName"></param>
+        /// <param name="queueMapper"></param>
+        /// <param name="siloMaturityPeriod"></param>
         /// <returns></returns>
-        Task Initialize();
+        Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod);
+
         /// <summary>
         /// Retrieves the latest queue distribution for this balancer.
         /// </summary>
         /// <returns>Queue allocated to this balancer.</returns>
-        Task<IEnumerable<QueueId>> GetMyQueues();
+        IEnumerable<QueueId> GetMyQueues();
 
         /// <summary>
         /// Subscribe to receive queue distribution change notifications
         /// </summary>
         /// <param name="observer">An observer interface to receive queue distribution change notifications.</param>
         /// <returns>Bool value indicating that subscription succeeded or not.</returns>
-        Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
+        bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
 
         /// <summary>
         /// Unsubscribe from receiving queue distribution notifications
         /// </summary>
         /// <param name="observer">An observer interface to receive queue distribution change notifications.</param>
         /// <returns>Bool value indicating that unsubscription succeeded or not</returns>
-        Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
+        bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer);
     }
 
     /// <summary>
@@ -41,6 +48,7 @@ namespace Orleans.Streams
     /// indicating that the balance of queues has changed.
     /// It should be implemented by components interested in stream queue load balancing.
     /// When change notification is received, listener should request updated list of queues from the queue balancer.
+    /// This interface inherit from IAddressable for threading-safe concern
     /// </summary>
     public interface IStreamQueueBalanceListener :IAddressable
     {

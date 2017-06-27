@@ -14,7 +14,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
     public class PluggableQueueBalancerTestsWithMemoryStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithMemoryStreamProvider.Fixture>
     {
-        private const string StreamProviderName = "EventHubStreamProvider";
+        private const string StreamProviderName = "MemoryStreamProvider";
         private static readonly int totalQueueCount = 6;
         private static readonly short siloCount = 2;
         public static readonly MemoryAdapterConfig ProviderSettings =

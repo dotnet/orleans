@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +19,7 @@ namespace Tester.StreamingTests
         Task<bool> Renew(QueueId leaseNumber);
         Task Release(QueueId leaseNumber);
         Task<int> GetLeaseResposibility();
-
+        Task SetQueuesAsLeases(IEnumerable<QueueId> queues);
         //methods used in test asserts
         Task RecordBalancerResponsibility(string balancerId, int ownedQueues);
         Task<Dictionary<string, int>> GetResponsibilityMap();
@@ -31,15 +32,12 @@ namespace Tester.StreamingTests
         private static DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
         private ISiloStatusOracle siloStatusOracle;
-        private IStreamQueueMapper queueMapper;
         private ClusterConfiguration clusterConfiguration;
         public override Task OnActivateAsync()
         {
             this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
             this.clusterConfiguration = base.ServiceProvider.GetRequiredService<ClusterConfiguration>();
-            this.queueMapper = base.ServiceProvider.GetServiceByName<IStreamQueueMapper>(this.GetPrimaryKeyString());
             this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
-            SetQueuesAsLeases(this.queueMapper.GetAllQueues());
             this.responsibilityMap = new Dictionary<string, int>();
             return Task.CompletedTask;
         }
@@ -81,13 +79,17 @@ namespace Tester.StreamingTests
             return Task.CompletedTask;
         }
 
-        private void SetQueuesAsLeases(IEnumerable<QueueId> queueIds)
+        public Task SetQueuesAsLeases(IEnumerable<QueueId> queueIds)
         {
+            //if already set up, return
+            if (this.queueLeaseToRenewTimeMap.Count > 0)
+                return Task.CompletedTask;
             //set up initial lease map
             foreach (var queueId in queueIds)
             {
                 this.queueLeaseToRenewTimeMap.Add(queueId, UnAssignedLeaseTime);
             }
+            return Task.CompletedTask;
         }
 
         //methods used in test asserts

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    internal interface IConsistentRingProviderForGrains
+    public interface IConsistentRingProviderForGrains
     {
         /// <summary>
         /// Get the responsibility range of the current silo
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
     // This has to be a separate interface, not polymorphic with IRingRangeListener,
     // since IRingRangeListener is implemented by SystemTarget and thus if it becomes grain interface 
     // it would need to be system target interface (with SiloAddress as first argument).
-    internal interface IAsyncRingRangeListener
+    public interface IAsyncRingRangeListener
     {
         Task RangeChangeNotification(IRingRange old, IRingRange now);
     }

@@ -13,7 +13,7 @@ namespace Orleans.Streams
 
     internal interface IPersistentStreamPullingManager : ISystemTarget
     {
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IStreamQueueMapper> queueMapper);
         Task Stop();
         Task StartAgents();
         Task StopAgents();

@@ -6,20 +6,26 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
+    public class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
     {
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
-        private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
+        private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
-        public ConsistentRingQueueBalancer(
-            IConsistentRingProviderForGrains ringProvider,
-            IStreamQueueMapper queueMapper)
+        public ConsistentRingQueueBalancer(IConsistentRingProviderForGrains ringProvider)
         {
             if (ringProvider == null)
             {
                 throw new ArgumentNullException("ringProvider");
             }
+            myRange = ringProvider.GetMyRange();
+            ringProvider.SubscribeToRangeChangeEvents(this);
+        }
+
+        public Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
+        {
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
@@ -28,15 +34,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
             }
-
             streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
-            myRange = ringProvider.GetMyRange();
-
-            ringProvider.SubscribeToRangeChangeEvents(this);
-        }
-
-        public Task Initialize()
-        {
             return Task.CompletedTask;
         }
 
@@ -56,12 +54,12 @@ namespace Orleans.Streams
             return Task.WhenAll(notificatioTasks);
         }
 
-        public Task<IEnumerable<QueueId>> GetMyQueues()
+        public IEnumerable<QueueId> GetMyQueues()
         {
-            return Task.FromResult(streamQueueMapper.GetQueuesForRange(myRange));
+            return streamQueueMapper.GetQueuesForRange(myRange);
         }
 
-        public Task<bool> SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -69,14 +67,14 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                if (queueBalanceListeners.Contains(observer)) return Task.FromResult(false);
+                if (queueBalanceListeners.Contains(observer)) return false;
                 
                 queueBalanceListeners.Add(observer);
-                return Task.FromResult(true);
+                return true;
             }
         }
 
-        public Task<bool> UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
@@ -84,7 +82,7 @@ namespace Orleans.Streams
             }
             lock (queueBalanceListeners)
             {
-                return Task.FromResult(queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer));
+                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
             }
         }
     }

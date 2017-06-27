@@ -14,7 +14,7 @@ namespace Tester.StreamingTests
 {
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
-        private static string QueueBalancerName = typeof(LeaseBasedQueueBalancer).Name;
+        private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancer);
         private static PersistentStreamProviderConfig CustomPersistentProviderConfig = CreateConfigWithCustomBalancerType();
 
         public static void ConfigureCustomQueueBalancer(Dictionary<string, string> streamProviderSettings, ClusterConfiguration config)
@@ -26,7 +26,7 @@ namespace Tester.StreamingTests
         private static PersistentStreamProviderConfig CreateConfigWithCustomBalancerType()
         {
             var config = new PersistentStreamProviderConfig();
-            config.BalancerType = QueueBalancerName;
+            config.BalancerType = QueueBalancerType;
             return config;
         }
 
@@ -47,11 +47,7 @@ namespace Tester.StreamingTests
         {
             public IServiceProvider ConfigureServices(IServiceCollection services)
             {
-                var keyedFactories = new KeyedQueueBalancerFactoryCollection();
-                keyedFactories.AddService(QueueBalancerName, new QueueBalancerFactory());
-                services.AddSingleton<IKeyedServiceCollection<string, IStreamQueueBalancerFactory>>(keyedFactories);
-                //ad an empty bag for keyed StreamQueueMapper for later use
-                services.AddSingleton<IKeyedServiceCollection<string, IStreamQueueMapper>>(new KeyedStreamQueueMapperCollection());
+                services.AddTransient<LeaseBasedQueueBalancer>();
                 return services.BuildServiceProvider();
             }
         }

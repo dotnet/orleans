@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 ProviderSettings.WriteDataGeneratingConfig(settings);
 
                 // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, BuiltInStreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
                 // register stream provider
                 config.Globals.RegisterStreamProvider<EHStreamProviderWithCreatedCacheList>(StreamProviderName, settings);
