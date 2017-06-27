@@ -214,7 +214,7 @@ namespace TestServiceFabric
 
         private class MockStatusListener : ISiloStatusListener
         {
-            private AutoResetEvent versionUpdated = new AutoResetEvent(false);
+            private readonly AutoResetEvent versionUpdated = new AutoResetEvent(false);
             public Dictionary<SiloAddress, SiloStatus> Silos { get; } = new Dictionary<SiloAddress, SiloStatus>();
             public List<Tuple<SiloAddress, SiloStatus>> Notifications { get; } = new List<Tuple<SiloAddress, SiloStatus>>();
             private int Version => this.Notifications.Count;
@@ -269,18 +269,12 @@ namespace TestServiceFabric
             public Task Refresh()
             {
                 this.RefreshCalled++;
-                return Task.FromResult(0);
+                return Task.CompletedTask;
             }
 
             public void Notify(FabricSiloInfo[] update)
             {
                 foreach (var handler in this.Handlers) handler.OnUpdate(update);
-            }
-
-            public void Reset()
-            {
-                this.Handlers.Clear();
-                this.RefreshCalled = 0;
             }
         }
     }

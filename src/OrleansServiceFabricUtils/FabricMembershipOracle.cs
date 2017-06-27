@@ -212,7 +212,7 @@ namespace Microsoft.Orleans.ServiceFabric
             this.fabricServiceSiloResolver.Subscribe(this);
             this.RefreshAsync().Ignore();
             this.UpdateStatus(SiloStatus.Joining);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -221,7 +221,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public Task BecomeActive()
         {
             this.UpdateStatus(SiloStatus.Active);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -230,7 +230,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public Task ShutDown()
         {
             this.UpdateStatus(SiloStatus.ShuttingDown);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -239,7 +239,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public Task Stop()
         {
             this.UpdateStatus(SiloStatus.Stopping);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -249,7 +249,7 @@ namespace Microsoft.Orleans.ServiceFabric
         {
             this.UpdateStatus(SiloStatus.Dead);
             this.StopInternal();
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
