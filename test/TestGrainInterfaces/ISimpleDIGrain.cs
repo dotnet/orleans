@@ -13,5 +13,8 @@ namespace UnitTests.GrainInterfaces
     public interface IDIGrainWithInjectedServices : ISimpleDIGrain
     {
         Task<long> GetGrainFactoryId();
+        Task<string> GetInjectedSingletonServiceValue();
+        Task<string> GetInjectedScopedServiceValue();
+        Task AssertCanResolveSameServiceInstances();
     }
 }

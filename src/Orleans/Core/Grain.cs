@@ -1,5 +1,3 @@
-//#define REREAD_STATE_AFTER_WRITE_FAILED
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -39,7 +37,7 @@ namespace Orleans
         /// </summary>
         protected IServiceProvider ServiceProvider 
         {
-            get { return Runtime?.ServiceProvider; }
+            get { return Data.ServiceProvider ?? Runtime?.ServiceProvider; }
         }
 
         internal IGrainIdentity Identity;

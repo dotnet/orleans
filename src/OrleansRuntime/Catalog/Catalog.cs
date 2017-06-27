@@ -1243,15 +1243,24 @@ namespace Orleans.Runtime
                     {
                         logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget2, String.Format("UnregisterMessageTarget failed on {0}.", activationData), exc);
                     }
+
+                    // IMPORTANT: no more awaits and .Ignore after that point.
+
+                    // Just use this opportunity to invalidate local Cache Entry as well. 
+                    // If this silo is not the grain directory partition for this grain, it may have it in its cache.
                     try
                     {
-                        // IMPORTANT: no more awaits and .Ignore after that point.
 
-                        // Just use this opportunity to invalidate local Cache Entry as well. 
-                        // If this silo is not the grain directory partition for this grain, it may have it in its cache.
                         directory.InvalidateCacheEntry(activationData.Address);
 
                         RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
+                    }
+                    try
+                    {
                         if (grainInstance != null)
                         {
                             lock (activationData)
@@ -1259,10 +1268,12 @@ namespace Orleans.Runtime
                                 grainCreator.Release(activationData, grainInstance);
                             }
                         }
+
+                        activationData.Dispose();
                     }
                     catch (Exception exc)
                     {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
+                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Releasing of the grain instance and scope failed on {0}.", activationData), exc);
                     }
                 }
                 // step 5 - Resolve any waiting TaskCompletionSource
