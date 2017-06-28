@@ -57,36 +57,15 @@ namespace Orleans.Runtime.Placement
             return result ?? defaultActivationSelector;
         }
 
-        public bool TrySelectActivationSynchronously(
+        public async Task<PlacementResult> SelectOrAddActivation(
                 ActivationAddress sendingAddress,
                 PlacementTarget targetGrain,
                 IPlacementRuntime context,
-                PlacementStrategy strategy,
-                out PlacementResult placementResult)
+                PlacementStrategy strategy)
         {
             if (targetGrain.IsClient)
             {
-                return clientObserversPlacementDirector.TrySelectActivationSynchronously(
-                    strategy, 
-                    (GrainId) targetGrain.GrainIdentity, 
-                    context, 
-                    out placementResult);
-            }
-
-            var actualStrategy = strategy ?? defaultPlacementStrategy;
-            var director = ResolveSelector(actualStrategy);
-            return director.TrySelectActivationSynchronously(strategy, (GrainId)targetGrain.GrainIdentity, context, out placementResult);
-        }
-
-        public async Task<PlacementResult> SelectOrAddActivation(
-            ActivationAddress sendingAddress,
-            PlacementTarget targetGrain,
-            IPlacementRuntime context,
-            PlacementStrategy strategy)
-        {
-            if (targetGrain.IsClient)
-            {
-                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
+                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, (GrainId) targetGrain.GrainIdentity, context);
                 if (res == null)
                 {
                     throw new ClientNotAvailableException(targetGrain.GrainIdentity);
@@ -95,11 +74,19 @@ namespace Orleans.Runtime.Placement
             }
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;
-            var director = ResolveSelector(actualStrategy);
-            var result = await director.OnSelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
+            var result = await SelectActivation((GrainId) targetGrain.GrainIdentity, context, actualStrategy);
             if (result != null) return result;
 
             return await AddActivation(targetGrain, context, actualStrategy);
+        }
+
+        private Task<PlacementResult> SelectActivation(
+            GrainId targetGrain, 
+            IPlacementRuntime context, 
+            PlacementStrategy strategy)
+        {
+            var director = ResolveSelector(strategy);
+            return director.OnSelectActivation(strategy, targetGrain, context);
         }
 
         private async Task<PlacementResult> AddActivation(

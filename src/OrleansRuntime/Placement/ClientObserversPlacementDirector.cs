@@ -14,9 +14,10 @@ namespace Orleans.Runtime.Placement
     {
         public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            // no need to check if we can find an activation for this client in the cache or local directory partition
-            // as TrySelectActivationSynchronously which checks for that should have been called before 
+            // first, check if we can find an activation for this client in the cache or local directory partition
             AddressesAndTag addresses;
+            if (context.FastLookup(target, out addresses))
+                return ChooseRandomActivation(addresses.Addresses, context);
 
             // we need to look up the directory entry for this grain on a remote silo
             switch (target.Category)

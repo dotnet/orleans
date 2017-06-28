@@ -12,24 +12,6 @@ namespace Orleans.Runtime.Placement
         public Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            return Task.FromResult(SelectActivationCore(strategy, target, context));
-        }
-
-        public bool TrySelectActivationSynchronously(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
-        {
-            placementResult = SelectActivationCore(strategy, target, context);
-            return placementResult != null;
-        }
-
-
-        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
-        {
-            return Task.FromResult(context.LocalSilo);
-        }
-
-        private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
-        {
             if (target.IsClient)
                 throw new InvalidOperationException("Cannot use StatelessWorkerStrategy to route messages to client grains.");
 
@@ -39,7 +21,7 @@ namespace Orleans.Runtime.Placement
             List<ActivationData> local;
 
             if (!context.LocalLookup(target, out local) || local.Count == 0)
-                return null;
+                return Task.FromResult((PlacementResult)null);
 
             var placement = (StatelessWorkerPlacement)strategy;
 
@@ -49,16 +31,21 @@ namespace Orleans.Runtime.Placement
                 if (!context.TryGetActivationData(activation.ActivationId, out info) ||
                     info.State != ActivationState.Valid || !info.IsInactive) continue;
 
-                return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId));
+                return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId)));
             }
 
             if (local.Count >= placement.MaxLocal)
             {
                 var id = local[local.Count == 1 ? 0 : random.Next(local.Count)].ActivationId;
-                return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, id));
+                return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, id)));
             }
 
-            return null;
+            return Task.FromResult((PlacementResult)null);
+        }
+
+        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        {
+            return Task.FromResult(context.LocalSilo);
         }
 
         internal static ActivationData PickRandom(List<ActivationData> local)

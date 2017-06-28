@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
@@ -10,13 +9,10 @@ namespace Orleans.Runtime.Placement
     {
         Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context);
-
-        bool TrySelectActivationSynchronously(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult);
     }
 
     /// <summary>
-    /// Interface for activation selectors implementing the specified strategy.
+    /// Interface for activation selectorsimplementing the specified strategy.
     /// </summary>
     /// <typeparam name="TStrategy">The placement strategy which this selector implements.</typeparam>
     internal interface IActivationSelector<TStrategy> : IActivationSelector

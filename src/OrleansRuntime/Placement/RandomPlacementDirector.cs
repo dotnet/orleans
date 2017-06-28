@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.Placement
 {
@@ -12,22 +11,8 @@ namespace Orleans.Runtime.Placement
         public virtual async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            List<ActivationAddress> places = (await context.FullLookup(target)).Addresses;
+            List<ActivationAddress> places = (await context.Lookup(target)).Addresses;
             return ChooseRandomActivation(places, context);
-        }
-
-        public bool TrySelectActivationSynchronously(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
-        {
-            AddressesAndTag addressesAndTag;
-            if (context.FastLookup(target, out addressesAndTag))
-            {
-                placementResult = ChooseRandomActivation(addressesAndTag.Addresses, context);
-                return true;
-            }
-
-            placementResult = null;
-            return false;
         }
 
         protected PlacementResult ChooseRandomActivation(List<ActivationAddress> places, IPlacementRuntime context)
