@@ -8,6 +8,8 @@ namespace Orleans.Streams
     /// <summary>
     /// The stream queue balancer is responsible for load balancing queues across all other related queue balancers.  It
     /// notifies any listeners (<code>IStreamQueueBalanceListener</code>) of changes to the distribution of queues.
+    /// Method GetMyQueues, SubscribeToQueueDistributionChangeEvents, and UnSubscribeFromQueueDistributionChangeEvents will 
+    /// likely be called in the IStreamQueueBalanceListener's thread so they need to be thread safe
     /// </summary>
     public interface IStreamQueueBalancer
     {

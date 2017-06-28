@@ -12,12 +12,13 @@ namespace Orleans.Streams
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
-        internal ConsistentRingQueueBalancer(IConsistentRingProviderForGrains ringProvider)
+        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
         {
-            if (ringProvider == null)
+            if (streamProviderRuntime == null)
             {
-                throw new ArgumentNullException("ringProvider");
+                throw new ArgumentNullException("streamProviderRuntime");
             }
+            var ringProvider = streamProviderRuntime.GetConsistentRingProvider(0, 1);
             myRange = ringProvider.GetMyRange();
             ringProvider.SubscribeToRangeChangeEvents(this);
         }

@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Streams
 {
@@ -12,8 +13,8 @@ namespace Orleans.Streams
     {
         public StaticClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IDeploymentConfiguration deploymentConfig)
-            : base(siloStatusOracle, deploymentConfig, true)
+            ClusterConfiguration clusterConfiguration)
+            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), true)
         { }
     }
 
@@ -21,8 +22,8 @@ namespace Orleans.Streams
     {
         public DynamicClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IDeploymentConfiguration deploymentConfig)
-            : base(siloStatusOracle, deploymentConfig, false)
+            ClusterConfiguration clusterConfiguration)
+            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), false)
         { }
     }
 
@@ -30,8 +31,8 @@ namespace Orleans.Streams
     {
         public DynamicAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IDeploymentConfiguration deploymentConfig)
-            : base(siloStatusOracle, deploymentConfig, false)
+            IServiceProvider serviceProvider)
+            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), false)
         { }
     }
 
@@ -39,9 +40,18 @@ namespace Orleans.Streams
     {
         public StaticAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IDeploymentConfiguration deploymentConfig)
-            : base(siloStatusOracle, deploymentConfig, true)
+            IServiceProvider serviceProvider)
+            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), true)
         { }
+    }
+
+    internal static class DeploymentBasedQueueBalancerUtils
+    {
+        public static IDeploymentConfiguration CreateDeploymentConfigForAzure(IServiceProvider svp)
+        {
+            Logger logger = LogManager.GetLogger(typeof(DeploymentBasedQueueBalancer).Name, LoggerType.Runtime);
+            return AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, svp);
+        }
     }
 
     /// <summary>
@@ -107,7 +117,7 @@ namespace Orleans.Streams
             NotifyAfterStart().Ignore();
             return Task.CompletedTask;
         }
-
+        
         private async Task NotifyAfterStart()
         {
             await Task.Delay(siloMaturityPeriod);
