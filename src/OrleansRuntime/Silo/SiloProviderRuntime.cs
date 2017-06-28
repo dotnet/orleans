@@ -7,6 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Providers
 {
@@ -108,14 +109,14 @@ namespace Orleans.Runtime.Providers
         {
             return new EquallyDividedRangeRingProvider(this.consistentRingProvider, mySubRangeIndex, numSubRanges);
         }
-        
+
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config)
         {
-            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(config.BalancerType, streamProviderName, this.siloStatusOracle, this.siloDetails.ClusterConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
+            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);
@@ -124,6 +125,25 @@ namespace Orleans.Runtime.Providers
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
             return pullingAgentManager;
+        }
+
+        private IStreamQueueBalancer CreateQueueBalancer(PersistentStreamProviderConfig config, string streamProviderName)
+        {
+            //default type is ConsistentRingBalancer
+            if (config.BalancerType == null)
+                config.BalancerType = StreamQueueBalancerType.ConsistentRingBalancer;
+            try
+            {
+                var balancer = this.ServiceProvider.GetRequiredService(config.BalancerType) as IStreamQueueBalancer;
+                if (balancer == null)
+                    throw new ArgumentOutOfRangeException("balancerType", $"Configured BalancerType isn't a type which implements IStreamQueueBalancer. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}");
+                return balancer;
+            }
+            catch (Exception e)
+            {
+                string error = $"Unsupported balancerType for stream provider. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}, Exception: {e}";
+                throw new ArgumentOutOfRangeException("balancerType", error);
+            }
         }
 
         /// <inheritdoc />

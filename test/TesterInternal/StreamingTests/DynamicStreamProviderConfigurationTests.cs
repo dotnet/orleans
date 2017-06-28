@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
                 GeneratorConfig.WriteProperties(DefaultStreamProviderSettings);
 
                 // add queue balancer setting
-                DefaultStreamProviderSettings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+                DefaultStreamProviderSettings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
 
                 // add pub/sub settting
                 DefaultStreamProviderSettings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());

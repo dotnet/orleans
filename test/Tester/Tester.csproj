@@ -87,6 +87,10 @@
     <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\GeneratedStreamRecoveryTests.cs" />
+    <Compile Include="StreamingTests\PlugableQueueBalancerTests\LeaseBasedQueueBalancer.cs" />
+    <Compile Include="StreamingTests\PlugableQueueBalancerTests\LeaseManagerGrain.cs" />
+    <Compile Include="StreamingTests\PlugableQueueBalancerTests\PluggableQueueBalancerTestBase.cs" />
+    <Compile Include="StreamingTests\PlugableQueueBalancerTests\PluggableQueueBalancerTestsWithMemoryStreamProvider.cs" />
     <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubcribeTests.cs" />
     <Compile Include="StreamingTests\MemoryStreamProviderClientTests.cs" />
     <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubscribeTestsWithDynamicProviderConfiguration.cs" />

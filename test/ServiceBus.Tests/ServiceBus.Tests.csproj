@@ -130,6 +130,7 @@
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="EvictionStrategyTests\EHPurgeLogicTests.cs" />
     <Compile Include="EvictionStrategyTests\TestMocks.cs" />
+    <Compile Include="PluggableQueueBalancerTests.cs" />
     <Compile Include="SlowConsumingTests\EHSlowConsumingTests.cs" />
     <Compile Include="SlowConsumingTests\EventHubStreamProviderSettingsTests.cs" />
     <Compile Include="StatisticMonitorTests\CacheMonitorForTesting.cs" />
