@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans;
@@ -19,6 +18,9 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();
         private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> subscribers =
             new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>();
+
+        private readonly AutoResetEvent notificationEvent = new AutoResetEvent(false);
+        private readonly BlockingCollection<StatusChangeNotification> notifications = new BlockingCollection<StatusChangeNotification>();
         private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(30);
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly GlobalConfiguration globalConfig;
@@ -36,7 +38,6 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private Timer timer;
         private DateTime lastRefreshTime;
-        private TaskScheduler scheduler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricMembershipOracle"/> class.
@@ -109,8 +110,10 @@ namespace Microsoft.Orleans.ServiceFabric
                 }
 
                 this.multiClusterSilosCache = result;
-                return this.multiClusterSilosCache;
             }
+
+            this.log.Info($"Local cluster multi-cluster gateways: {string.Join(", ", result)}");
+            return result;
         }
 
         /// <summary>
@@ -194,7 +197,13 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         public Task Start()
         {
-            this.scheduler = TaskScheduler.Current;
+            // Start processing notifications.
+            Task.Factory.StartNew(
+                this.ProcessNotifications,
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                TaskScheduler.Current);
+
             this.timer = new Timer(
                 self => ((FabricMembershipOracle)self).RefreshAsync().Ignore(),
                 this,
@@ -203,7 +212,7 @@ namespace Microsoft.Orleans.ServiceFabric
             this.fabricServiceSiloResolver.Subscribe(this);
             this.RefreshAsync().Ignore();
             this.UpdateStatus(SiloStatus.Joining);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -212,7 +221,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public Task BecomeActive()
         {
             this.UpdateStatus(SiloStatus.Active);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -220,9 +229,8 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         public Task ShutDown()
         {
-            this.StopInternal();
             this.UpdateStatus(SiloStatus.ShuttingDown);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -230,9 +238,8 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         public Task Stop()
         {
-            this.StopInternal();
             this.UpdateStatus(SiloStatus.Stopping);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -240,9 +247,9 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         public Task KillMyself()
         {
-            this.fabricServiceSiloResolver.Unsubscribe(this);
             this.UpdateStatus(SiloStatus.Dead);
-            return Task.FromResult(0);
+            this.StopInternal();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -287,7 +294,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <param name="partitions">The updated set of partitions.</param>
         public void OnUpdate(FabricSiloInfo[] partitions)
         {
-            var changes = default(List<Tuple<SiloAddress, SiloStatus>>);
+            var hasChanges = false;
             lock (this.updateLock)
             {
                 foreach (var updatedSilo in partitions)
@@ -310,12 +317,15 @@ namespace Microsoft.Orleans.ServiceFabric
                     else
                     {
                         // Add the new silo.
-                        if (changes == null) changes = new List<Tuple<SiloAddress, SiloStatus>>();
-                        changes.Add(Tuple.Create(updatedSilo.SiloAddress, SiloStatus.Active));
-                        this.silos[updatedSilo.SiloAddress] = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
+                        this.notifications.Add(new StatusChangeNotification(updatedSilo.SiloAddress, SiloStatus.Active));
+                        var siloEntry = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
                         {
                             Refreshed = true
                         };
+                        this.silos[updatedSilo.SiloAddress] = siloEntry;
+                        hasChanges = true;
+
+                        this.log.Info($"Silo {updatedSilo.SiloAddress} ({siloEntry.Name}) transitioned from {SiloStatus.None} to {siloEntry.Status}.");
                     }
                 }
 
@@ -326,12 +336,13 @@ namespace Microsoft.Orleans.ServiceFabric
                     if (silo.Key.Equals(this.SiloAddress)) continue;
 
                     // Silos which were not included in the update must be dead.
-                    if (!silo.Value.Refreshed)
+                    if (!silo.Value.Refreshed && silo.Value.Status != SiloStatus.Dead)
                     {
                         // Mark the silo as dead and record it so that we can notify subscribers.
+                        this.log.Info($"Silo {silo.Key} ({silo.Value.Name}) transitioned from {silo.Value.Status} to {SiloStatus.Dead}.");
                         silo.Value.Status = SiloStatus.Dead;
-                        if (changes == null) changes = new List<Tuple<SiloAddress, SiloStatus>>();
-                        changes.Add(Tuple.Create(silo.Key, SiloStatus.Dead));
+                        this.notifications.Add(new StatusChangeNotification(silo.Key, SiloStatus.Dead));
+                        hasChanges = true;
                     }
 
                     // Reset the refresh flag.
@@ -340,19 +351,15 @@ namespace Microsoft.Orleans.ServiceFabric
             }
 
             // If anything was updated, clear the cache before notifying clients.
-            if (changes != null)
+            if (hasChanges)
             {
                 // Clear the caches.
                 this.ClearCaches();
 
-                // If any silos were added or removed, notify subscribers of the new status.
-                var siloStatusListeners = this.subscribers.Values.ToList();
-                foreach (var change in changes)
-                {
-                    var silo = change.Item1;
-                    var status = change.Item2;
-                    this.NotifySubscribers(silo, status, siloStatusListeners);
-                }
+                this.log.Info($"Current cluster members: {string.Join(", ", this.GetApproximateSiloStatuses(true))}");
+
+                // Notify all subscribers.
+                this.notificationEvent.Set();
             }
         }
 
@@ -366,25 +373,30 @@ namespace Microsoft.Orleans.ServiceFabric
             this.multiClusterSilosCache = null;
         }
 
-        private void NotifySubscribers(SiloAddress address, SiloStatus newStatus, List<ISiloStatusListener> listeners)
+        private async Task ProcessNotifications()
         {
-            Task.Factory.StartNew(() =>
+            while (!this.notifications.IsAddingCompleted)
             {
-                foreach (var subscriber in listeners)
+                await this.notificationEvent.WaitAsync(TimeSpan.FromMinutes(1));
+                StatusChangeNotification notification;
+                while (this.notifications.TryTake(out notification))
                 {
-                    try
+                    foreach (var subscriber in this.subscribers.Values)
                     {
-                        subscriber.SiloStatusChangeNotification(address, newStatus);
-                    }
-                    catch (Exception exception)
-                    {
-                        this.log.Warn(
-                            (int) ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
-                            "Exception notifying subscriber.",
-                            exception);
+                        try
+                        {
+                            subscriber.SiloStatusChangeNotification(notification.Silo, notification.Status);
+                        }
+                        catch (Exception exception)
+                        {
+                            this.log.Warn(
+                                (int)ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
+                                "Exception notifying subscriber.",
+                                exception);
+                        }
                     }
                 }
-            }, CancellationToken.None, TaskCreationOptions.None, this.scheduler);
+            }
         }
 
         private async Task RefreshAsync()
@@ -443,6 +455,20 @@ namespace Microsoft.Orleans.ServiceFabric
             this.timer?.Dispose();
             this.timer = null;
             this.fabricServiceSiloResolver.Unsubscribe(this);
+            this.notifications.CompleteAdding();
+            this.notificationEvent.Set();
+        }
+
+        private struct StatusChangeNotification
+        {
+            public StatusChangeNotification(SiloAddress silo, SiloStatus status)
+            {
+                this.Silo = silo;
+                this.Status = status;
+            }
+
+            public SiloAddress Silo { get; }
+            public SiloStatus Status { get; }
         }
 
         private class SiloEntry

@@ -115,7 +115,7 @@ namespace Microsoft.Orleans.ServiceFabric
         public Task CloseAsync(CancellationToken cancellationToken)
         {
             this.SiloHost.Stop();
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         /// <summary>
