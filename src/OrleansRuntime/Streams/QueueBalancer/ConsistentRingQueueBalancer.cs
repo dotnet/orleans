@@ -9,17 +9,24 @@ namespace Orleans.Streams
     internal class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
     {
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
-        private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
+        private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
-        public ConsistentRingQueueBalancer(
-            IConsistentRingProviderForGrains ringProvider,
-            IStreamQueueMapper queueMapper)
+        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
         {
-            if (ringProvider == null)
+            if (streamProviderRuntime == null)
             {
-                throw new ArgumentNullException("ringProvider");
+                throw new ArgumentNullException("streamProviderRuntime");
             }
+            var ringProvider = streamProviderRuntime.GetConsistentRingProvider(0, 1);
+            myRange = ringProvider.GetMyRange();
+            ringProvider.SubscribeToRangeChangeEvents(this);
+        }
+
+        public Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
+        {
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
@@ -28,11 +35,8 @@ namespace Orleans.Streams
             {
                 throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
             }
-
             streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
-            myRange = ringProvider.GetMyRange();
-
-            ringProvider.SubscribeToRangeChangeEvents(this);
+            return Task.CompletedTask;
         }
 
         public Task RangeChangeNotification(IRingRange old, IRingRange now)
@@ -71,7 +75,7 @@ namespace Orleans.Streams
             }
         }
 
-        public bool UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {

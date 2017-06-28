@@ -273,7 +273,6 @@
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
     <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
-    <Compile Include="Streams\PersistentStreams\StreamQueueBalancerType.cs" />
     <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />
     <Compile Include="Streams\Predicates\IStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\Core\IAsyncObservable.cs" />

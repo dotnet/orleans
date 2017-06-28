@@ -5,9 +5,55 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Streams
 {
+    internal class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public StaticClusterConfigDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            ClusterConfiguration clusterConfiguration)
+            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), true)
+        { }
+    }
+
+    internal class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public DynamicClusterConfigDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            ClusterConfiguration clusterConfiguration)
+            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), false)
+        { }
+    }
+
+    internal class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public DynamicAzureDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IServiceProvider serviceProvider)
+            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), false)
+        { }
+    }
+
+    internal class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    {
+        public StaticAzureDeploymentBalancer(
+            ISiloStatusOracle siloStatusOracle,
+            IServiceProvider serviceProvider)
+            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), true)
+        { }
+    }
+
+    internal static class DeploymentBasedQueueBalancerUtils
+    {
+        public static IDeploymentConfiguration CreateDeploymentConfigForAzure(IServiceProvider svp)
+        {
+            Logger logger = LogManager.GetLogger(typeof(DeploymentBasedQueueBalancer).Name, LoggerType.Runtime);
+            return AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, svp);
+        }
+    }
+
     /// <summary>
     /// DeploymentBasedQueueBalancer is a stream queue balancer that uses deployment information to
     /// help balance queue distribution.
@@ -17,21 +63,18 @@ namespace Orleans.Streams
     /// </summary>
     internal class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
     {
-        private readonly TimeSpan siloMaturityPeriod;
+        private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
-        private readonly ReadOnlyCollection<QueueId> allQueues;
+        private ReadOnlyCollection<QueueId> allQueues;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private readonly bool isFixed;
         private bool isStarting;
 
-        
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
-            IStreamQueueMapper queueMapper,
-            TimeSpan maturityPeriod,
             bool isFixed)
         {
             if (siloStatusOracle == null)
@@ -42,18 +85,12 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("deploymentConfig");
             }
-            if (queueMapper == null)
-            {
-                throw new ArgumentNullException("queueMapper");
-            }
 
             this.siloStatusOracle = siloStatusOracle;
             this.deploymentConfig = deploymentConfig;
-            allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
             queueBalanceListeners = new List<IStreamQueueBalanceListener>();
             immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.isFixed = isFixed;
-            siloMaturityPeriod = maturityPeriod;
             isStarting = true;
 
             // register for notification of changes to silo status for any silo in the cluster
@@ -65,10 +102,22 @@ namespace Orleans.Streams
             {
                 immatureSilos[silo] = false;     // record as mature
             }
-
-            NotifyAfterStart().Ignore();
         }
 
+        public Task Initialize(string strProviderName,
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
+        {
+            if (queueMapper == null)
+            {
+                throw new ArgumentNullException("queueMapper");
+            }
+            this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
+            this.siloMaturityPeriod = siloMaturityPeriod;
+            NotifyAfterStart().Ignore();
+            return Task.CompletedTask;
+        }
+        
         private async Task NotifyAfterStart()
         {
             await Task.Delay(siloMaturityPeriod);
@@ -163,7 +212,7 @@ namespace Orleans.Streams
             }
         }
 
-        public bool UnSubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)
             {
