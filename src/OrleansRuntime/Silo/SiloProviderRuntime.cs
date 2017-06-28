@@ -123,7 +123,7 @@ namespace Orleans.Runtime.Providers
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.
-            await pullingAgentManager.Initialize(queueAdapter.AsImmutable(), adapterFactory.GetStreamQueueMapper().AsImmutable());
+            await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
             return pullingAgentManager;
         }
 

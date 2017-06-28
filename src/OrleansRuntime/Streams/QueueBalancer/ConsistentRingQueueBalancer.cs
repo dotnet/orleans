@@ -6,13 +6,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
+    internal class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
     {
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
-        public ConsistentRingQueueBalancer(IConsistentRingProviderForGrains ringProvider)
+        internal ConsistentRingQueueBalancer(IConsistentRingProviderForGrains ringProvider)
         {
             if (ringProvider == null)
             {

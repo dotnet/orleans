@@ -106,8 +106,8 @@ namespace Orleans.Streams
         public TimeSpan StreamInactivityPeriod { get; set; } = DEFAULT_STREAM_INACTIVITY_PERIOD;
 
         /// <summary>
-        /// The queue balancer type for your stream provider. If you are using a custom queue balancer by injecting IStreamQueueBalancerFactory as a named service in DI,
-        /// you should use the same name in BalancerType as the name for your IStreamQueueBalancerFactory
+        /// The queue balancer type for your stream provider. If you are using a custom queue balancer by injecting IStreamQueueBalancer as a transient service into DI,
+        /// you should use your custom balancer's type
         /// </summary>
         public Type BalancerType { get; set; } = DEFAULT_STREAM_QUEUE_BALANCER_TYPE;
         public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;

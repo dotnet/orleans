@@ -5,7 +5,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Interface for accessing the deployment configuration.
     /// </summary>
-    public interface IDeploymentConfiguration
+    internal interface IDeploymentConfiguration
     {
         /// <summary>
         /// Get the silo instance names for all configured silos

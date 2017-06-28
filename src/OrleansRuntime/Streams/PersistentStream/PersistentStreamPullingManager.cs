@@ -76,7 +76,7 @@ namespace Orleans.Streams
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
         }
 
-        public async Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IStreamQueueMapper> queueMapper)
+        public async Task Initialize(Immutable<IQueueAdapter> qAdapter)
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
 
@@ -84,7 +84,7 @@ namespace Orleans.Streams
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-            await this.queueBalancer.Initialize(this.streamProviderName, queueMapper.Value, config.SiloMaturityPeriod);
+            await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var meAsQueueBalanceListener = this.AsReference<IStreamQueueBalanceListener>();
             queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
 

@@ -8,7 +8,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    internal class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public StaticClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
@@ -17,7 +17,7 @@ namespace Orleans.Streams
         { }
     }
 
-    public class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    internal class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public DynamicClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
@@ -26,7 +26,7 @@ namespace Orleans.Streams
         { }
     }
 
-    public class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    internal class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public DynamicAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
@@ -35,7 +35,7 @@ namespace Orleans.Streams
         { }
     }
 
-    public class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    internal class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public StaticAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
@@ -51,7 +51,7 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    public class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
+    internal class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
     {
         private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
