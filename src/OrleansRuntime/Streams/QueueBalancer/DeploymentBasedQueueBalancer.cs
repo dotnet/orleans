@@ -92,8 +92,6 @@ namespace Orleans.Streams
             {
                 immatureSilos[silo] = false;     // record as mature
             }
-
-            NotifyAfterStart().Ignore();
         }
 
         public Task Initialize(string strProviderName,
@@ -106,6 +104,7 @@ namespace Orleans.Streams
             }
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
             this.siloMaturityPeriod = siloMaturityPeriod;
+            NotifyAfterStart().Ignore();
             return Task.CompletedTask;
         }
 
