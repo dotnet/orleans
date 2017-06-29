@@ -389,6 +389,7 @@ namespace Orleans.TestingHost
         public void KillClient()
         {
             this.InternalClient?.Abort();
+            this.InternalClient = null;
         }
 
         /// <summary>
