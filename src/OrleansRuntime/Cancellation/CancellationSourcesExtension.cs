@@ -11,12 +11,12 @@ namespace Orleans.Runtime
     /// </summary>
     internal class CancellationSourcesExtension : ICancellationSourcesExtension
     {
-        private readonly static Lazy<Logger> _logger = new Lazy<Logger>(() =>
+        private static readonly Lazy<Logger> _logger = new Lazy<Logger>(() =>
             LogManager.GetLogger(nameof(CancellationSourcesExtension), LoggerType.Runtime));
 
         private readonly Interner<Guid, GrainCancellationToken> _cancellationTokens;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
-        private static readonly int _defaultInternerCollectionSize = 31;
+        private const int _defaultInternerCollectionSize = 31;
 
 
         public CancellationSourcesExtension()
@@ -26,12 +26,12 @@ namespace Orleans.Runtime
                  _cleanupFrequency);
         }
 
-        public Task CancelRemoteToken(GrainCancellationToken token)
+        public Task CancelRemoteToken(Guid tokenId)
         {
             GrainCancellationToken gct;
-            if (!_cancellationTokens.TryFind(token.Id, out gct))
+            if (!_cancellationTokens.TryFind(tokenId, out gct))
             {
-                _logger.Value.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {token.Id} was not found");
+                _logger.Value.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {tokenId} was not found");
                 return Task.CompletedTask;
             }
 
