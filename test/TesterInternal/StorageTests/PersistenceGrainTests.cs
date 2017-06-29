@@ -735,6 +735,36 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val);
         }
 
+        /// <summary>
+        /// Tests that deactivations caused by an <see cref="InconsistentStateException"/> only affect the grain which
+        /// the exception originated from.
+        /// </summary>
+        /// <returns></returns>
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_Provider_InconsistentStateException_DeactivatesOnlyCurrentGrain()
+        {
+            var target = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
+            var proxy = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
+            
+            // Record the original activation ids.
+            var targetActivationId = await target.GetActivationId();
+            var proxyActivationId = await proxy.GetActivationId();
+
+            // Cause an inconsistent state exception.
+            this.SetErrorInjection(ErrorInjectorProviderName, new ErrorInjectionBehavior
+            {
+                ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
+                ExceptionType = typeof(InconsistentStateException)
+            });
+            this.CheckStorageProviderErrors(() => proxy.DoWrite(63, target), typeof(InconsistentStateException));
+
+            // The target should have been deactivated by the exception.
+            Assert.NotEqual(targetActivationId, await target.GetActivationId());
+
+            // The grain which called the target grain should not have been deactivated.
+            Assert.Equal(proxyActivationId, await proxy.GetActivationId());
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterWrite()
         {

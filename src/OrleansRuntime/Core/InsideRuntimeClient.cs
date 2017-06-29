@@ -335,11 +335,20 @@ namespace Orleans.Runtime
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
-                    if (exc1 is InconsistentStateException && target is Grain)
+                    // If a grain allowed an inconsistent state exception to escape and the exception originated from
+                    // this activation, then deactivate it.
+                    var ise = exc1 as InconsistentStateException;
+                    if (ise != null && ise.IsSourceActivation)
                     {
-                        var activation = ((Grain)target).Data;
-                        invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
-                        this.DeactivateOnIdle(activation.ActivationId);
+                        // Mark the exception so that it doesn't deactivate any other activations.
+                        ise.IsSourceActivation = false;
+
+                        var activation = (target as Grain)?.Data;
+                        if (activation != null)
+                        {
+                            invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                            this.DeactivateOnIdle(activation.ActivationId);
+                        }
                     }
 
                     if (message.Direction != Message.Directions.OneWay)
