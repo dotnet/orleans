@@ -16,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\src\OrleansProviders\**\*.cs" Exclude="..\..\..\src\OrleansProviders\bin\**\*.cs" />
+    <Compile Include="..\..\..\src\OrleansProviders\**\*.cs" Exclude="..\..\..\src\OrleansProviders\obj\**\*.cs;..\..\..\src\OrleansProviders\bin\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
