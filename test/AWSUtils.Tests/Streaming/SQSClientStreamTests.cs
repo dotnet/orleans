@@ -1,4 +1,5 @@
-﻿using Orleans.Providers.Streams;
+﻿using AWSUtils.Tests.StorageTests;
+using Orleans.Providers.Streams;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -17,7 +18,7 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private const string StorageConnectionString = "";
+        private string StorageConnectionString = AWSTestConstants.DefaultSQSConnectionString;
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
@@ -30,6 +31,11 @@ namespace AWSUtils.Tests.Streaming
         
         public override TestCluster CreateTestCluster()
         {
+            if (!AWSTestConstants.IsSqsAvailable)
+            {
+                throw new SkipException("Empty connection string");
+            }
+
             var deploymentId = Guid.NewGuid().ToString();
             var streamConnectionString = new Dictionary<string, string>
                 {
@@ -56,7 +62,7 @@ namespace AWSUtils.Tests.Streaming
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StorageConnectionString).Wait();
         }
 
-        [Fact, TestCategory("AWS")]
+        [SkippableFact, TestCategory("AWS")]
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");

@@ -47,5 +47,6 @@ namespace AWSUtils.Tests.StorageTests
         public static string Service { get; set; } = "http://localhost:8000";
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
+        public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(DefaultSQSConnectionString);
     }
 }
