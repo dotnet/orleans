@@ -2,7 +2,7 @@
 setlocal
 
 SET CMDHOME=%~dp0.
-SET BUILD_FLAGS=/m /v:m /fl /flp:logfile=build.log;verbosity=detailed
+SET BUILD_FLAGS=/m:1 /v:m /fl /flp:logfile=build.log;verbosity=detailed
 
 :: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
 :: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
