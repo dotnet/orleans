@@ -18,7 +18,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="2.4.145" />
-    <PackageReference Include="Newtonsoft.Json" version="9.0.1" />
+    <PackageReference Include="Newtonsoft.Json" version="10.0.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
