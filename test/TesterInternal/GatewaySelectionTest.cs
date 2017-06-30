@@ -1,5 +1,4 @@
 ﻿//#define USE_SQL_SERVER
-#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -152,4 +151,3 @@ namespace UnitTests.MessageCenterTests
         }
     }
 }
-#endif
