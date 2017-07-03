@@ -40,9 +40,9 @@ namespace Orleans.Serialization
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-#if !NETSTANDARD_TODO
-                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+                TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
 
+#if !NETSTANDARD_TODO
                 // Types such as GrainReference need context during deserialization, so provide that context now.
                 Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
 #endif
@@ -73,9 +73,7 @@ namespace Orleans.Serialization
                 bool useFullAssemblyNames;
                 if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
                 {
-#if !NETSTANDARD_TODO
-                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
-#endif
+                    settings.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Full;
                 }
             }
 

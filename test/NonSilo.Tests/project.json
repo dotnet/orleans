@@ -1,6 +1,6 @@
 ﻿{
   "dependencies": {
-    "Newtonsoft.Json": "9.0.1"
+    "Newtonsoft.Json": "10.0.3"
   },
   "frameworks": {
     "net461": {}
