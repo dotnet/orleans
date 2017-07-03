@@ -1,5 +1,4 @@
-﻿#if !NETSTANDARD_TODO
-using Orleans.Runtime.Configuration;
+﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using UnitTests.MembershipTests;
@@ -20,7 +19,7 @@ namespace Consul.Tests
             ConsulTestUtils.EnsureConsul();
 
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT; ;
+            options.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
             options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansConsulUtils";
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
@@ -60,5 +59,3 @@ namespace Consul.Tests
         }
     }
 }
-
-#endif

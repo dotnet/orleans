@@ -34,6 +34,11 @@ namespace AWSUtils.Tests.Streaming
 
         public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
+            if (!AWSTestConstants.IsSqsAvailable)
+            {
+                throw new SkipException("Empty connection string");
+            }
+
             this.output = output;
             this.fixture = fixture;
             this.deploymentId = MakeDeploymentId();
@@ -44,7 +49,7 @@ namespace AWSUtils.Tests.Streaming
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString).Wait();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task SendAndReceiveFromSQS()
         {
             var properties = new Dictionary<string, string>
