@@ -45,6 +45,8 @@
       <package id="System.ComponentModel" version="4.3.0" targetFramework="net451" />
       <package id="System.Diagnostics.Debug" version="4.3.0" targetFramework="net451" />
       <package id="System.Globalization" version="4.3.0" targetFramework="net451" />
+      <package id="System.IO.Compression" version="4.3.0" targetFramework="net461" />
+      <package id="System.IO.FileSystem" version="4.3.0" targetFramework="net461" />
       <package id="System.Linq" version="4.3.0" targetFramework="net451" />
       <package id="System.Linq.Expressions" version="4.3.0" targetFramework="net451" />
       <package id="System.Reflection" version="4.3.0" targetFramework="net451" />
@@ -53,6 +55,7 @@
       <package id="System.Runtime.Extensions" version="4.3.0" targetFramework="net451" />
       <package id="System.Threading" version="4.3.0" targetFramework="net451" />
       <package id="System.Threading.Tasks" version="4.3.0" targetFramework="net451" />
+      <package id="System.ValueTuple" version="4.3.0" targetFramework="net451" />
     </packages>
   </WizardData>
 </VSTemplate>
