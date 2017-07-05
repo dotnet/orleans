@@ -5,41 +5,57 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
-### [1.5.0-rc]  (changes since 1.5.0-beta1)
+### [1.5.0]
 - Breaking changes
   - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
-  - Renamed the `Catalog.Activation.DuplicateActivations` counter to `Catalog.Activation.ConcurrentRegistrationAttempts` to more accurately reflect what it tracks and its benign nature #3130
-  - Upgraded `WindowsAzure.ServiceBus` package dependency to 4.1.0 #3127
+  - Automatically deactivate a grain if it bubbles up `InconsistentStateException` (thrown when there is an optimistic concurrency conflict when writing to storage) #2959
+  - Upgraded minimum framework dependency to .NET 4.6.1 #2945
+  - Support for non-static client via ClientBuilder (although static GrainClient still works but will be removed in a future version). You can now start many clients in the same process, even if you are inside a Silo #2822.
+    There are a few differences though:
+    - Several changes to SerializationManager, mainly to make it non-static #2592
+      - When deserializing a GrainReference from storage, you might need to re-bind it to the runtime by calling `grain.BindGrainReference(grainFactory)` on it or you would get `GrainReferenceNotBoundException` when attempting to use it #2738
+      - Removed `RegisterSerializerAttribute` (and corresponding static Register method for registering a custom serializer). If you were using that, please read https://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Serialization.html#writing-custom-serializers for alternative ways to register your custom serializer #2941
+  - Better serialization of `Type` values (but can cause compatibility issues if these were persisted by using the Serialziation Manager) #2952
+  - Providers are now constructed using Dependency Injection. The result is that custom providers must have a single public constructor with either no arguments or arguments which can all be injected, or they need to be explicitly registered in the ServiceCollection. #2721 #2980
   - Replaced `CacheSizeInMb` setting with `DataMaxAgeInCache` and `DataMinTimeInCache` in stream providers #3126
+  - Renamed the `Catalog.Activation.DuplicateActivations` counter to `Catalog.Activation.ConcurrentRegistrationAttempts` to more accurately reflect what it tracks and its benign nature #3130
+  - Change default stream subscription faulting to false in EventHub and Memory stream providers, as is in other providers #2974
   - Allow `IGrainWithGuidCompoundKey` as implicit subscription grain, and sets the stream namespace as the grain key extension (subtle breaking change: previous to 1.5 `IGrainWithGuidCompoundKey` wasn't technically supported, but if you did use it, the grain key extension would have had a `null` string) #3011
+
 - Non-breaking improvements
-  - Enable runtime policy change for Silo versioning #3055
+  - Support for custom placement strategies and directors #2932
+  - Grain interface versioning to enable no-downtime upgrades #2837 2837 #3055
   - Expose available versions information in placement context #3136
   - Add support for hash-based grain placement #2944
-  - Allow complex streaming filters in `ImplicitStreamSubscriptionAttribute` #2988
   - Support fire and forget one-way grain calls using `[OneWay]` method attribute #2993
+  - Replace `CallContext.LogicalSetData` with AsyncLocal #2200 #2961
+  - Support multiple silo request interceptors #3083
+  - Ability to configure `FabricClient` when deploying to Service Fabric #2954
+  - Added extension points to EventHubAdapterFactory #2930
+  - Added SlowConsumingPressureMonitor for EventHub streams #2873
+  - Dispose all registered services in the container when shutting down #2876
+  - Try to prevent port collisions when starting in-memory `TestCluster` #2779
+  - Deprecated `TestingSiloHost` in favor of `TestCluster` (although the former is still available for this version) #2919
   - Support exceptions with reference cycles in ILBasedExceptionSerializer #2999
   - Add extensibility point to replace the grain activator and finalizer #3002
-  - Generate serializers for more types #3035
-  - Expose IsOrleansShallowCopyable for external custom serializers #3077
-  - Detect if activation is in `Deactivating` state for too long and remove it from the directory if needed #3082
-  - Support grains with key extensions containing `+` symbols #2956
-  - Allow `TimeSpan.MaxValue` in configuration #2985
   - Add statistics to EventHub stream provider ecosystem
-  - Support for us-gov-west-1 as a possible AWS region endpoint #3017
-  - Support `CultureInfo` via built-in serializer #3036
-  - Support multiple silo request interceptors #3083
   - Add flag to disable FastKill on CTRL-C #3109
   - Avoid benign `DuplicateActivationException` from showing up in the logs #3130
+  - Programmable stream subscribe API #2741 #2796 #2909
+  - Allow complex streaming filters in `ImplicitStreamSubscriptionAttribute` #2988
+  - Make `StreamQueueBalancer` pluggable #3152
+  - ServiceFabric: Register `ISiloStatusOracle` implementation in `ServiceCollection` #3160
+
 - Non-breaking bug fixes
-  - Fix various unhandled exceptions happening during client closing #2962
   - Improve resiliency in stream PubSub when facing ungraceful shutdown of producers and silos #3003 #3128
-  - SMS: Ensure items are copied before yielding the thread in OnNextAsync #3048 #3058
-  - Remove unneeded extra constructors to play nicer with some non fully-conforming 3rd party containers #2996 #3074
   - Fixes to local IP address resolution #3069
   - Fixed a few issues with the Service Fabric membership provider #3059 #3061 #3128
+  - Use PostgreSQL synchronous API to avoid locking in DB thread with newer versions of Npgsql #3164
+  - Fix race condition on cancelling of `GrainCancellationTokenSource` #3168
   - Fixes and improvements for the Event Hub stream provider #3014 #3096 #3041 #3052 #2989
-
+  - Fix `NullReferenceException` when no `LogConsistencyProvider` attribute is provided #3158
+  - Several minor bug fixes and perf improvements, as well as reliability in our test code
+  
 ### [v1.4.2] (changes since 1.4.1)
 - Non-breaking improvements
   - Generate serializers for more types #3035
@@ -56,34 +72,6 @@ The idea is to track end-user facing changes as they occur.*
   - Fix various unhandled exceptions happening during client closing #2962
   - SMS: Ensure items are copied before yielding the thread in OnNextAsync #3048 #3058
   - Remove unneeded extra constructors to play nicer with some non fully-conforming 3rd party containers #2996 #3074
-
-### [1.5.0-beta1]
-- Breaking changes
-  - Upgraded minimum framework dependency to .NET 4.6.1 #2945
-  - Support for non-static client via ClientBuilder (although static GrainClient still works but will be removed in a future version). You can now start many clients in the same process, even if you are inside a Silo #2822.
-    There are a few differences though:
-    - Several changes to SerializationManager, mainly to make it non-static #2592
-      - When deserializing a GrainReference from storage, you might need to re-bind it to the runtime by calling `grain.BindGrainReference(grainFactory)` on it or you would get `GrainReferenceNotBoundException` when attempting to use it #2738
-      - Removed `RegisterSerializerAttribute` (and corresponding static Register method for registering a custom serializer). If you were using that, please read https://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Serialization.html#writing-custom-serializers for alternative ways to register your custom serializer #2941
-  - Better serialization of `Type` values (but can cause compatibility issues if these were persisted by using the Serialziation Manager) #2952
-  - Automatically deactivate a grain if it bubbles up `InconsistentStateException` (thrown when there is an optimistic concurrency conflict when writing to storage) #2959
-  - Providers are now constructed using Dependency Injection. The result is that custom providers must have a single public constructor with either no arguments or arguments which can all be injected, or they need to be explicitly registered in the ServiceCollection. #2721 #2980
-  - Change default stream subscription faulting to false in EventHub and Memory stream providers, as is in other providers #2974
-- Non-breaking improvements
-  - Grain interface versioning to enable no-downtime upgrades #2837 2837
-  - Programmable stream subscribe API #2741 #2796 #2909
-  - Support for custom placement strategies and directors #2932
-  - Improvements to GrainServices API #2839
-  - Replace `CallContext.LogicalSetData` with AsyncLocal #2200 #2961
-  - Ability to configure `FabricClient` when deploying to Service Fabric #2954
-  - Added extension points to EventHubAdapterFactory #2930
-  - Added SlowConsumingPressureMonitor for EventHub streams #2873
-  - Dispose all registered services in the container when shutting down #2876
-  - Try to prevent port collisions when starting in-memory `TestCluster` #2779
-  - Deprecated `TestingSiloHost` in favor of `TestCluster` (although the former is still available for this version) #2919
-- Non-breaking bug fixes
-  - Change how message expiration is handled to account for server clock skew #2922
-  - Several minor bug fixes and perf improvements, as well as reliability in our test code
 
 ### [v1.4.1]
 - Improvements
