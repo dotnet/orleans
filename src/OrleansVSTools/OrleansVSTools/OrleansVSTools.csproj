@@ -287,7 +287,6 @@
       <Link>Packages\System.IO.FileSystem.4.3.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <None Include="app.config" />
     <None Include="OrleansVSTools.snk" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
