@@ -87,7 +87,7 @@ When SQL, ZooKeeper, Consul and other technologies are used for system store, or
 </ol>
 <h2 id="orleans-silo-instances-table">Orleans Silo Instances table</h2>
 <p>Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the <a href="Cluster-Management.html">Cluster Management Protocol</a> that maintains this table.</p>
-<p>All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40"><code>SiloInstanceTableEntry</code></a>):</p>
+<p>All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Storage/OrleansSiloInstanceManager.cs#L16"><code>SiloInstanceTableEntry</code></a>):</p>
 <ol>
 <li><em>PartitionKey</em> - deployment id.</li>
 <li><em>RowKey</em> - Silo IP Address + &quot;-&quot; + Silo Port + &quot;-&quot; + Silo Generation number (epoch)</li>
@@ -124,7 +124,7 @@ Role name is a logical name of the whole service and instance name is the name o
 Azure host (<code>AzureSiloHost</code>) sets the role name to Azure role name (<code>myRoleInstance.Role.Name</code>) and instance name to Azure role Instance name (<code>myRoleInstance.Id</code>).
 On premises (<code>SiloHost</code>) the role name is the executing  assembly name (<code>Assembly.GetExecutingAssembly().GetName().Name</code>) and the instance name is the name the host gave to that silo when it was started.</p>
 <h2 id="orleans-reminders-table">Orleans Reminders table</h2>
-<p>Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/ReminderService/RemindersTableManager.cs#L38"><code>ReminderTableEntry</code></a>):</p>
+<p>Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Storage/RemindersTableManager.cs#L14"><code>ReminderTableEntry</code></a>):</p>
 <ol>
 <li><em>PartitionKey</em> - ServiceId + &quot;_&quot; + GrainRefConsistentHash</li>
 <li><em>RowKey</em> -  GrainReference + &quot;-&quot; ReminderName</li>
@@ -137,7 +137,7 @@ On premises (<code>SiloHost</code>) the role name is the executing  assembly nam
 <li><em>GrainRefConsistentHash</em> - the consistent hash of the GrainReference</li>
 </ol>
 <h2 id="silo-metrics-table">Silo Metrics table</h2>
-<p>Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - <a href="http://en.wikipedia.org/wiki/Performance_indicator">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36"><code>SiloMetricsData</code></a>).</p>
+<p>Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - <a href="https://en.wikipedia.org/wiki/Performance_indicator">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Storage/SiloMetricsTableDataManager.cs#L12"><code>SiloMetricsData</code></a>).</p>
 <ol>
 <li><em>PartitionKey</em> - DeploymentId</li>
 <li><em>RowKey</em> -  silo name</li>
@@ -159,7 +159,7 @@ On premises (<code>SiloHost</code>) the role name is the executing  assembly nam
 <li><em>Clients</em> - number of currently connected clients</li>
 </ol>
 <h2 id="clients-metrics-table">Clients Metrics table</h2>
-<p>Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/ClientMetricsTableDataManager.cs#L38"><code>ClientMetricsData</code></a>).</p>
+<p>Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Storage/ClientMetricsTableDataManager.cs#L14"><code>ClientMetricsData</code></a>).</p>
 <ol>
 <li><em>PartitionKey</em> - DeploymentId</li>
 <li><em>RowKey</em> - Address</li>
@@ -176,9 +176,9 @@ On premises (<code>SiloHost</code>) the role name is the executing  assembly nam
 <li><em>ConnectedGatewayCount</em> - number of gateways that this client is currently connected to.</li>
 </ol>
 <h2 id="silo-statistics-table">Silo Statistics table</h2>
-<p>Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper <a href="http://research.microsoft.com/apps/pubs/?id=217109">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept</a>.
+<p>Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper <a href="https://www.microsoft.com/en-us/research/publication/pad-performance-anomaly-detection-in-multi-server-distributed-systems">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept</a>.
 Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table.</p>
-<p>Each row is in the format (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38"><code>StatsTableData</code></a>):</p>
+<p>Each row is in the format (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Storage/StatsTableDataManager.cs#L14"><code>StatsTableData</code></a>):</p>
 <ol>
 <li><em>PartitionKey</em> - <code>DeploymentId$ReverseTimestampToTheNearestHour</code> - deploymentId and last hour</li>
 <li><em>RowKey</em> - <code>ReverseTimestampToTheNearestSecond$Name$counter</code> - current second, silo name, monotonically growing sequence number</li>

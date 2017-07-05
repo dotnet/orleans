@@ -457,7 +457,7 @@ on how to implement other formats.</p>
 <p>When the (de)serializers have been implemented, they need to ba added to the <code>StorageSerializationPicker</code> property in <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a>.
 This is an implementation of <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs">IStorageSerializationPicker</a>. By default
 <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs">StorageSerializationPicker</a> will be used. And example of changing data storage format
-or using (de)serializers can be seen at <a href="https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs">RelationalStorageTests</a>.</p>
+or using (de)serializers can be seen at <a href="https://github.com/dotnet/orleans/blob/master/test/TesterSQLUtils/StorageTests/Relational/RelationalStorageTests.cs">RelationalStorageTests</a>.</p>
 <p>Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a> instance.</p>
 <h2 id="next">Next</h2>
 <p><a href="Grains.html">Grains</a></p>

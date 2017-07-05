@@ -229,7 +229,7 @@ Fortunately, <code>Task</code> has a convenient <code>WhenAll</code> method whic
 This should be avoided in Orleans, tasks should always be awaited before <code>Result</code> is read.</p>
 <p>Note: When a large number of asynchronous actions need to happen simultaneously you can collect the tasks in a <code>List&lt;Task&lt;T&gt;&gt;</code> and present this to <code>Task.WhenAll</code>.</p>
 <h2 id="external-tasks">External Tasks</h2>
-<p>It&#39;s tempting to use the <a href="https://msdn.microsoft.com/en-us/library/dd460717">Task Parallel Library</a> <em>&quot;TPL&quot;</em> for executing parallel tasks in Orleans, but TPL uses the .NET thread pool to dispatch tasks. This is prohibited within grain code.</p>
+<p>It&#39;s tempting to use the <a href="https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl">Task Parallel Library</a> <em>&quot;TPL&quot;</em> for executing parallel tasks in Orleans, but TPL uses the .NET thread pool to dispatch tasks. This is prohibited within grain code.</p>
 <p>Orleans has its own task scheduler which provides the single threaded execution model used within grains. 
 It&#39;s important that when running tasks the Orleans scheduler is used, and not the .NET thread pool.</p>
 <p>Should your grain code require a sub-task to be created, you should use <code>Task.Factory.StartNew</code>:</p>

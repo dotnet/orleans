@@ -91,7 +91,7 @@
 <p>The Orleans runtime manages the location and activation of grains similarly to the way that the virtual memory manager of an operating system manages memory pages: it activates a grain by creating an in-memory copy (an activation) on a server (an <a href="Getting-Started-With-Orleans/Silos.html">Orleans Silo</a>), and later it may deactivate that activation if it hasn&#39;t been used for some time.</p>
 <p>If a message is sent to the grain and there is no activation on any server, then the runtime will pick a location and create a new activation there. Because grains are virtual, they never fail, even if the server that currently hosts all of their activations fails.
 This eliminates the need to test to see if a grain exists, as well as the need to track failures and recreate grains as needed; the Orleans runtime does all this automatically.</p>
-<p><a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf">Read the MSR Technical Report on Orleans</a></p>
+<p><a href="https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability">Read the MSR Technical Report on Orleans</a></p>
 </article>
           </div>
           
