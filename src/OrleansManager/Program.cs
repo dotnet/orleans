@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Versions.Compatibility;
+using Orleans.Versions.Selector;
 
 namespace OrleansManager
 {
@@ -81,6 +85,16 @@ namespace OrleansManager
                         GrainReport(grainReportArgs);
                         break;
 
+                    case "setcompatibilitystrategy":
+                        var setCompatStrategyArgs = args.Skip(1).ToArray();
+                        SetCompatibilityStrategy(setCompatStrategyArgs);
+                        break;
+
+                    case "setselectorstrategy":
+                        var setSelStrategyArgs = args.Skip(1).ToArray();
+                        SetSelStrategyArgs(setSelStrategyArgs);
+                        break;
+
                     default:
                         PrintUsage();
                         break;
@@ -98,7 +112,9 @@ namespace OrleansManager
     OrleansManager collect [-memory=nnn] [-age=nnn] [silo1 silo2 ...]
     OrleansManager unregister <grain interface type code (int)|grain implementation class name (string)> <grain id long|grain id Guid>
     OrleansManager lookup <grain interface type code (int)|grain implementation class name (string)> <grain id long|grain id Guid>
-    OrleansManager grainReport <grain interface type code (int)|grain implementation class name (string)> <grain id long|grain id Guid>");
+    OrleansManager grainReport <grain interface type code (int)|grain implementation class name (string)> <grain id long|grain id Guid>
+    OrleansManager setCompatibilityStrategy <CompatibilityStrategy (string)> [<grain interface type code (int)>]
+    OrleansManager setSelectorStrategy <VersionSelectorStrategy (string)> [<grain interface type code (int>])");
         }
 
         private static void CollectActivations(IReadOnlyDictionary<string, string> options, IEnumerable<string> args)
@@ -248,6 +264,51 @@ namespace OrleansManager
             
             WriteStatus(string.Format("**Full Grain Id to {0} is: GrainId = {1}", operation, grainId.ToFullString()));
             return grainId;
+        }
+
+        private static void SetSelStrategyArgs(string[] args)
+        {
+            int? interfaceId;
+            VersionSelectorStrategy strategy;
+            if (!GetStrategyArgs(args, VersionSelectorStrategy.Parse, out strategy, out interfaceId))
+                return;
+            if (interfaceId != null)
+                systemManagement.SetSelectorStrategy(interfaceId.Value, strategy);
+            else
+                systemManagement.SetSelectorStrategy(strategy);
+        }
+
+        private static void SetCompatibilityStrategy(string[] args)
+        {
+            int? interfaceId;
+            CompatibilityStrategy strategy;
+            if (!GetStrategyArgs(args, CompatibilityStrategy.Parse, out strategy, out interfaceId))
+                return;
+            if (interfaceId != null)
+                systemManagement.SetCompatibilityStrategy(interfaceId.Value, strategy);
+            else
+                systemManagement.SetCompatibilityStrategy(strategy);
+        }
+
+        private static bool GetStrategyArgs<T>(string[] args, Func<string, T> strategyParser, out T strategy, out int? interfaceId)
+        {
+            if (args.Length < 1 || args.Length > 2)
+            {
+                PrintUsage();
+                strategy = default(T);
+                interfaceId = null;
+                return true;
+            }
+            strategy = strategyParser(args[0]);
+            if (strategy == null)
+            {
+                Console.WriteLine($"Strategy ${args[0]} not found");
+                strategy = default(T);
+                interfaceId = null;
+                return false;
+            }
+            interfaceId = args.Length == 2 ? (int?)int.Parse(args[1]) : null;
+            return true;
         }
 
         private static SiloAddress GetSiloAddress()
