@@ -7,7 +7,7 @@
     <ProjectType>FSharp</ProjectType>
     <TemplateID>Orleans.Templates.Project.GrainClass</TemplateID>
     <TemplateGroupID>Orleans</TemplateGroupID>
-    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.6.1</RequiredFrameworkVersion>
     <CreateNewFolder>true</CreateNewFolder>
     <ProvideDefaultName>true</ProvideDefaultName>
     <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
@@ -26,7 +26,7 @@
   </WizardExtension>
   <WizardData>
     <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
-      <package id="Microsoft.Orleans.Core" version="1.4.0" />
+      <package id="Microsoft.Orleans.Core" version="1.5.0" />
       <package id="FSharp.Core" version="4.1.0.2" />
       <package id="System.ValueTuple" version="4.3.0" />
     </packages>
