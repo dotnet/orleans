@@ -9,7 +9,7 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Acquired lease
     /// </summary>
-    public class AcquiredLease
+    public class AcquiredLease 
     {
         /// <summary>
         /// The resource key which the lease is attached to 
@@ -24,17 +24,28 @@ namespace Orleans.LeaseProviders
         /// </summary>
         public string Token { get; }
         /// <summary>
+        /// Start time for this lease, which is when the lease is acquired or renewed
+        /// </summary>
+        public DateTime StartTimeUtc { get; }
+    }
+
+    /// <summary>
+    /// AcquireLeaseResult class, which demonstrates result of acquiring or renewing lease operation
+    /// </summary>
+    public class AcquireLeaseResult
+    {
+        /// <summary>
+        /// Acquired lease, which will be null if acquire or renew operation failed.
+        /// </summary>
+        AcquiredLease AcquiredLease { get; }
+        /// <summary>
         /// Whether successfully acquire or renew the lease
         /// </summary>
         public bool Success { get; }
         /// <summary>
-        /// If acquiring or renewing the lease failed, this is the exception which caused it
+        /// If acquiring or renewing the lease failed, this is the exception which caused it. This field would be null if operation succeed.
         /// </summary>
         public Exception FailureException { get; }
-        /// <summary>
-        /// Start time for this lease, which is when the lease is acquired or renewed
-        /// </summary>
-        public DateTime StartTimeUtc { get; }
     }
 
     /// <summary>
@@ -49,7 +60,7 @@ namespace Orleans.LeaseProviders
         /// <summary>
         /// Duration of the lease
         /// </summary>
-        public TimeSpan? Duration { get; set; }
+        public TimeSpan Duration { get; set; }
     }
 
     /// <summary>
@@ -63,14 +74,14 @@ namespace Orleans.LeaseProviders
         /// <param name="category">resource category</param>
         /// <param name="leaseRequests"></param>
         /// <returns>Lease acquiring results array, whose order is the same with leaseRequstes</returns>
-        Task<AcquiredLease[]> Acquire(string category, LeaseRequest[] leaseRequests);
+        Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests);
         /// <summary>
         /// Batch renew lease operation
         /// </summary>
         /// <param name="category">resource category</param>
         /// <param name="aquiredLeases"></param>
         /// <returns>Lease renew results array, whose order is the same with acquiredLeases</returns>
-        Task<AcquiredLease[]> Renew(string category, AcquiredLease[] aquiredLeases);
+        Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] aquiredLeases);
         /// <summary>
         /// Batch release lease operation
         /// </summary>
