@@ -110,6 +110,8 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
 REM Build VSIX only if new tooling was found
 
+:VSIX
+if NOT "%BuildOrleansVSIX%" == "true" goto :EOF
 if "%VS2017InstallDir%" == "" goto :EOF
 
 @echo Build VSIX ============================
