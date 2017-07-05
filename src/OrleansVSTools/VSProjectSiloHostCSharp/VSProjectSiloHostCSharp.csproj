@@ -40,10 +40,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="OrleansHostWrapper.cs" />
     <None Include="Template.App.config" />
     <None Include="AssemblyInfo.cs" />
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="Program.cs" />
     <None Include="ProjectTemplate.csproj" />
   </ItemGroup>
