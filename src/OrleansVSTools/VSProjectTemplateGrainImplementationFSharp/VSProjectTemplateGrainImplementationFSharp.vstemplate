@@ -7,7 +7,7 @@
     <ProjectType>FSharp</ProjectType>
     <TemplateID>Orleans.Templates.Project.GrainClass</TemplateID>
     <TemplateGroupID>Orleans</TemplateGroupID>
-    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.6.1</RequiredFrameworkVersion>
     <CreateNewFolder>true</CreateNewFolder>
     <ProvideDefaultName>true</ProvideDefaultName>
     <PromptForSaveOnCreation>true</PromptForSaveOnCreation>

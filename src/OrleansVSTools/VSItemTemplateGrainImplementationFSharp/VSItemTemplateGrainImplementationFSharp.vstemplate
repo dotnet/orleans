@@ -6,7 +6,7 @@
     <Icon>GrainImplementationFSharp.ico</Icon>
     <ProjectType>FSharp</ProjectType>
     <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
-    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.6.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <DefaultName>Grain.fs</DefaultName>
   </TemplateData>
