@@ -37,6 +37,10 @@
     <DeployExtension>False</DeployExtension>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core, Version=4.4.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\FSharp.Core.4.1.17\lib\net45\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.CodeAnalysis, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.CodeAnalysis.Common.2.0.0\lib\netstandard1.3\Microsoft.CodeAnalysis.dll</HintPath>
     </Reference>
@@ -267,8 +271,8 @@
       <Link>Packages\System.Threading.Tasks.4.3.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\FSharp.Core.4.1.0.2\FSharp.Core.4.1.0.2.nupkg">
-      <Link>Packages\FSharp.Core.4.1.0.2.nupkg</Link>
+    <Content Include="..\packages\FSharp.Core.4.1.17\FSharp.Core.4.1.17.nupkg">
+      <Link>Packages\FSharp.Core.4.1.17.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\packages\System.ValueTuple.4.3.0\System.ValueTuple.4.3.0.nupkg">
