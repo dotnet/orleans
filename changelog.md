@@ -5,6 +5,17 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [1.5.0] (changes since 1.5.0-rc)
+- Non-breaking improvements
+  - Make StreamQueueBalancer pluggable #3152
+  - ServiceFabric: Register `ISiloStatusOracle` implementation in `ServiceCollection` #3160
+- Non-breaking bug fixes
+  - Use PostgreSQL synchronous API to avoid locking in DB thread with newer versions of Npgsql #3164
+  - Fix `NullReferenceException` when no `LogConsistencyProvider` attribute is provided #3158
+  - Only allow `InconsistentStateException` to deactivate the current activation (technically a behavioral breaking change since 1.5.0-beta1) #3176
+  - Fix race condition on cancelling of `GrainCancellationTokenSource` #3168
+  - Improved reliability of several functional tests #3140 #3154 #3182
+
 ### [1.5.0-rc]  (changes since 1.5.0-beta1)
 - Breaking changes
   - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
