@@ -112,7 +112,7 @@ Specific details of how to do it are really application specific but the possibl
 <p>As described in the section above, choosing a strategy is application and context dependent and strategies usually have parameters which again have to be decided at the application level.
 For example you might want to retry a request maximum 5 times per minute and can deal with it being done eventually but for some other action you might not be able to continue if something is not working.
 If your Login grain fails , you can not process any other requests from the user as an example.</p>
-<p>There is a guide <a href="https://msdn.microsoft.com/en-us/library/dn568099.aspx">on MSDN</a> about good patterns and practices for the cloud which applies to Orleans in most cases as well.</p>
+<p>There is a guide <a href="https://docs.microsoft.com/en-us/azure/architecture/patterns/">in the Azure documentation</a> about good patterns and practices for the cloud which applies to Orleans in most cases as well.</p>
 <h2 id="a-fairly-complex-example">A fairly complex example</h2>
 <p>Since in Orleans grainss are activated and deactivated automatically and you don&#39;t handle their life-cycle, you usually only deal with making sure that actor state is correct and actions are being started and finished correctly in relation to each other.
 Knowing the dependencies between grains and actions they perform is a big step toward understanding how to handle failure in any complex system. If you need to store relations between grains, you can simply do it and it is a widely done practice.</p>

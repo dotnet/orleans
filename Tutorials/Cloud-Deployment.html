@@ -83,9 +83,9 @@
 <p>The following prerequisites are required:</p>
 <ul>
 <li>Visual Studio 2013 or 2015</li>
-<li><a href="http://azure.microsoft.com/en-us/downloads/">Windows Azure SDK v2.4 or higher</a></li>
+<li><a href="https://azure.microsoft.com/en-us/downloads/">Windows Azure SDK v2.4 or higher</a></li>
 </ul>
-<p>For more info on installing and working with Windows Azure in general, see the Microsoft Developer Network (MSDN) web site: (<a href="http://msdn.microsoft.com/en-us/windowsazure/">http://msdn.microsoft.com/en-us/windowsazure/</a>)</p>
+<p>For more info on installing and working with Windows Azure in general, see the Microsoft Azure documentation web site: (<a href="https://docs.microsoft.com/en-us/azure/">https://docs.microsoft.com/en-us/azure/</a>)</p>
 <h2 id="create-azure-worker-role-for-orleans-silos">Create Azure Worker Role for Orleans Silos</h2>
 <p>Right click on your solution, and select &#39;Add | New Project...&#39;.</p>
 <p>Choose the &#39;Windows Azure Cloud Service&#39; project template:</p>
@@ -164,7 +164,7 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
 <p>Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;</p>
 <p>This will be a normal Azure storage connection – either for the development storage emulator (only valid if running locally), or a full Azure storage account connection string for cloud-storage.</p>
 <p>In general, this connection string is likely to use the same configuration values as the <code>Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString</code> diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.</p>
-<p>See the <a href="http://azure.microsoft.com/en-us/documentation/articles/storage-configure-connection-string/">Configure Azure Storage Connection Strings</a> for more information.</p>
+<p>See the <a href="https://docs.microsoft.com/en-us/azure/storage/storage-configure-connection-string">Configure Azure Storage Connection Strings</a> for more information.</p>
 <p>For example, to use local Developer Storage emulator (for local testing only)</p>
 <pre><code class="lang-xml">&lt;ConfigurationSettings&gt;
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;UseDevelopmentStorage=true&quot; /&gt;
