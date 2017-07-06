@@ -36,10 +36,9 @@ namespace Orleans
         /// </summary>
         private readonly TypeMetadataCache typeCache;
 
-        /// <summary>
-        /// The runtime client.
-        /// </summary>
         private readonly IRuntimeClient runtimeClient;
+
+        private IGrainReferenceRuntime GrainReferenceRuntime => this.runtimeClient.GrainReferenceRuntime;
 
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
@@ -115,11 +114,11 @@ namespace Orleans
             if (grain == null) throw new ArgumentNullException(nameof(grain));
             var reference = grain as GrainReference;
             if (reference == null) throw new ArgumentException("Provided grain must be a GrainReference.", nameof(grain));
-            reference.Bind(this.runtimeClient);
+            reference.Bind(this.GrainReferenceRuntime);
         }
 
         /// <inheritdoc />
-        public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key, this.runtimeClient);
+        public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key, this.GrainReferenceRuntime);
 
         /// <inheritdoc />
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
@@ -173,7 +172,7 @@ namespace Orleans
             var typeInfo = interfaceType.GetTypeInfo();
             return GrainReference.FromGrainId(
                 grainId,
-                this.runtimeClient,
+                this.GrainReferenceRuntime,
                 typeInfo.IsGenericType ? TypeUtils.GenericTypeArgsString(typeInfo.UnderlyingSystemType.FullName) : null);
         }
 
@@ -290,7 +289,7 @@ namespace Orleans
                 }
                 else
                 {
-                    reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.runtimeClient, null, destination));
+                    reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, null, destination));
                     cache[destination] = reference; // Store for next time
                 }
             }
@@ -301,12 +300,12 @@ namespace Orleans
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
         {
-            return this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.runtimeClient));
+            return this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime));
         }
 
         /// <inheritdoc />
         public GrainReference GetGrain(GrainId grainId, string genericArguments)
-            => GrainReference.FromGrainId(grainId, this.runtimeClient, genericArguments);
+            => GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, genericArguments);
 
         #endregion
     }

@@ -308,7 +308,7 @@ namespace Orleans.CodeGenerator
 
         private static MemberDeclarationSyntax GenerateInterfaceIdProperty(Type grainType)
         {
-            var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceId);
+            var property = TypeUtils.Member((GrainReference _) => _.InterfaceId);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
@@ -317,12 +317,12 @@ namespace Orleans.CodeGenerator
                     .AddAccessorListAccessors(
                         SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                             .AddBodyStatements(SF.ReturnStatement(returnValue)))
-                    .AddModifiers(SF.Token(SyntaxKind.ProtectedKeyword), SF.Token(SyntaxKind.OverrideKeyword));
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword));
         }
 
         private static MemberDeclarationSyntax GenerateInterfaceVersionProperty(Type grainType)
         {
-            var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceVersion);
+            var property = TypeUtils.Member((GrainReference _) => _.InterfaceVersion);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType))); 
@@ -331,7 +331,7 @@ namespace Orleans.CodeGenerator
                     .AddAccessorListAccessors(
                         SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                             .AddBodyStatements(SF.ReturnStatement(returnValue)))
-                    .AddModifiers(SF.Token(SyntaxKind.ProtectedKeyword), SF.Token(SyntaxKind.OverrideKeyword));
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword));
         }
 
         private static MemberDeclarationSyntax GenerateIsCompatibleMethod(Type grainType)
@@ -378,12 +378,7 @@ namespace Orleans.CodeGenerator
 
         private static MethodDeclarationSyntax GenerateGetMethodNameMethod(Type grainType)
         {
-            // Get the method with the correct type.
-            var method =
-                typeof(GrainReference).GetTypeInfo()
-                    .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-                    .FirstOrDefault(m => m.Name == "GetMethodName");
-
+            var method = TypeUtils.Method((GrainReference _) => _.GetMethodName(default(int), default(int)));
             var methodDeclaration =
                 method.GetDeclarationSyntax()
                     .AddModifiers(SF.Token(SyntaxKind.OverrideKeyword));

@@ -235,6 +235,7 @@ namespace Orleans.Runtime
             services.AddFromExisting<IGrainFactory, GrainFactory>();
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
+            services.AddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
             services.AddSingleton<ActivationDirectory>();

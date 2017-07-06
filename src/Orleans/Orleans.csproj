@@ -95,6 +95,8 @@
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
     <Compile Include="Core\ClusterClient.cs" />
+    <Compile Include="Runtime\GrainReferenceRuntime.cs" />
+    <Compile Include="Serialization\GrainReferenceSerializer.cs" />
     <Compile Include="Runtime\IGrainActivationContext.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
@@ -129,6 +131,7 @@
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
+    <Compile Include="Runtime\IGrainReferenceRuntime.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
     <Compile Include="Runtime\RingRange.cs" />

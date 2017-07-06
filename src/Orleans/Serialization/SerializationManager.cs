@@ -752,12 +752,12 @@ namespace Orleans.Serialization
             // Register GrainReference serialization methods.
             Register(
                 type,
-                GrainReference.CopyGrainReference,
-                GrainReference.SerializeGrainReference,
+                GrainReferenceSerializer.CopyGrainReference,
+                GrainReferenceSerializer.SerializeGrainReference,
                 (expected, context) =>
                 {
                     Func<GrainReference, GrainReference> ctorDelegate;
-                    var deserialized = (GrainReference)GrainReference.DeserializeGrainReference(expected, context);
+                    var deserialized = (GrainReference)GrainReferenceSerializer.DeserializeGrainReference(expected, context);
                     if (expected.IsConstructedGenericType == false)
                     {
                         return defaultCtorDelegate(deserialized);

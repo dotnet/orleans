@@ -40,6 +40,7 @@ namespace Orleans.Runtime
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
         private readonly List<IGrainCallFilter> siloInterceptors;
+        private IGrainReferenceRuntime grainReferenceRuntime;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -97,6 +98,8 @@ namespace Orleans.Runtime
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
         #region Implementation of IRuntimeClient
+
+        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
         public void SendRequest(
             GrainReference target,
