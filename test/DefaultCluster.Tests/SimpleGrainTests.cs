@@ -43,6 +43,19 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public void SimpleGrainControlFlow_Blocking()
+        {
+            ISimpleGrain grain = GetSimpleGrain();
+
+            // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
+            grain.SetA(2).Wait();
+            grain.SetB(3).Wait();
+
+            var result = grain.GetAxB().Result;
+            Assert.Equal(6, result);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainDataFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
