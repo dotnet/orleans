@@ -5,6 +5,16 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v1.5.0](https://github.com/dotnet/orleans/releases/tag/v1.5.0) July 6th 2017
+
+- Major new features
+  - Non-static grain client via ClientBuilder enables connecting to multiple Orleans cluster from the same app domain and connecting to other clusters from within a silo.
+  - Support for versioning of grain interfaces for non-downtime upgrades.
+  - Support for custom grain placement strategies and directors.
+  - Support for hash-based grain placement.
+
+## [v1.4.2](https://github.com/dotnet/orleans/releases/tag/v1.4.2) June 9th 2017
+
 ## [v1.4.1](https://github.com/dotnet/orleans/releases/tag/v1.4.1) March 27th 2017
 
 
