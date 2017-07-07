@@ -24,7 +24,7 @@ namespace Orleans.LeaseProviders
         /// </summary>
         public string Token { get; }
         /// <summary>
-        /// Start time for this lease, which is when the lease is acquired or renewed
+        /// Caller side start time for this lease, which is when the lease is acquired or renewed
         /// </summary>
         public DateTime StartTimeUtc { get; }
     }
@@ -39,15 +39,35 @@ namespace Orleans.LeaseProviders
         /// </summary>
         AcquiredLease AcquiredLease { get; }
         /// <summary>
-        /// Whether successfully acquire or renew the lease
+        /// Response status
         /// </summary>
-        public bool Success { get; }
+        public ResponseCode StatusCode { get; }
         /// <summary>
         /// If acquiring or renewing the lease failed, this is the exception which caused it. This field would be null if operation succeed.
         /// </summary>
         public Exception FailureException { get; }
     }
 
+    public enum ResponseCode
+    {
+        /// <summary>
+        /// Operation succeed
+        /// </summary>
+        OK,
+        /// <summary>
+        /// Lease is owned by other entity
+        /// </summary>
+        LeaseNotAvailable,
+        /// <summary>
+        /// The token in the AcquiredLease is invalid, which means the lease expired
+        /// </summary>
+        InvalidToken,
+        /// <summary>
+        /// TransientFailure, which should be retriable. 
+        /// </summary>
+        TransientFailure
+    }
+    
     /// <summary>
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>
