@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net462</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <AssemblyName>Orleans.TelemetryConsumers.NewRelic</AssemblyName>
     <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
