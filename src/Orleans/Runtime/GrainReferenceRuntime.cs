@@ -14,12 +14,14 @@ namespace Orleans.Runtime
 
         private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
         private readonly Logger logger;
+        private readonly IInternalGrainFactory internalGrainFactory;
 
-        public GrainReferenceRuntime(Factory<string, Logger> loggerFactory, IRuntimeClient runtimeClient)
+        public GrainReferenceRuntime(Factory<string, Logger> loggerFactory, IRuntimeClient runtimeClient, IInternalGrainFactory internalGrainFactory)
         {
             this.responseCallbackDelegate = this.ResponseCallback;
             this.logger = loggerFactory.Invoke(nameof(GrainReferenceRuntime));
             this.RuntimeClient = runtimeClient;
+            this.internalGrainFactory = internalGrainFactory;
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -67,9 +69,9 @@ namespace Orleans.Runtime
             return resultTask.Unbox<T>();
         }
 
-        public TGrainInterface Cast<TGrainInterface>(IAddressable grain)
+        public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
         {
-            return this.RuntimeClient.InternalGrainFactory.Cast<TGrainInterface>(grain);
+            return this.internalGrainFactory.Cast<TGrainInterface>(grain);
         }
 
         private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)

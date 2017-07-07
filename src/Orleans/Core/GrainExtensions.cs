@@ -48,7 +48,7 @@ namespace Orleans
         {
             ThrowIfNullGrain(grain);
             var grainReference = grain.AsWeaklyTypedReference();
-            return grainReference.Runtime.Cast<TGrainInterface>(grainReference);
+            return grainReference.Runtime.Convert<TGrainInterface>(grainReference);
         }
 
         /// <summary>

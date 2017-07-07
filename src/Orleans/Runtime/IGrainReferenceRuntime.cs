@@ -27,10 +27,10 @@ namespace Orleans.Runtime
         /// <returns>Returns the response from the remote object.</returns>
         Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo);
 
-        /// <summary>Casts the provided <paramref name="grain"/> to the specified interface.</summary>
+        /// <summary>Converts the provided <paramref name="grain"/> to the specified interface.</summary>
         /// <typeparam name="TGrainInterface">The target grain interface type.</typeparam>
         /// <param name="grain">The grain reference being cast.</param>
         /// <returns>A reference to <paramref name="grain"/> which implements <typeparamref name="TGrainInterface"/>.</returns>
-        TGrainInterface Cast<TGrainInterface>(IAddressable grain);
+        TGrainInterface Convert<TGrainInterface>(IAddressable grain);
     }
 }
