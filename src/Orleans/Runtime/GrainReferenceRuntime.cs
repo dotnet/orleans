@@ -1,4 +1,5 @@
 ﻿using Orleans.CodeGeneration;
+using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;
 using System.Text;
@@ -15,13 +16,19 @@ namespace Orleans.Runtime
         private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
         private readonly Logger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
+        private readonly SerializationManager serializationManager;
 
-        public GrainReferenceRuntime(Factory<string, Logger> loggerFactory, IRuntimeClient runtimeClient, IInternalGrainFactory internalGrainFactory)
+        public GrainReferenceRuntime(
+            Factory<string, Logger> loggerFactory,
+            IRuntimeClient runtimeClient,
+            IInternalGrainFactory internalGrainFactory,
+            SerializationManager serializationManager)
         {
             this.responseCallbackDelegate = this.ResponseCallback;
             this.logger = loggerFactory.Invoke(nameof(GrainReferenceRuntime));
             this.RuntimeClient = runtimeClient;
             this.internalGrainFactory = internalGrainFactory;
+            this.serializationManager = serializationManager;
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -44,7 +51,7 @@ namespace Orleans.Runtime
             {
                 CheckForGrainArguments(arguments);
                 SetGrainCancellationTokensTarget(arguments, reference);
-                argsDeepCopy = (object[])this.RuntimeClient.SerializationManager.DeepCopy(arguments);
+                argsDeepCopy = (object[])this.serializationManager.DeepCopy(arguments);
             }
 
             var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, argsDeepCopy);
@@ -139,7 +146,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    response = (Response)message.GetDeserializedBody(this.RuntimeClient.SerializationManager);
+                    response = (Response)message.GetDeserializedBody(this.serializationManager);
                 }
                 catch (Exception exc)
                 {
@@ -159,7 +166,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
 
                     default:
-                        rejection = message.GetDeserializedBody(this.RuntimeClient.SerializationManager) as OrleansException;
+                        rejection = message.GetDeserializedBody(this.serializationManager) as OrleansException;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))
