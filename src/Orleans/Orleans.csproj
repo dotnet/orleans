@@ -97,6 +97,7 @@
     <Compile Include="Core\ClusterClient.cs" />
     <Compile Include="Runtime\GrainReferenceRuntime.cs" />
     <Compile Include="Serialization\GrainReferenceSerializer.cs" />
+    <Compile Include="Providers\ILeaseProvider.cs" />
     <Compile Include="Runtime\IGrainActivationContext.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
