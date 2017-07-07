@@ -1,0 +1,22 @@
+﻿<Project Sdk="FSharp.NET.Sdk;Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>TestFSharpInterfaces</AssemblyName>
+    <RootNamespace>TestFSharpInterfaces</RootNamespace>
+    <ProjectGuid>{a4f61392-36a3-457c-80d0-9cdc48f5922f}</ProjectGuid>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestFSharpInterfaces\**\*.fs" Exclude="..\..\..\test\TestFSharpInterfaces\obj\**\*.fs;..\..\..\test\TestFSharpInterfaces\bin\**\*.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="4.1.17" />
+    <PackageReference Include="FSharp.NET.Sdk" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

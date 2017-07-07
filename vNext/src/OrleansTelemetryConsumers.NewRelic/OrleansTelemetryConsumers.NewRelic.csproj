@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</PackageId>
+    <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
+    <Description>NewRelic implementation of Orleans Telemetry API.</Description>
+    <PackageTags>$(PackageTags) NewRelic</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>Orleans.TelemetryConsumers.NewRelic</AssemblyName>
+    <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansTelemetryConsumers.NewRelic\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.NewRelic\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.NewRelic\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NewRelic.Agent.Api" Version="5.10.59.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

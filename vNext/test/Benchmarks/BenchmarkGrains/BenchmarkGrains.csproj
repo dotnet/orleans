@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>BenchmarkGrains</RootNamespace>
+    <AssemblyName>BenchmarkGrains</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\..\test\Benchmarks\BenchmarkGrains\**\*.cs" Exclude="..\..\..\..\test\Benchmarks\BenchmarkGrains\obj\**\*.cs;..\..\..\..\test\Benchmarks\BenchmarkGrains\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+  </ItemGroup>
+</Project>
