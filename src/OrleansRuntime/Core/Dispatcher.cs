@@ -11,8 +11,6 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
-using Orleans.Versions.Compatibility;
-
 
 namespace Orleans.Runtime
 {
@@ -61,6 +59,8 @@ namespace Orleans.Runtime
             errorInjectionRate = rejectionInjectionRate + messageLossInjectionRate;
             random = new SafeRandom();
         }
+
+        public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
         #region Receive path
 

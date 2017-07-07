@@ -126,7 +126,7 @@ namespace DefaultCluster.Tests.General
 
                 var grainRef2 = GrainReference.FromKeyString(
                     grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IRuntimeClient>());
+                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
                 Assert.True(grainRef.Equals(grainRef2));
             }
 
@@ -142,7 +142,7 @@ namespace DefaultCluster.Tests.General
 
                 var grainRef2 = GrainReference.FromKeyString(
                     grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IRuntimeClient>());
+                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
                 Assert.True(grainRef.Equals(grainRef2));
             }
         }

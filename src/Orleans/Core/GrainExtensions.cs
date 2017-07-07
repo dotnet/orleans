@@ -31,7 +31,7 @@ namespace Orleans
             }
 
             var systemTarget = grain as ISystemTargetBase;
-            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, systemTarget.RuntimeClient, null, systemTarget.Silo);
+            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, systemTarget.RuntimeClient.GrainReferenceRuntime, null, systemTarget.Silo);
 
             throw new ArgumentException(
                 $"AsWeaklyTypedReference has been called on an unexpected type: {grain.GetType().FullName}.",
@@ -48,7 +48,7 @@ namespace Orleans
         {
             ThrowIfNullGrain(grain);
             var grainReference = grain.AsWeaklyTypedReference();
-            return grainReference.RuntimeClient.InternalGrainFactory.Cast<TGrainInterface>(grainReference);
+            return grainReference.Runtime.Convert<TGrainInterface>(grainReference);
         }
 
         /// <summary>
