@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             }
 
             // Call any registered client pre-call interceptor function.
-            CallClientInvokeCallback(request);
+            CallClientInvokeCallback(reference, request);
 
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
             return isOneWayCall ? null : resolver.Task;
         }
 
-        private void CallClientInvokeCallback(InvokeMethodRequest request)
+        private void CallClientInvokeCallback(GrainReference reference, InvokeMethodRequest request)
         {
             // Make callback to any registered client callback function, allowing opportunity for an application to set any additional RequestContext info, etc.
             // Should we set some kind of callback-in-progress flag to detect and prevent any inappropriate callback loops on this GrainReference?
@@ -114,9 +114,10 @@ namespace Orleans.Runtime
                 if (callback == null) return;
 
                 // Call ClientInvokeCallback only for grain calls, not for system targets.
-                if (this is IGrain)
+                var grain = reference as IGrain;
+                if (grain != null)
                 {
-                    callback(request, (IGrain)this);
+                    callback(request, grain);
                 }
             }
             catch (Exception exc)
@@ -183,7 +184,7 @@ namespace Orleans.Runtime
         private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
         {
             // String concatenation is approx 35% faster than string.Format here
-            //debugContext = String.Format("{0}:{1}()", this.InterfaceName, GetMethodName(this.InterfaceId, methodId));
+            //debugContext = String.Format("{0}:{1}()", interfaceName, methodName);
             var debugContext = new StringBuilder();
             debugContext.Append(interfaceName);
             debugContext.Append(":");
