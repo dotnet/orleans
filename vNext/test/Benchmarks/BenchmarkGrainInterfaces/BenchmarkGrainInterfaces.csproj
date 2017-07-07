@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>BenchmarkGrainInterfaces</RootNamespace>
+    <AssemblyName>BenchmarkGrainInterfaces</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\..\test\Benchmarks\BenchmarkGrainInterfaces\**\*.cs" Exclude="..\..\..\..\test\Benchmarks\BenchmarkGrainInterfaces\obj\**\*.cs;..\..\..\..\test\Benchmarks\BenchmarkGrainInterfaces\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>
