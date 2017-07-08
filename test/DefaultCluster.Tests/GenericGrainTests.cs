@@ -567,12 +567,12 @@ namespace DefaultCluster.Tests.General
         {
 
             var id = Guid.NewGuid();
-            var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var nonGenericActivationService =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             await Xunit.Assert.ThrowsAsync(typeof(OrleansException), async () =>
             {
                 try
                 {
-                    await nonGenericFacet.Ping();
+                    await nonGenericActivationService.Ping();
                 }
                 catch (AggregateException exc)
                 {
@@ -589,12 +589,12 @@ namespace DefaultCluster.Tests.General
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
             Assert.Equal(s1, s2);
-            var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var nonGenericActivationService =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             await Xunit.Assert.ThrowsAsync(typeof(OrleansException), async () =>
             {
                 try
                 {
-                    await nonGenericFacet.Ping();
+                    await nonGenericActivationService.Ping();
                 }
                 catch (AggregateException exc)
                 {
