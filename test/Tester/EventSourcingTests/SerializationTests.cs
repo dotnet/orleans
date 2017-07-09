@@ -134,6 +134,27 @@ namespace Tester.EventSourcingTests
             Assert.Equal(input.ToString(), output.ToString());
         }
 
+
+        [Fact, TestCategory("Serialization")]
+        public void SerializationTests_GrainStateWithMetaDataAndETag_CopySerializableView()
+        {
+            GrainStateWithMetaDataAndETag<SimplePOCO> input = new GrainStateWithMetaDataAndETag<SimplePOCO>("eTag", new SimplePOCO { A = 1, B = 2 }, 1, "writeVector");
+
+            GrainStateWithMetaDataAndETag<SimplePOCO> output = (GrainStateWithMetaDataAndETag<SimplePOCO>)fixture.SerializationManager.DeepCopy(input);
+
+            Assert.Equal(input.ToString(), output.ToString());
+        }
+
+        [Fact, TestCategory("Serialization")]
+        public void SerializationTests_GrainStateWithMetaDataAndETag_CopyNonSerializableView()
+        {
+            GrainStateWithMetaDataAndETag<AdvancedPOCO> input = new GrainStateWithMetaDataAndETag<AdvancedPOCO>("eTag", new AdvancedPOCO { A = 1, B = 2 }, 1, "writeVector");
+
+            GrainStateWithMetaDataAndETag<AdvancedPOCO> output = (GrainStateWithMetaDataAndETag<AdvancedPOCO>)fixture.SerializationManager.DeepCopy(input);
+
+            Assert.Equal(input.ToString(), output.ToString());
+        }
+
         [Fact, TestCategory("Serialization")]
         public void SerializationTests_GrainStateWithMetaDataAndETag_CustomSerialization()
         {
