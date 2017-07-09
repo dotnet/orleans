@@ -1,4 +1,6 @@
-﻿using Orleans.EventSourcing.Common;
+﻿using Orleans.CodeGeneration;
+using Orleans.EventSourcing.Common;
+using Orleans.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,14 +14,8 @@ namespace Orleans.EventSourcing.StateStorage
     /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
     /// </summary>
     /// <typeparam name="TView">The type used for log view</typeparam>
-    [Serializable]
-    public class GrainStateWithMetaDataAndETag<TView> : IGrainState where TView : class, new()
-    {
-        /// <summary>
-        /// Gets and Sets StateAndMetaData
-        /// </summary>
-        public GrainStateWithMetaData<TView> StateAndMetaData { get; set; }
-       
+    public class GrainStateWithMetaDataAndETag<TView> : GrainStateWithMetaData<TView>, IGrainState where TView : class, new()
+    {       
         /// <summary>
         /// Gets and Sets Etag
         /// </summary>
@@ -29,36 +25,70 @@ namespace Orleans.EventSourcing.StateStorage
         {
             get
             {
-                return StateAndMetaData;
+                return State;
             }
             set
             {
-                StateAndMetaData = (GrainStateWithMetaData<TView>)value;
+                State = (TView)value;
             }
         }
+
+        /// <summary>
+        /// Initialize a new instance of GrainStateWithMetaDataAndETag class from deserialized values
+        /// </summary>
+        protected GrainStateWithMetaDataAndETag(string etag, TView initialview, int globalVersion, string writeVector) : base(initialview, globalVersion, writeVector) { }
 
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with a initialVew
         /// </summary>
-        public GrainStateWithMetaDataAndETag(TView initialview)
-        {
-            StateAndMetaData = new GrainStateWithMetaData<TView>(initialview);
-        }
+        public GrainStateWithMetaDataAndETag(TView initialview) : base(initialview) { }
 
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class
         /// </summary>
-        public GrainStateWithMetaDataAndETag()
-        {
-            StateAndMetaData = new GrainStateWithMetaData<TView>();
-        }
+        public GrainStateWithMetaDataAndETag() : base() { }
 
         /// <summary>
         /// Convert current GrainStateWithMetaDataAndETag object information to a string
         /// </summary>
         public override string ToString()
         {
-            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.State);
+            return string.Format("v{0} Flags={1} ETag={2} Data={3}", GlobalVersion, WriteVector, ETag, State);
+        }
+
+        [CopierMethod]
+        public static object DeepCopier(object original, ICopyContext context)
+        {
+            GrainStateWithMetaDataAndETag<TView> instance = (GrainStateWithMetaDataAndETag<TView>)original;
+
+            string etag = (string)SerializationManager.DeepCopyInner(instance.ETag, context);
+            TView state = (TView)SerializationManager.DeepCopyInner(instance.State, context);
+            int globalVersion = (int)SerializationManager.DeepCopyInner(instance.GlobalVersion, context);
+            string writeVector = (string)SerializationManager.DeepCopyInner(instance.WriteVector, context);
+
+            return new GrainStateWithMetaDataAndETag<TView>(etag, state, globalVersion, writeVector);
+        }
+
+        [SerializerMethod]
+        internal static void Serialize(object input, ISerializationContext context, Type expected)
+        {
+            GrainStateWithMetaDataAndETag<TView> instance = (GrainStateWithMetaDataAndETag<TView>)input;
+
+            SerializationManager.SerializeInner(instance.ETag, context, typeof(string));
+            SerializationManager.SerializeInner(instance.State, context, typeof(TView));
+            SerializationManager.SerializeInner(instance.GlobalVersion, context, typeof(int));
+            SerializationManager.SerializeInner(instance.WriteVector, context, typeof(string));
+        }
+
+        [DeserializerMethod]
+        internal static object Deserialize(Type expected, IDeserializationContext context)
+        {
+            string etag = SerializationManager.DeserializeInner<string>(context);
+            TView state = SerializationManager.DeserializeInner<TView>(context);
+            int globalVersion = SerializationManager.DeserializeInner<int>(context);
+            string writeVector = SerializationManager.DeserializeInner<string>(context);
+
+            return new GrainStateWithMetaDataAndETag<TView>(etag, state, globalVersion, writeVector);
         }
     }
 
@@ -68,7 +98,6 @@ namespace Orleans.EventSourcing.StateStorage
     /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
     /// </summary>
     /// <typeparam name="TView"></typeparam>
-    [Serializable]
     public class GrainStateWithMetaData<TView> where TView : class, new()
     {
         /// <summary>
@@ -113,6 +142,15 @@ namespace Orleans.EventSourcing.StateStorage
             WriteVector = "";
         }
 
+        /// <summary>
+        /// Initialize a new instance of GrainStateWithMetaDataAndETag class from deserialized values
+        /// </summary>
+        protected GrainStateWithMetaData(TView initialview, int globalVersion, string writeVector)
+        {
+            State = initialview;
+            GlobalVersion = globalVersion;
+            WriteVector = writeVector;
+        }
 
         /// <summary>
         /// Gets one of the bits in <see cref="WriteVector"/>
@@ -135,6 +173,38 @@ namespace Orleans.EventSourcing.StateStorage
             var rval = StringEncodedWriteVector.FlipBit(ref str, Replica);
             WriteVector = str;
             return rval;
+        }
+
+        [CopierMethod]
+        public static object DeepCopier(object original, ICopyContext context)
+        {
+            GrainStateWithMetaData<TView> instance = (GrainStateWithMetaData<TView>)original;
+            
+            TView state = (TView)SerializationManager.DeepCopyInner(instance.State, context);
+            int globalVersion = (int)SerializationManager.DeepCopyInner(instance.GlobalVersion, context);
+            string writeVector = (string)SerializationManager.DeepCopyInner(instance.WriteVector, context);
+
+            return new GrainStateWithMetaData<TView>(state, globalVersion, writeVector);
+        }
+
+        [SerializerMethod]
+        internal static void Serialize(object input, ISerializationContext context, Type expected)
+        {
+            GrainStateWithMetaData<TView> instance = (GrainStateWithMetaData<TView>)input;
+            
+            SerializationManager.SerializeInner(instance.State, context, typeof(TView));
+            SerializationManager.SerializeInner(instance.GlobalVersion, context, typeof(int));
+            SerializationManager.SerializeInner(instance.WriteVector, context, typeof(string));
+        }
+
+        [DeserializerMethod]
+        internal static object Deserialize(Type expected, IDeserializationContext context)
+        {
+            TView state = SerializationManager.DeserializeInner<TView>(context);
+            int globalVersion = SerializationManager.DeserializeInner<int>(context);
+            string writeVector = SerializationManager.DeserializeInner<string>(context);
+
+            return new GrainStateWithMetaData<TView>(state, globalVersion, writeVector);
         }
     }
 }

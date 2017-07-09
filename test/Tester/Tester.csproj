@@ -48,6 +48,7 @@
     <Compile Include="ClientConnectionTests\GatewayConnectionTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DependencyInjectionDisambiguationTests.cs" />
+    <Compile Include="EventSourcingTests\SerializationTests.cs" />
     <Compile Include="GrainActivatorTests.cs" />
     <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
     <Compile Include="EventSourcingTests\ChatGrainTests.cs" />
@@ -68,6 +69,7 @@
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
+    <Compile Include="EventSourcingTests\EventSourceEnvironmentFixture.cs" />
     <Compile Include="SiloInitializationTests.cs" />
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
     <Compile Include="GeoClusterTests\MultiClusterDataTests.cs" />
