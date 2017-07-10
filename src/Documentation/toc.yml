@@ -82,6 +82,8 @@
     href: Advanced-Concepts/Powershell-Client.md
   - name: Heterogeneous Silos
     href: Advanced-Concepts/Heterogeneous-Silos.md
+  - name: Cancellation Tokens
+    href: Advanced-Concepts/Cancellation-Tokens.md
 - name: Grain Versioning
   href: Grain-Versioning/Grain-Versioning.md
   homepage: Grain-Versioning/Grain-Versioning.md
