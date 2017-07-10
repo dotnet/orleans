@@ -3,22 +3,22 @@ using System.Threading.Tasks;
 
 namespace Orleans
 {
-    public static class LifecyleExtensions
+    public static class LifecycleExtensions
     {
         private static Func<Task> NoOp => () => Task.CompletedTask;
 
-        public static IDisposable Subscribe<TRing>(this ILifecycleObservable<TRing> observable, TRing ring, Func<Task> onStart, Func<Task> onStop)
+        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<Task> onStart, Func<Task> onStop)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             if (onStart == null) throw new ArgumentNullException(nameof(onStart));
             if (onStop == null) throw new ArgumentNullException(nameof(onStop));
 
-            return observable.Subscribe(ring, new Observer(onStart, onStop));
+            return observable.Subscribe(stage, new Observer(onStart, onStop));
         }
 
-        public static IDisposable Subscribe<TRing>(this ILifecycleObservable<TRing> observable, TRing ring, Func<Task> onStart)
+        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<Task> onStart)
         {
-            return observable.Subscribe(ring, new Observer(onStart, NoOp));
+            return observable.Subscribe(stage, new Observer(onStart, NoOp));
         }
 
         private class Observer : ILifecycleObserver

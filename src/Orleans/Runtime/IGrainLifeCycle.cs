@@ -5,8 +5,8 @@ namespace Orleans.Runtime
     /// Stages of a grains lifecycle.
     /// TODO: Add more later, see ActivationInitializationStage
     /// Full grain lifecycle, including register, state setup, and 
-    ///   stream cleanup should all eventually be triggerd by the 
-    ///   grian lifecycle.
+    ///   stream cleanup should all eventually be triggered by the 
+    ///   grain lifecycle.
     /// </summary>
     public enum GrainLifecyleStage
     {

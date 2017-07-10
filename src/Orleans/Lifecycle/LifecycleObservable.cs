@@ -6,7 +6,7 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    public class LifecycleObservable<TStage> : ILifecycleObservable<TStage>
+    public class LifecycleObservable<TStage> : ILifecycleObservable<TStage>, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
         private readonly Logger logger;

@@ -25,6 +25,6 @@ namespace Orleans.Runtime
         /// <summary>Gets a key/value collection that can be used to share data within the scope of the grain activation.</summary>
         IDictionary<object, object> Items { get; }
 
-        IGrainLifeCycle LifeCycle { get; }
+        IGrainLifeCycle ObservableLifeCycle { get; }
     }
 }

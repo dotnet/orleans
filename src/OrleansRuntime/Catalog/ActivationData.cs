@@ -184,7 +184,7 @@ namespace Orleans.Runtime
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
             logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
-            this.FullLifeCycle = new GrainLifecycle(logger);
+            this.lifeCycle = new GrainLifecycle(logger);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.nodeConfiguration = nodeConfiguration;
@@ -348,9 +348,13 @@ namespace Orleans.Runtime
 
         public IDictionary<object, object> Items { get; private set; }
 
-        public IGrainLifeCycle LifeCycle => FullLifeCycle;
+#region lifecyle
+        private readonly GrainLifecycle lifeCycle;
 
-        internal GrainLifecycle FullLifeCycle { get; }
+        public IGrainLifeCycle ObservableLifeCycle => lifeCycle;
+
+        internal ILifecycleObserver LifeCycle => lifeCycle;
+#endregion lifecycle
 
         public void OnTimerCreated(IGrainTimer timer)
         {

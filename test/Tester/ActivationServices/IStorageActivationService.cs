@@ -45,7 +45,7 @@ namespace Tester
             var observer = this.storageActivationService as ILifecycleObserver;
             if (observer != null)
             {
-                context.LifeCycle.Subscribe(GrainLifecyleStage.SetupState, observer);
+                context.ObservableLifeCycle.Subscribe(GrainLifecyleStage.SetupState, observer);
             }
         }
 
