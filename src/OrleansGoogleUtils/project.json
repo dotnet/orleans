@@ -1,5 +1,6 @@
-{
+﻿{
   "dependencies": {
+    "Google.Cloud.PubSub.V1": "1.0.0-beta11",
     "Google.Protobuf": "3.0.0"
   },
   "frameworks": {
