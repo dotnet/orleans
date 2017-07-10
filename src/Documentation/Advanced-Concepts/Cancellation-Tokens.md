@@ -5,7 +5,7 @@ title: Grain cancellation tokens
 
 # Grain cancellation tokens
 
-The Orleans runtime provides mechanism called grain cancellation token, that enable the developer to cancel asynchronous or long-running synchronous operations. 
+The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel to cancel an executing grain operation. 
 
 
 ## Description
@@ -22,16 +22,19 @@ A **GrainCancellationTokenSource** is a object that provides a cancellation toke
 * Pass the token returned by the GrainCancellationTokenSource.Token property to each grain method that listens for cancellation.
 
 ``` csharp
-        var waitTask = grain.LongWait(tcs.Token, TimeSpan.FromSeconds(10));
+        var waitTask = grain.LongIoWork(tcs.Token, TimeSpan.FromSeconds(10));
 ```
-* Use the underlying **CancellationToken** property of **GrainCancellationToken** from operations that receive the cancellation token.
+* A cancellable grain operation needs to handle underlying **CancellationToken** property of **GrainCancellationToken** just like it would do in any other .NET code.
 ``` csharp
-        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
+        public async Task LongIoWork(GrainCancellationToken tc, TimeSpan delay)
         {
-            await Task.Delay(delay, tc.CancellationToken);
+            while(!tc.CancellationToken.IsCancellationRequested)
+            {
+                 await IoOperation(tc.CancellationToken);
+            }
         }
 ```
-* Call the ``GrainCancellationTokenSource.Cancel`` method to provide notification of cancellation. 
+* Call the ``GrainCancellationTokenSource.Cancel`` method to initiate cancellation. 
 
 ``` csharp
         await tcs.Cancel();
