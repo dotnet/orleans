@@ -6,13 +6,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
+    internal class ConsistentRingQueueBalancer : QueueBalancerBaseClass, IAsyncRingRangeListener, IStreamQueueBalancer
     {
-        private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
         public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
+            :base()
         {
             if (streamProviderRuntime == null)
             {
@@ -23,7 +23,7 @@ namespace Orleans.Streams
             ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
-        public Task Initialize(string strProviderName,
+        public override Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
             TimeSpan siloMaturityPeriod)
         {
@@ -55,36 +55,9 @@ namespace Orleans.Streams
             return Task.WhenAll(notificatioTasks);
         }
 
-        public IEnumerable<QueueId> GetMyQueues()
+        public override IEnumerable<QueueId> GetMyQueues()
         {
             return streamQueueMapper.GetQueuesForRange(myRange);
-        }
-
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            if (observer == null)
-            {
-                throw new ArgumentNullException("observer");
-            }
-            lock (queueBalanceListeners)
-            {
-                if (queueBalanceListeners.Contains(observer)) return false;
-                
-                queueBalanceListeners.Add(observer);
-                return true;
-            }
-        }
-
-        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            if (observer == null)
-            {
-                throw new ArgumentNullException("observer");
-            }
-            lock (queueBalanceListeners)
-            {
-                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
-            }
         }
     }
 }

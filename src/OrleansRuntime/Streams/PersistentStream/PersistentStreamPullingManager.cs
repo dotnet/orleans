@@ -102,6 +102,7 @@ namespace Orleans.Streams
             {
                 queuePrintTimer.Dispose();
             }
+            (this.queueBalancer as IDisposable)?.Dispose();
         }
 
         public async Task StartAgents()

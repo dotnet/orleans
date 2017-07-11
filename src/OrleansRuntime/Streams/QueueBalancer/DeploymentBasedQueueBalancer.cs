@@ -61,13 +61,12 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    internal class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
+    internal class DeploymentBasedQueueBalancer : QueueBalancerBaseClass, ISiloStatusListener, IStreamQueueBalancer
     {
         private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
         private ReadOnlyCollection<QueueId> allQueues;
-        private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private readonly bool isFixed;
         private bool isStarting;
@@ -76,6 +75,7 @@ namespace Orleans.Streams
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
             bool isFixed)
+            :base()
         {
             if (siloStatusOracle == null)
             {
@@ -88,7 +88,6 @@ namespace Orleans.Streams
 
             this.siloStatusOracle = siloStatusOracle;
             this.deploymentConfig = deploymentConfig;
-            queueBalanceListeners = new List<IStreamQueueBalanceListener>();
             immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.isFixed = isFixed;
             isStarting = true;
@@ -104,7 +103,7 @@ namespace Orleans.Streams
             }
         }
 
-        public Task Initialize(string strProviderName,
+        public override Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
             TimeSpan siloMaturityPeriod)
         {
@@ -173,7 +172,7 @@ namespace Orleans.Streams
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 
-        public IEnumerable<QueueId> GetMyQueues()
+        public override IEnumerable<QueueId> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
             bool useIdealDistribution = isFixed || isStarting;
@@ -194,35 +193,6 @@ namespace Orleans.Streams
             }
             return Enumerable.Empty<QueueId>();
         }
-
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            if (observer == null)
-            {
-                throw new ArgumentNullException("observer");
-            }
-            lock (queueBalanceListeners)
-            {
-                if (queueBalanceListeners.Contains(observer))
-                {
-                    return false;
-                }
-                queueBalanceListeners.Add(observer);
-                return true;
-            }
-        }
-
-        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            if (observer == null)
-            {
-                throw new ArgumentNullException("observer");
-            }
-            lock (queueBalanceListeners)
-            {
-                return queueBalanceListeners.Contains(observer) && queueBalanceListeners.Remove(observer);
-            }
-        }
         
         /// <summary>
         /// Checks to see if deployment configuration has changed, by adding or removing silos.
@@ -234,24 +204,6 @@ namespace Orleans.Streams
             var allSiloNames = deploymentConfig.GetAllSiloNames();
             // rebuild balancer with new list of instance names
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
-        }
-
-        private static List<string> GetActiveSilos(ISiloStatusOracle siloStatusOracle, ConcurrentDictionary<SiloAddress, bool> immatureSilos)
-        {
-            var activeSiloNames = new List<string>();
-            foreach (var kvp in siloStatusOracle.GetApproximateSiloStatuses(true))
-            {
-                bool immatureBit;
-                if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
-                {
-                    string siloName;
-                    if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
-                    {
-                        activeSiloNames.Add(siloName);
-                    }
-                }
-            }
-            return activeSiloNames;
         }
 
         private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle, 

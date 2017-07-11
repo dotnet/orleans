@@ -105,6 +105,7 @@
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
     <Compile Include="Catalog\IActivationCollector.cs" />
+    <Compile Include="Streams\QueueBalancer\LeaseBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerType.cs" />
     <Compile Include="Timers\GrainTimer.cs" />
     <Compile Include="Counters\SiloStatisticsManager.cs" />

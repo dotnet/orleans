@@ -59,6 +59,7 @@
     <Compile Include="MultiClusterNetwork\AzureTableBasedGossipChannel.cs" />
     <Compile Include="MultiClusterNetwork\GossipTableInstanceManager.cs" />
     <Compile Include="Providers\AzureConfigurationExtensions.cs" />
+    <Compile Include="Providers\Lease\AzureBlobLeaseProvider.cs" />
     <Compile Include="Providers\Storage\AzureBlobStorage.cs" />
     <Compile Include="Providers\Streams\AzureQueue\AzureQueueAdapterConstants.cs" />
     <Compile Include="Providers\Streams\AzureQueue\AzureQueueBatchContainerV2.cs" />

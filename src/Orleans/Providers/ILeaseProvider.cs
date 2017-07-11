@@ -27,6 +27,21 @@ namespace Orleans.LeaseProviders
         /// Caller side start time for this lease, which is when the lease is acquired or renewed
         /// </summary>
         public DateTime StartTimeUtc { get; }
+
+        /// <summary>
+        /// Consructor
+        /// </summary>
+        /// <param name="resourceKey"></param>
+        /// <param name="duration"></param>
+        /// <param name="token"></param>
+        /// <param name="startTimeUtc"></param>
+        public AcquiredLease(string resourceKey, TimeSpan duration, string token, DateTime startTimeUtc)
+        {
+            this.ResourceKey = resourceKey;
+            this.Duration = duration;
+            this.Token = token;
+            this.StartTimeUtc = startTimeUtc;
+        }
     }
 
     /// <summary>
@@ -37,7 +52,7 @@ namespace Orleans.LeaseProviders
         /// <summary>
         /// Acquired lease, which will be null if acquire or renew operation failed.
         /// </summary>
-        AcquiredLease AcquiredLease { get; }
+        public AcquiredLease AcquiredLease { get; }
         /// <summary>
         /// Response status
         /// </summary>
@@ -46,6 +61,13 @@ namespace Orleans.LeaseProviders
         /// If acquiring or renewing the lease failed, this is the exception which caused it. This field would be null if operation succeed.
         /// </summary>
         public Exception FailureException { get; }
+
+        public AcquireLeaseResult(AcquiredLease acquiredLease, ResponseCode statusCode, Exception failureException)
+        {
+            this.AcquiredLease = acquiredLease;
+            this.StatusCode = statusCode;
+            this.FailureException = failureException;
+        }
     }
 
     public enum ResponseCode
@@ -111,4 +133,9 @@ namespace Orleans.LeaseProviders
         Task Release(string category, AcquiredLease[] aquiredLeases);
     }
 
+    public class ResourceCategory
+    {
+        public const string Streaming = "Streaming";
+        public const string Storage = "Storage";
+    }
 }
