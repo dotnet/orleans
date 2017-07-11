@@ -28,6 +28,11 @@
   <PropertyGroup Condition="'$(OutDir)' == ''">
     <OutDir>bin\$(Configuration)\$(TargetFramework)\Orleans\</OutDir>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\OrleansPSUtils\OrleansPSUtils.psd1" Link="OrleansPSUtils.psd1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.0.0" />
@@ -38,24 +43,13 @@
     <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\..\..\src\OrleansPSUtils\Orleans.psd1">
-      <Link>Orleans.psd1</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <Target Name="AfterBuildHack" AfterTargets="AfterBuild">
     <ItemGroup>
-      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)Orleans.psd1'))"/>
+      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)OrleansPSUtils.psd1'))" />
     </ItemGroup>
     <PropertyGroup>
       <VersionToEmbed>$(Version)</VersionToEmbed>
     </PropertyGroup>
-    <WriteLinesToFile
-        File="$(OutDir)Orleans.psd1"
-        Lines="@(_PSDFileContent->Replace('$version$', '$(VersionToEmbed)'))"
-        Overwrite="true"
-        ContinueOnError="true" />
+    <WriteLinesToFile File="$(OutDir)OrleansPSUtils.psd1" Lines="@(_PSDFileContent-&gt;Replace('$version$', '$(VersionToEmbed)'))" Overwrite="true" ContinueOnError="true" />
   </Target>
 </Project>
