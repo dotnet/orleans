@@ -1,12 +1,13 @@
 ﻿using Google.Cloud.PubSub.V1;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
     public class GooglePubSubAdapterReceiver : IQueueAdapterReceiver
     {
@@ -33,10 +34,15 @@ namespace Orleans.Serialization.Providers.Streams
 
         private GooglePubSubAdapterReceiver(SerializationManager serializationManager, QueueId queueId, GooglePubSubDataManager pubSub, IGooglePubSubDataAdapter dataAdapter)
         {
-            Id = queueId ?? throw new ArgumentNullException(nameof(queueId));
+            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            Id = queueId;
             _serializationManager = serializationManager;
-            _pubSub = pubSub ?? throw new ArgumentNullException(nameof(pubSub));
-            _dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
+            if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
+            _pubSub = pubSub;
+
+            if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
+            _dataAdapter = dataAdapter;
+
             _logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
             _pending = new List<PendingDelivery>();
         }

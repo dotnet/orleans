@@ -1,12 +1,13 @@
 ﻿using Google.Cloud.PubSub.V1;
 using Google.Protobuf;
 using Orleans.Providers.Streams.Common;
+using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
     /// <summary>
     /// Converts event data to and from cloud queue message

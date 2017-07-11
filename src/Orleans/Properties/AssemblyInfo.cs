@@ -31,7 +31,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansHost")]
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("OrleansAWSUtils")]
-[assembly: InternalsVisibleTo("OrleansGoogleUtils")]
+[assembly: InternalsVisibleTo("OrleansGCPUtils")]
 [assembly: InternalsVisibleTo("OrleansManager")]
 [assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]

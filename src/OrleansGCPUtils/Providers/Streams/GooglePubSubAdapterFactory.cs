@@ -1,12 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Threading.Tasks;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
     public class GooglePubSubAdapterFactory<TDataAdapter> : IQueueAdapterFactory
         where TDataAdapter : IGooglePubSubDataAdapter
@@ -53,6 +53,8 @@ namespace Orleans.Serialization.Providers.Streams
                 }
 
                 _deadline = deadline;
+                if (_deadline > GooglePubSubAdapterConstants.MAX_DEADLINE)
+                    _deadline = GooglePubSubAdapterConstants.MAX_DEADLINE;
             }
             else
             {

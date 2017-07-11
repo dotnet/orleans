@@ -1,4 +1,4 @@
-﻿namespace Orleans.Serialization
+﻿namespace Orleans.Providers.Streams
 {
     public enum GoogleErrorCode
     {

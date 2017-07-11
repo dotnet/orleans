@@ -6,8 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
+    [Serializable]
     public class GooglePubSubBatchContainer : IBatchContainer
     {
         [JsonProperty]
@@ -46,7 +47,8 @@ namespace Orleans.Serialization.Providers.Streams
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
-            this.events = events ?? throw new ArgumentNullException(nameof(events), "Message contains no events");
+            if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
+            this.events = events;
             this.requestContext = requestContext;
         }
 

@@ -1,10 +1,11 @@
-﻿using Orleans.Streams;
+﻿using Orleans.Serialization;
+using Orleans.Streams;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
     internal class GooglePubSubAdapter<TDataAdapter> : IQueueAdapter
         where TDataAdapter : IGooglePubSubDataAdapter

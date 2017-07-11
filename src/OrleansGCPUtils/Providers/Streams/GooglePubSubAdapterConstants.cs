@@ -1,7 +1,10 @@
-﻿namespace Orleans.Serialization.Providers.Streams
+﻿using System;
+
+namespace Orleans.Providers.Streams
 {
     public static class GooglePubSubAdapterConstants
     {
+        public static readonly TimeSpan MAX_DEADLINE = TimeSpan.FromSeconds(10);
         public const string NUMBER_SUBSCRIPTIONS = "NumSubscriptions";
         public const int NUMBER_SUBSCRIPTIONS_DEFAULT = 8;
         internal const int CACHE_SIZE_DEFAULT = 4096;

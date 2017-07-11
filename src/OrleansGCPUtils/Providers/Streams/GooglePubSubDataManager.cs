@@ -1,11 +1,12 @@
 ﻿using Google.Cloud.PubSub.V1;
+using Grpc.Core;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Orleans.Serialization.Providers.Streams
+namespace Orleans.Providers.Streams
 {
     /// <summary>
     /// Utility class to encapsulate access to Google PubSub APIs.
@@ -13,6 +14,9 @@ namespace Orleans.Serialization.Providers.Streams
     /// <remarks> Used by Google PubSub streaming provider.</remarks>
     public class GooglePubSubDataManager
     {
+        private const string SUBSCRIPTIONS = "subscriptions";
+        private const string TOPICS = "topics";
+
         public TopicName TopicName { get; private set; }
         public SubscriptionName SubscriptionName { get; private set; }
 
@@ -27,14 +31,15 @@ namespace Orleans.Serialization.Providers.Streams
 
         public GooglePubSubDataManager(string projectId, string topicId, string subscriptionId, string deploymentId = "", TimeSpan? deadline = null)
         {
-            _logger = LogManager.GetLogger(GetType().Name, LoggerType.Runtime);
-            _deadline = deadline;
-            topicId = string.IsNullOrWhiteSpace(deploymentId) ? topicId : $"{topicId}-{deploymentId}";
-            subscriptionId = string.IsNullOrWhiteSpace(deploymentId) ? subscriptionId : $"{subscriptionId}-{deploymentId}";
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrWhiteSpace(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrWhiteSpace(subscriptionId)) throw new ArgumentNullException(nameof(subscriptionId));
 
+            _logger = LogManager.GetLogger(GetType().Name, LoggerType.Runtime);
+            _deadline = deadline;
+            topicId = string.IsNullOrWhiteSpace(deploymentId) ? topicId : $"{topicId}-{deploymentId}";
+            subscriptionId = string.IsNullOrWhiteSpace(deploymentId) ? subscriptionId : $"{subscriptionId}-{deploymentId}";
+            
             TopicName = new TopicName(projectId, topicId);
             SubscriptionName = new SubscriptionName(projectId, subscriptionId);
         }
@@ -44,30 +49,46 @@ namespace Orleans.Serialization.Providers.Streams
             try
             {
                 _publisher = await PublisherClient.CreateAsync();
-                _topic = await _publisher.GetTopicAsync(TopicName);
-                bool didCreate = false;
-                if (_topic == null)
-                {
-                    _topic = await _publisher.CreateTopicAsync(TopicName);
-                    didCreate = true;
-                }
-                _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
-
-                _subscriber = await SubscriberClient.CreateAsync();
-                _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
-                didCreate = false;
-                if (_subscription == null)
-                {
-                    _subscription = await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null, 
-                        ackDeadlineSeconds: _deadline.HasValue ? (int)_deadline.Value.TotalSeconds : 60);
-                    didCreate = true;
-                }
-                _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
             }
-            catch (Exception exc)
+            catch (Exception e)
             {
-                ReportErrorAndRethrow(exc, "Initialize", GoogleErrorCode.Initializing);
+                ReportErrorAndRethrow(e, "CreateAsync", GoogleErrorCode.Initializing);
             }
+
+            bool didCreate = false;
+
+            try
+            {
+                _topic = await _publisher.CreateTopicAsync(TopicName);
+                didCreate = true;
+            }
+            catch (RpcException e)
+            {
+                if (e.Status.StatusCode != StatusCode.AlreadyExists)
+                    ReportErrorAndRethrow(e, "CreateTopicAsync", GoogleErrorCode.Initializing);
+
+                _topic = await _publisher.GetTopicAsync(TopicName);
+            }
+
+            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
+
+            didCreate = false;
+
+            try
+            {
+                _subscriber = await SubscriberClient.CreateAsync();
+                _subscription = await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
+                    ackDeadlineSeconds: _deadline.HasValue ? (int)_deadline.Value.TotalSeconds : 60);
+                didCreate = true;
+            }
+            catch (RpcException e)
+            {
+                if (e.Status.StatusCode != StatusCode.AlreadyExists)
+                    ReportErrorAndRethrow(e, "CreateSubscriptionAsync", GoogleErrorCode.Initializing);
+
+                _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
+            }
+            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
         }
 
         public async Task DeleteTopic()
