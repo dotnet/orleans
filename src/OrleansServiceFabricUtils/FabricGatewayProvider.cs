@@ -41,8 +41,8 @@ namespace Microsoft.Orleans.ServiceFabric
         public FabricGatewayProvider(IFabricServiceSiloResolver siloResolver)
         {
             this.fabricServiceSiloResolver = siloResolver;
-            this.refreshPeriod = TimeSpan.FromSeconds(30);
-            this.MaxStaleness = TimeSpan.FromSeconds(this.refreshPeriod.TotalSeconds * 2);
+            this.refreshPeriod = TimeSpan.FromSeconds(5);
+            this.MaxStaleness = this.refreshPeriod;
         }
 
         /// <inheritdoc />

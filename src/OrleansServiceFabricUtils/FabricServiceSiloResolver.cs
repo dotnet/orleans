@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Fabric;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -131,14 +132,6 @@ namespace Microsoft.Orleans.ServiceFabric
                     var existing = this.silos[i].Partition;
                     if (!existing.IsSamePartitionAs(updated.Partition)) continue;
                     found = true;
-
-                    if (updated.Partition.IsOlderThan(existing))
-                    {
-                        this.log.Info($"Update for partition {updated} is superseded by existing version.");
-
-                        // Do not update the partition if the exiting one has a newer version than the update.
-                        break;
-                    }
 
                     // Update the partition.
                     this.silos[i] = updated;

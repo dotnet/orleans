@@ -14,9 +14,7 @@ namespace Microsoft.Orleans.ServiceFabric.Models
         Guid Id { get; }
 
         ServicePartitionKind Kind { get; }
-
-        bool IsOlderThan(IResolvedServicePartition other);
-
+        
         bool IsSamePartitionAs(IResolvedServicePartition other);
     }
 }
