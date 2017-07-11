@@ -287,7 +287,7 @@ namespace Orleans.Runtime
                 RequestContext.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
-                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message));
+                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
                 }

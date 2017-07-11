@@ -10,11 +10,11 @@ namespace Orleans.Runtime
         public ActivationId ActivationId { get; private set; }
         public string DebugContext { get; private set; }
 
-        internal RequestInvocationHistory(Message message)
+        public RequestInvocationHistory(GrainId grainId, ActivationId activationId, string debugContext)
         {
-            GrainId = message.TargetGrain;
-            ActivationId = message.TargetActivation;
-            DebugContext = message.DebugContext;
+            this.GrainId = grainId;
+            this.ActivationId = activationId;
+            DebugContext = debugContext;
         }
 
         public override string ToString()
