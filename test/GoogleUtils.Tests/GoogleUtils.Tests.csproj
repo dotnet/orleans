@@ -132,11 +132,14 @@
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="GoogleTestUtils.cs" />
     <Compile Include="ProtobufSerialization\Addressbook.cs" />
     <Compile Include="ProtobufSerialization\Counter.cs" />
     <Compile Include="ProtobufSerialization\ProtobufSerializationTests.cs" />
-    <Compile Include="Streaming\GPSStreamTests.cs" />
+    <Compile Include="Streaming\PubSubClientStreamTests.cs" />
+    <Compile Include="Streaming\PubSubStreamTests.cs" />
+    <Compile Include="Streaming\PubSubSubscriptionMultiplicityTests.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

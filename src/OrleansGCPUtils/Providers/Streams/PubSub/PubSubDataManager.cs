@@ -15,7 +15,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
     /// <remarks> Used by Google PubSub streaming provider.</remarks>
     public class PubSubDataManager
     {
-        private const int MAX_PULLED_MESSAGES = 1000;
+        public const int MAX_PULLED_MESSAGES = 1000;
 
         public TopicName TopicName { get; private set; }
         public SubscriptionName SubscriptionName { get; private set; }

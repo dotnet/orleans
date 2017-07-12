@@ -49,3 +49,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
 [assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
+[assembly: InternalsVisibleTo("GoogleUtils.Tests")]

@@ -12,7 +12,7 @@ using Xunit;
 namespace GoogleUtils.Tests.Streaming
 {
     [TestCategory("GCP"), TestCategory("PubSub")]
-    public class GPSStreamTests : TestClusterPerTest
+    public class PubSubStreamTests : TestClusterPerTest
     {
         public static readonly string PUBSUB_STREAM_PROVIDER_NAME = "GPSProvider";
         private SingleStreamTestRunner runner;
@@ -40,15 +40,12 @@ namespace GoogleUtils.Tests.Streaming
                 };
 
             options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-
             options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-
             options.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-
             return new TestCluster(options);
         }
 
-        public GPSStreamTests()
+        public PubSubStreamTests()
         {
             runner = new SingleStreamTestRunner(InternalClient, PUBSUB_STREAM_PROVIDER_NAME);
         }
