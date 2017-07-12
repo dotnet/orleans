@@ -74,7 +74,7 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="grain-cancellation-tokens">Grain cancellation tokens</h1>
 
-<p>The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel to cancel an executing grain operation. </p>
+<p>The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel an executing grain operation. </p>
 <h2 id="description">Description</h2>
 <p><strong>GrainCancellationToken</strong> is a wrapper around standard <strong>.NET System.Threading.CancellationToken</strong>, which enables cooperative cancellation between threads, thread pool work items or Task objects, and can be passed as grain method argument. </p>
 <p>A <strong>GrainCancellationTokenSource</strong> is a object that provides a cancellation token through its Token property and sends a cancellation message by calling its  <code>Cancel</code> method.  </p>
