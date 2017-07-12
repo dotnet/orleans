@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.Streams;
+﻿using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -35,12 +35,13 @@ namespace GoogleUtils.Tests.Streaming
                     { "ProjectId",  GoogleTestUtils.ProjectId },
                     { "TopicId",  GoogleTestUtils.TopicId },
                     { "DeploymentId",  GoogleTestUtils.DeploymentId.ToString()},
+                    { "Deadline",  "600" },
+                    //{ "CustomEndpoint", "localhost:8085" }
                 };
 
-            options.ClientConfiguration.RegisterStreamProvider<GooglePubSubStreamProvider>("GPSProvider", providerSettings);
+            options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
 
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<GooglePubSubStreamProvider>("GPSProvider", providerSettings);
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<GooglePubSubStreamProvider>("GPSProvider2", providerSettings);
+            options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
 
             options.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
 

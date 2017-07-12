@@ -1,4 +1,5 @@
-﻿using Google.Cloud.PubSub.V1;
+﻿using Google.Api.Gax.Grpc;
+using Google.Cloud.PubSub.V1;
 using Grpc.Core;
 using Orleans.Runtime;
 using System;
@@ -6,16 +7,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Orleans.Providers.Streams
+namespace Orleans.Providers.GCP.Streams.PubSub
 {
     /// <summary>
     /// Utility class to encapsulate access to Google PubSub APIs.
     /// </summary>
     /// <remarks> Used by Google PubSub streaming provider.</remarks>
-    public class GooglePubSubDataManager
+    public class PubSubDataManager
     {
-        private const string SUBSCRIPTIONS = "subscriptions";
-        private const string TOPICS = "topics";
+        private const int MAX_PULLED_MESSAGES = 1000;
 
         public TopicName TopicName { get; private set; }
         public SubscriptionName SubscriptionName { get; private set; }
@@ -25,30 +25,43 @@ namespace Orleans.Providers.Streams
         private PublisherClient _publisher;
         private SubscriberClient _subscriber;
         private TimeSpan? _deadline;
+        private ServiceEndpoint _customEndpoint;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly Logger _logger;
 
-        public GooglePubSubDataManager(string projectId, string topicId, string subscriptionId, string deploymentId = "", TimeSpan? deadline = null)
+        public PubSubDataManager(Logger baseLogger, string projectId, string topicId, string subscriptionId, string deploymentId, TimeSpan? deadline = null, string customEndpoint = "")
         {
+            if (string.IsNullOrWhiteSpace(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrWhiteSpace(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrWhiteSpace(subscriptionId)) throw new ArgumentNullException(nameof(subscriptionId));
 
-            _logger = LogManager.GetLogger(GetType().Name, LoggerType.Runtime);
+            _logger = baseLogger.GetSubLogger(GetType().Name);
             _deadline = deadline;
-            topicId = string.IsNullOrWhiteSpace(deploymentId) ? topicId : $"{topicId}-{deploymentId}";
-            subscriptionId = string.IsNullOrWhiteSpace(deploymentId) ? subscriptionId : $"{subscriptionId}-{deploymentId}";
-            
+            topicId = $"{topicId}-{deploymentId}";
+            subscriptionId = $"{projectId}-{deploymentId}";
             TopicName = new TopicName(projectId, topicId);
             SubscriptionName = new SubscriptionName(projectId, subscriptionId);
+
+            if (!string.IsNullOrWhiteSpace(customEndpoint))
+            {
+                var hostPort = customEndpoint.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (hostPort.Length != 2) throw new ArgumentException(nameof(customEndpoint));
+
+                var host = hostPort[0];
+                int port;
+                if (!int.TryParse(hostPort[1], out port)) throw new ArgumentException(nameof(customEndpoint));
+
+                _customEndpoint = new ServiceEndpoint(host, port);
+            }
         }
 
         public async Task Initialize()
         {
             try
             {
-                _publisher = await PublisherClient.CreateAsync();
+                _publisher = await PublisherClient.CreateAsync(_customEndpoint);
             }
             catch (Exception e)
             {
@@ -76,7 +89,7 @@ namespace Orleans.Providers.Streams
 
             try
             {
-                _subscriber = await SubscriberClient.CreateAsync();
+                _subscriber = await SubscriberClient.CreateAsync(_customEndpoint);
                 _subscription = await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
                     ackDeadlineSeconds: _deadline.HasValue ? (int)_deadline.Value.TotalSeconds : 60);
                 didCreate = true;
@@ -129,7 +142,8 @@ namespace Orleans.Providers.Streams
             PullResponse response = null;
             try
             {
-                response = await _subscriber?.PullAsync(SubscriptionName, true, count < 1 ? 1 : count);
+                //According to Google, no more than 1000 messages can be published/received
+                response = await _subscriber?.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
             }
             catch (Exception exc)
             {

@@ -6,10 +6,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.Providers.Streams
+namespace Orleans.Providers.GCP.Streams.PubSub
 {
     [Serializable]
-    public class GooglePubSubBatchContainer : IBatchContainer
+    public class PubSubBatchContainer : IBatchContainer
     {
         [JsonProperty]
         private EventSequenceTokenV2 sequenceToken;
@@ -32,7 +32,7 @@ namespace Orleans.Providers.Streams
         }
 
         [JsonConstructor]
-        public GooglePubSubBatchContainer(
+        public PubSubBatchContainer(
             Guid streamGuid,
             String streamNamespace,
             List<object> events,
@@ -43,7 +43,7 @@ namespace Orleans.Providers.Streams
             this.sequenceToken = sequenceToken;
         }
 
-        public GooglePubSubBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
+        public PubSubBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;

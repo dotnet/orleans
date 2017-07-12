@@ -43,15 +43,14 @@
   <ItemGroup>
     <Compile Include="GoogleErrorCodes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubAdapter.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubAdapterConstants.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubAdapterFactory.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubAdapterReceiver.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubBatchContainer.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubDataManager.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubStreamProvider.cs" />
-    <Compile Include="Providers\Streams\GooglePubSubUtils.cs" />
-    <Compile Include="Providers\Streams\IGooglePubSubDataAdapter.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubAdapter.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubAdapterConstants.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubAdapterFactory.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubAdapterReceiver.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubBatchContainer.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubDataManager.cs" />
+    <Compile Include="Providers\Streams\PubSub\PubSubStreamProvider.cs" />
+    <Compile Include="Providers\Streams\PubSub\IPubSubDataAdapter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />

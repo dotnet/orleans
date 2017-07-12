@@ -7,32 +7,32 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Orleans.Providers.Streams
+namespace Orleans.Providers.GCP.Streams.PubSub
 {
-    public class GooglePubSubAdapterReceiver : IQueueAdapterReceiver
+    public class PubSubAdapterReceiver : IQueueAdapterReceiver
     {
         private readonly SerializationManager _serializationManager;
-        private GooglePubSubDataManager _pubSub;
+        private PubSubDataManager _pubSub;
         private long _lastReadMessage;
         private Task _outstandingTask;
         private readonly Logger _logger;
-        private readonly IGooglePubSubDataAdapter _dataAdapter;
+        private readonly IPubSubDataAdapter _dataAdapter;
         private readonly List<PendingDelivery> _pending;
 
         public QueueId Id { get; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, QueueId queueId, string projectId, string topicId,
-            string deploymentId, IGooglePubSubDataAdapter dataAdapter, TimeSpan? deadline = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, Logger baseLogger, QueueId queueId, string projectId, string topicId,
+            string deploymentId, IPubSubDataAdapter dataAdapter, TimeSpan? deadline = null, string customEndpoint = "")
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
-            var pubSub = new GooglePubSubDataManager(projectId, topicId, queueId.ToString(), deploymentId, deadline);
-            return new GooglePubSubAdapterReceiver(serializationManager, queueId, pubSub, dataAdapter);
+            var pubSub = new PubSubDataManager(baseLogger, projectId, topicId, queueId.ToString(), deploymentId, deadline, customEndpoint);
+            return new PubSubAdapterReceiver(serializationManager, baseLogger, queueId, pubSub, dataAdapter);
         }
 
-        private GooglePubSubAdapterReceiver(SerializationManager serializationManager, QueueId queueId, GooglePubSubDataManager pubSub, IGooglePubSubDataAdapter dataAdapter)
+        private PubSubAdapterReceiver(SerializationManager serializationManager, Logger baseLogger, QueueId queueId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             Id = queueId;
@@ -43,7 +43,7 @@ namespace Orleans.Providers.Streams
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             _dataAdapter = dataAdapter;
 
-            _logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
+            _logger = baseLogger.GetSubLogger(GetType().Name);
             _pending = new List<PendingDelivery>();
         }
 
@@ -76,9 +76,7 @@ namespace Orleans.Providers.Streams
                 var pubSubRef = _pubSub; // store direct ref, in case we are somehow asked to shutdown while we are receiving.    
                 if (pubSubRef == null) return new List<IBatchContainer>();
 
-                int count = maxCount < 0 ? 10 : maxCount;
-
-                var task = pubSubRef.GetMessages(count);
+                var task = pubSubRef.GetMessages(maxCount);
                 _outstandingTask = task;
                 IEnumerable<ReceivedMessage> messages = await task;
 
@@ -122,7 +120,7 @@ namespace Orleans.Providers.Streams
                     .ToList();
                 if (deliveredMessages.Count == 0) return;
                 // delete all delivered queue messages from the queue.  Anything finalized but not delivered will show back up later
-                _outstandingTask = Task.WhenAll(deliveredMessages.Select(m => pubSubRef.AcknowledgeMessages(new[] { m })));
+                _outstandingTask = pubSubRef.AcknowledgeMessages(deliveredMessages);
 
                 try
                 {

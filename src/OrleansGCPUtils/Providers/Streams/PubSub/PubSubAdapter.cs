@@ -1,14 +1,15 @@
-﻿using Orleans.Serialization;
+﻿using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Providers.Streams
+namespace Orleans.Providers.GCP.Streams.PubSub
 {
-    internal class GooglePubSubAdapter<TDataAdapter> : IQueueAdapter
-        where TDataAdapter : IGooglePubSubDataAdapter
+    internal class PubSubAdapter<TDataAdapter> : IQueueAdapter
+        where TDataAdapter : IPubSubDataAdapter
     {
         protected readonly string DeploymentId;
         private readonly SerializationManager _serializationManager;
@@ -16,27 +17,31 @@ namespace Orleans.Providers.Streams
         protected readonly string TopicId;
         protected readonly TimeSpan? Deadline;
         private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
-        protected readonly ConcurrentDictionary<QueueId, GooglePubSubDataManager> Subscriptions = new ConcurrentDictionary<QueueId, GooglePubSubDataManager>();
-        protected readonly IGooglePubSubDataAdapter _dataAdapter;
-
+        protected readonly ConcurrentDictionary<QueueId, PubSubDataManager> Subscriptions = new ConcurrentDictionary<QueueId, PubSubDataManager>();
+        protected readonly IPubSubDataAdapter _dataAdapter;
+        private readonly Logger _logger;
+        private readonly string _customEndpoint;
         public string Name { get; }
         public bool IsRewindable => false;
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
-        public GooglePubSubAdapter(
+        public PubSubAdapter(
             TDataAdapter dataAdapter,
             SerializationManager serializationManager,
+            Logger logger,
             HashRingBasedStreamQueueMapper streamQueueMapper,
             string projectId,
             string topicId,
             string deploymentId,
             string providerName,
-            TimeSpan? deadline = null)
+            TimeSpan? deadline = null, 
+            string customEndpoint = "")
         {
             if (string.IsNullOrEmpty(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrEmpty(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
 
+            _logger = logger;
             _serializationManager = serializationManager;
             ProjectId = projectId;
             TopicId = topicId;
@@ -45,11 +50,12 @@ namespace Orleans.Providers.Streams
             Deadline = deadline;
             _streamQueueMapper = streamQueueMapper;
             _dataAdapter = dataAdapter;
+            _customEndpoint = customEndpoint;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return GooglePubSubAdapterReceiver.Create(_serializationManager, queueId, ProjectId, TopicId, DeploymentId, _dataAdapter, Deadline);
+            return PubSubAdapterReceiver.Create(_serializationManager, _logger, queueId, ProjectId, TopicId, DeploymentId, _dataAdapter, Deadline, _customEndpoint);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -57,10 +63,10 @@ namespace Orleans.Providers.Streams
             if (token != null) throw new ArgumentException("Google PubSub stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             var queueId = _streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
 
-            GooglePubSubDataManager pubSub;
+            PubSubDataManager pubSub;
             if (!Subscriptions.TryGetValue(queueId, out pubSub))
             {
-                var tmpPubSub = new GooglePubSubDataManager(ProjectId, TopicId, queueId.ToString(), DeploymentId, Deadline);
+                var tmpPubSub = new PubSubDataManager(_logger, ProjectId, TopicId, queueId.ToString(), DeploymentId, Deadline);
                 await tmpPubSub.Initialize();
                 pubSub = Subscriptions.GetOrAdd(queueId, tmpPubSub);
             }
