@@ -16,6 +16,7 @@ A **GrainCancellationTokenSource** is a object that provides a cancellation toke
 ## Usage
 
 * Instantiate a CancellationTokenSource object, which manages and sends cancellation notification to the individual cancellation tokens.
+
 ``` csharp
         var tcs = new GrainCancellationTokenSource();
 ```
@@ -25,6 +26,7 @@ A **GrainCancellationTokenSource** is a object that provides a cancellation toke
         var waitTask = grain.LongIoWork(tcs.Token, TimeSpan.FromSeconds(10));
 ```
 * A cancellable grain operation needs to handle underlying **CancellationToken** property of **GrainCancellationToken** just like it would do in any other .NET code.
+
 ``` csharp
         public async Task LongIoWork(GrainCancellationToken tc, TimeSpan delay)
         {
@@ -40,11 +42,13 @@ A **GrainCancellationTokenSource** is a object that provides a cancellation toke
         await tcs.Cancel();
 ```
 * Call the ``Dispose`` method when you are finished with the **GrainCancellationTokenSource** object.
- ``` csharp
+
+``` csharp
         tcs.Dispose();
 ```
 
- Important Considerations:
+
+ #### Important Considerations:
 
 * The ``GrainCancellationTokenSource.Cancel`` method returns **Task**, and in order to ensure cancellation the cancel call must be retried in case of transient communication failure.
 * Callbacks registered in underlying **System.Threading.CancellationToken** are subjects to single threaded execution guarantees within the grain activation on which they were registered.
