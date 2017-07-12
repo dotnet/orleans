@@ -59,7 +59,7 @@ namespace Benchmarks.Serialization
         private LargeTestData largeTestData;
         private SerializationManager serializationManager;
 
-        [Setup]
+        [GlobalSetup]
         public void BenchmarkSetup()
         {
             this.InitializeSerializer(this.Serializer);

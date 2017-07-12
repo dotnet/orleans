@@ -18,12 +18,7 @@ def branch = GithubBranchName
                 }
             }
             
-            if (platform == 'netfx') {
-                Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
-            } else {
-                // need to use a machine that has .NET 4.6.2 installed in the system
-                Utilities.setMachineAffinity(newJob, 'Windows_NT', '20161027')
-            }
+            Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
             
             Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
             Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results*.xml')

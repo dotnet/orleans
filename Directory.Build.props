@@ -1,9 +1,4 @@
 <Project>
-  <PropertyGroup>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">1.5.0</VersionPrefix>
-    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">beta2</VersionSuffix>
-  </PropertyGroup>
-
   <PropertyGroup Label="NuGet">
     <Authors>Microsoft</Authors>
     <Product>Microsoft Orleans</Product>
@@ -17,19 +12,13 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
-  <!-- For Debug builds generated a date/time dependent version suffix -->
-  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
-    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
-    <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
-  </PropertyGroup>
-
   <!-- Until we removing old csproj files we need to exclude assembly attributes from AssemblyInfo.cs files -->
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);EXCLUDE_ASSEMBLYINFO</DefineConstants>
   </PropertyGroup>
 
   <!-- Until VS2017 Update 3 released we've to exclude the F# bits from compilation -->
-  <PropertyGroup Condition="'$(IncludeFSharp)'==''">
+  <PropertyGroup Condition="'$(IncludeFSharp)'!='true'">
     <DefineConstants>$(DefineConstants);EXCLUDEFSHARP</DefineConstants>
   </PropertyGroup>
 
@@ -40,7 +29,93 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectCapability Include="ShowFilesOutsideOfProject" />
-  </ItemGroup>
+
+
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <BuildFlavor Condition=" '$(BuildFlavor)' == '' ">Current</BuildFlavor>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <!-- Temp hack until nuget issue fixed -->
+    <NETStandardImplicitPackageVersion>1.6.1</NETStandardImplicitPackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+    <TargetFramework>net461</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Shared Package Versions -->
+  <PropertyGroup>
+    <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
+    <MicrosoftPowerShell5ReferenceAssembliesVersion>1.0.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
+    <MicrosoftServiceFabricServicesVersion>2.4.145</MicrosoftServiceFabricServicesVersion>
+    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <MicrosoftExtensionsDependencyInjection>1.1.1</MicrosoftExtensionsDependencyInjection>
+    <SystemCollectionsImmutableVersion>1.3.1</SystemCollectionsImmutableVersion>
+    <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
+    <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
+    <MicrosoftExtensionsConfigurationVersion>1.1.1</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>1.1.1</MicrosoftExtensionsConfigurationBinderVersion>
+    <FSharpCoreVersion>4.1.17</FSharpCoreVersion>
+    <FSharpNETSdkVersion>1.0.*</FSharpNETSdkVersion>
+    <xUnitVersion>2.2.0</xUnitVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>1.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>1.1.1</MicrosoftExtensionsConfigurationJsonVersion>
+    <FluentAssertionsVersion>4.19.3</FluentAssertionsVersion>
+    <XunitSkippableFactVersion>1.3.1</XunitSkippableFactVersion>
+    <BenchmarkDotNetVersion>0.10.8</BenchmarkDotNetVersion>
+    <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
+    <MicrosoftDataSQLiteVersion>1.1.0</MicrosoftDataSQLiteVersion>
+    <NpgsqlVersion>3.1.9</NpgsqlVersion>
+    <MySqlDataVersion>6.9.9</MySqlDataVersion>
+    <NSubstituteVersion>1.10.0</NSubstituteVersion>
+    <!-- unused so far -->
+    <xunitabstractionsVersion>2.0.1</xunitabstractionsVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <AWSSDKDynamoDBv2Version>3.3.3</AWSSDKDynamoDBv2Version>
+    <AWSSDKSQSVersion>3.3.1.7</AWSSDKSQSVersion>
+    <WindowsAzureStorageVersion>8.1.1</WindowsAzureStorageVersion>
+    <BondCoreCSharpVersion>5.2.0</BondCoreCSharpVersion>
+    <ConsulVersion>0.7.2.1</ConsulVersion>
+    <GoogleProtobufVersion>3.2.0</GoogleProtobufVersion>
+    <MicrosoftAzureEventHubsVersion>1.0.0</MicrosoftAzureEventHubsVersion>
+    <MicrosoftApplicationInsightsVersion>2.2.0</MicrosoftApplicationInsightsVersion>
+    <ZooKeeperNetExVersion>3.4.9.2</ZooKeeperNetExVersion>
+    <SystemNetHttpVersion>4.3.1</SystemNetHttpVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+    <AWSSDKDynamoDBv2Version>3.1.5.2</AWSSDKDynamoDBv2Version>
+    <AWSSDKSQSVersion>3.1.0.9</AWSSDKSQSVersion>
+    <WindowsAzureStorageVersion>7.0.0</WindowsAzureStorageVersion>
+    <BondCoreCSharpVersion>4.0.1</BondCoreCSharpVersion>
+    <ConsulVersion>0.7.0.3</ConsulVersion>
+    <GoogleProtobufVersion>3.0.0</GoogleProtobufVersion>
+    <WindowsAzureServiceBusVersion>4.1.0</WindowsAzureServiceBusVersion>
+    <SystemReflectionMetadataVersion>1.4.2</SystemReflectionMetadataVersion>
+    <MicrosoftApplicationInsightsVersion>1.2.3</MicrosoftApplicationInsightsVersion>
+    <ZooKeeperNetExVersion>3.4.8.5</ZooKeeperNetExVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.0</VersionPrefix>
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">preview3</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">1.5.0</VersionPrefix>
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' "></VersionSuffix>
+  </PropertyGroup>
+
+  <!-- For Debug builds generated a date/time dependent version suffix -->
+  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
+  </PropertyGroup>
+
 </Project>

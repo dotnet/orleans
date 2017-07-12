@@ -7,5 +7,23 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <!-- Needed for tests to force the generation of binding redirects -->
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
+
+  <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <TargetFramework>net462</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' ">
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
+  </ItemGroup>
+
 </Project>

@@ -1,23 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <RootNamespace>NonSilo.Tests</RootNamespace>
     <AssemblyName>NonSilo.Tests</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <Compile Remove="AssemblyLoaderTests.cs" />
+  </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj" />
-    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
     <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.2017.csproj" />
     <ProjectReference Include="..\Tester\Tester.2017.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.2017.csproj" />
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.2017.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.2017.csproj" />
   </ItemGroup>

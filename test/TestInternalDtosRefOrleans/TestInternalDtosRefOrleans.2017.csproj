@@ -1,14 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <RootNamespace>TestInternalDtosRefOrleans</RootNamespace>
     <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.2017.csproj" />
   </ItemGroup>
 </Project>

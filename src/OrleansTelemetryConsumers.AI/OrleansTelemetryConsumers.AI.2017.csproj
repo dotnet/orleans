@@ -1,20 +1,20 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="NuGet">
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
-    <Description>
-      Microsoft Azure Application Insights implementation of Orleans Telemetry API.
-    </Description>
+    <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
+    <PackageTags>$(PackageTags) Azure ApplicationInsights</PackageTags>
   </PropertyGroup>
+
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <AssemblyName>OrleansTelemetryConsumers.AI</AssemblyName>
     <RootNamespace>OrleansTelemetryConsumers.AI</RootNamespace>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="1.2.3" />
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="$(MicrosoftApplicationInsightsVersion)" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
   </ItemGroup>

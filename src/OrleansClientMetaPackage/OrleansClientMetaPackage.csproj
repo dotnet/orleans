@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.Client</PackageId>
+    <Title>Microsoft Orleans Client Libraries</Title>
+    <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\Orleans\Configuration\OrleansConfiguration.xsd">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.2017.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
+  </ItemGroup>
+</Project>

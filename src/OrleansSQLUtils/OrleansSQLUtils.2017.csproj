@@ -1,32 +1,38 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="NuGet">
-    <PackageId>Microsoft.Orleans.OrleansSqlUtils</PackageId>
-    <Title>Microsoft Orleans Sql Utilities</Title>
-    <Description>
-      Library of utility types for relational storage of Microsoft Orleans.
-    </Description>
+    <PackageId>Microsoft.Orleans.OrleansSQLUtils</PackageId>
+    <Title>Microsoft Orleans SQL Utilities</Title>
+    <Description>Library of utility types for relational storage of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) SQL</PackageTags>
   </PropertyGroup>
+
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <AssemblyName>OrleansSQLUtils</AssemblyName>
     <RootNamespace>OrleansSQLUtils</RootNamespace>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
   </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Reflection" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Xml.XmlSerializer" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
-    <None Include="CreateOrleansTables_MySql.sql">
+    <None Include="CreateOrleansTables_MySQL.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\MySql\</PackagePath>
+      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
     </None>
-    <None Include="CreateOrleansTables_PostgreSql.sql">
+    <None Include="CreateOrleansTables_PostgreSQL.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\PostgreSql\</PackagePath>
+      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
     </None>
-    <None Include="CreateOrleansTables_SqlServer.sql">
+    <None Include="CreateOrleansTables_SQLServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>

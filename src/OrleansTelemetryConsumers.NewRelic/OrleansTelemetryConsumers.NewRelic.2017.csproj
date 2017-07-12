@@ -1,20 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="NuGet">
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
-    <Description>
-      NewRelic implementation of Orleans Telemetry API.
-    </Description>
+    <Description>NewRelic implementation of Orleans Telemetry API.</Description>
+    <PackageTags>$(PackageTags) NewRelic</PackageTags>
   </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <AssemblyName>Orleans.TelemetryConsumers.NewRelic</AssemblyName>
     <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="NewRelic.Agent.Api" Version="5.10.59.0" />
+    <PackageReference Include="NewRelic.Agent.Api" Version="$(NewRelicAgentApiVersion)" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
   </ItemGroup>

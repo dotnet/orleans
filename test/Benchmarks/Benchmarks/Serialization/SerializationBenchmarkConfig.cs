@@ -1,5 +1,5 @@
 ﻿using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Diagnostics.Windows;
+using BenchmarkDotNet.Diagnosers;
 
 namespace Benchmarks.Serialization
 {

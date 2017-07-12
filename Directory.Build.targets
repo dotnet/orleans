@@ -1,0 +1,9 @@
+<Project>
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and Exists('$(ProjectDir)..\Orleans.SDK.targets') " />
+  <!--End Orleans -->
+</Project>

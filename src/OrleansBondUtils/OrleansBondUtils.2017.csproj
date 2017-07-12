@@ -1,36 +1,34 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="NuGet">
     <PackageId>Microsoft.Orleans.Serialization.Bond</PackageId>
     <Title>Microsoft Orleans Bond Serializer</Title>
-    <Description>
-      Referencing this package allows Bond types to be serialized using the Bond Simple Binary serializer.
-    </Description>
+    <Description>Referencing this package allows Bond types to be serialized using the Bond Simple Binary serializer.</Description>
+    <PackageTags>$(PackageTags) Azure Bond</PackageTags>
   </PropertyGroup>
-  <PropertyGroup Label="Configuration">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-  </PropertyGroup>
+
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <AssemblyName>OrleansBondUtils</AssemblyName>
     <RootNamespace>OrleansBondUtils</RootNamespace>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
+
   <ItemGroup>
-    <Content Include="..\NuGet\BondSerializerInstall.ps1">
+    <Content Include="BondSerializerInstall.ps1">
       <Pack>true</Pack>
       <PackagePath>tools\Install.ps1</PackagePath>
       <Visible>false</Visible>
     </Content>
-    <Content Include="..\NuGet\BondSerializerUninstall.ps1">
+    <Content Include="BondSerializerUninstall.ps1">
       <Pack>true</Pack>
       <PackagePath>tools\Uninstall.ps1</PackagePath>
       <Visible>false</Visible>
     </Content>
   </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="Bond.Core.CSharp" Version="4.0.1" />
+    <PackageReference Include="Bond.Core.CSharp" Version="$(BondCoreCSharpVersion)" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />

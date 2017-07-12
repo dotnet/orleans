@@ -1,22 +1,22 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="NuGet">
     <PackageId>Microsoft.Orleans.OrleansAWSUtils</PackageId>
     <Title>Microsoft Orleans AWS Utilities</Title>
-    <Description>
-      Library of utility types for Amazon AWS of Microsoft Orleans.
-    </Description>
+    <Description>Library of utility types for Amazon AWS of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) AWS Amazon DynamoDB</PackageTags>
   </PropertyGroup>
+
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
     <AssemblyName>OrleansAWSUtils</AssemblyName>
     <RootNamespace>OrleansAWSUtils</RootNamespace>
+    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.1.5.2" />
-    <PackageReference Include="AWSSDK.SQS" Version="3.1.0.9" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="$(AWSSDKDynamoDBv2Version)" />
+    <PackageReference Include="AWSSDK.SQS" Version="$(AWSSDKSQSVersion)" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.2017.csproj" />

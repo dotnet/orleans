@@ -9,9 +9,11 @@ namespace Benchmarks.MapReduce
         {
             Add(new Job
             {
-                LaunchCount = 1,
-                TargetCount = 2,
-                WarmupCount = 0
+                Run = {
+                    LaunchCount = 1,
+                    TargetCount = 2,
+                    WarmupCount = 0
+                }
             });
         }
     }

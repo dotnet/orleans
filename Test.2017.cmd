@@ -14,7 +14,7 @@ SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%\TestResults
 
 if not exist %TestResultDir% md %TestResultDir%
 
-SET _Directory=bin\%CONFIGURATION%\net461\win
+SET _Directory=bin\%CONFIGURATION%\net462\win
 
 rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
 if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1

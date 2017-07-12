@@ -20,7 +20,7 @@ namespace Benchmarks.MapReduce
         private readonly int _repeats = 50000;
         private int _currentRepeat = 0;
 
-        [Setup]
+        [GlobalSetup]
         public void BenchmarkSetup()
         {
             var options = new TestClusterOptions(1);
