@@ -5,7 +5,7 @@ title: Grain cancellation tokens
 
 # Grain cancellation tokens
 
-The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel to cancel an executing grain operation. 
+The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel an executing grain operation. 
 
 
 ## Description
