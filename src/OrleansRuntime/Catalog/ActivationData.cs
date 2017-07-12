@@ -354,7 +354,9 @@ namespace Orleans.Runtime
         public IGrainLifeCycle ObservableLifeCycle => lifeCycle;
 
         internal ILifecycleObserver LifeCycle => lifeCycle;
-#endregion lifecycle
+        #endregion lifecycle
+
+        public ParameterInfo[] ConstructorParameters => GrainTypeData.ConstructorParameters;
 
         public void OnTimerCreated(IGrainTimer timer)
         {

@@ -48,11 +48,11 @@
     <Compile Include="ClientConnectionTests\GatewayConnectionTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DependencyInjectionDisambiguationTests.cs" />
-    <Compile Include="ActivationServices\LifecycleTests.cs" />
-    <Compile Include="ActivationServices\StorageActivationServiceGrain.cs" />
-    <Compile Include="ActivationServices\StorageActivationServiceImplementations.cs" />
-    <Compile Include="ActivationServices\StorageActivationServiceTests.cs" />
-    <Compile Include="ActivationServices\IStorageActivationService.cs" />
+    <Compile Include="Lifecycle\LifecycleTests.cs" />
+    <Compile Include="Facet\StorageFacetGrain.cs" />
+    <Compile Include="Facet\StorageFacetImplementations.cs" />
+    <Compile Include="Facet\StorageFacetTests.cs" />
+    <Compile Include="Facet\IStorageFacet.cs" />
     <Compile Include="GrainActivatorTests.cs" />
     <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
     <Compile Include="EventSourcingTests\ChatGrainTests.cs" />

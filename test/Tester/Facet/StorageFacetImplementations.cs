@@ -4,9 +4,9 @@ using Orleans;
 
 namespace Tester
 {
-    public class BlobStorageActivationService<TState> : IStorageActivationService<TState>
+    public class BlobStorageFacet<TState> : IStorageFacet<TState>
     {
-        public BlobStorageActivationService(string name)
+        public BlobStorageFacet(string name)
         {
             this.Name = name;
         }
@@ -26,11 +26,11 @@ namespace Tester
         }
     }
 
-    public class TableStorageActivationService<TState> : IStorageActivationService<TState>, ILifecycleObserver
+    public class TableStorageFacet<TState> : IStorageFacet<TState>, ILifecycleObserver
     {
         private bool activateCalled;
 
-        public TableStorageActivationService(string name)
+        public TableStorageFacet(string name)
         {
             this.Name = name;
         }

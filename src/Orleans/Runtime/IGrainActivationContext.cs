@@ -1,6 +1,7 @@
 ﻿using System;
 using Orleans.Core;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -26,5 +27,7 @@ namespace Orleans.Runtime
         IDictionary<object, object> Items { get; }
 
         IGrainLifeCycle ObservableLifeCycle { get; }
+
+        ParameterInfo[] ConstructorParameters { get; }
     }
 }

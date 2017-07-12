@@ -27,7 +27,7 @@ namespace Orleans
                     .OrderBy(group => group.Key))
                 {
                     highStage = observerGroup.Key;
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => orderedObserver.Observer.OnStart()));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(orderedObserver.Observer.OnStart)));
                 }
             }
             catch (Exception ex)
@@ -56,7 +56,7 @@ namespace Orleans
                 highStage = observerGroup.Key;
                 try
                 {
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => orderedObserver.Observer.OnStop()));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(orderedObserver.Observer.OnStop)));
                 }
                 catch (Exception ex)
                 {
@@ -78,6 +78,11 @@ namespace Orleans
         {
             OrderedObserver o;
             subscribers.TryRemove(key, out o);
+        }
+
+        private static async Task WrapExecution(Func<Task> action)
+        {
+            await action();
         }
 
         private class Disposable : IDisposable

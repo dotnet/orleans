@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Tester
 {
-    public class StorageActivationServiceTests : IClassFixture<StorageActivationServiceTests.Fixture>
+    public class StorageFacetTests : IClassFixture<StorageFacetTests.Fixture>
     {
         private Fixture fixture;
 
@@ -25,32 +25,32 @@ namespace Tester
             {
                 public IServiceProvider ConfigureServices(IServiceCollection services)
                 {
-                    services.AddSingleton(typeof(StorageActivationServiceFactory<>));
-                    services.AddTransient(typeof(IStorageActivationService<>), typeof(AttributedStorageActivationService<>));
+                    services.AddSingleton(typeof(StorageFacetFactory<>));
+                    services.AddTransient(typeof(IStorageFacet<>), typeof(AttributedStorageFacet<>));
                     return services.BuildServiceProvider();
                 }
             }
         }
 
-        public StorageActivationServiceTests(Fixture fixture)
+        public StorageFacetTests(Fixture fixture)
         {
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivationServices")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
         public async Task UserActivationServiceHappyPath()
         {
-            IStorageActivationServiceGrain grain = this.fixture.GrainFactory.GetGrain<IStorageActivationServiceGrain>(0);
+            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<IStorageFacetGrain>(0);
             string[] names = await grain.GetNames();
             Assert.Equal(2, names.Length);
             Assert.Equal("FirstState", names[0]);
             Assert.Equal("second", names[1]);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivationServices")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
         public async Task GetExtendedInfoFromActivationServices()
         {
-            IStorageActivationServiceGrain grain = this.fixture.GrainFactory.GetGrain<IStorageActivationServiceGrain>(0);
+            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<IStorageFacetGrain>(0);
             string[] info = await grain.GetExtendedInfo();
             Assert.Equal(2, info.Length);
             Assert.Equal("Blob:FirstState", info[0]);

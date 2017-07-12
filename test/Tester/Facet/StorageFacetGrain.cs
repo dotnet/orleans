@@ -3,22 +3,22 @@ using System.Threading.Tasks;
 
 namespace Tester
 {
-    public interface IStorageActivationServiceGrain : IGrainWithIntegerKey
+    public interface IStorageFacetGrain : IGrainWithIntegerKey
     {
         Task<string[]> GetNames();
         Task<string[]> GetExtendedInfo();
     }
 
-    public class StorageActivationServiceGrain : Grain, IStorageActivationServiceGrain
+    public class StorageFacetGrain : Grain, IStorageFacetGrain
     {
-        private readonly IStorageActivationService<string> first;
-        private readonly IStorageActivationService<string> second;
+        private readonly IStorageFacet<string> first;
+        private readonly IStorageFacet<string> second;
 
-        public StorageActivationServiceGrain(
-            [StorageActivationService("Blob", stateName: "FirstState")]
-            IStorageActivationService<string> first,
-            [StorageActivationService("Table")]
-            IStorageActivationService<string> second)
+        public StorageFacetGrain(
+            [StorageFacet("Blob", stateName: "FirstState")]
+            IStorageFacet<string> first,
+            [StorageFacet("Table")]
+            IStorageFacet<string> second)
         {
             this.first = first;
             this.second = second;

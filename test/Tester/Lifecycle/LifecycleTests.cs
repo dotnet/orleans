@@ -10,7 +10,7 @@ namespace Tester
 {
     public class LifecycleTests
     {
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task FullLifecycleTest()
         {
             const int observersPerStage = 2;
@@ -32,7 +32,7 @@ namespace Tester
             }
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task FailOnStartOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
@@ -73,7 +73,7 @@ namespace Tester
             }
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task FailOnStopOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
@@ -133,18 +133,20 @@ namespace Tester
                 this.failOnStop = failOnStop;
             }
 
-            public async Task OnStart()
+            public Task OnStart()
             {
                 this.Started = true;
                 this.FailedOnStart = this.failOnStart;
                 if(this.failOnStart) throw new Exception("failOnStart");
+                return Task.CompletedTask;
             }
 
-            public async Task OnStop()
+            public Task OnStop()
             {
                 this.Stopped = true;
                 this.FailedOnStop = this.failOnStop;
                 if (this.failOnStop) throw new Exception("failOnStop");
+                return Task.CompletedTask;
             }
         }
         private async Task<Dictionary<TestStages,List<Observer>>> RunLifeCycle(Dictionary<TestStages,int> observerCountByStage, TestStages? failOnStart, TestStages? failOnStop)
