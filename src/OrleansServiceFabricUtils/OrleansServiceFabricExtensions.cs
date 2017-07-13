@@ -39,6 +39,8 @@ namespace Microsoft.Orleans.ServiceFabric
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
 
+            serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
+
             // In order to support local, replicated persistence, the state manager must be registered.
             serviceCollection.AddTransient(_ => service.StateManager);
             serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
@@ -66,6 +68,9 @@ namespace Microsoft.Orleans.ServiceFabric
                         sp.GetService<IFabricQueryManager>(),
                         sp.GetService<Factory<string, Logger>>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
+
+            serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
+
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
 

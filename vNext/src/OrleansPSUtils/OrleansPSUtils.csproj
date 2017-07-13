@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.OrleansPSUtils</PackageId>
+    <Title>Microsoft Orleans PowerShell Utilities</Title>
+    <Description>Library of utility types for PowerShell of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) PowerShell</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <AssemblyName>OrleansPSUtils</AssemblyName>
+    <RootNamespace>OrleansPSUtils</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansPSUtils\**\*.cs" Exclude="..\..\..\src\OrleansPSUtils\obj\**\*.cs;..\..\..\src\OrleansPSUtils\bin\**\*.cs" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(OutDir)' != ''">
+    <OutDir>$(OutDir)\Orleans\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutDir)' == ''">
+    <OutDir>bin\$(Configuration)\$(TargetFramework)\Orleans\</OutDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\OrleansPSUtils\OrleansPSUtils.psd1" Link="OrleansPSUtils.psd1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+  </ItemGroup>
+
+  <Target Name="AfterBuildHack" AfterTargets="AfterBuild">
+    <ItemGroup>
+      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)OrleansPSUtils.psd1'))" />
+    </ItemGroup>
+    <PropertyGroup>
+      <VersionToEmbed>$(Version)</VersionToEmbed>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(OutDir)OrleansPSUtils.psd1" Lines="@(_PSDFileContent-&gt;Replace('$version$', '$(VersionToEmbed)'))" Overwrite="true" ContinueOnError="true" />
+  </Target>
+</Project>

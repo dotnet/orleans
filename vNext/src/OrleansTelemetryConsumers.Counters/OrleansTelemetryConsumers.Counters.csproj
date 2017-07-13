@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</PackageId>
+    <Title>Microsoft Orleans Telemetry Consumer - Performance Counters</Title>
+    <Description>Microsoft Windows Performance Counters implementation of Orleans Telemetry API.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>OrleansTelemetryConsumers.Counters</AssemblyName>
+    <RootNamespace>OrleansTelemetryConsumers.Counters</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansTelemetryConsumers.Counters\**\*.cs" Exclude="..\..\..\src\OrleansTelemetryConsumers.Counters\obj\**\*.cs;..\..\..\src\OrleansTelemetryConsumers.Counters\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Configuration.Install" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+  </ItemGroup>
+</Project>

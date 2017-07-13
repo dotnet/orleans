@@ -1,19 +1,14 @@
-﻿#if !NETSTANDARD_TODO
-using Orleans;
+﻿using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using TesterInternal;
-using UnitTests;
 using UnitTests.GrainInterfaces;
-using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBStorageProvider;
@@ -86,7 +81,6 @@ namespace AWSUtils.Tests.StorageTests
                 output.WriteLine("Unable to connect to AWS DynamoDB simulator");
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             }
-
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -219,5 +213,3 @@ namespace AWSUtils.Tests.StorageTests
         }
     }
 }
-
-#endif

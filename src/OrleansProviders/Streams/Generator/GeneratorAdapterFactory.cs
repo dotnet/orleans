@@ -8,6 +8,8 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Runtime.Configuration;
+using System.Diagnostics;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -42,6 +44,8 @@ namespace Orleans.Providers.Streams.Generator
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private Logger logger;
         private SerializationManager serializationManager;
+        private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
+        private MonitorAggregationDimensions sharedDimensions;
 
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
@@ -54,6 +58,24 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <returns>The direction in which this adapter provides data.</returns>
         public StreamProviderDirection Direction => StreamProviderDirection.ReadOnly;
+
+        /// <summary>
+        /// Create a cache monitor to report cache related metrics
+        /// Return a ICacheMonitor
+        /// </summary>
+        protected Func<CacheMonitorDimensions, Logger, ICacheMonitor> CacheMonitorFactory;
+
+        /// <summary>
+        /// Create a block pool monitor to monitor block pool related metrics
+        /// Return a IBlockPoolMonitor
+        /// </summary>
+        protected Func<BlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> BlockPoolMonitorFactory;
+
+        /// <summary>
+        /// Create a monitor to monitor QueueAdapterReceiver related metrics
+        /// Return a IQueueAdapterReceiverMonitor
+        /// </summary>
+        protected Func<ReceiverMonitorDimensions, Logger, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
         /// <summary>
         /// Initialize the factory
@@ -70,6 +92,12 @@ namespace Orleans.Providers.Streams.Generator
             adapterConfig = new GeneratorAdapterConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
+            if (CacheMonitorFactory == null)
+                this.CacheMonitorFactory = (dimensions, logger) => new DefaultCacheMonitor(dimensions, logger);
+            if (this.BlockPoolMonitorFactory == null)
+                this.BlockPoolMonitorFactory = (dimensions, logger) => new DefaultBlockPoolMonitor(dimensions, logger);
+            if (this.ReceiverMonitorFactory == null)
+                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultQueueAdapterReceiverMonitor(dimensions, logger);
             if (adapterConfig.GeneratorConfigType != null)
             {
                 generatorConfig = (IStreamGeneratorConfig)(serviceProvider?.GetService(adapterConfig.GeneratorConfigType) ?? Activator.CreateInstance(adapterConfig.GeneratorConfigType));
@@ -79,8 +107,19 @@ namespace Orleans.Providers.Streams.Generator
                 }
                 generatorConfig.PopulateFromProviderConfig(providerConfig);
             }
-            // 10 meg buffer pool.  10 1 meg blocks
-            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1<<20), 10);
+            this.sharedDimensions = new MonitorAggregationDimensions(serviceProvider.GetService<GlobalConfiguration>(), serviceProvider.GetService<NodeConfiguration>());
+        }
+
+        private void CreateBufferPoolIfNotCreatedYet()
+        {
+            if (this.bufferPool == null)
+            {
+                // 1 meg block size pool
+                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
+                var oneMb = 1 << 20;
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.logger.GetSubLogger(typeof(DefaultBlockPoolMonitor).Name)), oneMb);
+                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+            }
         }
 
         /// <summary>
@@ -148,7 +187,9 @@ namespace Orleans.Providers.Streams.Generator
         /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver());
+            var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
+            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, logger.GetSubLogger(typeof(IQueueAdapterReceiverMonitor).Name));
+            Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
             SetGeneratorOnReciever(receiver);
             return receiver;
         }
@@ -183,21 +224,36 @@ namespace Orleans.Providers.Streams.Generator
         {
             const int MaxDelayMs = 20;
             private readonly Random random = new Random((int)DateTime.UtcNow.Ticks % int.MaxValue);
-
+            private IQueueAdapterReceiverMonitor receiverMonitor;
             public IStreamGenerator QueueGenerator { private get; set; }
+
+            public Receiver(IQueueAdapterReceiverMonitor receiverMonitor)
+            {
+                this.receiverMonitor = receiverMonitor;
+            }
 
             public Task Initialize(TimeSpan timeout)
             {
+                this.receiverMonitor?.TrackInitialization(true, TimeSpan.MinValue, null);
                 return Task.CompletedTask;
             }
 
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
+                var watch = Stopwatch.StartNew();
                 await Task.Delay(random.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, out batches))
                 {
                     return new List<IBatchContainer>();
+                }
+                watch.Stop();
+                this.receiverMonitor?.TrackRead(true, watch.Elapsed, null);
+                if (batches.Count > 0)
+                {
+                    var oldestMessage = batches[0] as GeneratedBatchContainer;
+                    var newestMessage = batches[batches.Count - 1] as GeneratedBatchContainer;
+                    this.receiverMonitor?.TrackMessagesReceived(batches.Count, oldestMessage?.EnqueueTimeUtc, newestMessage?.EnqueueTimeUtc);
                 }
                 return batches;
             }
@@ -209,6 +265,7 @@ namespace Orleans.Providers.Streams.Generator
 
             public Task Shutdown(TimeSpan timeout)
             {
+                this.receiverMonitor?.TrackShutdown(true, TimeSpan.MinValue, null);
                 return Task.CompletedTask;
             }
         }
@@ -236,7 +293,12 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new GeneratorPooledCache(bufferPool, logger, serializationManager);
+            //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side.
+            CreateBufferPoolIfNotCreatedYet();
+            var dimensions = new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
+            var cacheMonitor = this.CacheMonitorFactory(dimensions, logger.GetSubLogger(typeof(ICacheMonitor).Name));
+            return new GeneratorPooledCache(bufferPool, logger.GetSubLogger(typeof(GeneratorPooledCache).Name), serializationManager, 
+                cacheMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
     }
 }

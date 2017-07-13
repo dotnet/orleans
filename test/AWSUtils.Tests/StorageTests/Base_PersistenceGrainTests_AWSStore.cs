@@ -1,5 +1,4 @@
-﻿#if !NETSTANDARD_TODO
-using Orleans;
+﻿using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost;
@@ -440,5 +439,3 @@ namespace AWSUtils.Tests.StorageTests
         #endregion
     }
 }
-
-#endif

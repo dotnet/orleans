@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.ServiceFabric</PackageId>
+    <Title>Microsoft Orleans Service Fabric Support</Title>
+    <Description>Support for hosting Microsoft Orleans on Service Fabric.</Description>
+    <PackageTags>$(PackageTags) Azure ServiceFabric</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <PackageTargetFallback>$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+    <PlatformTarget>x64</PlatformTarget>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AssemblyName>Microsoft.Orleans.ServiceFabric</AssemblyName>
+    <RootNamespace>Microsoft.Orleans.ServiceFabric</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansServiceFabricUtils\**\*.cs" Exclude="..\..\..\src\OrleansServiceFabricUtils\obj\**\*.cs;..\..\..\src\OrleansServiceFabricUtils\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ServiceFabric.Services" Version="2.4.145" />
+    <PackageReference Include="Newtonsoft.Json" version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+  </ItemGroup>
+</Project>

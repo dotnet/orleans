@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Startup
                 return servicesMethod.Build(instance, serviceCollection);
             }
 
-            return serviceCollection.BuildServiceProvider();
+            return serviceCollection.BuildServiceProvider(validateScopes: true);
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)

@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>TestServiceFabric</RootNamespace>
+    <AssemblyName>TestServiceFabric</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestServiceFabric\**\*.cs" Exclude="..\..\..\test\TestServiceFabric\obj\**\*.cs;..\..\..\test\TestServiceFabric\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="FluentAssertions" Version="4.18.0" />
+    <PackageReference Include="Microsoft.ServiceFabric.Services" Version="2.4.145" />
+    <PackageReference Include="NSubstitute" Version="1.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansServiceFabricUtils\OrleansServiceFabricUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\test\TestServiceFabric\App.config">
+      <Link>App.config</Link>
+    </None>
+    <None Include="..\..\..\test\TestServiceFabric\TestServiceFabric.xunit.runner.json">
+      <Link>ServiceBus.Tests.xunit.runner.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

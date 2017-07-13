@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Scheduler
             try
             {
                 var grain = activation.GrainInstance;
-                var runtimeClient = (ISiloRuntimeClient)grain.GrainReference.RuntimeClient;
+                var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);
                 task.ContinueWith(t =>
                 {

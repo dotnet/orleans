@@ -5,7 +5,7 @@ SET CMDHOME=%~dp0.
 
 @REM Locate VS 2017 with the proper method
 
-SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/1.0.62/vswhere.exe
+SET VSWHERE_REMOTE_PATH=https://github.com/Microsoft/vswhere/releases/download/2.0.2/vswhere.exe
 SET VSWHERE_LOCAL_DIR=%CMDHOME%\Tools
 SET VSWHERE_LOCAL_PATH=%VSWHERE_LOCAL_DIR%\vswhere.exe
 
@@ -110,6 +110,8 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
 REM Build VSIX only if new tooling was found
 
+:VSIX
+if NOT "%BuildOrleansVSIX%" == "true" goto :EOF
 if "%VS2017InstallDir%" == "" goto :EOF
 
 @echo Build VSIX ============================

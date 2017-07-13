@@ -6,7 +6,7 @@
     <Icon>GrainImplementationCSharp.ico</Icon>
     <ProjectType>CSharp</ProjectType>
     <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
-    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.6.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <DefaultName>MyGrain.cs</DefaultName>
   </TemplateData>
@@ -24,7 +24,7 @@
   </WizardExtension>
   <WizardData>
     <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
-      <package id="Microsoft.Orleans.Core" version="1.4.0" />
+      <package id="Microsoft.Orleans.Core" version="1.5.0" />
     </packages>
   </WizardData>
 </VSTemplate>

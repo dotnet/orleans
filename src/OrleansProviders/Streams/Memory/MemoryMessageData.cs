@@ -21,6 +21,17 @@ namespace Orleans.Providers
         /// Position of even in stream.
         /// </summary>
         public long SequenceNumber;
+
+        /// <summary>
+        /// Time message was read from message queue
+        /// </summary>
+        public DateTime DequeueTimeUtc;
+
+        /// <summary>
+        /// Time message was written to message queue
+        /// </summary>
+        public DateTime EnqueueTimeUtc;
+
         /// <summary>
         /// Serialized event data.
         /// </summary>
@@ -32,6 +43,7 @@ namespace Orleans.Providers
             {
                 StreamGuid = streamGuid,
                 StreamNamespace = streamNamespace,
+                EnqueueTimeUtc = DateTime.UtcNow,
                 Payload = arraySegment
             };
         }

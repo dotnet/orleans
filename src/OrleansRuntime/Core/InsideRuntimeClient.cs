@@ -40,6 +40,7 @@ namespace Orleans.Runtime
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
         private readonly List<IGrainCallFilter> siloInterceptors;
+        private IGrainReferenceRuntime grainReferenceRuntime;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -97,6 +98,8 @@ namespace Orleans.Runtime
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
         #region Implementation of IRuntimeClient
+
+        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
         public void SendRequest(
             GrainReference target,
@@ -284,7 +287,7 @@ namespace Orleans.Runtime
                 RequestContext.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
-                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message));
+                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
                 }
@@ -335,11 +338,20 @@ namespace Orleans.Runtime
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
-                    if (exc1 is InconsistentStateException && target is Grain)
+                    // If a grain allowed an inconsistent state exception to escape and the exception originated from
+                    // this activation, then deactivate it.
+                    var ise = exc1 as InconsistentStateException;
+                    if (ise != null && ise.IsSourceActivation)
                     {
-                        var activation = ((Grain)target).Data;
-                        invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
-                        this.DeactivateOnIdle(activation.ActivationId);
+                        // Mark the exception so that it doesn't deactivate any other activations.
+                        ise.IsSourceActivation = false;
+
+                        var activation = (target as Grain)?.Data;
+                        if (activation != null)
+                        {
+                            invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                            this.DeactivateOnIdle(activation.ActivationId);
+                        }
                     }
 
                     if (message.Direction != Message.Directions.OneWay)

@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="NuGet">
+    <PackageId>Microsoft.Orleans.OrleansManager</PackageId>
+    <Title>Microsoft Orleans Management Tool</Title>
+    <Description>Management tool of Microsoft Orleans for remote management of Orleans deployment.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <RootNamespace>OrleansManager</RootNamespace>
+    <AssemblyName>OrleansManager</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansManager\**\*.cs" Exclude="..\..\..\src\OrleansManager\obj\**\*.cs;..\..\..\src\OrleansManager\bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\src\SDK\ClientConfiguration.xml">
+      <Link>ClientConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\src\OrleansManager\Microsoft.Orleans.OrleansManager.targets">
+      <Link>Microsoft.Orleans.OrleansManager.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\OrleansManager\README.txt">
+      <Link>README.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\OrleansManager\runOrleansManager.cmd">
+      <Link>runOrleansManager.cmd</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

@@ -1,8 +1,9 @@
 ﻿
 using System;
-using System.Collections.Generic;
 using Orleans.Runtime;
 using System.Threading;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -14,7 +15,7 @@ namespace Orleans.Providers.Streams.Common
         where T : PooledResource<T>
     {
         private const int DefaultPoolCapacity = 1 << 10; // 1k
-        private readonly Stack<T> pool;
+        private readonly ConcurrentStack<T> pool;
         private readonly Func<T> factoryFunc;
         private long totalObjects;
         private Timer timer;
@@ -27,21 +28,17 @@ namespace Orleans.Providers.Streams.Common
         /// Simple object pool
         /// </summary>
         /// <param name="factoryFunc">Function used to create new resources of type T</param>
-        /// <param name="initialCapacity">Initial number of items to allocate</param>
         /// <param name="monitor">monitor to report statistics for object pool</param>
         /// <param name="monitorWriteInterval"></param>
-        public ObjectPool(Func<T> factoryFunc, int initialCapacity = DefaultPoolCapacity, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
+        public ObjectPool(Func<T> factoryFunc, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
         {
             if (factoryFunc == null)
             {
                 throw new ArgumentNullException("factoryFunc");
             }
-            if (initialCapacity < 0)
-            {
-                throw new ArgumentOutOfRangeException("initialCapacity");
-            }
+
             this.factoryFunc = factoryFunc;
-            pool = new Stack<T>(initialCapacity);
+            pool = new ConcurrentStack<T>();
             this.monitor = monitor;
 
             if (this.monitor != null && monitorWriteInterval.HasValue)
@@ -58,14 +55,11 @@ namespace Orleans.Providers.Streams.Common
         public virtual T Allocate()
         {
             T resource;
-            if (pool.Count != 0)
-            {
-                resource = pool.Pop();
-            }
-            else
+            //if couldn't pop a resource from the pool, create a new resource using factoryFunc from outside of the pool
+            if (!pool.TryPop(out resource))
             {
                 resource = factoryFunc();
-                this.totalObjects++;
+                Interlocked.Increment(ref this.totalObjects);
             }
             this.monitor?.TrackObjectAllocated();
             resource.Pool = this;

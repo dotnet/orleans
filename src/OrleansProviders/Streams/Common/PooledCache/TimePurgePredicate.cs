@@ -1,7 +1,7 @@
 ﻿
 using System;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Determines if data should be purged based off time.
@@ -10,11 +10,6 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly TimeSpan minTimeInCache;
         private readonly TimeSpan maxRelativeMessageAge;
-
-        /// <summary>
-        /// Default time purge predicate never purges by time.
-        /// </summary>
-        public static readonly TimePurgePredicate Default = new TimePurgePredicate(TimeSpan.MinValue, TimeSpan.MaxValue);
 
         /// <summary>
         /// Contructor

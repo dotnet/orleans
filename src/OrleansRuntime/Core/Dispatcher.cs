@@ -12,8 +12,6 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
-using Orleans.Versions.Compatibility;
-
 
 namespace Orleans.Runtime
 {
@@ -62,6 +60,8 @@ namespace Orleans.Runtime
             errorInjectionRate = rejectionInjectionRate + messageLossInjectionRate;
             random = new SafeRandom();
         }
+
+        public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
         #region Receive path
 
@@ -366,7 +366,7 @@ namespace Orleans.Runtime
 
                 var newChain = new List<RequestInvocationHistory>();
                 newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
-                newChain.Add(new RequestInvocationHistory(message));
+                newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                 
                 throw new DeadlockException(newChain);
             }
@@ -476,8 +476,14 @@ namespace Orleans.Runtime
             {
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
-            logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests, 
-                String.Format("Forwarding {0} requests to old address {1} after {2}.", messages.Count, oldAddress, failedOperation));
+
+            if (logger.IsInfo)
+            {
+                logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests,
+                    string.Format("Forwarding {0} requests destined for address {1} to address {2} after {3}.",
+                        messages.Count, oldAddress, forwardingAddress,
+                        failedOperation));
+            }
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             scheduler.QueueWorkItem(new ClosureWorkItem(

@@ -7,7 +7,7 @@
     <ProjectType>CSharp</ProjectType>
     <TemplateID>Orleans.Templates.Project.GrainInterface</TemplateID>
     <TemplateGroupID>Orleans</TemplateGroupID>
-    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.6.1</RequiredFrameworkVersion>
     <CreateNewFolder>true</CreateNewFolder>
     <ProvideDefaultName>true</ProvideDefaultName>
     <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
@@ -26,8 +26,8 @@
   </WizardExtension>
   <WizardData>
     <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
-      <package id="Microsoft.Orleans.Core" version="1.4.0" />
-      <package id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="1.4.0" />
+      <package id="Microsoft.Orleans.Core" version="1.5.0" />
+      <package id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="1.5.0" />
     </packages>
   </WizardData>
 </VSTemplate>

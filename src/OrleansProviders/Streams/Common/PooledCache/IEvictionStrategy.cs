@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -26,14 +22,24 @@ namespace Orleans.Providers.Streams.Common
         /// Method which should be called when pulling agent try to do a purge on the cache
         /// </summary>
         /// <param name="utcNow"></param>
-        /// <param name="purgeRequest"></param>
-        void PerformPurge(DateTime utcNow, IDisposable purgeRequest = null);
+        void PerformPurge(DateTime utcNow);
 
         /// <summary>
         /// Method which should be called when data adapter allocated a new block
         /// </summary>
         /// <param name="newBlock"></param>
-        void OnBlockAllocated(IDisposable newBlock);
+        void OnBlockAllocated(FixedSizeBuffer newBlock);
+    }
+
+    public static class EvictionStrategyCommonUtils
+    {
+        public static void WireUpEvictionStrategy<TQueueMessage, TCachedMessage>(PooledQueueCache<TQueueMessage, TCachedMessage> cache,
+            ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, IEvictionStrategy<TCachedMessage> evictionStrategy)
+            where TCachedMessage : struct
+        {
+            evictionStrategy.PurgeObservable = cache;
+            cacheDataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+        }
     }
 
     /// <summary>

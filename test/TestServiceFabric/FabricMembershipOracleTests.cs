@@ -67,9 +67,9 @@ namespace TestServiceFabric
 
             await this.oracle.Stop();
             AssertStatus(SiloStatus.Stopping);
-            Assert.DoesNotContain(this.oracle, this.resolver.Handlers);
             
             await this.oracle.KillMyself();
+            Assert.DoesNotContain(this.oracle, this.resolver.Handlers);
             AssertStatus(SiloStatus.Dead);
         }
 
@@ -132,11 +132,11 @@ namespace TestServiceFabric
                     SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 4), 2),
                     "OtherNewSilo"),
             };
-
-            listener.VersionReached.Reset();
-            listener.WaitForVersion = 4;
+            
+            // The local silo transitioned to 'Joining' and then 'Active' and two other silos became 'Active',
+            // so the version must be 4
             this.resolver.Notify(silos);
-            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
+            listener.WaitForVersion(4);
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Active, listener.Silos[silos[1].SiloAddress]);
@@ -154,9 +154,9 @@ namespace TestServiceFabric
             Assert.Equal(2, multiClusters.Count);
 
             // Remove a silo and verify that it's been removed.
-            listener.WaitForVersion = 5;
+            // The single removal will bump the version to 5.
             this.resolver.Notify(new[] {silos[1]});
-            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
+            listener.WaitForVersion(5);
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
             Assert.Equal(SiloStatus.Active, listener.Silos[silos[1].SiloAddress]);
@@ -168,7 +168,7 @@ namespace TestServiceFabric
 
             // Remove a silo and verify that it's been removed.
             this.resolver.Notify(new FabricSiloInfo[0]);
-            listener.VersionReached.WaitOne(TimeSpan.FromMinutes(1));
+            listener.WaitForVersion(6);
 
             Assert.Equal(3, listener.Silos.Count);
             Assert.Contains(silos[1].SiloAddress, listener.Silos.Keys);
@@ -214,18 +214,39 @@ namespace TestServiceFabric
 
         private class MockStatusListener : ISiloStatusListener
         {
-            public int Version { get; private set; }
-            public int WaitForVersion { get; set; }
-            public AutoResetEvent VersionReached { get; } = new AutoResetEvent(false);
+            private readonly AutoResetEvent versionUpdated = new AutoResetEvent(false);
             public Dictionary<SiloAddress, SiloStatus> Silos { get; } = new Dictionary<SiloAddress, SiloStatus>();
             public List<Tuple<SiloAddress, SiloStatus>> Notifications { get; } = new List<Tuple<SiloAddress, SiloStatus>>();
+            private int Version => this.Notifications.Count;
 
             public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
             {
-                this.Notifications.Add(Tuple.Create(updatedSilo, status));
+                SiloStatus existingStatus;
+                if (this.Silos.TryGetValue(updatedSilo, out existingStatus))
+                {
+                    if (existingStatus == status) throw new InvalidOperationException($"Silo {updatedSilo} already has status {status}.");
+                }
                 this.Silos[updatedSilo] = status;
-                this.Version++;
-                if (this.Version >= this.WaitForVersion) this.VersionReached.Set();
+                this.Notifications.Add(Tuple.Create(updatedSilo, status));
+                this.versionUpdated.Set();
+            }
+
+            public void WaitForVersion(int version)
+            {
+                while (version > this.Version)
+                {
+                    // If we are at the correct version, exit without waiting.
+                    if (this.Version >= version)
+                    {
+                        break;
+                    }
+
+                    // Wait to be pulsed by an incoming update.
+                    this.versionUpdated.WaitOne(TimeSpan.FromSeconds(1));
+                }
+
+                // Wake up any waiters to check the current version.
+                this.versionUpdated.Set();
             }
         }
 
@@ -248,18 +269,12 @@ namespace TestServiceFabric
             public Task Refresh()
             {
                 this.RefreshCalled++;
-                return Task.FromResult(0);
+                return Task.CompletedTask;
             }
 
             public void Notify(FabricSiloInfo[] update)
             {
                 foreach (var handler in this.Handlers) handler.OnUpdate(update);
-            }
-
-            public void Reset()
-            {
-                this.Handlers.Clear();
-                this.RefreshCalled = 0;
             }
         }
     }

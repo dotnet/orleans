@@ -1,5 +1,4 @@
-﻿#if !NETSTANDARD_TODO
-using Orleans;
+﻿using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
@@ -91,5 +90,3 @@ namespace Consul.Tests
         }
     }
 }
-
-#endif

@@ -29,7 +29,7 @@
   </PropertyGroup>
 
   <!-- Until VS2017 Update 3 released we've to exclude the F# bits from compilation -->
-  <PropertyGroup Condition="'$(IncludeFSharp)'==''">
+  <PropertyGroup Condition="'$(IncludeFSharp)'!='true'">
     <DefineConstants>$(DefineConstants);EXCLUDEFSHARP</DefineConstants>
   </PropertyGroup>
 

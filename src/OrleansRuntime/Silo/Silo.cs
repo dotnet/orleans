@@ -216,6 +216,12 @@ namespace Orleans.Runtime
             services.AddTransient(sp => initializationParams.GlobalConfig);
             services.AddTransient<Func<NodeConfiguration>>(sp => () => initializationParams.NodeConfig);
             services.AddTransient(typeof(IStreamSubscriptionObserver<>),typeof(StreamSubscriptionObserverProxy<>));
+            //queue balancer contructing related
+            services.AddTransient<StaticClusterConfigDeploymentBalancer>();
+            services.AddTransient<DynamicClusterConfigDeploymentBalancer>();
+            services.AddTransient<DynamicAzureDeploymentBalancer>();
+            services.AddTransient<StaticAzureDeploymentBalancer>();
+            services.AddTransient<ConsistentRingQueueBalancer>();
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.AddSingleton<SerializationManager>();
@@ -229,6 +235,7 @@ namespace Orleans.Runtime
             services.AddFromExisting<IGrainFactory, GrainFactory>();
             services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
+            services.AddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
             services.AddSingleton<ActivationDirectory>();
@@ -305,6 +312,8 @@ namespace Orleans.Runtime
             services.AddSingleton<Catalog>();
             services.AddSingleton<GrainCreator>();
             services.AddSingleton<IGrainActivator, DefaultGrainActivator>();
+            services.AddScoped<ActivationData.GrainActivationContextFactory>();
+            services.AddScoped<IGrainActivationContext>(sp => sp.GetRequiredService<ActivationData.GrainActivationContextFactory>().Context);
 
             services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)

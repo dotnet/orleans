@@ -1,6 +1,4 @@
 using System;
-using Newtonsoft.Json;
-using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -16,7 +14,6 @@ namespace Orleans.Runtime
             get { return Grain != null && Activation != null && Silo != null; }
         }
 
-        [JsonConstructor]
         private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
             Silo = silo;

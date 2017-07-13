@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -19,19 +18,19 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task BlastCallNewGrains(int nGrains, long startingKey, int nCallsToEach)
+        public Task BlastCallNewGrains(int nGrains, long startingKey, int nCallsToEach)
         {
-            var promises = new List<Task>();
+            var promises = new List<Task>(nGrains * nCallsToEach);
 
             for (int i = 0; i < nGrains; i++)
             {
-                var grain = GrainFactory.GetGrain<ICatalogTestGrain>((startingKey + i).ToString(CultureInfo.InvariantCulture));
+                var grain = GrainFactory.GetGrain<ICatalogTestGrain>(startingKey + i);
 
-                for(int j=0; j<nCallsToEach; j++)
+                for (int j = 0; j < nCallsToEach; j++)
                     promises.Add(grain.Initialize());
             }
 
-            await Task.WhenAll(promises);
+            return Task.WhenAll(promises);
         }
     }
 }

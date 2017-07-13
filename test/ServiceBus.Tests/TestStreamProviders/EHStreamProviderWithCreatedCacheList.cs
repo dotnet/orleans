@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                     var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, cacheLogger);
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
-                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, cacheMonitor, providerSettings.StatisticMonitorWriteInterval, timePurge),
+                        EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge, cacheMonitor, providerSettings.StatisticMonitorWriteInterval),
                         cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
                     this.caches.Add(cache);
                     return cache;

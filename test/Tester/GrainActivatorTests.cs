@@ -70,7 +70,7 @@ namespace UnitTests.General
                 {
                     if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
                     {
-                        return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(), HardcodedValue, numberOfReleasedInstances);
+                        return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(null), HardcodedValue, numberOfReleasedInstances);
                     }
 
                     return base.Create(context);

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -11,18 +12,8 @@ namespace Orleans.ServiceBus.Providers
     /// Base class for monitor aggregation dimensions, whcih is a information bag for the monitoring target. 
     /// Monitors can use this information bag to build its aggregation dimensions.
     /// </summary>
-    public class EventHubMonitorAggregationDimensions
+    public class EventHubMonitorAggregationDimensions : MonitorAggregationDimensions
     {
-        /// <summary>
-        /// Data object holding Silo global configuration parameters.
-        /// </summary>
-        public GlobalConfiguration GlobalConfig { get; set; }
-
-        /// <summary>
-        /// Individual node-specific silo configuration parameters.
-        /// </summary>
-        public NodeConfiguration NodeConfig { get; set; }
-
         /// <summary>
         /// Eventhub path
         /// </summary>
@@ -35,9 +26,8 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="nodeConfig"></param>
         /// <param name="ehHubPath"></param>
         public EventHubMonitorAggregationDimensions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig, string ehHubPath)
+            :base(globalConfig, nodeConfig)
         {
-            this.GlobalConfig = globalConfig;
-            this.NodeConfig = nodeConfig;
             this.EventHubPath = ehHubPath;
         }
 
@@ -46,9 +36,8 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="dimensions"></param>
         public EventHubMonitorAggregationDimensions(EventHubMonitorAggregationDimensions dimensions)
+            :base(dimensions.GlobalConfig, dimensions.NodeConfig)
         {
-            this.GlobalConfig = dimensions.GlobalConfig;
-            this.NodeConfig = dimensions.NodeConfig;
             this.EventHubPath = dimensions.EventHubPath;
         }
 
@@ -97,7 +86,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Block pool this cache belongs to
         /// </summary>
-        public string ObjectPoolId { get; set; }
+        public string BlockPoolId { get; set; }
 
         /// <summary>
         /// Constructor
@@ -108,7 +97,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubCacheMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition, string blockPoolId)
             :base(dimensions, ehPartition)
         {
-            this.ObjectPoolId = blockPoolId;
+            this.BlockPoolId = blockPoolId;
         }
 
         /// <summary>

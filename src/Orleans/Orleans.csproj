@@ -95,6 +95,10 @@
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
     <Compile Include="Core\ClusterClient.cs" />
+    <Compile Include="Runtime\GrainReferenceRuntime.cs" />
+    <Compile Include="Serialization\GrainReferenceSerializer.cs" />
+    <Compile Include="Providers\ILeaseProvider.cs" />
+    <Compile Include="Runtime\IGrainActivationContext.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />
@@ -105,7 +109,6 @@
     <Compile Include="Messaging\MessageFactory.cs" />
     <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
-    <Compile Include="CodeGeneration\GrainState.cs" />
     <Compile Include="CodeGeneration\ICodeGeneratorCache.cs" />
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
     <Compile Include="CodeGeneration\IRuntimeCodeGenerator.cs" />
@@ -129,6 +132,7 @@
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
+    <Compile Include="Runtime\IGrainReferenceRuntime.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
     <Compile Include="Runtime\RingRange.cs" />
@@ -273,7 +277,6 @@
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
     <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
-    <Compile Include="Streams\PersistentStreams\StreamQueueBalancerType.cs" />
     <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />
     <Compile Include="Streams\Predicates\IStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\Core\IAsyncObservable.cs" />

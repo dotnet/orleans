@@ -42,7 +42,7 @@ namespace ServiceBus.Tests.StreamingTests
                 EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName) { CacheSizeMb = 3 };
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         public override TestCluster CreateTestCluster()
         {
@@ -189,7 +189,7 @@ namespace ServiceBus.Tests.StreamingTests
             CheckpointerSettings.WriteProperties(settings);
 
             // add queue balancer setting
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
 
             // add pub/sub settting
             settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());

@@ -14,7 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans\Orleans.2017.csproj">
-      <Name>TestFSharpInterfaces.2017</Name>
+      <Name>Orleans.2017</Name>
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Private>True</Private>
     </ProjectReference>
