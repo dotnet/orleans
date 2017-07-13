@@ -1,3 +1,5 @@
+- name: Stateless Worker Grains
+  href: StatelessWorker.md
 - name: Interceptors
   href: Interceptors.md
 - name: Reentrant Grains
