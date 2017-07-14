@@ -80,32 +80,34 @@
 <p>A <strong>GrainCancellationTokenSource</strong> is a object that provides a cancellation token through its Token property and sends a cancellation message by calling its  <code>Cancel</code> method.  </p>
 <h2 id="usage">Usage</h2>
 <ul>
-<li>Instantiate a CancellationTokenSource object, which manages and sends cancellation notification to the individual cancellation tokens.
-<code>csharp
-      var tcs = new GrainCancellationTokenSource();</code></li>
+<li>Instantiate a CancellationTokenSource object, which manages and sends cancellation notification to the individual cancellation tokens.</li>
+</ul>
+<pre><code class="lang-csharp">        var tcs = new GrainCancellationTokenSource();
+</code></pre><ul>
 <li>Pass the token returned by the GrainCancellationTokenSource.Token property to each grain method that listens for cancellation.</li>
 </ul>
 <pre><code class="lang-csharp">        var waitTask = grain.LongIoWork(tcs.Token, TimeSpan.FromSeconds(10));
 </code></pre><ul>
-<li>A cancellable grain operation needs to handle underlying <strong>CancellationToken</strong> property of <strong>GrainCancellationToken</strong> just like it would do in any other .NET code.
-<code>csharp
-      public async Task LongIoWork(GrainCancellationToken tc, TimeSpan delay)
-      {
-          while(!tc.CancellationToken.IsCancellationRequested)
-          {
-               await IoOperation(tc.CancellationToken);
-          }
-      }</code></li>
+<li>A cancellable grain operation needs to handle underlying <strong>CancellationToken</strong> property of <strong>GrainCancellationToken</strong> just like it would do in any other .NET code.</li>
+</ul>
+<pre><code class="lang-csharp">        public async Task LongIoWork(GrainCancellationToken tc, TimeSpan delay)
+        {
+            while(!tc.CancellationToken.IsCancellationRequested)
+            {
+                 await IoOperation(tc.CancellationToken);
+            }
+        }
+</code></pre><ul>
 <li>Call the <code>GrainCancellationTokenSource.Cancel</code> method to initiate cancellation. </li>
 </ul>
 <pre><code class="lang-csharp">        await tcs.Cancel();
 </code></pre><ul>
-<li><p>Call the <code>Dispose</code> method when you are finished with the <strong>GrainCancellationTokenSource</strong> object.</p>
-<pre><code class="lang-csharp">      tcs.Dispose();
-</code></pre><p>Important Considerations:</p>
-</li>
-<li><p>The <code>GrainCancellationTokenSource.Cancel</code> method returns <strong>Task</strong>, and in order to ensure cancellation the cancel call must be retried in case of transient communication failure.</p>
-</li>
+<li>Call the <code>Dispose</code> method when you are finished with the <strong>GrainCancellationTokenSource</strong> object.</li>
+</ul>
+<pre><code class="lang-csharp">        tcs.Dispose();
+</code></pre><h4 id="important-considerations">Important Considerations:</h4>
+<ul>
+<li>The <code>GrainCancellationTokenSource.Cancel</code> method returns <strong>Task</strong>, and in order to ensure cancellation the cancel call must be retried in case of transient communication failure.</li>
 <li>Callbacks registered in underlying <strong>System.Threading.CancellationToken</strong> are subjects to single threaded execution guarantees within the grain activation on which they were registered.</li>
 <li>Each <strong>GrainCancellationToken</strong> can be passed through multiple methods invocations. </li>
 </ul>
