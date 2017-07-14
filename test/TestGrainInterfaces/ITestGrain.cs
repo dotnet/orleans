@@ -58,4 +58,13 @@ namespace UnitTests.GrainInterfaces
 
         Task<int> GetCount();
     }
+
+    public interface ICanBeOneWayGrain : IGrainWithGuidKey
+    {
+        Task Notify(ISimpleGrainObserver observer);
+
+        Task Throws();
+
+        Task<int> GetCount();
+    }
 }

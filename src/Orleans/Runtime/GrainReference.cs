@@ -40,6 +40,12 @@ namespace Orleans.Runtime
         internal GrainId GrainId { get; private set; }
 
         /// <summary>
+        /// Invoke method options specific to this grain reference instance
+        /// </summary>
+        [NonSerialized]
+        internal readonly InvokeMethodOptions invokeMethodOptions;
+
+        /// <summary>
         /// Called from generated code.
         /// </summary>
         protected internal readonly SiloAddress SystemTargetSilo;
@@ -119,6 +125,11 @@ namespace Orleans.Runtime
         protected GrainReference(GrainReference other)
             : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtime) { }
 
+        protected internal GrainReference(GrainReference other, InvokeMethodOptions invokeMethodOptions)
+            : this(other)
+        {
+            this.invokeMethodOptions = invokeMethodOptions;
+        }
         #endregion
 
         #region Instance creator factory functions
