@@ -22,7 +22,8 @@ namespace Orleans.Runtime.GrainMethodInvocationExtensions
             var oneWayGrainReferenceCopy = new GrainReference((GrainReference) (object)grainReference, InvokeMethodOptions.OneWay).Cast<T>();
 
             // Task always completed at this point. Should also help catching situation of mistakenly calling the method on original grain reference
-            if (!grainMethodInvocation(oneWayGrainReferenceCopy).IsCompleted)
+            var invokationResult = grainMethodInvocation(oneWayGrainReferenceCopy);
+            if (!invokationResult.IsCompleted)
             {
                 throw new InvalidOperationException("Invoking of methods with one way flag must result in completed task");
             }
