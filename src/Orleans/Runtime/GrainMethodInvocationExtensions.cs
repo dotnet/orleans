@@ -16,10 +16,9 @@ namespace Orleans.Runtime.GrainMethodInvocationExtensions
         /// <typeparam name="T">Grain interface</typeparam>
         /// <param name="grainReference">Grain reference which will be copied and then a call executed on it</param>
         /// <param name="grainMethodInvocation">Function that should invoke grain method and return resulting task</param>
-        public static void InvokeOneWay<T>(this T grainReference, Func<T, Task> grainMethodInvocation) where T : class, IGrain
+        public static void InvokeOneWay<T>(this T grainReference, Func<T, Task> grainMethodInvocation) where T : class, IAddressable
         {
-            // double cast is safe, as it can be invoked by user only on grain references
-            var oneWayGrainReferenceCopy = new GrainReference((GrainReference) (object)grainReference, InvokeMethodOptions.OneWay).Cast<T>();
+            var oneWayGrainReferenceCopy = new GrainReference(grainReference.AsWeaklyTypedReference(), InvokeMethodOptions.OneWay).Cast<T>();
 
             // Task always completed at this point. Should also help catching situation of mistakenly calling the method on original grain reference
             var invokationResult = grainMethodInvocation(oneWayGrainReferenceCopy);

@@ -38,7 +38,7 @@ namespace DefaultCluster.Tests.General
             var observerRef = await Client.CreateObjectReference<ISimpleGrainObserver>(observer);
             grain.InvokeOneWay(g =>
             {
-                Assert.True(g != grain, "One way call should be executed on copy of grain reference");
+                Assert.False(object.ReferenceEquals(g, grain), "One way call should be executed on copy of grain reference");
                 Assert.Equal(g, grain);
                 return g.Notify(observerRef);
             });
