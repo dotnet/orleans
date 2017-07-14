@@ -4,40 +4,71 @@ title: Grains
 ---
 
 
-## Grains (Actors): Units of Distribution
+### Grains
 
-Distributed applications are inherently concurrent, which leads to complexity. One of the things that makes the actor model special and productive is that it helps reduce some of the complexities of having to grapple with concurrency.
-
-Actors accomplish this in two ways:
-
-* By providing single-threaded access to the internal state of an actor instance.
-* By not sharing data between actor instances except via message-passing.
-
+Grains are the key primitives of the Orleans programming model.
 Grains are the building blocks of an Orleans application, they are atomic units of isolation, distribution, and persistence.
-A typical grain encapsulates state and behavior of a single entity (e.g. a specific user).
+Grains are objects that represent application entities.
+Just like in the classic Object Oriented Programming, a grain encapsulates state of an entity and encodes its behavior in the code logic.
+Grains can hold references to each other and interact by invoking each other’s methods exposed via interfaces. 
 
-### Turns: Units of Execution
+Orleans greatly simplify building a scalable application and eliminate most of the concurrency challenges 
 
-The idea behind the single-threaded execution model for actors is that the invokers (remote) take turns "calling" its methods. Thus, a message coming to actor B from actor A will be placed in a queue and the associated handler is invoked only when all prior messages have been serviced.
+* By not sharing data between grains instances except via message passing.
+* By providing the single-threaded execution guarantee to each individual grain.
 
-This allows us to avoid all use of locks to protect actor state, as it is inherently protected against data races. However, it may also lead to problems when messages pass back and forth and the message graph forms cycles. If A sends a message to B from one of its methods and awaits its completion, and B sends a message to A, also awaiting its completion, the application will quickly lock up.
+A typical grain encapsulates state and behavior of a single entity (e.g. a specific user or a device or a session).
 
-### A Grain Activation - The runtime instance of a Grain
+### Grain identity
 
-When there is work for a grain, Orleans ensures there is an instance of the grain on one of [Orleans Silos](Silos.md). When there is no instance of the grain on any silo, the run-time creates one. This process is called Activation. In case a grain is using [Grain Persistence](Grain-Persistence.md), the run-time automatically reads the state from the backing-store upon activation. 
-Orleans controls the process of activating and deactivating grains transparently. When coding a grain, a developer assumes all grains are always activated.
+An individual grain is ais a uniquely addressable instance of a grain type (class).
+Each grain has a unique identity, also referred to as a grain key, within its type.
+Grain identity within its type can be a long integer, a GUID, a string, or a combination of a long+string or GUID+string combination.
 
-A grain activation performs work in chunks and finishes each chunk before it moves on to the next. Chunks of work include method invocations in response to requests from other grains or external clients, and closures scheduled on completion of a previous chunk. The basic unit of execution corresponding to a chunk of work is known as a turn.
+### Accessing a grain
 
-While Orleans may execute many turns belonging to different activations in parallel, each activation will always execute its turns one at a time. This means that there is no need to use locks or other synchronization methods to guard against data races and other multi-threading hazards. As mentioned above, however, the unpredictable interleaving of turns for scheduled closures can cause the state of the grain to be different than when the closure was scheduled, so developers must still watch out for interleaving bugs.
+A grain class implements one or more grain interfaces, formal code contracts for interacting with grains of that type.
+To invoke a grain, a caller needs to know the grain interface that the grain class implements that includes the method that the caller wants to call and the unique identity (key) of the target grain.
+For example, here's how a user profile grain can be called to update user's address if email is used as a user identity.
 
-### Activation modes
+```csharp
+var user = grainFactory.GetGrain<IUserProfile>(userEmail);
+await user.UpdateAddress(newAddress);
+```
 
-Orleans supports two modes: single activation mode (default), in which only one simultaneous activation of every grain is created, and stateless worker mode, in which independent activations of a grain are created to increase the throughput.
-"Independent" implies that there is no state reconciliation between different activations of the same grain.
-So this mode is appropriate for grains that hold no local state, or grains whose local state is static, such as a grain that acts as a cache of persistent state
+Note that there is no need to create or instantiate the target grain.
+We make a call to it to update user's address as if the user's grain is already instantiated for us.
+This is one of the biggest advantages of the Orleans programming model - we never need to create, instantiate or delete grains.
+We can write our code as if all possible grains, for example millions of user profiles, are always in memory waiting for us to call them.
+Behind the scene, the Orleans runtime performs all the heavy lifting of managing resources to transparently bring grains to memory when needed.   
 
-## Next
-Next we look at Silos, a unit for hosting grains.
+### Behind the scene - Grain Lifecycle
 
-[Observers](Observers.md)
+Grains live in execution containers called [Silos](Silos.md).
+Silos form a cluster that combines resources of multiple physical or virtual machines.
+When there is work (request) for a grain, Orleans ensures there is an instance of the grain on one of the Silos in the cluster.
+If there is no instance of the grain on any silo, the Orleans runtime creates one. 
+This process is called Activation.
+In case a grain is using [Grain Persistence](Grain-Persistence.md), the runtime automatically reads the state from the backing store upon activation.
+Once activated on a silo, a grain processes incoming requests (method calls) from other grains or from outside of the cluster (usually from frontend web servers).
+In the course of processing a request a grain may call other grains or some external services.
+If a grain stops receiving requests and stay idle, after a configurable period of inactivity Orleans removes the grain from memory (deactivates it) to free up resources for other grains.
+If and when there's a new request for that grain, Orleans will activate it again, potentially on a different silo, so the caller gets the impression that the grain stayed in memory the whole time.
+A grain goes through the lifecycle from existing only as its persisted state (if it has any) in storage to being instantiated in memory to being removed from memory.
+
+![](../grain-lifecycle.png)
+
+Orleans controls the process of activating and deactivating grains transparently.
+When coding a grain, a developer assumes all grains are always activated.
+
+A grain activation performs work in chunks and finishes each chunk before it moves on to the next.
+Chunks of work include method invocations in response to requests from other grains or external clients, and closures scheduled on completion of a previous chunk.
+The basic unit of execution corresponding to a chunk of work is known as a turn.
+
+While Orleans may execute many turns belonging to different activations in parallel, each activation will always execute its turns one at a time.
+This means that there is no need to use locks or other synchronization methods to guard against data races and other multi-threading hazards. 
+
+### Next
+Next we look at how to implement a grain class.
+
+[Developing a Grain](Developing-a-Grain.md)
