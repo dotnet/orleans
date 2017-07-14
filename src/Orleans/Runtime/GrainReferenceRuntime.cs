@@ -58,7 +58,7 @@ namespace Orleans.Runtime
 
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;
-            options |= reference.invokeMethodOptions;
+
             Task<object> resultTask = InvokeMethod_Impl(reference, request, null, options);
 
             if (resultTask == null)

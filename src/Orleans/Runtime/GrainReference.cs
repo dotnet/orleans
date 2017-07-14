@@ -15,6 +15,12 @@ namespace Orleans.Runtime
         private readonly string genericArguments;
         private readonly GuidId observerId;
 
+        /// <summary>
+        /// Invoke method options specific to this grain reference instance
+        /// </summary>
+        [NonSerialized]
+        private readonly InvokeMethodOptions invokeMethodOptions;
+
         internal bool IsSystemTarget { get { return GrainId.IsSystemTarget; } }
 
         internal bool IsObserverReference { get { return GrainId.IsClient; } }
@@ -38,13 +44,7 @@ namespace Orleans.Runtime
         internal bool IsBound => this.runtime != null;
 
         internal GrainId GrainId { get; private set; }
-
-        /// <summary>
-        /// Invoke method options specific to this grain reference instance
-        /// </summary>
-        [NonSerialized]
-        internal readonly InvokeMethodOptions invokeMethodOptions;
-
+        
         /// <summary>
         /// Called from generated code.
         /// </summary>
@@ -123,7 +123,10 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtime) { }
+            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtime)
+        {
+            this.invokeMethodOptions = other.invokeMethodOptions;
+        }
 
         protected internal GrainReference(GrainReference other, InvokeMethodOptions invokeMethodOptions)
             : this(other)
@@ -306,7 +309,7 @@ namespace Orleans.Runtime
         /// </summary>
         protected void InvokeOneWayMethod(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
-            this.Runtime.InvokeOneWayMethod(this, methodId, arguments, options, silo);
+            this.Runtime.InvokeOneWayMethod(this, methodId, arguments, options | invokeMethodOptions, silo);
         }
 
         /// <summary>
@@ -314,7 +317,7 @@ namespace Orleans.Runtime
         /// </summary>
         protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
-            return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options, silo);
+            return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options | invokeMethodOptions, silo);
         }
 
         #endregion
