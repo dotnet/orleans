@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         internal bool IsBound => this.runtime != null;
 
         internal GrainId GrainId { get; private set; }
-        
+
         /// <summary>
         /// Called from generated code.
         /// </summary>

@@ -39,6 +39,7 @@ namespace DefaultCluster.Tests.General
             grain.InvokeOneWay(g =>
             {
                 Assert.True(g != grain, "One way call should be executed on copy of grain reference");
+                Assert.Equal(g, grain);
                 return g.Notify(observerRef);
             });
 
