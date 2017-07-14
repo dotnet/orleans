@@ -1,11 +1,11 @@
+- name: Grains
+  href: Grains.md
 - name: Developing a Grain
   href: Developing-a-Grain.md
 - name: Developing a Client
   href: Developing-a-Client.md
 - name: Grain Persistence
   href: Grain-Persistence.md
-- name: Grains
-  href: Grains.md
 - name: Observers
   href: Observers.md
 - name: Running the Application
