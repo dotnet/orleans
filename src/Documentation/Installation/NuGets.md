@@ -5,7 +5,7 @@ title: Orleans NuGet Packages
 
 # Nuget Packages
 
-## Orleans NuGet packages as of [v1.3.1](https://github.com/dotnet/orleans/releases/tag/v1.3.1)
+## Orleans NuGet packages as of [v1.5.0](https://github.com/dotnet/orleans/releases/tag/v1.5.0)
 
 There are 4 key NuGet packages you will need to use in most scenarios:
 
@@ -15,7 +15,9 @@ There are 4 key NuGet packages you will need to use in most scenarios:
 PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
 ```
 
-Build support for grain interfaces and implementation projects. Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers. `Microsoft.Orleans.Templates.Interfaces` and `Microsoft.Orleans.Templates.Grains` packages are obsolete and provided only for backward compatibility and migration.
+Build support for grain interfaces and implementation projects.
+Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers.
+`Microsoft.Orleans.Templates.Interfaces` and `Microsoft.Orleans.Templates.Grains` packages are obsolete and provided only for backward compatibility and migration.
 
 ### [Microsoft Orleans Core Library](https://www.nuget.org/packages/Microsoft.Orleans.Core/)
 
@@ -23,7 +25,8 @@ Build support for grain interfaces and implementation projects. Add it to your g
 PM> Install-Package Microsoft.Orleans.Core
 ```
 
-Contains Orleans.dll, which defines most of Orleans public types and Orleans Client. Reference it for building libraries and client applications that use Orleans types but don't need any of the included providers.
+Contains Orleans.dll, which defines most of Orleans public types and Orleans Client.
+Reference it for building libraries and client applications that use Orleans types but don't need any of the included providers.
 
 ### [Microsoft Orleans Server Libraries](https://www.nuget.org/packages/Microsoft.Orleans.Server/)
 
@@ -48,6 +51,21 @@ Includes everything you need for an Orleans client (frontend).
 
 The below packages provide additional functionality.
 
+### [Microsoft Orleans Providers](https://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/)
+
+```
+PM> Install-Package Microsoft.Orleans.OrleansProviders
+```
+Contains a set of built-in persistence and stream providers, primarily for testing, as well as some abstractions and utility types for building persistence and stream providers.
+Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
+
+### [Microsoft Orleans Event-Sourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing/)
+
+```
+PM> Install-Package Microsoft.Orleans.EventSourcing 
+```
+Contains a set of base types for creating grain classes with event-sourced state.
+
 ## Providers and extensions
 
 ### [Microsoft Orleans Azure Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansAzureUtils/)
@@ -66,14 +84,7 @@ PM> Install-Package Microsoft.Orleans.OrleansSqlUtils
 Contains SQL based cluster membership and persistence providers for use with SQL Server, MySQL, PostgreSQL, and other SQL databases.
 
 
-### [Microsoft Orleans Providers](https://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/)
-
-```
-PM> Install-Package Microsoft.Orleans.OrleansProviders
-```
-Contains a set of built-in persistence and stream providers. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
-
-### [Microsoft Orleans ServiceBus Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansServiceBus/)
+#### [Microsoft Orleans ServiceBus Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansServiceBus/)
 
 ```
 PM> Install-Package Microsoft.Orleans.OrleansServiceBus
@@ -93,6 +104,13 @@ Includes the plugin for using Consul for storing cluster membership data.
 PM> Install-Package Microsoft.Orleans.OrleansZooKeeperUtils
 ```
 Includes the plugin for using ZooKeeper for storing cluster membership data.
+
+### [Microsoft Orleans AWS Utilities ](https://www.nuget.org/packages/Microsoft.Orleans.OrleansAWSUtils/)
+
+```
+PM> Install-Package Microsoft.Orleans.OrleansAWSUtils
+```
+Includes DynamoDB based cluster membership provider, DynamoDB persistence provider, and SQS based stream provider.
 
 ### [Microsoft Orleans Telemetry Consumer - Performance Counters](https://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.Counters/)
 
@@ -122,6 +140,13 @@ PM> Install-Package Microsoft.Orleans.Serialization.Bond
 ```
 Includes support for [Bond serializer](https://github.com/microsoft/bond).
 
+### [Microsoft Orleans Google Utilities ](https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/)
+
+```
+PM> Install-Package Microsoft.Orleans.OrleansGoogleUtils
+```
+Includes Google Protocol Buffers serializer.
+
 ## Hosting and testing
 
 ### [Microsoft Orleans Runtime](https://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/)
@@ -137,6 +162,7 @@ Core runtime library of Microsoft Orleans that hosts and executes grains within 
 PM> Install-Package Microsoft.Orleans.OrleansHost
 ```
 Includes the default silo host - OrleansHost.exe. Can be used for on-premises deployments or as an out-of-process silo host in Azure Worker Role. Included in Microsoft.Orleans.Server.
+**We are planning to deprecate this package in favor of customers building their custom silo host processes in order to simplify dependency management and programmatic configuration.**
 
 ### [Microsoft Orleans Service Fabric Support](https://www.nuget.org/packages/Microsoft.Orleans.ServiceFabric/)
 
@@ -174,4 +200,4 @@ Includes OrleansCounterControl.exe, which registers Windows performance counter 
 PM> Install-Package Microsoft.Orleans.OrleansManager
 ```
 Includes Orleans management tool - OrleansManager.exe.
-
+**We are planning to deprecate this package in favor of customers building their custom management tools in order to simplify dependency management and programmatic configuration.**
