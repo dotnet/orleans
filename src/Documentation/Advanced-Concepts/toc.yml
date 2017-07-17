@@ -45,4 +45,4 @@
 - name: Configuring-.NET-Garbage-Collection
   href: Configuring-.NET-Garbage-Collection.md
 - name: Cancellation Tokens
-  href: Advanced-Concepts/Cancellation-Tokens.md
+  href: Cancellation-Tokens.md
