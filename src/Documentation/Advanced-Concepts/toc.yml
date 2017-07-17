@@ -42,7 +42,5 @@
   href: Codegen.md
 - name: Heterogeneous silos
   href: Heterogeneous-Silos.md
-- name: Configuring-.NET-Garbage-Collection
-  href: Configuring-.NET-Garbage-Collection.md
 - name: Cancellation Tokens
   href: Cancellation-Tokens.md
