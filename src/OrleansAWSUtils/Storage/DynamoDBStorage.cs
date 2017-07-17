@@ -118,13 +118,20 @@ namespace OrleansAWSUtils.Storage
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                 service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
+                // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
                 ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service });
             }
-            else
+            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
+                // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(accessKey, secretKey);
                 ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            }
+            else
+            {
+                // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
+                ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
             }
         }
 
