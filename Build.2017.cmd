@@ -33,15 +33,15 @@ call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES
 
 SET CURRENT_CONFIGURATION=Debug
 
-call %_dotnet% restore /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% restore /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo RESTORE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -49,15 +49,15 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURA
 
 SET CURRENT_CONFIGURATION=Release
 
-call %_dotnet% restore /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% restore /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo RESTORE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo BUILD ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -68,7 +68,7 @@ goto :BuildFinished
 
 SET CURRENT_CONFIGURATION=Debug
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -76,7 +76,7 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURA
 
 SET CURRENT_CONFIGURATION=Release
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=true "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /p:Configuration=%CURRENT_CONFIGURATION%;IncludeFSharp=false "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
