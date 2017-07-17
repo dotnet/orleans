@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
     <OutputType>Exe</OutputType>
     <RuntimeIdentifier>win</RuntimeIdentifier>
     <RootNamespace>OrleansManager</RootNamespace>

@@ -15,6 +15,8 @@ if NOT [%ERRORLEVEL%]==[0] exit /b 1
 set _toolRuntime=%~dp0Tools
 set _dotnet=%_toolRuntime%\dotnetcli\dotnet.exe
 
+SET PATH=%_toolRuntime%\dotnetcli;%PATH%
+
 SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 
 SET SOLUTION=%CMDHOME%\Orleans.2017.sln
