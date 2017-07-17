@@ -32,8 +32,9 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                logger?.Error(ErrorCode.LifecycleStartFailure, $"Lifecycle start canceled due to errors at stage {this.highStage}", ex);
-                throw new OperationCanceledException("Start canceled to failures.", ex);
+                string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
+                logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
+                throw new OperationCanceledException(error, ex);
             }
         }
 
@@ -69,9 +70,9 @@ namespace Orleans
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
 
-            var key = new object();
-            subscribers.TryAdd(key, new OrderedObserver(stage, observer));
-            return new Disposable(() => Remove(key));
+            var orderedObserver = new OrderedObserver(stage, observer);
+            subscribers.TryAdd(orderedObserver, orderedObserver);
+            return new Disposable(() => Remove(orderedObserver));
         }
 
         private void Remove(object key)
