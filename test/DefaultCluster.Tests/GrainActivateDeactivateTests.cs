@@ -164,11 +164,12 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
-            catch (Exception exc)
+            catch (OrleansGrainActivationFailedException exc)
             {
-                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
+                Assert.NotNull(exc.InnerException);
+                Assert.IsType<ApplicationException>(exc.InnerException);
+                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
             }
-            
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
@@ -183,9 +184,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
             }
-            catch (Exception exc)
+            catch (OrleansGrainActivationFailedException exc)
             {
-                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
+                Assert.NotNull(exc.InnerException);
+                Assert.IsType<ApplicationException>(exc.InnerException);
+                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
             }
         }
 
@@ -201,9 +204,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
-            catch (Exception exc)
+            catch (OrleansGrainActivationFailedException exc)
             {
-                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
+                Assert.NotNull(exc.InnerException);
+                Assert.IsType<ApplicationException>(exc.InnerException);
+                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
             }
         }
 

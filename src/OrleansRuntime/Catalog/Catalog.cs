@@ -680,7 +680,9 @@ namespace Orleans.Runtime
                                 SchedulingContext).Ignore();
                         }
 
-                        RerouteAllQueuedMessages(activation, null, "Failed InvokeActivate", exception);
+                        // Reject all of the messages queued for this activation.
+                        var activationFailedMsg = nameof(Grain.OnActivateAsync) + " failed";
+                        RejectAllQueuedMessages(activation, activationFailedMsg, exception);
                         break;
                 }
             }
@@ -1299,6 +1301,36 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Rejects all messages enqueued for the provided activation.
+        /// </summary>
+        /// <param name="activation">The activation.</param>
+        /// <param name="failedOperation">The operation which failed, resulting in this rejection.</param>
+        /// <param name="exception">The rejection exception.</param>
+        private void RejectAllQueuedMessages(
+            ActivationData activation,
+            string failedOperation,
+            Exception exception = null)
+        {
+            lock (activation)
+            {
+                List<Message> msgs = activation.DequeueAllWaitingMessages();
+                if (msgs == null || msgs.Count <= 0) return;
+
+                if (logger.IsVerbose)
+                    logger.Verbose(
+                        ErrorCode.Catalog_RerouteAllQueuedMessages,
+                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
+                this.Dispatcher.ProcessRequestsToInvalidActivation(
+                    msgs,
+                    activation.Address,
+                    forwardingAddress: null,
+                    failedOperation: failedOperation,
+                    exc: exception,
+                    rejectMessages: true);
+            }
+        }
+
         private async Task CallGrainActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             var grainTypeName = activation.GrainInstanceType.FullName;
@@ -1343,7 +1375,7 @@ namespace Orleans.Runtime
 
                 activationsFailedToActivate.Increment();
 
-                throw;
+                throw new OrleansGrainActivationFailedException(nameof(Grain.OnActivateAsync) + " failed", exc);
             }
 
             if (activation.GrainInstance is ILogConsistencyProtocolParticipant)

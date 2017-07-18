@@ -469,7 +469,8 @@ namespace Orleans.Runtime
             ActivationAddress oldAddress,
             ActivationAddress forwardingAddress, 
             string failedOperation,
-            Exception exc = null)
+            Exception exc = null,
+            bool rejectMessages = false)
         {
             // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
@@ -491,7 +492,15 @@ namespace Orleans.Runtime
                 {
                     foreach (var message in messages)
                     {
-                        TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                        if (rejectMessages)
+                        {
+                            RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                        }
+                        else
+                        {
+                            TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                        }
+                        
                     }
                 }
                 ), catalog.SchedulingContext);

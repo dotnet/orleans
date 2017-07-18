@@ -253,5 +253,26 @@ namespace Orleans.Runtime
         { }
 #endif
     }
+
+    /// <summary>
+    /// Indicates that grain activation failed.
+    /// </summary>
+    [Serializable]
+    public class OrleansGrainActivationFailedException : OrleansException
+    {
+        internal OrleansGrainActivationFailedException(string message)
+            : base(message)
+        {
+        }
+
+        internal OrleansGrainActivationFailedException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+
+#if !NETSTANDARD
+        protected OrleansGrainActivationFailedException(SerializationInfo info, StreamingContext context) : base(info, context)
+        { }
+#endif
+    }
 }
 
