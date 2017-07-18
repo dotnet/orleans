@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="NuGet">
     <PackageId>Microsoft.Orleans.PlatformServices</PackageId>
     <Title>Microsoft Orleans Platform Services</Title>
