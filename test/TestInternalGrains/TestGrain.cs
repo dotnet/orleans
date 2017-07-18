@@ -203,4 +203,29 @@ namespace UnitTests.Grains
             throw new Exception("GET OUT!");
         }
     }
+
+    public class CanBeOneWayGrain : Grain, ICanBeOneWayGrain
+    {
+        private int count;
+
+        public Task Notify()
+        {
+            this.count++;
+            return Task.CompletedTask;
+        }
+
+        public Task Notify(ISimpleGrainObserver observer)
+        {
+            this.count++;
+            observer.StateChanged(this.count - 1, this.count);
+            return Task.CompletedTask;
+        }
+
+        public Task<int> GetCount() => Task.FromResult(this.count);
+
+        public Task Throws()
+        {
+            throw new Exception("GET OUT!");
+        }
+    }
 }
