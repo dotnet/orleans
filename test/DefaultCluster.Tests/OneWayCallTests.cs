@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime.GrainMethodInvocationExtensions;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
