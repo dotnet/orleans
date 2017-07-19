@@ -105,14 +105,19 @@ namespace Orleans.CodeGenerator
                     .AddReferences(assemblies)
                     .WithOptions(options);
 
-            var outputStream = new MemoryStream();
-            var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
-            try
+            using (var outputStream = new MemoryStream())
             {
                 var emitOptions = new EmitOptions()
-                    .WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
+                    .WithEmitMetadataOnly(false)
+                    .WithIncludePrivateMembers(true)
+                    .WithTolerateErrors(true);
 
-                var compilationResult = compilation.Emit(outputStream, symbolStream, options: emitOptions);
+                if (emitDebugSymbols)
+                {
+                    emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.Embedded);
+                }
+
+                var compilationResult = compilation.Emit(outputStream, options: emitOptions);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
@@ -132,14 +137,8 @@ namespace Orleans.CodeGenerator
                     assemblyName);
                 return new GeneratedAssembly
                 {
-                    RawBytes = outputStream.ToArray(),
-                    DebugSymbolRawBytes = symbolStream?.ToArray()
+                    RawBytes = outputStream.ToArray()
                 };
-            }
-            finally
-            {
-                outputStream.Dispose();
-                symbolStream?.Dispose();
             }
         }
 
