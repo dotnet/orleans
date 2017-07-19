@@ -6,7 +6,7 @@ title: Why Orleans Streams?
 # Why Orleans Streams?
 
 There is already a wide range of technologies that allow to build stream processing systems.
-Those include systems to **durably store stream data** (e.g., [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/) and [Kafka](http://kafka.apache.org/)) and systems to express **compute operations** over the stream data (e.g., [Azure Stream Analytics](http://azure.microsoft.com/en-us/services/stream-analytics/), [Apache Storm](https://storm.apache.org/), and [Apache Spark Streaming](https://spark.apache.org/streaming/)). Those are great systems that allow to build effecient data stream processing pipelines.
+Those include systems to **durably store stream data** (e.g., [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/) and [Kafka](http://kafka.apache.org/)) and systems to express **compute operations** over the stream data (e.g., [Azure Stream Analytics](http://azure.microsoft.com/en-us/services/stream-analytics/), [Apache Storm](https://storm.apache.org/), and [Apache Spark Streaming](https://spark.apache.org/streaming/)). Those are great systems that allow to build efficient data stream processing pipelines.
 
 ### Limitations of Existing Systems
 However, those systems are not suitable for **fine-grained free-form compute over stream data**. The Streaming Compute systems mentioned above all allow to specify a **unified data-flow graph of operations that are applied in the same way to all stream items**. This is a powerful model when data is uniform and you want to express the same set of transformations, filtering or aggregation operations over this data.
