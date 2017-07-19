@@ -296,20 +296,11 @@ namespace Orleans.CodeGenerator
             throw new NotImplementedException();
 #elif NETSTANDARD
             Assembly result;
-            result = Orleans.PlatformServices.PlatformAssemblyLoader.LoadFromBytes(asm.RawBytes, asm.DebugSymbolRawBytes);
+            result = Orleans.PlatformServices.PlatformAssemblyLoader.LoadFromBytes(asm.RawBytes);
             AppDomain.CurrentDomain.AddAssembly(result);
             return result;
 #else
-            if (asm.DebugSymbolRawBytes != null)
-            {
-                return Assembly.Load(
-                    asm.RawBytes,
-                    asm.DebugSymbolRawBytes);
-            }
-            else
-            {
-                return Assembly.Load(asm.RawBytes);
-            }
+            return Assembly.Load(asm.RawBytes);
 #endif
         }
 

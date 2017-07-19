@@ -26,7 +26,6 @@ namespace Orleans.CodeGeneration
         public GeneratedAssembly(GeneratedAssembly other)
         {
             this.RawBytes = other.RawBytes;
-            this.DebugSymbolRawBytes = other.DebugSymbolRawBytes;
             this.Assembly = other.Assembly;
         }
 
@@ -34,11 +33,6 @@ namespace Orleans.CodeGeneration
         /// Gets or sets a serialized representation of the assembly.
         /// </summary>
         public byte[] RawBytes { get; set; }
-
-        /// <summary>
-        /// Gets or sets a serialized representation of the assembly's debug symbol stream.
-        /// </summary>
-        public byte[] DebugSymbolRawBytes { get; set; }
 
         /// <summary>
         /// Gets or sets the assembly.
