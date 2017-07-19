@@ -103,6 +103,23 @@ namespace Orleans.LeaseProviders
         /// Duration of the lease
         /// </summary>
         public TimeSpan Duration { get; set; }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        public LeaseRequest()
+        { }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="resourceKey"></param>
+        /// <param name="duration"></param>
+        public LeaseRequest(string resourceKey, TimeSpan duration)
+        {
+            this.ResourceKey = resourceKey;
+            this.Duration = duration;
+        }
     }
 
     /// <summary>

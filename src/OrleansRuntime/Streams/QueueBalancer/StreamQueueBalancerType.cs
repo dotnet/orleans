@@ -44,5 +44,18 @@ namespace Orleans.Streams
         /// That is, it does not rebalance queues based on dymanic changes in the cluster Membership.
         /// </summary>
         public static Type StaticClusterConfigDeploymentBalancer = typeof(StaticClusterConfigDeploymentBalancer);
+
+        /// <summary>
+        /// Stream queue balancer that uses the cluster configuration to determine deployment information for load balancing.  
+        /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
+        /// </summary>
+        public static Type ClusterConfigDeploymentLeaseBasedBalancer = typeof(ClusterConfigDeploymentLeaseBasedBalancer);
+
+        /// <summary>
+        ///  Stream queue balancer that uses Azure deployment information for load balancing. 
+        /// Requires silo running in Azure.
+        /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
+        /// </summary>
+        public static Type AzureDeploymentLeaseBasedBalancer = typeof(AzureDeploymentLeaseBasedBalancer);
     }
 }

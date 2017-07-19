@@ -15,28 +15,27 @@ namespace Orleans.LeaseProviders
     public class AzureBlobLeaseProviderConfig
     {
         public string DataConnectionString { get; set; }
+        public string BlobContainerName { get; set; }
     }
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
         private CloudBlobContainer container;
-        private GlobalConfiguration globalConfig;
+        private AzureBlobLeaseProviderConfig providerConfig;
         private CloudBlobClient blobClient;
-        public AzureBlobLeaseProvider(AzureBlobLeaseProviderConfig config, GlobalConfiguration globalConfig )
+        public AzureBlobLeaseProvider(AzureBlobLeaseProviderConfig config)
         {
             var account = CloudStorageAccount.Parse(config.DataConnectionString);
             this.blobClient = account.CreateCloudBlobClient();
-            this.globalConfig = globalConfig;
+            this.providerConfig = config;
         }
 
-        private Task InitContainerIfNotExistsAsync()
+        private async Task InitContainerIfNotExistsAsync()
         {
             if (this.container == null)
             {
-                var containerName = $"Cluster-{globalConfig.DeploymentId}-{ResourceCategory.Streaming}-{typeof(AzureBlobLeaseProvider).Name}";
-                this.container = blobClient.GetContainerReference(containerName);
-                return this.container.CreateIfNotExistsAsync();
+                this.container = blobClient.GetContainerReference(this.providerConfig.BlobContainerName);
+                await this.container.CreateIfNotExistsAsync().ConfigureAwait(false); 
             }
-            return Task.CompletedTask;
         }
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
@@ -51,37 +50,35 @@ namespace Orleans.LeaseProviders
             return await Task.WhenAll(tasks);
         }
 
-        private ResponseCode MapHttpResponseCode(int httpResponseCode)
-        {
-            //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
-            // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
-            switch (httpResponseCode)
-            {
-                case 409: return ResponseCode.LeaseNotAvailable;
-                case 412: return ResponseCode.InvalidToken;
-                case 200:
-                case 201:
-                case 202: return ResponseCode.OK;
-                default: return ResponseCode.TransientFailure;
-            }
-        }
-
         private string GetBlobName(string category, string resourceKey)
         {
-            return $"{category}-{resourceKey}";
+            return $"{category.ToLower()}-{resourceKey.ToLower()}.json";
         }
 
         private async Task<AcquireLeaseResult> Acquire(string category, LeaseRequest leaseRequest)
         {
-            var blob = this.container.GetBlobReference(GetBlobName(category, leaseRequest.ResourceKey));
             try
             {
+                var blob = this.container.GetBlockBlobReference(GetBlobName(category, leaseRequest.ResourceKey));
+                blob.Properties.ContentType = "application/json";
+                //create this blob
+                await blob.UploadTextAsync("blob");
                 var leaseId = await blob.AcquireLeaseAsync(leaseRequest.Duration);
                 return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, leaseId, DateTime.UtcNow), ResponseCode.OK, null);
             }
             catch (StorageException e)
             {
-                return new AcquireLeaseResult(null, MapHttpResponseCode(e.RequestInformation.HttpStatusCode), e);
+                ResponseCode statusCode;
+                //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
+                // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
+                switch (e.RequestInformation.HttpStatusCode)
+                {
+                    case 404:
+                    case 409: 
+                    case 412: statusCode = ResponseCode.LeaseNotAvailable; break;
+                    default: statusCode = ResponseCode.TransientFailure; break;
+                }
+                return new AcquireLeaseResult(null, statusCode, e);
             }
         }
 
@@ -126,7 +123,17 @@ namespace Orleans.LeaseProviders
             }
             catch (StorageException e)
             {
-                return new AcquireLeaseResult(null, MapHttpResponseCode(e.RequestInformation.HttpStatusCode), e);
+                ResponseCode statusCode;
+                //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
+                // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
+                switch (e.RequestInformation.HttpStatusCode)
+                {
+                    case 404:
+                    case 409:
+                    case 412: statusCode = ResponseCode.InvalidToken; break;
+                    default: statusCode = ResponseCode.TransientFailure; break;
+                }
+                return new AcquireLeaseResult(null, statusCode, e);
             }
         }
     }
