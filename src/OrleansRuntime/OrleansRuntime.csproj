@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
+    <Title>Microsoft Orleans Runtime</Title>
+    <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RootNamespace>Orleans.Runtime</RootNamespace>
+    <AssemblyName>OrleansRuntime</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

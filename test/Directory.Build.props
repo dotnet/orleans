@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <TargetFramework>net462</TargetFramework>
+  <PropertyGroup>
+    <TargetFramework>$(TestProjectTargetFramework)</TargetFramework>
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
@@ -25,5 +25,4 @@
   <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' ">
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
   </ItemGroup>
-
 </Project>

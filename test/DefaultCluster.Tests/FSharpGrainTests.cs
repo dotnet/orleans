@@ -1,4 +1,3 @@
-#if !EXCLUDEFSHARP
 using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
@@ -95,4 +94,3 @@ namespace DefaultCluster.Tests.General
         }
     }
 }
-#endif

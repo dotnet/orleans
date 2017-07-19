@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-#if !EXCLUDEFSHARP
 using Microsoft.FSharp.Core;
-#endif
 using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -44,7 +42,6 @@ namespace DefaultCluster.Tests.General
             ClientSerializerExists(typeof(UnitTests.Grains.SimpleGrainState));
         }
 
-#if !EXCLUDEFSHARP
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task Silo_Serializer_Exists_for_Type_In_Known_Assembly()
         {
@@ -70,7 +67,6 @@ namespace DefaultCluster.Tests.General
         {
             ClientSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
         }
-#endif
 #endif
     }
 }

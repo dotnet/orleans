@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup Label="NuGet">
+  <PropertyGroup>
     <PackageId>Microsoft.Orleans.Client</PackageId>
     <Title>Microsoft Orleans Client Libraries</Title>
     <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
@@ -15,8 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans\Orleans.2017.csproj" />
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.2017.csproj" />
-    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.2017.csproj" />
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
   </ItemGroup>
 </Project>

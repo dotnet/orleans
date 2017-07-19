@@ -1,7 +1,5 @@
 using System.Runtime.CompilerServices;
-#if !EXCLUDEFSHARP
 using Microsoft.FSharp.Core;
-#endif
 using Orleans.CodeGeneration;
 
 [assembly: InternalsVisibleTo("TestInternalGrains")]
@@ -13,6 +11,4 @@ using Orleans.CodeGeneration;
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 
 // generate Orleans serializers for types in FSharp.core.dll
-#if !EXCLUDEFSHARP
 [assembly: KnownAssembly(typeof(FSharpOption<>))]
-#endif

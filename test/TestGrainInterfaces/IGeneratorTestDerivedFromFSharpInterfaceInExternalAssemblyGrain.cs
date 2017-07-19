@@ -1,5 +1,4 @@
-﻿#if !EXCLUDEFSHARP
-using Orleans;
+﻿using Orleans;
 using UnitTests.FSharpInterfaces;
 
 namespace UnitTests.GrainInterfaces
@@ -10,4 +9,3 @@ namespace UnitTests.GrainInterfaces
     {
     }
 }
-#endif

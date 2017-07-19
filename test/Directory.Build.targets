@@ -8,8 +8,9 @@
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to ClientGenerator.exe -->
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
+    <OrleansReferencesBase>$(ProjectDir)../../src/Bootstrap/</OrleansReferencesBase>
   </PropertyGroup>
-  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and Exists('$(ProjectDir)..\..\src\Orleans.SDK.targets') " />
+
+  <Import Project="$(ProjectDir)../../src/Orleans.SDK.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and Exists('$(ProjectDir)../../src/Orleans.SDK.targets') " />
   <!--End Orleans -->
 </Project>

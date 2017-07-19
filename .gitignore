@@ -3,10 +3,6 @@
 
 # Tool Runtime Dir
 /[Tt]ools/
-/vNext/[Tt]ools/
-/vNext/src/[Bb]ootstrap/
-/vNext/[Bb]ootstrap/
-/src/[Tt]ools/
 /src/[Bb]ootstrap/
 
 # Orleans code-gen files

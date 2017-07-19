@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansCodeGenerator</PackageId>
+    <Title>Microsoft Orleans Code Generation</Title>
+    <Description>Runtime and compile-time code generation support for Microsoft Orleans.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>OrleansCodeGenerator</AssemblyName>
+    <RootNamespace>OrleansCodeGenerator</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisCSharpVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <PackageReference Include="System.Reflection" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
+</Project>

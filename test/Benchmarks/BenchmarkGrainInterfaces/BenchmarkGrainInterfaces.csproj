@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>BenchmarkGrainInterfaces</RootNamespace>
+    <AssemblyName>BenchmarkGrainInterfaces</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

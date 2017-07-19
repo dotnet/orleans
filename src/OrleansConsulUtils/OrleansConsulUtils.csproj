@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansConsulUtils</PackageId>
+    <Title>Microsoft Orleans Consul Utilities</Title>
+    <Description>Library of utility types for Consul of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) Consul</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>OrleansConsulUtils</AssemblyName>
+    <RootNamespace>OrleansConsulUtils</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Consul" Version="$(ConsulVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+</Project>

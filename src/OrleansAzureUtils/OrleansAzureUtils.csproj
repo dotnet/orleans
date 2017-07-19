@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
+    <Title>Microsoft Orleans Azure Utilities</Title>
+    <Description>Support library for hosting Orleans on Microsoft Azure.</Description>
+    <PackageTags>$(PackageTags) Azure</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>OrleansAzureUtils</AssemblyName>
+    <RootNamespace>OrleansAzureUtils</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <PackageReference Include="System.Net.Requests" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+</Project>
