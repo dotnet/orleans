@@ -26,6 +26,6 @@
   <files>
     <file src="OrleansGCPUtils.dll" target="lib\net461" />
     <file src="OrleansGCPUtils.pdb" target="lib\net461" />
-    <file src="OrleansGCPUtils\**\*.cs" target="src" />
+    <file src="$SRC_DIR$OrleansGCPUtils\**\*.cs" target="src" />
   </files>
 </package>
