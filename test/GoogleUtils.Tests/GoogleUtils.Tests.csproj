@@ -51,6 +51,10 @@
       <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
       <Name>OrleansCodeGenerator</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansGCPUtils\OrleansGCPUtils.csproj">
+      <Project>{6e5860c5-44e7-415c-80d6-3ecf15a80796}</Project>
+      <Name>OrleansGCPUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansGoogleUtils\OrleansGoogleUtils.csproj">
       <Project>{b9196cb5-d356-4228-b73f-143f2eb80c64}</Project>
       <Name>OrleansGoogleUtils</Name>
@@ -70,6 +74,10 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj">
+      <Project>{09610024-F5B9-4065-9557-BD9E36A32421}</Project>
+      <Name>TesterInternal</Name>
     </ProjectReference>
     <ProjectReference Include="..\Tester\Tester.csproj">
       <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55d}</Project>
@@ -124,10 +132,16 @@
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="GoogleTestUtils.cs" />
     <Compile Include="ProtobufSerialization\Addressbook.cs" />
     <Compile Include="ProtobufSerialization\Counter.cs" />
     <Compile Include="ProtobufSerialization\ProtobufSerializationTests.cs" />
+    <Compile Include="Streaming\PubSubClientStreamTests.cs" />
+    <Compile Include="Streaming\PubSubStreamTests.cs" />
+    <Compile Include="Streaming\PubSubSubscriptionMultiplicityTests.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
