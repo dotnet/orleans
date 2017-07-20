@@ -13,6 +13,7 @@ namespace Tester.AzureUtils.Lease
     [TestCategory("Functional"), TestCategory("Azure"), TestCategory("Lease")]
     public class AzureBlobLeaseProviderTests : AzureStorageBasicTests
     {
+        private const string LeaseCategory = "AzureBlobLeaseProviderTests";
         private AzureBlobLeaseProvider leaseProvider;
         public AzureBlobLeaseProviderTests()
             :base()
@@ -32,7 +33,7 @@ namespace Tester.AzureUtils.Lease
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var results = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             for(int i = 0; i < results.Count(); i++)
             {
                 var result = results[i];
@@ -49,9 +50,9 @@ namespace Tester.AzureUtils.Lease
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var results = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //release
-            await this.leaseProvider.Release(ResourceCategory.Streaming, results.Select(result => result.AcquiredLease).ToArray());
+            await this.leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease).ToArray());
         }
 
         [SkippableFact]
@@ -61,9 +62,9 @@ namespace Tester.AzureUtils.Lease
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var acquireResults = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var acquireResults = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(ResourceCategory.Streaming, acquireResults.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults.Select(result => result.AcquiredLease).ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -81,7 +82,7 @@ namespace Tester.AzureUtils.Lease
                 new LeaseRequest(resourceId, TimeSpan.FromSeconds(15)), new LeaseRequest(resourceId, TimeSpan.FromSeconds(15))
             };
             //two entity tries to acquire lease on the same release
-            var results = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //one attempt succeeded and one attemp failed
             Assert.True(results.Any(result => result.StatusCode == ResponseCode.OK));
             Assert.True(results.Any(result => result.StatusCode == ResponseCode.LeaseNotAvailable));
@@ -94,10 +95,10 @@ namespace Tester.AzureUtils.Lease
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var results = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             var acquiredLeaseWithWrongToken = results.Select(result => new AcquiredLease(result.AcquiredLease.ResourceKey, result.AcquiredLease.Duration, Guid.NewGuid().ToString(), result.AcquiredLease.StartTimeUtc));
             //renew with wrong token
-            var renewResults = await this.leaseProvider.Renew(ResourceCategory.Streaming, acquiredLeaseWithWrongToken.ToArray());
+            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquiredLeaseWithWrongToken.ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -115,9 +116,9 @@ namespace Tester.AzureUtils.Lease
             };
 
             //acquire first time
-            var acquireResults1 = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var acquireResults1 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(ResourceCategory.Streaming, acquireResults1.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults1.Select(result => result.AcquiredLease).ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -126,10 +127,10 @@ namespace Tester.AzureUtils.Lease
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
             }
             //release
-            await this.leaseProvider.Release(ResourceCategory.Streaming, renewResults.Select(result => result.AcquiredLease).ToArray());
+            await this.leaseProvider.Release(LeaseCategory, renewResults.Select(result => result.AcquiredLease).ToArray());
 
             //acquire second time, acquire lease on the same resource after their leases got released
-            var acquireResults2 = await this.leaseProvider.Acquire(ResourceCategory.Streaming, leaseRequests.ToArray());
+            var acquireResults2 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             for (int i = 0; i < acquireResults2.Count(); i++)
             {
                 var result = acquireResults2[i];

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Providers;
 
 namespace Orleans.Streams
 {
@@ -25,7 +26,8 @@ namespace Orleans.Streams
 
         public override Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod)
+            TimeSpan siloMaturityPeriod,
+            IProviderConfiguration providerConfig)
         {
             if (queueMapper == null)
             {

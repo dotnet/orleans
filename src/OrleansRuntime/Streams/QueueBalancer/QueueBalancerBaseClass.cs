@@ -1,4 +1,5 @@
-﻿using Orleans.Runtime;
+﻿using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Streams;
 using System;
 using System.Collections.Concurrent;
@@ -20,7 +21,7 @@ namespace Orleans.Streams
             this.queueBalanceListeners = new List<IStreamQueueBalanceListener>();
         }
         public abstract IEnumerable<QueueId> GetMyQueues();
-        public abstract Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod);
+        public abstract Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod, IProviderConfiguration providerConfig);
         public virtual bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
             if (observer == null)

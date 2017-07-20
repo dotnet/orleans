@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using System;
+using Orleans.Providers;
 
 namespace Orleans.Streams
 {
@@ -19,10 +20,12 @@ namespace Orleans.Streams
         /// <param name="strProviderName"></param>
         /// <param name="queueMapper"></param>
         /// <param name="siloMaturityPeriod"></param>
+        /// <param name="providerConfig">Provider configuration for current stream provider</param>
         /// <returns></returns>
         Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod);
+            TimeSpan siloMaturityPeriod,
+            IProviderConfiguration providerConfig);
 
         /// <summary>
         /// Retrieves the latest queue distribution for this balancer.

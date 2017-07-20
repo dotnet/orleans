@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Orleans.Concurrency;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Acquired lease
     /// </summary>
+    [Immutable]
     public class AcquiredLease 
     {
         /// <summary>
@@ -47,6 +49,7 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// AcquireLeaseResult class, which demonstrates result of acquiring or renewing lease operation
     /// </summary>
+    [Immutable]
     public class AcquireLeaseResult
     {
         /// <summary>
@@ -93,6 +96,7 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>
+    [Immutable]
     public class LeaseRequest
     {
         /// <summary>
@@ -148,11 +152,5 @@ namespace Orleans.LeaseProviders
         /// <param name="aquiredLeases"></param>
         /// <returns></returns>
         Task Release(string category, AcquiredLease[] aquiredLeases);
-    }
-
-    public class ResourceCategory
-    {
-        public const string Streaming = "Streaming";
-        public const string Storage = "Storage";
     }
 }

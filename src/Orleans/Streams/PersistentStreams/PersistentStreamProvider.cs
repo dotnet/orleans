@@ -51,6 +51,7 @@ namespace Orleans.Providers.Streams.Common
         private SerializationManager serializationManager;
         private IRuntimeClient runtimeClient;
         private IStreamSubscriptionManager streamSubscriptionManager;
+        private IProviderConfiguration providerConfig;
         public string Name { get; private set; }
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -96,6 +97,7 @@ namespace Orleans.Providers.Streams.Common
             adapterFactory.Init(config, Name, logger, new GrainFactoryServiceProvider(providerRuntime));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
+            this.providerConfig = config;
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
             if (this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
@@ -131,7 +133,7 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter, myConfig);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter, myConfig, this.providerConfig);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == PersistentStreamProviderState.AgentsStarted)

@@ -28,6 +28,11 @@ namespace Tester.AzureUtils.Lease
             new MemoryAdapterConfig(StreamProviderName);
         public static readonly PersistentStreamProviderConfig ProviderConfig = new PersistentStreamProviderConfig()
         { BalancerType = StreamQueueBalancerType.ClusterConfigDeploymentLeaseBasedBalancer };
+        public static readonly LeaseBasedQueueBalancerConfig BalancerConfig = new LeaseBasedQueueBalancerConfig()
+        {
+            LeaseProviderType = typeof(AzureBlobLeaseProvider),
+            LeaseLength = TimeSpan.FromSeconds(10)
+        };
 
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
         public static readonly TimeSpan TimeOut = TimeSpan.FromMinutes(2);
@@ -46,7 +51,7 @@ namespace Tester.AzureUtils.Lease
             // get initial settings from configs
             ProviderSettings.WriteProperties(settings);
             ProviderConfig.WriteProperties(settings);
-
+            BalancerConfig.WriterProperties(settings);
             // register stream provider
             config.Globals.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, settings);
             config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
@@ -113,7 +118,7 @@ namespace Tester.AzureUtils.Lease
                     BlobContainerName = "test-container-leasebasedqueuebalancer"
                 };
                 services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<ILeaseProvider, AzureBlobLeaseProvider>();
+                services.AddTransient<AzureBlobLeaseProvider>();
                 return services.BuildServiceProvider();
             }
         }
