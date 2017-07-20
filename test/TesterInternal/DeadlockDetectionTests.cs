@@ -37,13 +37,13 @@ namespace UnitTests.General
         // 2 silos, loop across all cases (to force all grains to be local and remote):
         //      Non Reentrant A, B
         //      Reentrant C
-        // 1) Deadlock A, A
-        // 2) Deadlock A, B, A
+        // 1) Allowed reentrancy A, A
+        // 2) Allowed reentrancy A, B, A
         // 3) Deadlock C, A, C, A
         // 4) No Deadlock C, C
         // 5) No Deadlock C, A, C
 
-        // 1) Deadlock A, A
+        // 1) Allowed reentrancy A, A
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_1()
         {
@@ -55,14 +55,11 @@ namespace UnitTests.General
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(grainId, true));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
-
-                var deadlockExc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
-                this.fixture.Logger.Info(deadlockExc.Message);
-                Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
+                await firstGrain.CallNext_1(callChain, 1);
             }
         }
 
-        // 2) Deadlock A, B, A
+        // 2) Allowed reentrancy on non-reentrant grains A, B, A
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_2()
         {
@@ -76,14 +73,11 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(grainId, true));
                 callChain.Add(new Tuple<long, bool>(bBase + grainId, true));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
-
-                var deadlockExc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
-                this.fixture.Logger.Info(deadlockExc.Message);
-                Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
+                await firstGrain.CallNext_1(callChain, 1);
             }
         }
 
-        // 3) Deadlock C, A, C, A
+        // 3) Allowed reentrancy C, A, C, A
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_3()
         {
@@ -98,10 +92,7 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(grainId, true));
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
-
-                var exc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
-                this.fixture.Logger.Info(exc.Message);
-                Assert.Equal(callChain.Count, exc.CallChain.Count());
+                await firstGrain.CallNext_1(callChain, 1);
             }
         }
 
@@ -143,4 +134,3 @@ namespace UnitTests.General
         }
     }
 }
-
