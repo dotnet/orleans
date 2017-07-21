@@ -33,15 +33,16 @@ namespace Orleans.LeaseProviders
         {
             if (this.container == null)
             {
-                this.container = blobClient.GetContainerReference(this.providerConfig.BlobContainerName);
-                await this.container.CreateIfNotExistsAsync().ConfigureAwait(false); 
+                var tmpContainer = blobClient.GetContainerReference(this.providerConfig.BlobContainerName);
+                await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
+                this.container = tmpContainer;
             }
         }
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {
             await InitContainerIfNotExistsAsync();
-            var tasks = new List<Task<AcquireLeaseResult>>();
+            var tasks = new List<Task<AcquireLeaseResult>>(leaseRequests.Length);
             foreach (var leaseRequest in leaseRequests)
             {
                 tasks.Add(Acquire(category, leaseRequest));
@@ -82,11 +83,11 @@ namespace Orleans.LeaseProviders
             }
         }
 
-        public async Task Release(string category, AcquiredLease[] aquiredLeases)
+        public async Task Release(string category, AcquiredLease[] acquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
-            var tasks = new List<Task>();
-            foreach (var acquiredLease in aquiredLeases)
+            var tasks = new List<Task>(acquiredLeases.Length);
+            foreach (var acquiredLease in acquiredLeases)
             {
                 tasks.Add(Release(category, acquiredLease));
             }
@@ -99,11 +100,11 @@ namespace Orleans.LeaseProviders
             return blob.ReleaseLeaseAsync(AccessCondition.GenerateLeaseCondition(acquiredLease.Token));
         }
 
-        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] aquiredLeases)
+        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
-            var tasks = new List<Task<AcquireLeaseResult>>();
-            foreach (var acquiredLease in aquiredLeases)
+            var tasks = new List<Task<AcquireLeaseResult>>(acquiredLeases.Length);
+            foreach (var acquiredLease in acquiredLeases)
             {
                 tasks.Add(Renew(category, acquiredLease));
             }

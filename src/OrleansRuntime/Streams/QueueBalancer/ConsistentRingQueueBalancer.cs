@@ -7,13 +7,12 @@ using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    internal class ConsistentRingQueueBalancer : QueueBalancerBaseClass, IAsyncRingRangeListener, IStreamQueueBalancer
+    internal class ConsistentRingQueueBalancer : QueueBalancerBase, IAsyncRingRangeListener, IStreamQueueBalancer
     {
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
         public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
-            :base()
         {
             if (streamProviderRuntime == null)
             {

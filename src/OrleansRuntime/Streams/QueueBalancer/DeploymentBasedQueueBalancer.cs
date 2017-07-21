@@ -62,7 +62,7 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    internal class DeploymentBasedQueueBalancer : QueueBalancerBaseClass, ISiloStatusListener, IStreamQueueBalancer
+    internal class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
     {
         private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -76,7 +76,6 @@ namespace Orleans.Streams
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
             bool isFixed)
-            :base()
         {
             if (siloStatusOracle == null)
             {
@@ -180,7 +179,7 @@ namespace Orleans.Streams
             bool useIdealDistribution = isFixed || isStarting;
             Dictionary<string, List<QueueId>> distribution = useIdealDistribution
                 ? balancer.IdealDistribution
-                : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
+                : balancer.GetDistribution(QueueBalancerUtilities.GetActiveSilos(siloStatusOracle, immatureSilos));
 
             List<QueueId> myQueues;
             if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))

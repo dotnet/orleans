@@ -27,7 +27,7 @@ namespace Orleans.Streams
         /// <param name="newSelectionCount"></param>
         /// <param name="existingSelection"></param>
         /// <returns></returns>
-        IEnumerable<T> NextSelection(int newSelectionCount, IEnumerable<T> existingSelection);
+        List<T> NextSelection(int newSelectionCount, List<T> existingSelection);
     }
 
     /// <summary>
@@ -36,9 +36,9 @@ namespace Orleans.Streams
     /// <typeparam name="T"></typeparam>
     internal class RoundRobinSelector<T> : IResourceSelector<T>
     {
-        private List<T> resources;
+        private ReadOnlyCollection<T> resources;
         private int lastSelection;
-        public RoundRobinSelector(List<T> resources)
+        public RoundRobinSelector(ReadOnlyCollection<T> resources)
         {
             this.resources = resources;
             this.lastSelection = new Random().Next(this.resources.Count);
@@ -50,9 +50,9 @@ namespace Orleans.Streams
         /// <param name="newSelectionCount"></param>
         /// <param name="existingSelection"></param>
         /// <returns></returns>
-        public IEnumerable<T> NextSelection(int newSelectionCount, IEnumerable<T> existingSelection)
+        public List<T> NextSelection(int newSelectionCount, List<T> existingSelection)
         {
-            var selection = new List<T>();
+            var selection = new List<T>(newSelectionCount);
             while (selection.Count < newSelectionCount)
             {
                 this.lastSelection = (++this.lastSelection) % (this.resources.Count - 1);
@@ -71,9 +71,9 @@ namespace Orleans.Streams
     public class AzureDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
     {
         public AzureDeploymentLeaseBasedBalancer(ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider, Factory<string, Logger> loggerFac)
             : base(serviceProvider, siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider),
-                  serviceProvider.GetRequiredService<Factory<string, Logger>>())
+                  loggerFac)
         { }
     }
 
@@ -150,8 +150,11 @@ namespace Orleans.Streams
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// as much as possible. 
     /// </summary>
-    public class LeaseBasedQueueBalancer : QueueBalancerBaseClass, ISiloStatusListener, IStreamQueueBalancer, IDisposable
+    public class LeaseBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer, IDisposable
     {
+        /// <summary>
+        /// Lease category for LeaseBasedQueueBalancer
+        /// </summary>
         public const string LeaseCategory = "QueueBalancer";
         private class AcquiredQueue 
         {
@@ -180,8 +183,14 @@ namespace Orleans.Streams
         private IServiceProvider serviceProvider;
         private Logger logger;
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="serviceProvider"></param>
+        /// <param name="siloStatusOracle"></param>
+        /// <param name="deploymentConfig"></param>
+        /// <param name="loggerFac"></param>
         public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, Factory<string, Logger> loggerFac)
-            : base()
         {
             this.serviceProvider = serviceProvider;
             this.deploymentConfig = deploymentConfig;
@@ -200,6 +209,7 @@ namespace Orleans.Streams
             }
         }
 
+        /// <inheritdoc/>
         public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod, IProviderConfiguration providerConfig)
         {
             if (queueMapper == null)
@@ -218,10 +228,11 @@ namespace Orleans.Streams
             this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
-            this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues.ToList());
+            this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues);
             return MaintainAndBalanceQueues(null);
         }
 
+        /// <inheritdoc/>
         public override IEnumerable<QueueId> GetMyQueues()
         {
             return this.myQueues.Select(queue => queue.QueueId);
@@ -279,14 +290,14 @@ namespace Orleans.Streams
             while (attempts ++ <= maxAttempts && leasesToAquire > 0)
             {
                 //select new queues to acquire
-                var expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId)).ToList();
+                var expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList()).ToList();
                 var leaseRequests = expectedQueues.Select(queue => new LeaseRequest() {
                     ResourceKey = queue.ToString(),
                     Duration = this.leaseLength
                 });
                 var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
                 //add successfully acquired queue to myQueues list
-                for (int i = 0; i < results.Count(); i++)
+                for (int i = 0; i < results.Length; i++)
                 {
                     if (results[i].StatusCode == ResponseCode.OK)
                     {
@@ -330,7 +341,7 @@ namespace Orleans.Streams
             }
             else
             {
-                activeBuckets = GetActiveSilos(this.siloStatusOracle, this.immatureSilos).Count;
+                activeBuckets = QueueBalancerUtilities.GetActiveSilos(this.siloStatusOracle, this.immatureSilos).Count;
             }
             this.minimumResponsibilty = this.allQueues.Count / activeBuckets;
             //if allQueues count is divisible by active bukets, then every bucket should take the same count of queues, otherwise, there should be one bucket take 1 more queue
@@ -339,6 +350,7 @@ namespace Orleans.Streams
             else this.maximumRespobsibility = this.minimumResponsibilty + 1;
         }
 
+        /// <inheritdoc/>
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             if (status == SiloStatus.Dead)
@@ -399,6 +411,7 @@ namespace Orleans.Streams
             return Task.WhenAll(notificatioTasks);
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             this.renewLeaseTimer?.Dispose();
