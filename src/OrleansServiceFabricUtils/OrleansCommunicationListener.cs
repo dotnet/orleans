@@ -42,7 +42,8 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         /// <param name="context">The context.</param>
         /// <param name="configuration">The configuration.</param>
-        public OrleansCommunicationListener(ServiceContext context, ClusterConfiguration configuration)
+        /// <param name="siloName">The silo name, or <see langword="null"/> to have a name automatically selected.</param>
+        public OrleansCommunicationListener(ServiceContext context, ClusterConfiguration configuration, string siloName = null)
         {
             this.configuration = configuration;
             if (this.configuration == null)
@@ -51,8 +52,10 @@ namespace Microsoft.Orleans.ServiceFabric
                 this.configuration.StandardLoad();
             }
 
-            this.SiloName = Regex.Replace(context.ServiceName.PathAndQuery.Trim('/'), "[^a-zA-Z0-9_]", "_") + "_" +
-                            context.ReplicaOrInstanceId.ToString("X");
+            this.SiloName = !string.IsNullOrWhiteSpace(siloName)
+                ? siloName
+                : Regex.Replace(context.ServiceName.PathAndQuery.Trim('/'), "[^a-zA-Z0-9_]", "_") + "_" +
+                  context.ReplicaOrInstanceId.ToString("X");
 
             // Gather configuration from Service Fabric.
             var activation = context.CodePackageActivationContext;

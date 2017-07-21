@@ -18,11 +18,12 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
         /// </summary>
         /// <param name="configuration">The Orleans cluster configuration.</param>
+        /// <param name="siloName">The silo name, or <see langword="null"/> to have a name automatically selected.</param>
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
-        public static ServiceInstanceListener CreateStateless(ClusterConfiguration configuration)
+        public static ServiceInstanceListener CreateStateless(ClusterConfiguration configuration, string siloName = null)
         {
             return new ServiceInstanceListener(
-                context => new OrleansCommunicationListener(context, configuration),
+                context => new OrleansCommunicationListener(context, configuration, siloName),
                 OrleansServiceFabricEndpointName);
         }
 
@@ -30,11 +31,12 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
         /// </summary>
         /// <param name="configuration">The Orleans cluster configuration.</param>
+        /// <param name="siloName">The silo name, or <see langword="null"/> to have a name automatically selected.</param>
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
-        public static ServiceReplicaListener CreateStateful(ClusterConfiguration configuration)
+        public static ServiceReplicaListener CreateStateful(ClusterConfiguration configuration, string siloName = null)
         {
             return new ServiceReplicaListener(
-                context => new OrleansCommunicationListener(context, configuration),
+                context => new OrleansCommunicationListener(context, configuration, siloName),
                 OrleansServiceFabricEndpointName);
         }
     }
