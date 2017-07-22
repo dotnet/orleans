@@ -19,6 +19,7 @@ namespace Orleans.Runtime
     [Serializable]
     internal class GrainTypeData
     {
+        private static readonly ParameterInfo[] EmptyParameters = {};
         internal Type Type { get; private set; }
         internal string GrainClass { get; private set; }
         internal List<Type> RemoteInterfaceTypes { get; private set; }
@@ -27,7 +28,9 @@ namespace Orleans.Runtime
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
         internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
-   
+        [NonSerialized] private ParameterInfo[] constructorParameters;
+        internal ParameterInfo[] ConstructorParameters => constructorParameters ?? (constructorParameters = GetConstructorParameters());
+
         public GrainTypeData(Type type, Type stateObjectType, MultiClusterRegistrationStrategyManager registrationManager)
         {
             var typeInfo = type.GetTypeInfo();
@@ -150,6 +153,12 @@ namespace Orleans.Runtime
             var predicate = Expression.Lambda<Func<InvokeMethodRequest, bool>>(call, parameter).Compile();
 
             return predicate;
+        }
+
+        private ParameterInfo[] GetConstructorParameters()
+        {
+            var constructor = this.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
+            return constructor?.GetParameters() ?? EmptyParameters;
         }
     }
 }

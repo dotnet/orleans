@@ -121,15 +121,9 @@ namespace Orleans.Runtime
                 return extensionMap != null && extensionMap.ContainsKey(interfaceId);
             }
 
-            public int InterfaceId
-            {
-                get { return 0; } // 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
-            }
+            public int InterfaceId { get; } = 0;// 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
 
-            public ushort InterfaceVersion
-            {
-                get { return 0; }
-            }
+            public ushort InterfaceVersion { get; } = 0;
 
             /// <summary>
             /// Gets the extension from this instance if it is available.
@@ -185,11 +179,12 @@ namespace Orleans.Runtime
 			TimeSpan maxRequestProcessingTime,
             IRuntimeClient runtimeClient)
         {
-            if (null == addr) throw new ArgumentNullException("addr");
-            if (null == placedUsing) throw new ArgumentNullException("placedUsing");
-            if (null == collector) throw new ArgumentNullException("collector");
+            if (null == addr) throw new ArgumentNullException(nameof(addr));
+            if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
+            if (null == collector) throw new ArgumentNullException(nameof(collector));
 
             logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
+            this.lifeCycle = new GrainLifecycle(logger);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.nodeConfiguration = nodeConfiguration;
@@ -320,10 +315,7 @@ namespace Orleans.Runtime
             return streamDirectory ?? (streamDirectory = new Streams.StreamDirectory());
         }
 
-        internal bool IsUsingStreams 
-        {
-            get { return streamDirectory != null; }
-        }
+        internal bool IsUsingStreams => streamDirectory != null;
 
         internal async Task DeactivateStreamResources()
         {
@@ -340,15 +332,9 @@ namespace Orleans.Runtime
         }
 
         #region IActivationData
-        GrainReference IActivationData.GrainReference
-        {
-            get { return GrainReference; }
-        }
-        
-        public GrainId Identity
-        {
-            get { return Grain; }
-        }
+        GrainReference IActivationData.GrainReference => GrainReference;
+
+        public GrainId Identity => Grain;
 
         public GrainTypeData GrainTypeData { get; private set; }
 
@@ -361,6 +347,16 @@ namespace Orleans.Runtime
         public IServiceProvider ServiceProvider => this.serviceScope?.ServiceProvider;
 
         public IDictionary<object, object> Items { get; private set; }
+
+#region lifecyle
+        private readonly GrainLifecycle lifeCycle;
+
+        public IGrainLifeCycle ObservableLifeCycle => lifeCycle;
+
+        internal ILifecycleObserver LifeCycle => lifeCycle;
+        #endregion lifecycle
+
+        public ParameterInfo[] ConstructorParameters => GrainTypeData.ConstructorParameters;
 
         public void OnTimerCreated(IGrainTimer timer)
         {
