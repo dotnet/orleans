@@ -201,6 +201,7 @@ namespace Orleans.Runtime
                 var candidates = 
                     Directory.EnumerateFiles(pathName, "*.dll", searchOption)
                     .Select(Path.GetFullPath)
+                    .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     .Distinct()
                     .ToArray();
 
@@ -215,8 +216,17 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
-                        Assembly.ReflectionOnlyLoadFrom(j);
+                        var complaints = default(string[]);
+
+                        if (IsCompatibleWithCurrentProcess(j, out complaints))
+                        {
+                            if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
+                            Assembly.ReflectionOnlyLoadFrom(j);
+                        }
+                        else
+                        {
+                            if (logger.IsInfo) logger.Info("{0} is not compatible with current process, loading is skipped.", j);
+                        }
                     }
                     catch (Exception)
                     {
@@ -290,7 +300,19 @@ namespace Orleans.Runtime
 
         private static bool InterpretFileLoadException(string asmPathName, out string[] complaints)
         {
-            var matched = MatchWithLoadedAssembly(AssemblyName.GetAssemblyName(asmPathName));
+            var matched = default(Assembly);
+
+            try
+            {
+                matched = MatchWithLoadedAssembly(AssemblyName.GetAssemblyName(asmPathName));
+            }
+            catch (BadImageFormatException ex)
+            {
+                // this can happen when System.Reflection.Metadata or System.Collections.Immutable assembly version is different (one requires the other) and there is no correct binding redirect in the app.config
+                complaints = null;
+                return false;
+            }
+
             if (null == matched)
             {
                 // something unexpected has occurred. rethrow until we know what we're catching.

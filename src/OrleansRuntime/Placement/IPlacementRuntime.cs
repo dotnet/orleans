@@ -35,12 +35,6 @@ namespace Orleans.Runtime.Placement
 
     internal static class PlacementRuntimeExtensions
     {
-        public static Task<AddressesAndTag> Lookup(this IPlacementRuntime @this, GrainId grainId)
-        {
-            AddressesAndTag l;
-            return @this.FastLookup(grainId, out l) ? Task.FromResult(l) : @this.FullLookup(grainId); 
-        }
-
         public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
         {
             string unused;
