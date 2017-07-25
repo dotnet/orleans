@@ -25,7 +25,7 @@ namespace Tester
             {
                 public IServiceProvider ConfigureServices(IServiceCollection services)
                 {
-                    services.AddSingleton(typeof(IStorageFacetFactory<>), typeof(StorageFacetFactory<>));
+                    services.AddSingleton(typeof(IStorageFeatureFactory<>), typeof(StorageFeatureFactory<>));
                     return services.BuildServiceProvider();
                 }
             }

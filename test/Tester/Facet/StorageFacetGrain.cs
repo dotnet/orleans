@@ -11,10 +11,10 @@ namespace Tester
 
     public class StorageFacetGrain : Grain, IStorageFacetGrain
     {
-        [StorageFacet("Blob", stateName: "FirstState")]
-        public IStorageFacet<string> First { get; set; }
-        [StorageFacet("Table")]
-        public IStorageFacet<string> Second { get; set; }
+        [StorageFeature("Blob", stateName: "FirstState")]
+        public IStorageFeature<string> First { get; set; }
+        [StorageFeature("Table")]
+        public IStorageFeature<string> Second { get; set; }
 
         public Task<string[]> GetNames()
         {
