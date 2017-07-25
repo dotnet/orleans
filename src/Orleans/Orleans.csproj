@@ -95,9 +95,14 @@
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
     <Compile Include="Core\ClusterClient.cs" />
+    <Compile Include="Facet\GrainFacetAttribute.cs" />
     <Compile Include="Runtime\GrainReferenceRuntime.cs" />
     <Compile Include="Serialization\GrainReferenceSerializer.cs" />
     <Compile Include="Providers\ILeaseProvider.cs" />
+    <Compile Include="Lifecycle\ILifecycleObservable.cs" />
+    <Compile Include="Lifecycle\ILifecycleObserver.cs" />
+    <Compile Include="Lifecycle\LifecycleObservable.cs" />
+    <Compile Include="Lifecycle\LifecycleExtensions.cs" />
     <Compile Include="Runtime\IGrainActivationContext.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
@@ -131,6 +136,7 @@
     <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
+    <Compile Include="Runtime\IGrainLifeCycle.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainReferenceRuntime.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
