@@ -35,6 +35,10 @@ namespace Orleans.CodeGenerator
         /// </summary>
         private const string ClassSuffix = "Serializer";
 
+        private static readonly RuntimeTypeHandle IntPtrTypeHandle = typeof(IntPtr).TypeHandle;
+        private static readonly RuntimeTypeHandle UIntPtrTypeHandle = typeof(UIntPtr).TypeHandle;
+        private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
@@ -446,11 +450,34 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => !field.IsNotSerialized())
+                    .Where(field => ShouldSerializeField(field))
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
             return result;
+        }
+
+        /// <summary>
+        /// Returns <see langowrd="true"/> if the provided field should be serialized, <see langword="false"/> otherwise.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <returns>
+        /// <see langowrd="true"/> if the provided field should be serialized, <see langword="false"/> otherwise.
+        /// </returns>
+        private static bool ShouldSerializeField(FieldInfo field)
+        {
+            if (field.IsNotSerialized()) return false;
+
+            var fieldType = field.GetType();
+            if (fieldType.IsPointer || fieldType.IsByRef) return false;
+
+            var handle = fieldType.TypeHandle;
+            if (handle.Equals(IntPtrTypeHandle)) return false;
+            if (handle.Equals(UIntPtrTypeHandle)) return false;
+
+            if (DelegateTypeInfo.IsAssignableFrom(fieldType)) return false;
+
+            return true;
         }
 
         /// <summary>
