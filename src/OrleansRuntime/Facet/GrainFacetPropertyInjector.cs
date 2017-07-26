@@ -40,7 +40,10 @@ namespace Orleans.Runtime
 
             public void InjectProperties(IGrainActivationContext grainContext)
             {
-                propertyInjectors.ForEach(injector => injector.Invoke(grainContext));
+                foreach (Action<IGrainActivationContext> injector in propertyInjectors)
+                {
+                    injector(grainContext);
+                }
             }
 
             private static IEnumerable<Action<IGrainActivationContext>> CreatePropertyInjectors(Type type)

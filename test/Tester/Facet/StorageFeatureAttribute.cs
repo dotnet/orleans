@@ -32,7 +32,7 @@ namespace Tester
                 object facet = factory?.Create(this);
 
                 // register with grain lifecycle
-                facet.ParticipateInGrainLifecycle(context.ObservableLifeCycle);
+                facet.ParticipateInLifecycle(context.ObservableLifeCycle);
 
                 return facet;
             };

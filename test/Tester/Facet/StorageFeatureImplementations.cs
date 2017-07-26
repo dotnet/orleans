@@ -29,7 +29,7 @@ namespace Tester
         }
     }
 
-    public class TableStorageFeature<TState> : IStorageFeature<TState>, IGrainLifecycleParticipant
+    public class TableStorageFeature<TState> : IStorageFeature<TState>, ILifecycleParticipant<IGrainLifeCycle>
     {
         private readonly IStorageFeatureConfig config;
         private bool activateCalled;
