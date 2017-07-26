@@ -67,14 +67,16 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <inheritdoc />
         public bool SubscribeToGatewayNotificationEvents(IGatewayListListener subscriber)
         {
+            this.log.Verbose($"Unsubscribing {subscriber} to gateway notification events.");
             this.subscribers.TryAdd(subscriber, subscriber);
             return true;
         }
 
         /// <inheritdoc />
-        public bool UnSubscribeFromGatewayNotificationEvents(IGatewayListListener listener)
+        public bool UnSubscribeFromGatewayNotificationEvents(IGatewayListListener subscriber)
         {
-            this.subscribers.TryRemove(listener, out listener);
+            this.log.Verbose($"Unsubscribing {subscriber} from gateway notification events.");
+            this.subscribers.TryRemove(subscriber, out subscriber);
             return true;
         }
 
