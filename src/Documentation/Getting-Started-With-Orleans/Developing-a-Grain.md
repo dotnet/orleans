@@ -141,17 +141,23 @@ A grain reference can be obtained by passing the identity of a grain to the `Gra
 
 The following are examples of how to obtain a grain reference of the `IPlayerGrain` interface defined above.
 
-In Orleans Client code:
-
-```csharp
-    //construct the grain reference of a specific player
-    IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
-```
-From inside a Grain class:
+From inside a grain class:
 
 ```csharp
     //construct the grain reference of a specific player
     IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+```
+
+From [Orleans Client](Developing-a-Client.md) code.
+
+Prior to 1.5.0:
+```csharp
+    IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
+```
+
+Since 1.5.0:
+```csharp
+    IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
 ```
 
 ### Grain Method Invocation
