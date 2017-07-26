@@ -7,7 +7,7 @@ title: Dependency Injection
 
 Dependency injection (DI) is a software design pattern that implements inversion of control for resolving dependencies.
 
-Orleans is using the abstraction written by the developers of [ASP.NET Core](https://docs.asp.net). For a detailed explanation about how does it work, check out the [official documentation](https://docs.asp.net/en/latest/fundamentals/dependency-injection.html#dependency-injection).
+Orleans is using the abstraction written by the developers of [ASP.NET Core](https://docs.asp.net). For a detailed explanation about how it works, check out the [official documentation](https://docs.asp.net/en/latest/fundamentals/dependency-injection.html#dependency-injection).
 
 # DI in Orleans
 
