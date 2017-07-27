@@ -64,20 +64,6 @@ namespace Orleans.Streams
     }
 
     /// <summary>
-    ///  Stream queue balancer that uses Azure deployment information for load balancing. 
-    /// Requires silo running in Azure.
-    /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// </summary>
-    public class AzureDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
-    {
-        public AzureDeploymentLeaseBasedBalancer(ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider, Factory<string, Logger> loggerFac)
-            : base(serviceProvider, siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider),
-                  loggerFac)
-        { }
-    }
-
-    /// <summary>
     /// Stream queue balancer that uses the cluster configuration to determine deployment information for load balancing.  
     /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// </summary>

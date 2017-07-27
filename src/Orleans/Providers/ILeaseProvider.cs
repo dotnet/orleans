@@ -96,7 +96,6 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>
-    [Immutable]
     public class LeaseRequest
     {
         /// <summary>

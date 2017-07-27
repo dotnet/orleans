@@ -66,6 +66,8 @@
     <Compile Include="Providers\Streams\AzureQueue\IAzureQueueDataAdapter.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\StreamDeliveryFailureEntity.cs" />
+    <Compile Include="QueueBalancers\AzureDeployemntQueueBalancer.cs" />
+    <Compile Include="QueueBalancers\StreamQueueBalancerType.cs" />
     <Compile Include="Storage\AzureBasedMembershipTable.cs" />
     <Compile Include="Storage\AzureBasedReminderTable.cs" />
     <Compile Include="Hosting\AzureConfigUtils.cs" />
@@ -117,6 +119,7 @@
     <None Include="app.config" />
     <None Include="project.json" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <PropertyGroup>

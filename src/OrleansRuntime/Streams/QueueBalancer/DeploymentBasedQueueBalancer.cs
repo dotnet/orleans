@@ -10,7 +10,7 @@ using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    internal class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    public class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public StaticClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
@@ -19,40 +19,13 @@ namespace Orleans.Streams
         { }
     }
 
-    internal class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
+    public class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
     {
         public DynamicClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
             ClusterConfiguration clusterConfiguration)
             : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), false)
         { }
-    }
-
-    internal class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
-    {
-        public DynamicAzureDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider)
-            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), false)
-        { }
-    }
-
-    internal class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
-    {
-        public StaticAzureDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider)
-            : base(siloStatusOracle, DeploymentBasedQueueBalancerUtils.CreateDeploymentConfigForAzure(serviceProvider), true)
-        { }
-    }
-
-    internal static class DeploymentBasedQueueBalancerUtils
-    {
-        public static IDeploymentConfiguration CreateDeploymentConfigForAzure(IServiceProvider svp)
-        {
-            Logger logger = LogManager.GetLogger(typeof(DeploymentBasedQueueBalancer).Name, LoggerType.Runtime);
-            return AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, svp);
-        }
     }
 
     /// <summary>
@@ -62,7 +35,7 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    internal class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
+    public class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
     {
         private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;

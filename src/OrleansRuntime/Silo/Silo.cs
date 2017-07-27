@@ -219,10 +219,7 @@ namespace Orleans.Runtime
             //queue balancer contructing related
             services.AddTransient<StaticClusterConfigDeploymentBalancer>();
             services.AddTransient<DynamicClusterConfigDeploymentBalancer>();
-            services.AddTransient<DynamicAzureDeploymentBalancer>();
-            services.AddTransient<StaticAzureDeploymentBalancer>();
             services.AddTransient<ConsistentRingQueueBalancer>();
-            services.AddTransient<AzureDeploymentLeaseBasedBalancer>();
             services.AddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
