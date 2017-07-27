@@ -115,7 +115,7 @@ Includes DynamoDB based cluster membership provider, DynamoDB persistence provid
 ### [Microsoft Orleans Telemetry Consumer - Performance Counters](https://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.Counters/)
 
 ```
-PM> Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.AI
+PM> Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.Counters
 ```
 Windows Performance Counters implementation of Orleans Telemetry API.
 
