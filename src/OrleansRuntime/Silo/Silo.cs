@@ -591,7 +591,8 @@ namespace Orleans.Runtime
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
-            typeManager.Initialize(versionStore);
+            scheduler.QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
+                     .WaitWithThrow(this.initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating
