@@ -13,12 +13,12 @@ Hence, a client acts as a connector or conduit to the cluster and to all grains 
 
 Usually, clients are used on the frontend web servers to connect to an Orleans cluster that serves as a middle tier with grains executing business logic.
 In a typical setup, a frontend web server:
-* Receives a request over HTTP (or some other protocol)
+* Receives a web request
 * Performs necessary authentication and authorization validation
 * Decides which grain(s) should process the request
 * Uses Grain Client to make one or more method call to the grain(s)
 * Handles successful completion or failures of the grain calls and any returned values
-* Sends a response for the HTTP request
+* Sends a response for the web request
 
 ### Initialization of Grain Client
 
