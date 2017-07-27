@@ -37,15 +37,9 @@ Once we have a configuration object, we can build a client via the `ClientBuilde
 IClusterClient client = new ClientBuilder().UseConfiguration(clientConfig).Build();
 ```
 
-Lastly, we need to call `Connect()` method on the constructed client object to make it connect to the Orleans cluster, and wait for connection to succeed.
-If the code runs withing an asynchronous method, then it is better to `await` the `Connect()` call, so that we do not block the executing thread:
+Lastly, we need to call `Connect()` method on the constructed client object to make it connect to the Orleans cluster. It's an asynchronous method that returns a `Task`. So we need to wait for its completion with an `await` or `.Wait()`.
 ```csharp
 await client.Connect(); 
-```
-
-Otherwise, if the running method cannot be made asynchronous, we have to block the thread with a `Wait()`:
-```csharp
-client.Connect().Wait(); 
 ```
 
 ### Making Calls to Grains
