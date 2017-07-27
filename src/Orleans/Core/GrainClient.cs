@@ -3,12 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Runtime.ExceptionServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -328,10 +324,12 @@ namespace Orleans
         {
             get
             {
+                CheckInitialized();
                 return RuntimeClient.ClientInvokeCallback;
             }
             set
             {
+                CheckInitialized();
                 RuntimeClient.ClientInvokeCallback = value;
             }
         }
