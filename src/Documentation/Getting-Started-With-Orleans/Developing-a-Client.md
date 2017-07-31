@@ -3,71 +3,81 @@ layout: page
 title: Developing a Client
 ---
 
+### What Is Grain Client?
 
-Once we have our grain type implemented, we can write a client application that uses the type.
+The term "Client" or sometimes "Grain Client" is used for application code that interacts with grains but itself is not part of a grain logic.
+Client code runs outside of the cluster of [Orleans servers called "silos"](Silos.md) where grains are hosted.
+Hence, a client acts as a connector or conduit to the cluster and to all grains of the application.
 
-The following Orleans DLLs from either the `[SDK-ROOT]\Binaries\PresenceClient_ or _[SDK-ROOT]\Samples\References` directories need to be referenced in the client application project:
+![](Frontend-Cluster.png)
 
-* Orleans.dll
-* OrleansRuntimeInterfaces.dll
+Usually, clients are used on the frontend web servers to connect to an Orleans cluster that serves as a middle tier with grains executing business logic.
+In a typical setup, a frontend web server:
+* Receives a web request
+* Performs necessary authentication and authorization validation
+* Decides which grain(s) should process the request
+* Uses Grain Client to make one or more method call to the grain(s)
+* Handles successful completion or failures of the grain calls and any returned values
+* Sends a response for the web request
 
-Almost any client will involve use of the grain factory class.
-The `GetGrain()` method is used for getting a grain reference for a particular ID.
-As was already mentioned, grains cannot be explicitly created or deleted.
+### Initialization of Grain Client
 
-``` csharp
-GrainClient.Initialize();
+Before a grain client can be used for making calls to grains hosted in an Orleans cluster, it needs to be configured, initialized, and connected to the cluster.
 
-// Hardcoded player ID
-Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
-IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
-
-IGameGrain game = player.CurrentGame.Result;
-var watcher = new GameObserver();
-var observer = GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher);
-await game.SubscribeForGameUpdates();
+Configuration is provided via a `ClientConfiguration` object that contains a hierarchy of configuration properties for programmatically configuring a client.
+There is also a way to configure a client via a XML file, but that option will be deprecated in the future.
+More information is in the [Client Configuration guide](..\Orleans-Configuration-Guide\Client-Configuration.md).
+Here we will simply use a helper method that creates a configuration object hardcoded for connecting to a local silo running as `localhost`.
+```csharp
+ClientConfiguration clientConfig = ClientConfiguration.LocalhostSilo(); 
 ```
 
-If this code is used from the main thread of a console application, you have to call `Wait()` on the task returned by `game.SubscribeForGameUpdates()` because `await` does not prevent the `Main()` function from returning, which will cause the client process to exit.
+Once we have a configuration object, we can build a client via the `ClientBuilder` class.
+```csharp
+IClusterClient client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+```
 
-See the Key Concepts section for more details on the various ways to use `Task`s for execution scheduling and exception flow.
+Lastly, we need to call `Connect()` method on the constructed client object to make it connect to the Orleans cluster. It's an asynchronous method that returns a `Task`. So we need to wait for its completion with an `await` or `.Wait()`.
+```csharp
+await client.Connect(); 
+```
 
-## Find or create grains
+### Making Calls to Grains
 
-After establishing a connection by calling `GrainClient.Initialize()`, static methods in the generic factory class may be used to get a reference to a grain, such as `GrainClient.GrainFactory.GetGrain<IPlayerGrain>()` for the `PlayerGrain`. The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()`.
-
-## Sending messages to grains
-
-The programming model for communicating with grains from a client is almost the same as from a grain.
-The client holds grain references which implement a grain interface like `IPlayerGrain`.
-It invokes methods on that grain reference, and these return asynchronous values: `Task`/`Task<T>`, or another grain interface inheriting from `IGrain`.
-The client can use the `await` keyword or `ContinueWith()` method to queue continuations to be executed when these asynchronous values resolve, or the `Wait()` method to block the current thread.
-
-The one key difference between communicating with a grain from within a client or from within another grain is the single-threaded execution model.
-Grains are constrained to be single-threaded by the Orleans scheduler, while clients may be multi-threaded.
-The client library uses the TPL thread pool to manage continuations and callbacks, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, TPL tasks, etc.
-
-## Receiving notifications
-
-There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications.
-For example, a user might want to be notified when a new message has been published by someone that she is following.
-
-An observer is a one-way asynchronous interface that inherits from `IGrainObserver`, and all its methods must be `void`.
-The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result.
-The Orleans runtime will ensure one-way delivery of the notifications.
-A grain that publishes such notifications should provide an API to add or remove observers.
-
-To subscribe to a notification, the client must first create a local C# object that implements the observer interface.
-It then calls `CreateObjectReference()` method on the grain factory, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
-
-This model can also be used by other grains to receive asynchronous notifications.
-Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `this.AsReference<IChirperViewer>`).
-
-## Example
-
-Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
+Making calls to grain from a client is really no different from [making such calls from within grain code](Developing-a-Grain.md#grain-method-invocation).
+The same `GetGrain<T>(key)` method, where `T` is the target grain interface, is used in both cases [to obtain grain references](Developing-a-Grain.md#grain-reference).
+The slight difference is in through what factory object we invoke `GetGrain`.
+In client code we do that through the connected client object.
 
 ``` csharp
+IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
+Task t = player.JoinGame(game)
+await t;
+```
+
+A call to a grain method returns a `Task` or a`Task<T>` as required by the [grain interface rules](Developing-a-Grain.md#grain-interfaces-and-classes).
+The client can use the `await` keyword to asynchronously await the returned `Task` without blocking the thread, or in some cases the `Wait()` method to block the current thread of execution.
+
+The major difference between making calls to grains from client code and from within another grain is the single-threaded execution model of grains.
+Grains are constrained to be single-threaded by the Orleans runtime, while clients may be multi-threaded.
+Orleans does not provide any such guarantee on the client side, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, `Tasks`, etc.
+
+### Receiving notifications
+
+There are situations in which a simple request-response pattern is not enough, and the client needs to receive asynchronous notifications.
+For example, a user might want to be notified when a new message has been published by someone that she is following.
+
+[Observers](Observers.md) is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
+Calls to observers do not provide any indication of success or failure, as they are sent as one-way best effort message.
+So it is a responsibility of the application code to build a higher level reliability mechanism on top of observers where necessary. 
+
+Another mechanism that can be used for delivering asynchronous messages to clients is [Streams](../Orleans-Streams/index.md). Streams expose indications of success or failure of delivery of individual messages, and hence enable reliable communication back to the client.
+
+### Example
+
+Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of with an observer, and prints out notifications until the program is manually terminated.
+
+```csharp
 namespace PlayerWatcher
 {
     class Program
@@ -79,13 +89,25 @@ namespace PlayerWatcher
         /// </summary>
         static void Main(string[] args)
         {
+            RunWatcher().Wait();
+            // Block main thread so that the process doesn't exit.
+            // Updates arrive on thread pool threads.
+            Console.ReadLine();
+        }
+
+        static async Task RunWatcher()
+        {
             try
+
             {
-                GrainClient.Initialize();
+                // Connect to local silo
+                var config = ClientConfiguration.LocalhostSilo();
+                var client = new ClientBuilder().UseConfiguration(config).Build();
+                await client.Connect();
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
-                IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
+                IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
                 IGameGrain game = null;
 
                 while (game == null)
@@ -94,9 +116,11 @@ namespace PlayerWatcher
 
                     try
                     {
-                        game = player.CurrentGame.Result;
+                        game = await player.GetCurrentGame();
                         if (game == null) // Wait until the player joins a game
-                            Thread.Sleep(5000);
+                        {
+                            await Task.Delay(5000);
+                        }
                     }
                     catch (Exception exc)
                     {
@@ -108,35 +132,33 @@ namespace PlayerWatcher
 
                 // Subscribe for updates
                 var watcher = new GameObserver();
-                game.SubscribeForGameUpdates(GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher)).Wait();
+                await game.SubscribeForGameUpdates(
+                    await client.CreateObjectReference<IGameObserver>(watcher));
 
-                // .Wait will block main thread so that the process doesn't exit.
-                // Updates arrive on thread pool threads.
                 Console.WriteLine("Subscribed successfully. Press <Enter> to stop.");
-                Console.ReadLine();
             }
             catch (Exception exc)
             {
                 Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException());
             }
         }
+    }
 
-        /// <summary>
-        /// Observer class that implements the observer interface.
-        /// Need to pass a grain reference to an instance of this class to subscribe for updates.
-        /// </summary>
-        private class GameObserver : IGameObserver
+    /// <summary>
+    /// Observer class that implements the observer interface. Need to pass a grain reference to an instance of this class to subscribe for updates.
+    /// </summary>
+    class GameObserver : IGameObserver
+    {
+        // Receive updates
+        public void UpdateGameScore(string score)
         {
-            // Receive updates
-            public void UpdateGameScore(string score)
-            {
-                Console.WriteLine("New game score: {0}", score);
-            }
+            Console.WriteLine("New game score: {0}", score);
         }
+    }
     }
 }
 ```
 
-## Next
+### Next
 
 [Grain Persistence](Grain-Persistence.md)
