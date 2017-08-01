@@ -155,14 +155,6 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
 
             public ServicePartitionKind Kind => this.Partition.Info.Kind;
 
-            public bool IsOlderThan(IResolvedServicePartition other)
-            {
-                var otherWrapper = other as ResolvedServicePartitionWrapper;
-                if (otherWrapper == null) return false;
-
-                return this.Partition.IsOlderThan(otherWrapper.Partition);
-            }
-
             public bool IsSamePartitionAs(IResolvedServicePartition other)
             {
                 var otherWrapper = other as ResolvedServicePartitionWrapper;
