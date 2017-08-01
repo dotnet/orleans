@@ -881,6 +881,9 @@ namespace Orleans
                 ClientStatistics.Dispose();
                 ClientStatistics = null;
             }
+
+            (this.ServiceProvider as IDisposable)?.Dispose();
+            this.ServiceProvider = null;
             GC.SuppressFinalize(this);
         }
 
