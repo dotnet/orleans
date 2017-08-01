@@ -14,8 +14,10 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
         /// <returns>The active endpoints published by the specified partition.</returns>
         public static List<FabricSiloInfo> GetPartitionEndpoints(this ResolvedServicePartition partition)
         {
-            var results = new List<FabricSiloInfo>(partition.Endpoints.Count);
-            foreach (var silo in partition.Endpoints)
+            var resolvedServiceEndpoints = partition.Endpoints;
+            if (resolvedServiceEndpoints == null) return new List<FabricSiloInfo>();
+            var results = new List<FabricSiloInfo>(resolvedServiceEndpoints.Count);
+            foreach (var silo in resolvedServiceEndpoints)
             {
                 // Find the primary endpoint. If this is a stateless service, find any endpoint.
                 if (silo.Role != ServiceEndpointRole.Stateless && silo.Role != ServiceEndpointRole.StatefulPrimary) continue;
@@ -30,7 +32,7 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
         }
 
         /// <summary>
-        /// Respresents endpoints returned from <see cref="ResolvedServiceEndpoint.Address"/> in JSON form.
+        /// Represents endpoints returned from <see cref="ResolvedServiceEndpoint.Address"/> in JSON form.
         /// </summary>
         internal class ServicePartitionEndpoints
         {
