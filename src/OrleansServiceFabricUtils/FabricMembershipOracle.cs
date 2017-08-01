@@ -21,7 +21,7 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private readonly AutoResetEvent notificationEvent = new AutoResetEvent(false);
         private readonly BlockingCollection<StatusChangeNotification> notifications = new BlockingCollection<StatusChangeNotification>();
-        private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(5);
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly GlobalConfiguration globalConfig;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;

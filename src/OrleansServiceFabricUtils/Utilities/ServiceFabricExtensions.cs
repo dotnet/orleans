@@ -7,19 +7,6 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
     internal static class ServiceFabricExtensions
     {
         /// <summary>
-        /// Returns a value indicating whether or not <paramref name="left"/> is older than <paramref name="right"/>.
-        /// </summary>
-        /// <param name="left">One resolved partition.</param>
-        /// <param name="right">The other resolved partition.</param>
-        /// <returns>
-        /// <see langword="true"/> if <paramref name="left"/> is older than <paramref name="right"/>, <see langword="false"/> otherwise.
-        /// </returns>
-        public static bool IsOlderThan(this ResolvedServicePartition left, ResolvedServicePartition right)
-        {
-            return left.Info.Id == right.Info.Id && left.CompareVersion(right) < 0;
-        }
-
-        /// <summary>
         /// Returns a value indicating whether or not <paramref name="left"/> is the same partition as <paramref name="right"/>.
         /// </summary>
         /// <param name="left">One resolved partition.</param>
