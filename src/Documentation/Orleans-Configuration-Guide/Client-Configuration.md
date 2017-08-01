@@ -134,17 +134,42 @@ config.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingStrea
         { "PubSubType", "ExplicitGrainBasedAndImplicit" }
     });
 
-// Initialize client using config defined above
-while (!GrainClient.IsInitialized)
+IClusterClient client = null;
+while (true)
 {
     try
     {
-        GrainClient.Initialize(config);
+        // Build a client and then connect it to the cluster.
+        client = new ClientBuilder()
+            .UseConfiguration(config)
+            .ConfigureServices(
+                services =>
+                {
+                    // Services can be provided to the client here. These services are made
+                    // available via dependency injection.
+                    // ConfigureServices can be called multiple times for a single
+                    // ClientBuilder instance.
+                })
+            .Build();
+
+        // Connect the client to the cluster. Once connection succeeds, the client will
+        // maintain the connection, automatically reconnecting as necessary.
+        await client.Connect().ConfigureAwait(false);
+        break;
     }
-    catch (Exception exc)
+    catch (Exception exception)
     {
-        //Log "Exception when initializing Orleans Client"
+        // If the connection attempt fails, the client instance must be disposed.
+        client?.Dispose();
+
+        // TODO: Log the exception.
+        // TODO: Add a counter to break up an infinite cycle (circuit breaker pattern).
+        await Task.Delay(TimeSpan.FromSeconds(5));
     }
-    Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: developer may want to add counter to break up infinity cycle (circuit breaker pattern)
 }
+
+// Use the client.
+// Note that clients can be shared between threads and are typically long-lived.
+var user client.GetGrain<IUserGrain>("leeroy77jenkins@battle.net");
+Console.WriteLine(await user.GetProfile());
 ```
