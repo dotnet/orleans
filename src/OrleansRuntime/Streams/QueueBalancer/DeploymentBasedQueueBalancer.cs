@@ -68,7 +68,6 @@ namespace Orleans.Streams
         private readonly IDeploymentConfiguration deploymentConfig;
         private ReadOnlyCollection<QueueId> allQueues;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
-        private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private readonly bool isFixed;
         private bool isStarting;
 
@@ -89,19 +88,11 @@ namespace Orleans.Streams
             this.siloStatusOracle = siloStatusOracle;
             this.deploymentConfig = deploymentConfig;
             queueBalanceListeners = new List<IStreamQueueBalanceListener>();
-            immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.isFixed = isFixed;
             isStarting = true;
 
             // register for notification of changes to silo status for any silo in the cluster
             this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
-
-            // record all already active silos as already mature. 
-            // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                immatureSilos[silo] = false;     // record as mature
-            }
         }
 
         public Task Initialize(string strProviderName,
@@ -133,44 +124,11 @@ namespace Orleans.Streams
         /// <param name="status">new silo status</param>
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (status == SiloStatus.Dead)
-            {
-                // just clean up garbage from immatureSilos.
-                bool ignore;
-                immatureSilos.TryRemove(updatedSilo, out ignore);
-            }
-            SiloStatusChangeNotification().Ignore();
-        }
-
-        private async Task SiloStatusChangeNotification()
-        {
-            List<Task> tasks = new List<Task>();
-            // look at all currently active silos not including myself
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                bool ignore;
-                if (!immatureSilos.TryGetValue(silo, out ignore))
-                {
-                    tasks.Add(RecordImmatureSilo(silo));
-                }
-            }
             if (!isStarting)
             {
                 // notify, uncoditionaly, and deal with changes in GetMyQueues()
                 NotifyListeners().Ignore();
             }
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-                await NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
-            }
-        }
-
-        private async Task RecordImmatureSilo(SiloAddress updatedSilo)
-        {
-            immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(siloMaturityPeriod);
-            immatureSilos[updatedSilo] = false;     // record as mature
         }
 
         public IEnumerable<QueueId> GetMyQueues()
@@ -179,17 +137,11 @@ namespace Orleans.Streams
             bool useIdealDistribution = isFixed || isStarting;
             Dictionary<string, List<QueueId>> distribution = useIdealDistribution
                 ? balancer.IdealDistribution
-                : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
+                : balancer.GetDistribution(GetActiveSilos(siloStatusOracle));
 
             List<QueueId> myQueues;
             if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))
             {
-                if (!useIdealDistribution)
-                {
-                    HashSet<QueueId> queuesOfImmatureSilos = GetQueuesOfImmatureSilos(siloStatusOracle, immatureSilos, balancer.IdealDistribution);
-                    // filter queues that belong to immature silos
-                    myQueues.RemoveAll(queue => queuesOfImmatureSilos.Contains(queue));
-                }
                 return myQueues;
             }
             return Enumerable.Empty<QueueId>();
@@ -236,42 +188,18 @@ namespace Orleans.Streams
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }
 
-        private static List<string> GetActiveSilos(ISiloStatusOracle siloStatusOracle, ConcurrentDictionary<SiloAddress, bool> immatureSilos)
+        private static List<string> GetActiveSilos(ISiloStatusOracle siloStatusOracle)
         {
             var activeSiloNames = new List<string>();
             foreach (var kvp in siloStatusOracle.GetApproximateSiloStatuses(true))
             {
-                bool immatureBit;
-                if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
+                string siloName;
+                if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
                 {
-                    string siloName;
-                    if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
-                    {
-                        activeSiloNames.Add(siloName);
-                    }
+                    activeSiloNames.Add(siloName);
                 }
             }
             return activeSiloNames;
-        }
-
-        private static HashSet<QueueId> GetQueuesOfImmatureSilos(ISiloStatusOracle siloStatusOracle, 
-            ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
-            Dictionary<string, List<QueueId>> idealDistribution)
-        {
-            HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
-            foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
-            {
-                string siloName;
-                if (siloStatusOracle.TryGetSiloName(silo.Key, out siloName))
-                {
-                    List<QueueId> queues;
-                    if (idealDistribution.TryGetValue(siloName, out queues))
-                    {
-                        queuesOfImmatureSilos.UnionWith(queues);
-                    }
-                }
-            }
-            return queuesOfImmatureSilos;
         }
 
         private Task NotifyListeners()
