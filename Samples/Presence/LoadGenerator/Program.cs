@@ -15,13 +15,17 @@ namespace LoadGenerator
         /// </summary>
         static void Main(string[] args)
         {
-            RunLoadGenerator().Wait();
+            var client = RunLoadGenerator().Result;
+
             // Block main thread so that the process doesn't exit.
             // Updates arrive on thread pool threads.
             Console.ReadLine();
+
+            // Close connection to the cluster.
+            client.Dispose();
         }
 
-        static async Task RunLoadGenerator()
+        static async Task<IClusterClient> RunLoadGenerator()
         {
             try
             {
@@ -85,10 +89,13 @@ namespace LoadGenerator
 
                     Thread.Sleep(sendInterval);
                 }
+
+                return client;
             }
             catch (Exception exc)
             {
                 Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException());
+                throw;
             }
         }
 

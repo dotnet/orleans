@@ -15,13 +15,17 @@ namespace PlayerWatcher
         /// </summary>
         static void Main(string[] args)
         {
-            RunWatcher().Wait();
+            var client = RunWatcher().Result;
+
             // Block main thread so that the process doesn't exit.
             // Updates arrive on thread pool threads.
             Console.ReadLine();
+
+            // Close connection to the cluster.
+            client.Dispose();
         }
 
-        static async Task RunWatcher()
+        static async Task<IClusterClient> RunWatcher()
         {
             try
 
@@ -62,10 +66,13 @@ namespace PlayerWatcher
                     await client.CreateObjectReference<IGameObserver>(watcher));
 
                 Console.WriteLine("Subscribed successfully. Press <Enter> to stop.");
+
+                return client;
             }
             catch (Exception exc)
             {
                 Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException());
+                throw;
             }
         }
     }
