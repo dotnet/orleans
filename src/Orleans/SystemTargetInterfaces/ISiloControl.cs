@@ -10,10 +10,6 @@ namespace Orleans
     {
         Task Ping(string message);
 
-        Task SetSystemLogLevel(int traceLevel);
-        Task SetAppLogLevel(int traceLevel);
-        Task SetLogLevel(string logName, int traceLevel);
-
         Task ForceGarbageCollection();
         Task ForceActivationCollection(TimeSpan ageLimit);
         Task ForceRuntimeStatisticsCollection();
