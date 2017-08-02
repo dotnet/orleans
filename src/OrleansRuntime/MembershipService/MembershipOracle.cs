@@ -38,16 +38,16 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
-        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
-            : base(Constants.MembershipOracleId, silo.SiloAddress)
+        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
+            : base(Constants.MembershipOracleId, siloDetails.SiloAddress)
         {
             this.membershipTableFactory = membershipTableFactory;
             this.grainFactory = grainFactory;
             logger = LogManager.GetLogger("MembershipOracle");
-            membershipOracleData = new MembershipOracleData(silo, logger);
+            membershipOracleData = new MembershipOracleData(siloDetails, nodeConfiguration, clusterConfiguration.Globals, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
-            orleansConfig = silo.OrleansConfig;
-            nodeConfig = silo.LocalConfig;
+            orleansConfig = clusterConfiguration;
+            nodeConfig = nodeConfiguration;
             pingCounter = 0;
             TimeSpan backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(orleansConfig.Globals.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
             EXP_BACKOFF_CONTENTION_MAX = backOffMax;

@@ -1,5 +1,6 @@
-{
+﻿{
   "dependencies": {
+    "Microsoft.Extensions.Options": "1.1.2"
   },
   "frameworks": {
     "net461": {}

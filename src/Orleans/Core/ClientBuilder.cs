@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Providers;
 using Orleans.Runtime;

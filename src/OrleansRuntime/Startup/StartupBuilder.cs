@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Startup
             return serviceCollection.BuildServiceProvider(validateScopes: true);
         }
 
-        private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
+        internal static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
         {
             var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), false);
 

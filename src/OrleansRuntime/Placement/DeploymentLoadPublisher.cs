@@ -14,9 +14,11 @@ namespace Orleans.Runtime
     /// </summary>
     internal class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener
     {
-        private readonly Silo silo;
+        private readonly ILocalSiloDetails siloDetails;
+        private readonly ISiloPerformanceMetrics siloMetrics;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly OrleansTaskScheduler scheduler;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
@@ -26,15 +28,19 @@ namespace Orleans.Runtime
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
 
         public DeploymentLoadPublisher(
-            Silo silo,
+            ILocalSiloDetails siloDetails,
+            ISiloPerformanceMetrics siloMetrics,
             ISiloStatusOracle siloStatusOracle,
             GlobalConfiguration config,
-            IInternalGrainFactory grainFactory)
-            : base(Constants.DeploymentLoadPublisherSystemTargetId, silo.SiloAddress)
+            IInternalGrainFactory grainFactory,
+            OrleansTaskScheduler scheduler)
+            : base(Constants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress)
         {
-            this.silo = silo;
+            this.siloDetails = siloDetails;
+            this.siloMetrics = siloMetrics;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
+            this.scheduler = scheduler;
             statisticsRefreshTime = config.DeploymentLoadPublisherRefreshTime;
             periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
@@ -63,14 +69,14 @@ namespace Orleans.Runtime
                 if(logger.IsVerbose) logger.Verbose("PublishStatistics.");
                 List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
                 var tasks = new List<Task>();
-                var myStats = new SiloRuntimeStatistics(silo.Metrics, DateTime.UtcNow);
+                var myStats = new SiloRuntimeStatistics(this.siloMetrics, DateTime.UtcNow);
                 foreach (var siloAddress in members)
                 {
                     try
                     {
                         tasks.Add(this.grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
                             Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
-                            .UpdateRuntimeStatistics(silo.SiloAddress, myStats));
+                            .UpdateRuntimeStatistics(this.siloDetails.SiloAddress, myStats));
                     }
                     catch (Exception)
                     {
@@ -107,7 +113,7 @@ namespace Orleans.Runtime
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
             if (logger.IsVerbose) logger.Verbose("RefreshStatistics.");
-            await silo.LocalScheduler.RunOrQueueTask( () =>
+            await this.scheduler.RunOrQueueTask( () =>
                 {
                     var tasks = new List<Task>();
                     List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
