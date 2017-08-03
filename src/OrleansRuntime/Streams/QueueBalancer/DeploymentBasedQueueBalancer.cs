@@ -152,7 +152,7 @@ namespace Orleans.Streams
             bool useIdealDistribution = isFixed || isStarting;
             Dictionary<string, List<QueueId>> distribution = useIdealDistribution
                 ? balancer.IdealDistribution
-                : balancer.GetDistribution(QueueBalancerUtilities.GetActiveSilos(siloStatusOracle, immatureSilos));
+                : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
 
             List<QueueId> myQueues;
             if (distribution.TryGetValue(siloStatusOracle.SiloName, out myQueues))
@@ -167,7 +167,25 @@ namespace Orleans.Streams
             }
             return Enumerable.Empty<QueueId>();
         }
-        
+
+        private static List<string> GetActiveSilos(ISiloStatusOracle siloStatusOracle, ConcurrentDictionary<SiloAddress, bool> immatureSilos)
+        {
+            var activeSiloNames = new List<string>();
+            foreach (var kvp in siloStatusOracle.GetApproximateSiloStatuses(true))
+            {
+                bool immatureBit;
+                if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
+                {
+                    string siloName;
+                    if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
+                    {
+                        activeSiloNames.Add(siloName);
+                    }
+                }
+            }
+            return activeSiloNames;
+        }
+
         /// <summary>
         /// Checks to see if deployment configuration has changed, by adding or removing silos.
         /// If so, it updates the list of all silo names and creates a new resource balancer.

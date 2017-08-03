@@ -136,7 +136,7 @@ namespace Orleans.Streams
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// as much as possible. 
     /// </summary>
-    public class LeaseBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer, IDisposable
+    public class LeaseBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IDisposable
     {
         /// <summary>
         /// Lease category for LeaseBasedQueueBalancer
@@ -159,7 +159,6 @@ namespace Orleans.Streams
         private List<AcquiredQueue> myQueues;
         private TimeSpan siloMaturityPeriod;
         private bool isStarting;
-        private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private TimeSpan leaseLength;
         private AsyncTaskSafeTimer renewLeaseTimer;
         private AsyncTaskSafeTimer tryAcquireMaximumLeaseTimer;
@@ -182,17 +181,8 @@ namespace Orleans.Streams
             this.deploymentConfig = deploymentConfig;
             this.siloStatusOracle = siloStatusOracle;
             this.myQueues = new List<AcquiredQueue>();
-            this.immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.isStarting = true;
             this.logger = loggerFac(this.GetType().Name);
-            // register for notification of changes to silo status for any silo in the cluster
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
-            // record all already active silos as already mature. 
-            // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                immatureSilos[silo] = false;     // record as mature
-            }
         }
 
         /// <inheritdoc/>
@@ -327,7 +317,7 @@ namespace Orleans.Streams
             }
             else
             {
-                activeBuckets = QueueBalancerUtilities.GetActiveSilos(this.siloStatusOracle, this.immatureSilos).Count;
+                activeBuckets = GetActiveSiloCount(this.siloStatusOracle);
             }
             this.minimumResponsibilty = this.allQueues.Count / activeBuckets;
             //if allQueues count is divisible by active bukets, then every bucket should take the same count of queues, otherwise, there should be one bucket take 1 more queue
@@ -336,43 +326,10 @@ namespace Orleans.Streams
             else this.maximumRespobsibility = this.minimumResponsibilty + 1;
         }
 
-        /// <inheritdoc/>
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
-        {
-            if (status == SiloStatus.Dead)
-            {
-                // just clean up garbage from immatureSilos.
-                bool ignore;
-                immatureSilos.TryRemove(updatedSilo, out ignore);
-            }
-            SiloStatusChangeNotification().Ignore();
-        }
 
-        private async Task SiloStatusChangeNotification()
+        private static int GetActiveSiloCount(ISiloStatusOracle siloStatusOracle)
         {
-            this.logger.Info("SiloStatusChangeNotification received");
-            List<Task> tasks = new List<Task>();
-            // look at all currently active silos not including myself
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                bool ignore;
-                if (!immatureSilos.TryGetValue(silo, out ignore))
-                {
-                    tasks.Add(RecordImmatureSilo(silo));
-                }
-            }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-            }
-        }
-
-        private async Task RecordImmatureSilo(SiloAddress updatedSilo)
-        {
-            immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(siloMaturityPeriod);
-            immatureSilos[updatedSilo] = false;     // record as mature
+            return siloStatusOracle.GetApproximateSiloStatuses(true).Count;
         }
 
         private async Task NotifyAfterStart()

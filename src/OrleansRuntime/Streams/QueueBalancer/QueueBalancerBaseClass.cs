@@ -57,36 +57,4 @@ namespace Orleans.Streams
             }
         }
     }
-
-    internal class QueueBalancerUtilities
-    {
-        /// <summary>
-        /// This method is used in DeploymentBasedQueueBalancer and LeaseBasedQueueBalancer in the same manner. 
-        /// Basically, whenever there's a SiloStatusNotification, balancer calls siloStatusOracle asking for active silo information. 
-        /// If there's new silo which was not recorded in immatureSilos, then balancer will first mark it as immature and then wait siloMaturityPeriod to mark it as mature. 
-        /// If GetActiveSilos is called before it is marked as mature, but siloStatusOracle report those new silo as active, we still think they are immature.
-        /// It is a conservative way to deal with inconsistent view in a distributed cluster.Since local siloStatusOracle thinks this silo is active 
-        /// doesn't mean other silo thinks it is active too. So we'd better wait for siloMaturityPeriod.
-        /// </summary>
-        /// <param name="siloStatusOracle"></param>
-        /// <param name="immatureSilos"></param>
-        /// <returns></returns>
-        public static List<string> GetActiveSilos(ISiloStatusOracle siloStatusOracle, ConcurrentDictionary<SiloAddress, bool> immatureSilos)
-        {
-            var activeSiloNames = new List<string>();
-            foreach (var kvp in siloStatusOracle.GetApproximateSiloStatuses(true))
-            {
-                bool immatureBit;
-                if (!(immatureSilos.TryGetValue(kvp.Key, out immatureBit) && immatureBit)) // if not immature now or any more
-                {
-                    string siloName;
-                    if (siloStatusOracle.TryGetSiloName(kvp.Key, out siloName))
-                    {
-                        activeSiloNames.Add(siloName);
-                    }
-                }
-            }
-            return activeSiloNames;
-        }
-    }
 }
