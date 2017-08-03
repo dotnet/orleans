@@ -1315,6 +1315,7 @@ namespace Orleans.Runtime
             try
             {
                 RequestContext.Import(requestContextData);
+                await activation.LifeCycle.OnStart();
                 await activation.GrainInstance.OnActivateAsync();
 
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
@@ -1370,6 +1371,7 @@ namespace Orleans.Runtime
                     {
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                         await activation.GrainInstance.OnDeactivateAsync();
+                        await activation.LifeCycle.OnStop();
                     }
                     if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
                 }
