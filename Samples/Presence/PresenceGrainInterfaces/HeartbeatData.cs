@@ -62,14 +62,26 @@ namespace Orleans.Samples.Presence.GrainInterfaces
     /// </summary>
     public static class HeartbeatDataDotNetSerializer
     {
+        private static readonly BinaryFormatter formatter = new BinaryFormatter();
+
         public static byte[] Serialize(object o)
         {
-            return SerializationManager.SerializeToByteArray(o);
+            byte[] bytes;
+            using (var memoryStream = new MemoryStream())
+            {
+                formatter.Serialize(memoryStream, o);
+                memoryStream.Flush();
+                bytes = memoryStream.ToArray();
+            }
+            return bytes;
         }
 
         public static HeartbeatData Deserialize(byte [] data)
         {
-            return SerializationManager.DeserializeFromByteArray<HeartbeatData>(data);
+            using (var memoryStream = new MemoryStream(data))
+            {
+                return (HeartbeatData) formatter.Deserialize(memoryStream);
+            }
         }
     }
 }

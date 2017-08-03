@@ -15,10 +15,24 @@ namespace LoadGenerator
         /// </summary>
         static void Main(string[] args)
         {
+            var client = RunLoadGenerator().Result;
+
+            // Block main thread so that the process doesn't exit.
+            // Updates arrive on thread pool threads.
+            Console.ReadLine();
+
+            // Close connection to the cluster.
+            client.Close().Wait();
+        }
+
+        static async Task<IClusterClient> RunLoadGenerator()
+        {
             try
             {
+                // Connect to local silo
                 var config = ClientConfiguration.LocalhostSilo();
-                GrainClient.Initialize(config);
+                var client = new ClientBuilder().UseConfiguration(config).Build();
+                await client.Connect();
 
                 int nGames = 10; // number of games to simulate
                 int nPlayersPerGame = 4; // number of players in each game
@@ -39,7 +53,7 @@ namespace LoadGenerator
                 }
 
                 int iteration = 0;
-                IPresenceGrain presence = GrainClient.GrainFactory.GetGrain<IPresenceGrain>(0); // PresenceGrain is a StatelessWorker, so we use a single grain ID for auto-scale
+                IPresenceGrain presence = client.GetGrain<IPresenceGrain>(0); // PresenceGrain is a StatelessWorker, so we use a single grain ID for auto-scale
                 List<Task> promises = new List<Task>();
 
                 while (iteration++ < nIterations)
@@ -75,10 +89,13 @@ namespace LoadGenerator
 
                     Thread.Sleep(sendInterval);
                 }
+
+                return client;
             }
             catch (Exception exc)
             {
                 Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException());
+                throw;
             }
         }
 
