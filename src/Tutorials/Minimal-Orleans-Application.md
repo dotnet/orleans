@@ -102,7 +102,7 @@ Change App.config to enable the recommended server garbage collection
 <configuration>
   <runtime>
     <gcServer enabled="true"/>
-    <gcConcurrent enabled="false"/>
+    <gcConcurrent enabled="true"/>
   </runtime>
 </configuration>
 
