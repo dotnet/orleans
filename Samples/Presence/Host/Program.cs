@@ -18,10 +18,11 @@ namespace Host
             var silo = new SiloHost("Test Silo", siloConfig);
             silo.InitializeOrleansSilo();
             silo.StartOrleansSilo();
-
             
             Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
             Console.ReadLine();
+
+            silo.ShutdownOrleansSilo();
         }
     }
 }

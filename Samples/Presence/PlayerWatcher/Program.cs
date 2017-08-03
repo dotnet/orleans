@@ -22,7 +22,7 @@ namespace PlayerWatcher
             Console.ReadLine();
 
             // Close connection to the cluster.
-            client.Dispose();
+            client.Close();
         }
 
         static async Task<IClusterClient> RunWatcher()
