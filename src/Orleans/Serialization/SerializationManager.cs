@@ -1118,6 +1118,13 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="obj">The input data to be serialized.</param>
         /// <param name="context">The serialization context.</param>
+        public static void SerializeInner<T>(T obj, ISerializationContext context) => SerializeInner(obj, context, typeof(T));
+
+        /// <summary>
+        /// Encodes the object to the provided binary token stream.
+        /// </summary>
+        /// <param name="obj">The input data to be serialized.</param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expected">Current expected Type on this stream.</param>
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, ISerializationContext context, Type expected)
