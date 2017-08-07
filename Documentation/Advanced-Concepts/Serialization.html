@@ -179,7 +179,7 @@ static private object Deserialize(Type expected, IDeserializationContext context
     ...
 }
 </code></pre><p>The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream. The actual type of the object to be created will always be the type of the class in which the deserializer is defined.</p>
-<p>To deserialize sub-objects, use the SerializationManager&#39;s DeserializeInner routine:</p>
+<p>To deserialize sub-objects, use the <code>SerializationManager</code>&#39;s <code>DeserializeInner</code> routine:</p>
 <pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner(typeof(FooType), context);
 </code></pre><p>Or, alternatively,</p>
 <pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner&lt;FooType&gt;(context);
@@ -229,26 +229,66 @@ static private object Deserialize(Type expected, IDeserializationContext context
 }
 </code></pre><h2 id="method-3-writing-a-serializer-for-individual-types">Method 3: Writing a Serializer for Individual Types</h2>
 <p>In this method you write a new class annotated with an attribute <code>[SerializerAttribute(typeof(TargetType))]</code>, where <code>TargetType</code> is the type which is being serialized, and implement the 3 serialization routines. The rules for how to write those routines are identical to method 1. Orleans uses the <code>[SerializerAttribute(typeof(TargetType))]</code> to determine that this class is a serializer for <code>TargetType</code> and this attribute can be specified multiple times on the same class if it&#39;s able to serialize multiple types. Below is an example for such a class:</p>
-<pre><code class="lang-csharp">[Orleans.CodeGeneration.SerializerAttribute(typeof(TargetType))]
-[Orleans.CodeGeneration.SerializerAttribute(typeof(SomeOtherType))]
-internal class MyObjectSerializationExample
+<pre><code class="lang-csharp">public class User
+{
+    public User BestFriend { get; set; }
+    public string NickName { get; set; }
+    public int FavoriteNumber { get; set; }
+    public DateTimeOffset BirthDate { get; set; }
+}
+
+[Orleans.CodeGeneration.SerializerAttribute(typeof(User))]
+internal class UserSerializer
 {
     [CopierMethod]
     public static object DeepCopier(object original, ICopyContext context)
     {
-        ...
+        var input = (User) original;
+        var result = new User();
+
+        // Record &#39;result&#39; as a copy of &#39;input&#39;. Doing this immediately after construction allows for
+        // data structures which have cyclic references or duplicate references.
+        // For example, imagine that &#39;input.BestFriend&#39; is set to &#39;input&#39;. In that case, failing to record
+        // the copy before trying to copy the &#39;BestFriend&#39; field would result in infinite recursion.
+        context.RecordCopy(original, result);
+
+        // Deep-copy each of the fields.
+        result.BestFriend = (User)context.SerializationManager.DeepCopy(input.BestFriend);
+        result.NickName = input.NickName; // strings in .NET are immutable, so they can be shallow-copied.
+        result.FavoriteNumber = input.FavoriteNumber; // ints are primitive value types, so they can be shallow-copied.
+        result.BirthDate = (DateTimeOffset)context.SerializationManager.DeepCopy(input.BirthDate);
+
+        return result;
     }
 
     [SerializerMethod]
     public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
     {
-        ...
+        var input = (User) untypedInput;
+
+        // Serialize each field.
+        SerializationManager.SerializeInner(input.BestFriend, context);
+        SerializationManager.SerializeInner(input.NickName, context);
+        SerializationManager.SerializeInner(input.FavoriteNumber, context);
+        SerializationManager.SerializeInner(input.BirthDate, context);
     }
 
     [DeserializerMethod]
     public static object Deserializer(Type expected, IDeserializationContext context)
     {
-        ...
+        var result = new User();
+
+        // Record &#39;result&#39; immediately after constructing it. As with with the deep copier, this
+        // allows for cyclic references and de-duplication.
+        context.RecordObject(result);
+
+        // Deserialize each field in the order that they were serialized.
+        result.BestFriend = SerializationManager.DeserializeInner&lt;User&gt;(context);
+        result.NickName = SerializationManager.DeserializeInner&lt;string&gt;(context);
+        result.FavoriteNumber = SerializationManager.DeserializeInner&lt;int&gt;(context);
+        result.BirthDate = SerializationManager.DeserializeInner&lt;DateTimeOffset&gt;(context);
+
+        return result;
     }
 }
 </code></pre><h3 id="serializing-generic-types">Serializing Generic Types</h3>
@@ -315,7 +355,7 @@ public class MyImmutableType
 <li>As a wire format for transmitting data between grains and clients at runtime.</li>
 <li>As a storage format for persisting long-lived data for later retrieval.</li>
 </ol>
-<p>The serializers generated by Orleans are suitable for the first purpose due to their flexibility, performance, and versatility. They are not as suitable for the second purpose, since they are not explicitly version-tolerant. It is recommended that users configure a version-tolerant serializer such as <a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a> or <a href="https://github.com/microsoft/bond/">Bond</a> for persistent data (both those serializers are already integrated and supported by Orleans). The best-practices for the particular serializer of choice should be used in order to ensure version-tolerance. These third-party serializers can be configured using the <code>SerializationProviders</code> configuration property as described above.</p>
+<p>The serializers generated by Orleans are suitable for the first purpose due to their flexibility, performance, and versatility. They are not as suitable for the second purpose, since they are not explicitly version-tolerant. It is recommended that users configure a version-tolerant serializer such as <a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a> for persistent data. Protocol Buffers is supported via <code>Orleans.Serialization.ProtobufSerializer</code> from the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/">Microsoft.Orleans.OrleansGoogleUtils</a> NuGet package. The best-practices for the particular serializer of choice should be used in order to ensure version-tolerance. Third-party serializers can be configured using the <code>SerializationProviders</code> configuration property as described above.</p>
 </article>
           </div>
           
