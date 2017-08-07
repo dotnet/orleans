@@ -62,11 +62,13 @@
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\DefaultGrainActivator.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
+    <Compile Include="Catalog\GrainLifecycle.cs" />
     <Compile Include="Catalog\IGrainActivator.cs" />
     <Compile Include="Core\GrainRuntime.cs" />
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Core\GrainMethodInvoker.cs" />
+    <Compile Include="Facet\GrainFacetPropertyInjector.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Placement\HashBasedPlacementDirector.cs" />
     <Compile Include="Placement\IActivationSelector.cs" />
