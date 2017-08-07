@@ -14,7 +14,7 @@ namespace Tester.StreamingTests
 {
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
-        private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancer);
+        private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
         private static PersistentStreamProviderConfig CustomPersistentProviderConfig = CreateConfigWithCustomBalancerType();
 
         public static void ConfigureCustomQueueBalancer(Dictionary<string, string> streamProviderSettings, ClusterConfiguration config)
@@ -47,7 +47,7 @@ namespace Tester.StreamingTests
         {
             public IServiceProvider ConfigureServices(IServiceCollection services)
             {
-                services.AddTransient<LeaseBasedQueueBalancer>();
+                services.AddTransient<LeaseBasedQueueBalancerForTest>();
                 return services.BuildServiceProvider();
             }
         }

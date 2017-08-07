@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Orleans.Concurrency;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ namespace Orleans.LeaseProviders
     /// <summary>
     /// Acquired lease
     /// </summary>
+    [Immutable]
     public class AcquiredLease 
     {
         /// <summary>
@@ -27,17 +29,33 @@ namespace Orleans.LeaseProviders
         /// Caller side start time for this lease, which is when the lease is acquired or renewed
         /// </summary>
         public DateTime StartTimeUtc { get; }
+
+        /// <summary>
+        /// Consructor
+        /// </summary>
+        /// <param name="resourceKey"></param>
+        /// <param name="duration"></param>
+        /// <param name="token"></param>
+        /// <param name="startTimeUtc"></param>
+        public AcquiredLease(string resourceKey, TimeSpan duration, string token, DateTime startTimeUtc)
+        {
+            this.ResourceKey = resourceKey;
+            this.Duration = duration;
+            this.Token = token;
+            this.StartTimeUtc = startTimeUtc;
+        }
     }
 
     /// <summary>
     /// AcquireLeaseResult class, which demonstrates result of acquiring or renewing lease operation
     /// </summary>
+    [Immutable]
     public class AcquireLeaseResult
     {
         /// <summary>
         /// Acquired lease, which will be null if acquire or renew operation failed.
         /// </summary>
-        AcquiredLease AcquiredLease { get; }
+        public AcquiredLease AcquiredLease { get; }
         /// <summary>
         /// Response status
         /// </summary>
@@ -46,6 +64,13 @@ namespace Orleans.LeaseProviders
         /// If acquiring or renewing the lease failed, this is the exception which caused it. This field would be null if operation succeed.
         /// </summary>
         public Exception FailureException { get; }
+
+        public AcquireLeaseResult(AcquiredLease acquiredLease, ResponseCode statusCode, Exception failureException)
+        {
+            this.AcquiredLease = acquiredLease;
+            this.StatusCode = statusCode;
+            this.FailureException = failureException;
+        }
     }
 
     public enum ResponseCode
@@ -81,6 +106,23 @@ namespace Orleans.LeaseProviders
         /// Duration of the lease
         /// </summary>
         public TimeSpan Duration { get; set; }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        public LeaseRequest()
+        { }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="resourceKey"></param>
+        /// <param name="duration"></param>
+        public LeaseRequest(string resourceKey, TimeSpan duration)
+        {
+            this.ResourceKey = resourceKey;
+            this.Duration = duration;
+        }
     }
 
     /// <summary>
@@ -110,5 +152,4 @@ namespace Orleans.LeaseProviders
         /// <returns></returns>
         Task Release(string category, AcquiredLease[] aquiredLeases);
     }
-
 }

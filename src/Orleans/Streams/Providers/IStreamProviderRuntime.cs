@@ -65,7 +65,8 @@ namespace Orleans.Streams
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
-            PersistentStreamProviderConfig config);
+            PersistentStreamProviderConfig config,
+            IProviderConfiguration providerConfig);
     }
 
     public enum StreamPubSubType

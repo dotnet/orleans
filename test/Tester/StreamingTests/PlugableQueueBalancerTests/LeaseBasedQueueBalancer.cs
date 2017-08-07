@@ -15,21 +15,22 @@ using System.Threading.Tasks;
 namespace Tester.StreamingTests
 {
     //Dumb queue balancer only acquire leases once, never renew it, just for testing
-    public class LeaseBasedQueueBalancer : IStreamQueueBalancer
+    public class LeaseBasedQueueBalancerForTest : IStreamQueueBalancer
     {
         private ILeaseManagerGrain leaseManagerGrain;
         private IGrainFactory grainFactory;
         private string id;
         private List<QueueId> ownedQueues;
 
-        public LeaseBasedQueueBalancer(IGrainFactory grainFactory)
+        public LeaseBasedQueueBalancerForTest(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;
         }
 
         public async Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod)
+            TimeSpan siloMaturityPeriod,
+            IProviderConfiguration providerConfig)
         {
             this.leaseManagerGrain = this.grainFactory.GetGrain<ILeaseManagerGrain>(strProviderName);
             await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
