@@ -1108,7 +1108,7 @@ namespace UnitTests
 
     public class DummyLogConsumer : ILogConsumer
     {
-        public void Log(Severity severity, LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
+        public void Log(Severity severity, string caller, string message, Exception exception, int eventCode = 0)
         {
             throw new NotImplementedException();
         }

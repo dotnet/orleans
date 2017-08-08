@@ -513,7 +513,7 @@ namespace UnitTests
         private readonly Dictionary<int,int> entryCounts = new Dictionary<int, int>();
         private int lastLogCode;
 
-        public void Log(Severity severity, LoggerType loggerType, string caller, string message, System.Net.IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
+        public void Log(Severity severity, string caller, string message, Exception exception, int eventCode = 0)
         {
             lock (this)
             {

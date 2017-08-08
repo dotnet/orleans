@@ -55,6 +55,35 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
+        public Task SetSystemLogLevel(int traceLevel)
+        {
+            var newTraceLevel = (Severity)traceLevel;
+            logger.Info("SetSystemLogLevel={0}", newTraceLevel);
+            LogManager.SetRuntimeLogLevel(newTraceLevel);
+            silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
+            return Task.CompletedTask;
+        }
+
+        public Task SetAppLogLevel(int traceLevel)
+        {
+            var newTraceLevel = (Severity)traceLevel;
+            logger.Info("SetAppLogLevel={0}", newTraceLevel);
+            LogManager.SetAppLogLevel(newTraceLevel);
+            return Task.CompletedTask;
+        }
+
+        public Task SetLogLevel(string logName, int traceLevel)
+        {
+            var newTraceLevel = (Severity)traceLevel;
+            logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
+            LoggerImpl log = LogManager.FindLogger(logName);
+            
+            if (log == null) throw new ArgumentException(string.Format("Logger {0} not found", logName));
+            
+            log.SetSeverityLevel(newTraceLevel);
+            return Task.CompletedTask;
+        }
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {

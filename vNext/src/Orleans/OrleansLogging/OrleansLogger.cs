@@ -8,33 +8,7 @@ using System.Linq;
 using System.Text;
 
 namespace Orleans.Extensions.Logging
-{ 
-    public static class OrleansLoggerExtension
-    {
-        /// <summary>
-        /// Extension method to preserve legacy orleans logging method <see cref="Logger.Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception)">,
-        /// and legacy message bulking feature. Message bulking feature is only supported when OrleansLoggerProvider is added to ILoggerFactory. 
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="errorCode"></param>
-        /// <param name="sev"></param>
-        /// <param name="format"></param>
-        /// <param name="args"></param>
-        /// <param name="exception"></param>
-        public static void Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception)
-        {
-            logger.Log<string>(OrleansLogger.SeverityToLogLevel(sev), OrleansLogger.CreateEventId(0, errorCode), FormatMessageText(format, args), exception,
-                (message, exc) => exc == null? message : $"{message}, Exception: {exc}");
-        }
-
-        private static string FormatMessageText(string format, object[] args)
-        {
-            // avoids exceptions if format string contains braces in calls that were not
-            // designed to use format strings
-            return (args == null || args.Length == 0) ? format : String.Format(format, args);
-        }
-    }
-
+{
     /// <summary>
     /// OreansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,
     /// <see cref="IFlushableLogConsumer">, <see cref="Severity">, message bulking. 
