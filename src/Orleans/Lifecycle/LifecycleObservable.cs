@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,14 +17,14 @@ namespace Orleans
         public LifecycleObservable(Logger logger)
         {
             this.logger = logger?.GetLogger(GetType().Name);
-            subscribers = new ConcurrentDictionary<object, OrderedObserver>();
+            this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
         public async Task OnStart(CancellationTokenSource cts = null)
         {
             try
             {
-                foreach (IGrouping<TStage, OrderedObserver> observerGroup in subscribers.Values
+                foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
@@ -31,35 +32,27 @@ namespace Orleans
                     {
                         throw new OperationCanceledException();
                     }
-                    highStage = observerGroup.Key;
+                    this.highStage = observerGroup.Key;
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(cts, orderedObserver.Observer.OnStart)));
                 }
             }
             catch (Exception ex)
             {
                 string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
-                logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
+                this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
                 throw new OperationCanceledException(error, ex);
             }
         }
 
         public async Task OnStop(CancellationTokenSource cts = null)
         {
-            bool skip = true;
-            foreach (IGrouping<TStage, OrderedObserver> observerGroup in subscribers.Values
+            foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
-                .OrderByDescending(group => group.Key))
-            {
+                .OrderByDescending(group => group.Key)
                 // skip all until we hit the highest started stage
-                if (skip && highStage.Equals(observerGroup.Key))
-                {
-                    skip = false;
-                }
-                if (skip)
-                {
-                    continue;
-                }
-                highStage = observerGroup.Key;
+                .SkipWhile(group => !this.highStage.Equals(group.Key)))
+            {
+                this.highStage = observerGroup.Key;
                 try
                 {
                     if (cts != null && cts.Token.IsCancellationRequested)
@@ -70,7 +63,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    logger?.Error(ErrorCode.LifecycleStopFailure, $"Stopping lifecycle encountered an error at stage {this.highStage}.  Continuing to stop.", ex);
+                    this.logger?.Error(ErrorCode.LifecycleStopFailure, $"Stopping lifecycle encountered an error at stage {this.highStage}.  Continuing to stop.", ex);
                 }
             }
         }
@@ -80,14 +73,14 @@ namespace Orleans
             if (observer == null) throw new ArgumentNullException(nameof(observer));
 
             var orderedObserver = new OrderedObserver(stage, observer);
-            subscribers.TryAdd(orderedObserver, orderedObserver);
+            this.subscribers.TryAdd(orderedObserver, orderedObserver);
             return new Disposable(() => Remove(orderedObserver));
         }
 
         private void Remove(object key)
         {
             OrderedObserver o;
-            subscribers.TryRemove(key, out o);
+            this.subscribers.TryRemove(key, out o);
         }
 
         private static async Task WrapExecution(CancellationTokenSource cts, Func<CancellationTokenSource, Task> action)

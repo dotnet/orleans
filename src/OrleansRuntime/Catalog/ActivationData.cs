@@ -363,13 +363,11 @@ namespace Orleans.Runtime
 
         public IDictionary<object, object> Items { get; private set; }
 
-#region lifecyle
         private readonly GrainLifecycle lifeCycle;
 
         public IGrainLifeCycle ObservableLifeCycle => lifeCycle;
 
         internal ILifecycleObserver LifeCycle => lifeCycle;
-        #endregion lifecycle
 
         public void OnTimerCreated(IGrainTimer timer)
         {
