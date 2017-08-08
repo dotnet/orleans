@@ -115,7 +115,7 @@ namespace Tester
         {
             var lifecycle = new LifecycleObservable<TestStages>(null);
             var multiStageObserver = new MultiStageObserver();
-            multiStageObserver.ParticipateInLifecycle(lifecycle);
+            multiStageObserver.Participate(lifecycle);
             await lifecycle.OnStart();
             await lifecycle.OnStop();
             Assert.Equal(4, multiStageObserver.Started.Count);
@@ -198,7 +198,7 @@ namespace Tester
         /// <summary>
         /// Single component which takes action at multiple stages of the lifecycle (most common expected pattern)
         /// </summary>
-        private class MultiStageObserver : ILifecycleParticipant<ILifecycleObservable<TestStages>>
+        private class MultiStageObserver : ILifecycleParticipant<TestStages>
         {
             public Dictionary<TestStages,bool> Started { get; } = new Dictionary<TestStages, bool>(); 
             public Dictionary<TestStages, bool> Stopped { get; } = new Dictionary<TestStages, bool>();
