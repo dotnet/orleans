@@ -12,12 +12,12 @@ namespace Orleans
         /// Handle start notifications
         /// </summary>
         /// <returns></returns>
-        Task OnStart(CancellationTokenSource cts = null);
+        Task OnStart(CancellationToken ct);
 
         /// <summary>
         /// Handle stop notifications
         /// </summary>
         /// <returns></returns>
-        Task OnStop(CancellationTokenSource cts = null);
+        Task OnStop(CancellationToken ct);
     }
 }

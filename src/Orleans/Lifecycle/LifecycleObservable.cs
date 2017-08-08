@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,7 +19,7 @@ namespace Orleans
             this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
-        public async Task OnStart(CancellationTokenSource cts = null)
+        public async Task OnStart(CancellationToken ct)
         {
             try
             {
@@ -28,12 +27,12 @@ namespace Orleans
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
-                    if (cts != null && cts.Token.IsCancellationRequested)
+                    if (ct.IsCancellationRequested)
                     {
                         throw new OperationCanceledException();
                     }
                     this.highStage = observerGroup.Key;
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(cts, orderedObserver.Observer.OnStart)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
                 }
             }
             catch (Exception ex)
@@ -44,7 +43,7 @@ namespace Orleans
             }
         }
 
-        public async Task OnStop(CancellationTokenSource cts = null)
+        public async Task OnStop(CancellationToken ct)
         {
             foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
@@ -55,11 +54,11 @@ namespace Orleans
                 this.highStage = observerGroup.Key;
                 try
                 {
-                    if (cts != null && cts.Token.IsCancellationRequested)
+                    if (ct.IsCancellationRequested)
                     {
                         throw new OperationCanceledException();
                     }
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(cts, orderedObserver.Observer.OnStop)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                 }
                 catch (Exception ex)
                 {
@@ -83,9 +82,9 @@ namespace Orleans
             this.subscribers.TryRemove(key, out o);
         }
 
-        private static async Task WrapExecution(CancellationTokenSource cts, Func<CancellationTokenSource, Task> action)
+        private static async Task WrapExecution(CancellationToken ct, Func<CancellationToken, Task> action)
         {
-            await action(cts);
+            await action(ct);
         }
 
         private class Disposable : IDisposable

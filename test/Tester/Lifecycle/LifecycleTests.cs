@@ -20,7 +20,7 @@ namespace Tester
             {
                 observerCountByStage[stage] = observersPerStage;
             }
-            Dictionary<TestStages, List<Observer>> observersByStage = await RunLifeCycle(observerCountByStage, null, null);
+            Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, null, null);
 
             Assert.Equal(observerCountByStage.Count, observersByStage.Count);
             foreach (KeyValuePair<TestStages,List<Observer>> kvp in observersByStage)
@@ -45,7 +45,7 @@ namespace Tester
 
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
-                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifeCycle(observerCountByStage, stage, null);
+                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, stage, null);
 
                 Assert.Equal(observerCountByStage.Count, observersByStage.Count);
                 foreach (KeyValuePair<TestStages, List<Observer>> kvp in observersByStage)
@@ -86,7 +86,7 @@ namespace Tester
 
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
-                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifeCycle(observerCountByStage, null, stage);
+                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, null, stage);
 
                 Assert.Equal(observerCountByStage.Count, observersByStage.Count);
                 foreach (KeyValuePair<TestStages, List<Observer>> kvp in observersByStage)
@@ -124,7 +124,7 @@ namespace Tester
             Assert.True(multiStageObserver.Stopped.Values.All(o => o));
         }
 
-        private async Task<Dictionary<TestStages,List<Observer>>> RunLifeCycle(Dictionary<TestStages,int> observerCountByStage, TestStages? failOnStart, TestStages? failOnStop)
+        private async Task<Dictionary<TestStages,List<Observer>>> RunLifecycle(Dictionary<TestStages,int> observerCountByStage, TestStages? failOnStart, TestStages? failOnStop)
         {
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
@@ -178,7 +178,7 @@ namespace Tester
                 this.failOnStop = failOnStop;
             }
 
-            public Task OnStart(CancellationTokenSource cts = null)
+            public Task OnStart(CancellationToken ct)
             {
                 this.Started = true;
                 this.FailedOnStart = this.failOnStart;
@@ -186,7 +186,7 @@ namespace Tester
                 return Task.CompletedTask;
             }
 
-            public Task OnStop(CancellationTokenSource cts = null)
+            public Task OnStop(CancellationToken ct)
             {
                 this.Stopped = true;
                 this.FailedOnStop = this.failOnStop;
@@ -218,10 +218,10 @@ namespace Tester
 
             public void Participate(ILifecycleObservable<TestStages> lifecycle)
             {
-                lifecycle.Subscribe(TestStages.Down, cts => OnStartStage(TestStages.Down), cts => OnStopStage(TestStages.Down));
-                lifecycle.Subscribe(TestStages.Initialize, cts => OnStartStage(TestStages.Initialize), cts => OnStopStage(TestStages.Initialize));
-                lifecycle.Subscribe(TestStages.Configure, cts => OnStartStage(TestStages.Configure), cts => OnStopStage(TestStages.Configure));
-                lifecycle.Subscribe(TestStages.Run, cts => OnStartStage(TestStages.Run), cts => OnStopStage(TestStages.Run));
+                lifecycle.Subscribe(TestStages.Down, ct => OnStartStage(TestStages.Down), ct => OnStopStage(TestStages.Down));
+                lifecycle.Subscribe(TestStages.Initialize, ct => OnStartStage(TestStages.Initialize), ct => OnStopStage(TestStages.Initialize));
+                lifecycle.Subscribe(TestStages.Configure, ct => OnStartStage(TestStages.Configure), ct => OnStopStage(TestStages.Configure));
+                lifecycle.Subscribe(TestStages.Run, ct => OnStartStage(TestStages.Run), ct => OnStopStage(TestStages.Run));
             }
         }
 

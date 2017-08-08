@@ -1,7 +1,7 @@
 ﻿
 namespace Orleans.Runtime
 {
-    internal class GrainLifecycle : LifecycleObservable<GrainLifecyleStage>, IGrainLifeCycle
+    internal class GrainLifecycle : LifecycleObservable<GrainLifecyleStage>, IGrainLifecycle
     {
         public GrainLifecycle(Logger logger) : base(logger)
         {

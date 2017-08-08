@@ -136,7 +136,7 @@
     <Compile Include="Placement\PlacementTarget.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
     <Compile Include="Providers\MemoryStorageEtagMismatchException.cs" />
-    <Compile Include="Runtime\IGrainLifeCycle.cs" />
+    <Compile Include="Runtime\IGrainLifecycle.cs" />
     <Compile Include="Runtime\IGrainReferenceConverter.cs" />
     <Compile Include="Runtime\IGrainReferenceRuntime.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />

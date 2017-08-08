@@ -20,7 +20,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Grain life cycle
     /// </summary>
-    public interface IGrainLifeCycle : ILifecycleObservable<GrainLifecyleStage>
+    public interface IGrainLifecycle : ILifecycleObservable<GrainLifecyleStage>
     {
     }
 }

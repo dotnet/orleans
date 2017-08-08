@@ -6,9 +6,9 @@ namespace Orleans
 {
     public static class LifecycleExtensions
     {
-        private static Func<CancellationTokenSource, Task> NoOp => cts => Task.CompletedTask;
+        private static Func<CancellationToken, Task> NoOp => ct => Task.CompletedTask;
 
-        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationTokenSource, Task> onStart, Func<CancellationTokenSource, Task> onStop)
+        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             if (onStart == null) throw new ArgumentNullException(nameof(onStart));
@@ -17,25 +17,34 @@ namespace Orleans
             return observable.Subscribe(stage, new Observer(onStart, onStop));
         }
 
-        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationTokenSource, Task> onStart)
+        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationToken, Task> onStart)
         {
             return observable.Subscribe(stage, new Observer(onStart, NoOp));
         }
 
+        public static Task OnStart(this ILifecycleObserver observer)
+        {
+            return observer.OnStart(CancellationToken.None);
+        }
+
+        public static Task OnStop(this ILifecycleObserver observer)
+        {
+            return observer.OnStop(CancellationToken.None);
+        }
+
         private class Observer : ILifecycleObserver
         {
-            private readonly Func<CancellationTokenSource, Task> onStart;
-            private readonly Func<CancellationTokenSource, Task> onStop;
+            private readonly Func<CancellationToken, Task> onStart;
+            private readonly Func<CancellationToken, Task> onStop;
 
-            public Observer(Func<CancellationTokenSource, Task> onStart, Func<CancellationTokenSource, Task> onStop)
+            public Observer(Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
             {
                 this.onStart = onStart;
                 this.onStop = onStop;
             }
 
-            public Task OnStart(CancellationTokenSource cts = null) => onStart(cts);
-            public Task OnStop(CancellationTokenSource cts = null) => onStop(cts);
+            public Task OnStart(CancellationToken ct) => onStart(ct);
+            public Task OnStop(CancellationToken ct) => onStop(ct);
         }
     }
-
 }

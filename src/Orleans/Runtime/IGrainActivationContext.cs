@@ -28,6 +28,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Observable Grain life cycle
         /// </summary>
-        IGrainLifeCycle ObservableLifeCycle { get; }
+        IGrainLifecycle ObservableLifecycle { get; }
     }
 }
