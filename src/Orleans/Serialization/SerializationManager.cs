@@ -232,6 +232,16 @@ namespace Orleans.Serialization
             Register(typeof(Tuple<,,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
             Register(typeof(Tuple<,,,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
 
+            // Built-in handlers: ValueTuples
+            Register(typeof(ValueTuple<>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,,,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,,,,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+            Register(typeof(ValueTuple<,,,,,,,>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
+
             // Built-in handlers: enumerables
             Register(typeof(List<>), BuiltInTypes.CopyGenericList, BuiltInTypes.SerializeGenericList, BuiltInTypes.DeserializeGenericList);
             Register(typeof(ReadOnlyCollection<>), BuiltInTypes.CopyGenericReadOnlyCollection, BuiltInTypes.SerializeGenericReadOnlyCollection, BuiltInTypes.DeserializeGenericReadOnlyCollection);

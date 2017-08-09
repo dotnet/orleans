@@ -1450,6 +1450,287 @@ namespace Orleans.Serialization
 
         #endregion
 
+        #region ValueTuples
+
+        internal static void SerializeValueTuple(object raw, ISerializationContext context, Type expected)
+        {
+            Type t = raw.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+
+            concretes.Item1(raw, context, expected);
+        }
+
+        internal static object DeserializeValueTuple(Type t, IDeserializationContext context)
+        {
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+
+            return concretes.Item2(t, context);
+        }
+
+        internal static object DeepCopyValueTuple(object original, ICopyContext context)
+        {
+            Type t = original.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+
+            return concretes.Item3(original, context);
+        }
+
+        internal static object DeepCopyValueTuple1<T1>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1>)original;
+            var result = new ValueTuple<T1>((T1)SerializationManager.DeepCopyInner(input.Item1, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple1<T1>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+        }
+
+        internal static object DeserializeValueTuple1<T1>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            return new ValueTuple<T1>(item1);
+        }
+
+        internal static object DeepCopyValueTuple2<T1, T2>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2>)original;
+            var result = new ValueTuple<T1, T2>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple2<T1, T2>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+        }
+
+        internal static object DeserializeValueTuple2<T1, T2>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            return new ValueTuple<T1, T2>(item1, item2);
+        }
+
+        internal static object DeepCopyValueTuple3<T1, T2, T3>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2, T3>)original;
+            var result = new ValueTuple<T1, T2, T3>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple3<T1, T2, T3>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2, T3>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+        }
+
+        internal static object DeserializeValueTuple3<T1, T2, T3>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            return new ValueTuple<T1, T2, T3>(item1, item2, item3);
+        }
+
+        internal static object DeepCopyValueTuple4<T1, T2, T3, T4>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4>)original;
+            var result = new ValueTuple<T1, T2, T3, T4>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context),
+                (T4)SerializationManager.DeepCopyInner(input.Item4, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple4<T1, T2, T3, T4>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+            SerializationManager.SerializeInner(input.Item4, context, typeof(T4));
+        }
+
+        internal static object DeserializeValueTuple4<T1, T2, T3, T4>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            var item4 = (T4)SerializationManager.DeserializeInner(typeof(T4), context);
+            return new ValueTuple<T1, T2, T3, T4>(item1, item2, item3, item4);
+        }
+
+        internal static object DeepCopyValueTuple5<T1, T2, T3, T4, T5>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5>)original;
+            var result = new ValueTuple<T1, T2, T3, T4, T5>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context),
+                (T4)SerializationManager.DeepCopyInner(input.Item4, context),
+                (T5)SerializationManager.DeepCopyInner(input.Item5, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple5<T1, T2, T3, T4, T5>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+            SerializationManager.SerializeInner(input.Item4, context, typeof(T4));
+            SerializationManager.SerializeInner(input.Item5, context, typeof(T5));
+        }
+
+        internal static object DeserializeValueTuple5<T1, T2, T3, T4, T5>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            var item4 = (T4)SerializationManager.DeserializeInner(typeof(T4), context);
+            var item5 = (T5)SerializationManager.DeserializeInner(typeof(T5), context);
+            return new ValueTuple<T1, T2, T3, T4, T5>(item1, item2, item3, item4, item5);
+        }
+
+        internal static object DeepCopyValueTuple6<T1, T2, T3, T4, T5, T6>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6>)original;
+            var result = new ValueTuple<T1, T2, T3, T4, T5, T6>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context),
+                (T4)SerializationManager.DeepCopyInner(input.Item4, context),
+                (T5)SerializationManager.DeepCopyInner(input.Item5, context),
+                (T6)SerializationManager.DeepCopyInner(input.Item6, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple6<T1, T2, T3, T4, T5, T6>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+            SerializationManager.SerializeInner(input.Item4, context, typeof(T4));
+            SerializationManager.SerializeInner(input.Item5, context, typeof(T5));
+            SerializationManager.SerializeInner(input.Item6, context, typeof(T6));
+        }
+
+        internal static object DeserializeValueTuple6<T1, T2, T3, T4, T5, T6>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            var item4 = (T4)SerializationManager.DeserializeInner(typeof(T4), context);
+            var item5 = (T5)SerializationManager.DeserializeInner(typeof(T5), context);
+            var item6 = (T6)SerializationManager.DeserializeInner(typeof(T6), context);
+            return new ValueTuple<T1, T2, T3, T4, T5, T6>(item1, item2, item3, item4, item5, item6);
+        }
+
+        internal static object DeepCopyValueTuple7<T1, T2, T3, T4, T5, T6, T7>(object original, ICopyContext context)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6, T7>)original;
+            var result = new ValueTuple<T1, T2, T3, T4, T5, T6, T7>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context),
+                (T4)SerializationManager.DeepCopyInner(input.Item4, context),
+                (T5)SerializationManager.DeepCopyInner(input.Item5, context),
+                (T6)SerializationManager.DeepCopyInner(input.Item6, context),
+                (T7)SerializationManager.DeepCopyInner(input.Item7, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple7<T1, T2, T3, T4, T5, T6, T7>(object obj, ISerializationContext context, Type expected)
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6, T7>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+            SerializationManager.SerializeInner(input.Item4, context, typeof(T4));
+            SerializationManager.SerializeInner(input.Item5, context, typeof(T5));
+            SerializationManager.SerializeInner(input.Item6, context, typeof(T6));
+            SerializationManager.SerializeInner(input.Item7, context, typeof(T7));
+        }
+
+        internal static object DeserializeValueTuple7<T1, T2, T3, T4, T5, T6, T7>(Type expected, IDeserializationContext context)
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            var item4 = (T4)SerializationManager.DeserializeInner(typeof(T4), context);
+            var item5 = (T5)SerializationManager.DeserializeInner(typeof(T5), context);
+            var item6 = (T6)SerializationManager.DeserializeInner(typeof(T6), context);
+            var item7 = (T7)SerializationManager.DeserializeInner(typeof(T7), context);
+            return new ValueTuple<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
+        }
+
+        internal static object DeepCopyValueTuple8<T1, T2, T3, T4, T5, T6, T7, T8>(object original, ICopyContext context) where T8 : struct
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>)original;
+            var result = new ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>(
+                (T1)SerializationManager.DeepCopyInner(input.Item1, context), 
+                (T2)SerializationManager.DeepCopyInner(input.Item2, context),
+                (T3)SerializationManager.DeepCopyInner(input.Item3, context),
+                (T4)SerializationManager.DeepCopyInner(input.Item4, context),
+                (T5)SerializationManager.DeepCopyInner(input.Item5, context),
+                (T6)SerializationManager.DeepCopyInner(input.Item6, context),
+                (T7)SerializationManager.DeepCopyInner(input.Item7, context),
+                (T8)SerializationManager.DeepCopyInner(input.Rest, context));
+            context.RecordCopy(original, result);
+            return result;
+        }
+
+        internal static void SerializeValueTuple8<T1, T2, T3, T4, T5, T6, T7, T8>(object obj, ISerializationContext context, Type expected) where T8 : struct
+        {
+            var input = (ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>)obj;
+            SerializationManager.SerializeInner(input.Item1, context, typeof(T1));
+            SerializationManager.SerializeInner(input.Item2, context, typeof(T2));
+            SerializationManager.SerializeInner(input.Item3, context, typeof(T3));
+            SerializationManager.SerializeInner(input.Item4, context, typeof(T4));
+            SerializationManager.SerializeInner(input.Item5, context, typeof(T5));
+            SerializationManager.SerializeInner(input.Item6, context, typeof(T6));
+            SerializationManager.SerializeInner(input.Item7, context, typeof(T7));
+            SerializationManager.SerializeInner(input.Rest, context, typeof(T8));
+        }
+
+        internal static object DeserializeValueTuple8<T1, T2, T3, T4, T5, T6, T7, T8>(Type expected, IDeserializationContext context) where T8 : struct
+        {
+            var item1 = (T1)SerializationManager.DeserializeInner(typeof(T1), context);
+            var item2 = (T2)SerializationManager.DeserializeInner(typeof(T2), context);
+            var item3 = (T3)SerializationManager.DeserializeInner(typeof(T3), context);
+            var item4 = (T4)SerializationManager.DeserializeInner(typeof(T4), context);
+            var item5 = (T5)SerializationManager.DeserializeInner(typeof(T5), context);
+            var item6 = (T6)SerializationManager.DeserializeInner(typeof(T6), context);
+            var item7 = (T7)SerializationManager.DeserializeInner(typeof(T7), context);
+            var rest = (T8)SerializationManager.DeserializeInner(typeof(T8), context);
+            return new ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, rest);
+        }
+
+        #endregion
+
         #region KeyValuePairs
 
         internal static void SerializeGenericKeyValuePair(object original, ISerializationContext context, Type expected)
