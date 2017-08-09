@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -55,7 +56,7 @@ namespace UnitTests.OrleansRuntime
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
             random = new SafeRandom();
-            List<Task> tasks = new List<Task>();
+            ConcurrentStack<Task> tasks = new ConcurrentStack<Task>();
             List<Task> enqueueTasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
@@ -64,7 +65,7 @@ namespace UnitTests.OrleansRuntime
                     Task.Run(() =>
                     {
                         logger.Info("Submitting Task {0}.", capture);
-                        tasks.Add(executor.AddNext(() => Operation(capture)));
+                        tasks.Push(executor.AddNext(() => Operation(capture)));
                     }));
             }
             await Task.WhenAll(enqueueTasks);
