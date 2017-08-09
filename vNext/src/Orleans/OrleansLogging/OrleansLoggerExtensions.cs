@@ -6,6 +6,9 @@ using System.Text;
 
 namespace Orleans.Extensions.Logging
 {
+    /// <summary>
+    /// Extension methods which preserves legacy orleans log methods in <see cref="Runtime.LoggerExtensions">
+    /// </summary>
     public static class OrleansLoggerExtension
     {
         /// <summary>

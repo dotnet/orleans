@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Orleans.Extensions.Logging
 {
+    /// <summary>
+    /// Config for message bulking feature
+    /// </summary>
     public class MessageBulkingConfig
     {
         /// <summary>
@@ -35,8 +38,8 @@ namespace Orleans.Extensions.Logging
     }
 
     /// <summary>
-    /// Provides an ILoggerProvider based on orleans legacy logging abstraction.
-    /// OrleansLoggerProvider creates <see cref="OrleansLogger"/>, which supports orleans legacy logging features, including including <see cref="ILogConsumer"/>, 
+    /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction
+    /// OrleansLoggerProvider creates <see cref="OrleansLogger"/>, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">, message bulking. 
     /// OrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
@@ -101,7 +104,7 @@ namespace Orleans.Extensions.Logging
             if (this.loggerSeverityOverrides.LoggerSeverityOverrides.ContainsKey(categoryName))
                 return this.loggerSeverityOverrides.LoggerSeverityOverrides[categoryName];
             //if no severity override, return the default severity.
-            return Severity.Info;
+            return DefaultSeverity;
         }
         /// <inheritdoc/>
         public ILogger CreateLogger(string categoryName)
@@ -172,7 +175,7 @@ namespace Orleans.Extensions.Logging
         /// <returns></returns>
         public OrleansLoggerSeverityOverrides AddLoggerSeverityOverrides(string categoryName, Severity loggerSeverity)
         {
-            this.LoggerSeverityOverrides[categoryName] = loggerSeverity;
+            this.LoggerSeverityOverrides.AddOrUpdate(categoryName, loggerSeverity, (name, sev) => sev);
             return this;
         }
     }

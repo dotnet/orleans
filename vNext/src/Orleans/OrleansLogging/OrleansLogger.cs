@@ -30,6 +30,13 @@ namespace Orleans.Extensions.Logging
         private IList<ILogConsumer> logConsumers;
         private Severity maxSeverityLevel;
         private string name;
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="categoryName"></param>
+        /// <param name="logConsumers"></param>
+        /// <param name="maxSeverityLevel"></param>
+        /// <param name="bulkingConfig"></param>
         public OrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, Severity maxSeverityLevel, MessageBulkingConfig bulkingConfig)
         {
             this.logConsumers = logConsumers;
@@ -38,6 +45,7 @@ namespace Orleans.Extensions.Logging
             this.messageBulkingConfig = bulkingConfig == null ? new MessageBulkingConfig() : bulkingConfig;
         }
 
+        /// <inheritdoc/>
         public IDisposable BeginScope<TState>(TState state)
         {
             if (state == null)
@@ -48,17 +56,29 @@ namespace Orleans.Extensions.Logging
             return NullScope.Instance;
         }
 
+        /// <inheritdoc/>
         public bool IsEnabled(LogLevel logLevel)
         {
             var severity = LogLevelToSeverity(logLevel);
             return severity <= maxSeverityLevel;
         }
 
+        /// <summary>
+        /// Create EventId in a format which supports message bulking
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="errorCode"></param>
+        /// <returns></returns>
         public static EventId CreateEventId(int eventId, int errorCode)
         {
             return new EventId(eventId, $"{LogCodeString} {errorCode}");
         }
 
+        /// <summary>
+        /// Get error code from EventId
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <returns></returns>
         public static int? GetOrleansErrorCode(EventId eventId)
         {
             if (eventId.Name.Contains(LogCodeString))
@@ -75,7 +95,7 @@ namespace Orleans.Extensions.Logging
         /// <summary>
         /// Log a message. Current logger supports legacy message bulking feature, only when <param name="eventId"> contains errorCode information in a certain format. 
         /// For example, in order to use message bulking feature, one need to use eventId = OrleansLogger.CreateEventId(eventId, errorCode) to create a EventId which fulfils the certain format.
-        /// Or one can use extension method ILogger.Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception) to achieve this.
+        /// Or one can use extension method <see cref="ILogger.Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception)"/> to achieve this.
         /// </summary>
         /// <typeparam name="TState"></typeparam>
         /// <param name="logLevel"></param>
@@ -100,7 +120,12 @@ namespace Orleans.Extensions.Logging
             }
         }
 
-        internal static Severity LogLevelToSeverity(LogLevel logLevel)
+        /// <summary>
+        /// Map LogLevel to Severity
+        /// </summary>
+        /// <param name="logLevel"></param>
+        /// <returns></returns>
+        public static Severity LogLevelToSeverity(LogLevel logLevel)
         {
             switch (logLevel)
             {
@@ -110,11 +135,16 @@ namespace Orleans.Extensions.Logging
                 case LogLevel.Warning: return Severity.Warning;
                 case LogLevel.Information: return Severity.Info;
                 case LogLevel.Debug: return Severity.Verbose;
-                default: return Severity.Verbose2;
+                default: return Severity.Verbose3;
             }
         }
 
-        internal static LogLevel SeverityToLogLevel(Severity severity)
+        /// <summary>
+        /// Map Severity to LogLevel
+        /// </summary>
+        /// <param name="severity"></param>
+        /// <returns></returns>
+        public static LogLevel SeverityToLogLevel(Severity severity)
         {
             switch (severity)
             {
