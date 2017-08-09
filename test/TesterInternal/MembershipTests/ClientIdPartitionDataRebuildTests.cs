@@ -45,7 +45,7 @@ namespace UnitTests.MembershipTests
             this.output = output;
         }
 
-        [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("Functional")]
+        [SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Observer()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
@@ -69,7 +69,7 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 20, TimeSpan.FromSeconds(10));
         }
 
-        [Fact, TestCategory("Functional")]
+        [SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Request()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo2
