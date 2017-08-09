@@ -109,8 +109,7 @@ namespace Orleans.CodeGenerator
             {
                 var emitOptions = new EmitOptions()
                     .WithEmitMetadataOnly(false)
-                    .WithIncludePrivateMembers(true)
-                    .WithTolerateErrors(true);
+                    .WithIncludePrivateMembers(true);
 
                 if (emitDebugSymbols)
                 {
