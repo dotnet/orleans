@@ -23,7 +23,7 @@ namespace Orleans.Extensions.Logging
         /// <param name="exception"></param>
         public static void Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception)
         {
-            logger.Log<string>(OrleansLogger.SeverityToLogLevel(sev), OrleansLogger.CreateEventId(0, errorCode), FormatMessageText(format, args), exception,
+            logger.Log<string>(OrleansLogger.SeverityToLogLevel(sev), OrleansLoggingDecorator.CreateEventId(0, errorCode), FormatMessageText(format, args), exception,
                 (message, exc) => exc == null ? message : $"{message}, Exception: {exc}");
         }
 

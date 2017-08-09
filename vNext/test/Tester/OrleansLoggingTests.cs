@@ -26,7 +26,7 @@ namespace Tester
             //get logger
             var logger = serviceProvider.GetService<ILogger<OrleansLoggingTests>>();
             Assert.NotNull(logger);
-            logger.Log<string>(LogLevel.Information, OrleansLogger.CreateEventId(0, 0), "Successfully logged one message", null, (msg, exc) => msg);
+            logger.Log<string>(LogLevel.Information, OrleansLoggingDecorator.CreateEventId(0, 0), "Successfully logged one message", null, (msg, exc) => msg);
             //supports orleans legacy log method
             logger.Info(0,"Successfully logged one message", null);
 

@@ -8,38 +8,8 @@ using System.Text;
 namespace Orleans.Extensions.Logging
 {
     /// <summary>
-    /// Config for message bulking feature
-    /// </summary>
-    public class MessageBulkingConfig
-    {
-        /// <summary>
-        /// Count limit for bulk message output.
-        /// If the same log code is written more than <c>BulkMessageLimit</c> times in the <c>BulkMessageInterval</c> time period, 
-        /// then only the first <c>BulkMessageLimit</c> individual messages will be written, plus a count of how bulk messages suppressed.
-        /// </summary>
-        public int BulkMessageLimit { get; set; } = DefaultBulkMessageLimit;
-
-        /// <summary>
-        /// Default bulk message limit. 
-        /// </summary>
-        public const int DefaultBulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
-
-        /// <summary>
-        /// Time limit for bulk message output.
-        /// If the same log code is written more than <c>BulkMessageLimit</c> times in the <c>BulkMessageInterval</c> time period, 
-        /// then only the first <c>BulkMessageLimit</c> individual messages will be written, plus a count of how bulk messages suppressed.
-        /// </summary>
-        public TimeSpan BulkMessageInterval { get; set; } = DefaultBulkMessageInterval;
-
-        /// <summary>
-        /// Default bulk message interval
-        /// </summary>
-        public static readonly TimeSpan DefaultBulkMessageInterval = TimeSpan.FromMinutes(1);
-    }
-
-    /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction
-    /// OrleansLoggerProvider creates <see cref="OrleansLogger"/>, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
+    /// OrleansLoggerProvider creates one ILogger implementation, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">, message bulking. 
     /// OrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
@@ -106,10 +76,11 @@ namespace Orleans.Extensions.Logging
             //if no severity override, return the default severity.
             return DefaultSeverity;
         }
+
         /// <inheritdoc/>
         public ILogger CreateLogger(string categoryName)
         {
-            return new OrleansLogger(categoryName, this.logConsumers.ToArray(), FindSeverityLevel(categoryName), this.messageBulkingConfig);
+            return new OrleansLoggingDecorator(this.messageBulkingConfig, new OrleansLogger(categoryName, this.logConsumers.ToArray(), FindSeverityLevel(categoryName)));
         }
 
         /// <summary>
