@@ -351,7 +351,6 @@ namespace Orleans.Runtime
             healthCheckParticipants.Add(membershipOracle);
 
             catalog.SiloStatusOracle = this.membershipOracle;
-            localGrainDirectory.CatalogSiloStatusListener = catalog;
             this.membershipOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
             messageCenter.SiloDeadOracle = this.membershipOracle.IsDeadSilo;
 

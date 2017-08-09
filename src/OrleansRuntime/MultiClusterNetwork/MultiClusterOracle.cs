@@ -114,7 +114,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             // any status change can cause changes in gateway list
-            PublishChanges();
+            this.ScheduleTask(() => Utils.SafeExecute(() => this.PublishChanges())).Ignore();
         }
 
         public bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)

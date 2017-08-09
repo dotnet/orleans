@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -122,5 +123,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// The id of this cluster
         /// </summary>
         string ClusterId { get; }
+
+        /// <summary>
+        /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.
+        /// </summary>
+        /// <param name="catalogOnSiloRemoved">The callback.</param>
+        void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved);
     }
 }
