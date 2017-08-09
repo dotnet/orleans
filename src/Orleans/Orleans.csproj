@@ -204,6 +204,9 @@
     <Compile Include="Utils\CachedReadConcurrentDictionary.cs" />
     <Compile Include="Utils\Factory.cs" />
     <Compile Include="Utils\IKeyedServiceCollection.cs" />
+    <Compile Include="Utils\SharedState\ISharedStatePublisher.cs" />
+    <Compile Include="Utils\SharedState\SharedState.cs" />
+    <Compile Include="Utils\SharedState\SharedStatePublisherBase.cs" />
     <Compile Include="Versions\Compatibility\AllVersionsCompatible.cs" />
     <Compile Include="Versions\Compatibility\BackwardCompatible.cs" />
     <Compile Include="Versions\Compatibility\StrictVersionCompatible.cs" />
