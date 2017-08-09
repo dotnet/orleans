@@ -7,6 +7,7 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    [TestCategory("BVT"), TestCategory("OneWay")]
     public class OneWayCallTests : HostedTestClusterEnsureDefaultStarted
     {
         public OneWayCallTests(DefaultClusterFixture fixture) : base(fixture) { }
