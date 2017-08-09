@@ -49,7 +49,7 @@ Silos form a cluster that combines resources of multiple physical or virtual mac
 When there is work (request) for a grain, Orleans ensures there is an instance of the grain on one of the Silos in the cluster.
 If there is no instance of the grain on any silo, the Orleans runtime creates one. 
 This process is called Activation.
-In case a grain is using [Grain Persistence](Grain-Persistence.md), the runtime automatically reads the state from the backing store upon activation.
+In case a grain is using [Grain Persistence](../Core-Features/Grain-Persistence.md), the runtime automatically reads the state from the backing store upon activation.
 Once activated on a silo, a grain processes incoming requests (method calls) from other grains or from outside of the cluster (usually from frontend web servers).
 In the course of processing a request a grain may call other grains or some external services.
 If a grain stops receiving requests and stays idle, after a configurable period of inactivity Orleans removes the grain from memory (deactivates it) to free up resources for other grains.

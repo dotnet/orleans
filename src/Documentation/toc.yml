@@ -12,19 +12,13 @@
   href: Installation/toc.yml
 - name: Getting Started with Orleans
   href: Getting-Started-With-Orleans/toc.yml
-- name: Advanced Concepts
+- name: Core Features
+  href: Core-Features/toc.yml
+- name: Deployment
+  href: Deployment-and-Operations/toc.yml
+- name: Advanced Features
   href: Advanced-Concepts/toc.yml
-- name: Grain Versioning
-  href: Grain-Versioning/toc.yml  
 - name: Runtime Implementation Details
   href: Runtime-Implementation-Details/toc.yml
-- name: Streams
-  href: Orleans-Streams/toc.yml
-- name: Multi-Cluster Support
-  href: Multi-Cluster/toc.yml
-- name: Event Sourcing
-  href: Event-Sourcing/toc.yml
-- name: Configuration Guide
-  href: Orleans-Configuration-Guide/toc.yml
 - name: Samples
   href: Samples-Overview/toc.yml

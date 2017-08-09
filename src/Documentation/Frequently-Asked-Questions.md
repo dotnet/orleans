@@ -65,7 +65,7 @@ Instead, since 1.3.0, you can consider a [multi-cluster deployment where cluster
 
 ## How do you version grains or add new grain classes and interfaces?
 
-You can [add silos with new grain classes](Advanced-Concepts/Heterogeneous-Silos.md) or [new versions of existing grain classes](Grain-Versioning/Grain-versioning.md) to a running cluster.
+You can [add silos with new grain classes](Deployment-and-Operations/Heterogeneous-Silos.md) or [new versions of existing grain classes](Grain-Versioning/Grain-versioning.md) to a running cluster.
 
 ## Can I persist a grain’s state to the Azure cache service?
 
