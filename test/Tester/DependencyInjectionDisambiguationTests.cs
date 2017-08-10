@@ -41,7 +41,7 @@ namespace UnitTests.General
 
         private class ValueServiceCollection<TValue> : IKeyedServiceCollection<TValue, IValue<TValue>>
         {
-            public IValue<TValue> GetService(TValue name)
+            public IValue<TValue> GetService(IServiceProvider serviceProvider, TValue name)
             {
                 return new SomeValue<TValue> { Value = name };
             }

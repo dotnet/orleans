@@ -95,6 +95,7 @@
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
     <Compile Include="Core\ClusterClient.cs" />
+    <Compile Include="Facet\FacetAttribute.cs" />
     <Compile Include="Lifecycle\ILifecycleParticipant.cs" />
     <Compile Include="Runtime\GrainReferenceRuntime.cs" />
     <Compile Include="Serialization\GrainReferenceSerializer.cs" />
