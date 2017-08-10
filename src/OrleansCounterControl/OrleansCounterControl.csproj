@@ -67,6 +67,7 @@
     <None Include="Microsoft.Orleans.CounterControl.targets">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
