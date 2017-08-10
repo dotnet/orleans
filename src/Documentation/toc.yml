@@ -10,7 +10,7 @@
     href: Frequently-Asked-Questions.md
 - name: Installation
   href: Installation/toc.yml
-- name: Getting Started with Orleans
+- name: Getting Started
   href: Getting-Started-With-Orleans/toc.yml
 - name: Core Features
   href: Core-Features/toc.yml
@@ -18,7 +18,7 @@
   href: Deployment-and-Operations/toc.yml
 - name: Advanced Features
   href: Advanced-Concepts/toc.yml
-- name: Runtime Implementation Details
+- name: Implementation Details
   href: Runtime-Implementation-Details/toc.yml
 - name: Samples
   href: Samples-Overview/toc.yml
