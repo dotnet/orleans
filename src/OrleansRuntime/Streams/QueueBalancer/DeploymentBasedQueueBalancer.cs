@@ -35,13 +35,14 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    public class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
+    public class DeploymentBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer
     {
         private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
         private ReadOnlyCollection<QueueId> allQueues;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
+        private ISharedState<SiloStatusChange> siloStatusSharedState;
         private readonly bool isFixed;
         private bool isStarting;
 
@@ -65,9 +66,6 @@ namespace Orleans.Streams
             this.isFixed = isFixed;
             isStarting = true;
 
-            // register for notification of changes to silo status for any silo in the cluster
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
-
             // record all already active silos as already mature. 
             // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
             foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
@@ -87,6 +85,8 @@ namespace Orleans.Streams
             }
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
             this.siloMaturityPeriod = siloMaturityPeriod;
+            this.siloStatusSharedState = this.siloStatusOracle.CreateSiloStatusSharedState();
+            HandleSiloStatusChange().Ignore();
             NotifyAfterStart().Ignore();
             return Task.CompletedTask;
         }
@@ -98,19 +98,33 @@ namespace Orleans.Streams
             await NotifyListeners();
         }
 
+        private async Task HandleSiloStatusChange()
+        {
+            while (!this.siloStatusOracle.CurrentStatus.IsTerminating())
+            {
+                try
+                {
+                    this.siloStatusSharedState = await this.siloStatusSharedState.NextAsync;
+                    HandleSiloStatusChange(this.siloStatusSharedState.State);
+                }
+                catch (Exception)
+                {
+                    // squelch exceptions.  Nothing to do.
+                }
+            }
+        }
+
         /// <summary>
         /// Called when the status of a silo in the cluster changes.
         /// - Notify listeners
         /// </summary>
-        /// <param name="updatedSilo">Silo which status has changed</param>
-        /// <param name="status">new silo status</param>
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        public void HandleSiloStatusChange(SiloStatusChange change)
         {
-            if (status == SiloStatus.Dead)
+            if (change.Status == SiloStatus.Dead)
             {
                 // just clean up garbage from immatureSilos.
                 bool ignore;
-                immatureSilos.TryRemove(updatedSilo, out ignore);
+                immatureSilos.TryRemove(change.UpdatedSilo, out ignore);
             }
             SiloStatusChangeNotification().Ignore();
         }
