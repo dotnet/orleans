@@ -41,7 +41,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -68,7 +68,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             Message deserializedMessage = DeserializeMessage(length, data);
 
             Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
         }
 
         private void RunTest(int numItems)
