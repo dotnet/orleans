@@ -13,7 +13,7 @@ namespace Tester.StorageFacet.Implementations
         public string Name => this.config.StateName;
         public TState State { get; set; }
 
-        public Task SaveAsync()
+        public Task Save()
         {
             return Task.CompletedTask;
         }

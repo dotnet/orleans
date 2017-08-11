@@ -10,16 +10,16 @@ namespace Orleans.Runtime
     /// </summary>
     public class DefaultGrainActivator : IGrainActivator
     {
-        private readonly GrainConstructorFacetArguementsFactory arguementsFactory;
+        private readonly ConstructorArguementFactory argumentFactory;
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache;
 
         /// <summary>
         /// Public constructor
         /// </summary>
-        /// <param name="service"></param>
-        public DefaultGrainActivator(IServiceProvider service)
+        /// <param name="serviceProvider"></param>
+        public DefaultGrainActivator(IServiceProvider serviceProvider)
         {
-            this.arguementsFactory = new GrainConstructorFacetArguementsFactory(service);
+            this.argumentFactory = new ConstructorArguementFactory(serviceProvider);
             this.typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
         }
 
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
 
             var serviceProvider = context.ActivationServices;
             var activator = this.typeActivatorCache.GetOrAdd(grainType, this.CreateFactory);
-            var grain = activator(serviceProvider, this.arguementsFactory.CreateArguements(context));
+            var grain = activator(serviceProvider, this.argumentFactory.CreateArguments(context));
             return grain;
         }
 
@@ -70,7 +70,7 @@ namespace Orleans.Runtime
 
         private ObjectFactory CreateFactory(Type type)
         {
-            return ActivatorUtilities.CreateFactory(type, this.arguementsFactory.ArguementTypes(type));
+            return ActivatorUtilities.CreateFactory(type, this.argumentFactory.ArgumentTypes(type));
         }
     }
 }

@@ -3,18 +3,18 @@
 namespace Tester.StorageFacet.Abstractions
 {
     /// <summary>
-    /// Primary storage feature interface.  
+    /// Primary storage feature interface.
     ///  This is the actual functionality the users need.
     /// </summary>
     /// <typeparam name="TState"></typeparam>
     public interface IStorageFeature<TState>
     {
-        string Name { get; }
-
         TState State { get; set; }
 
-        Task SaveAsync();
+        Task Save();
 
+        // Test calls - used to verify facet wiring works
+        string Name { get; }
         string GetExtendedInfo();
     }
 

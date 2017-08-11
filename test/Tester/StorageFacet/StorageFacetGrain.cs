@@ -47,7 +47,7 @@ namespace Tester
             INamedStorageFeatureFactory namedStorageFeatureFactory)
         {
             this.first = namedStorageFeatureFactory.Create<string>("Blob", new StorageFeatureConfig("FirstState"));
-            this.second = namedStorageFeatureFactory.Create<string>("Table", new StorageFeatureConfig("second")); ;
+            this.second = namedStorageFeatureFactory.Create<string>("Table", new StorageFeatureConfig("second"));
         }
 
         public Task<string[]> GetNames()

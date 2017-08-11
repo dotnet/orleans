@@ -11,8 +11,8 @@ namespace Tester.StorageFacet.Infrastructure
             // storage feature factory infrastructure
             services.AddScoped<INamedStorageFeatureFactory, NamedStorageFeatureFactory>();
 
-            // storage feature facet attribute
-            services.AddSingleton(typeof(IParameterFacetFactory<StorageFeatureAttribute>), typeof(StorageFeatureParameterFacetFactory));
+            // storage feature facet attribute mapper
+            services.AddSingleton(typeof(IAttributeToFactoryMapper<StorageFeatureAttribute>), typeof(StorageFeatureAttributeMapper));
         }
 
         public static void UseAsDefaultStorageFeature<TFactoryType>(this IServiceCollection services)

@@ -68,8 +68,8 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Core\GrainMethodInvoker.cs" />
-    <Compile Include="Facet\GrainConstructorFacetArguementsFactory.cs" />
-    <Compile Include="Facet\IParamiterFacetFactory.cs" />
+    <Compile Include="Facet\ConstructorArguementFactory.cs" />
+    <Compile Include="Facet\IAttributeToFactoryMapper.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Placement\HashBasedPlacementDirector.cs" />
     <Compile Include="Placement\IActivationSelector.cs" />

@@ -6,11 +6,11 @@ using Tester.StorageFacet.Abstractions;
 
 namespace Tester.StorageFacet.Infrastructure
 {
-    public class StorageFeatureParameterFacetFactory : IParameterFacetFactory<StorageFeatureAttribute>
+    public class StorageFeatureAttributeMapper : IAttributeToFactoryMapper<StorageFeatureAttribute>
     {
         private static readonly MethodInfo create = typeof(INamedStorageFeatureFactory).GetMethod("Create");
 
-        public Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, StorageFeatureAttribute attribute)
+        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, StorageFeatureAttribute attribute)
         {
             IStorageFeatureConfig config = attribute;
             // set state name to parameter name, if not already specified
@@ -30,5 +30,4 @@ namespace Tester.StorageFacet.Infrastructure
             return genericCreate.Invoke(factory, args);
         }
     }
-
 }
