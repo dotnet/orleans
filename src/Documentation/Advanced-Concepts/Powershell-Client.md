@@ -9,7 +9,7 @@ The Orleans PowerShell Client Module is a set of [PowerShell Cmdlets](https://te
 [GrainClient](https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs) in a set of convenient commands making possible to interact with not just
 [ManagementGrain](https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs) but any `IGrain` just as a regular Orleans application can by using Powershell scripts.
 
-These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershel scripts.
+These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershell scripts.
 
 Here is how to use it:
 
@@ -23,7 +23,7 @@ PS> Import-Module .\projectOutputDir\Orleans.psd1
 
 ```
 
-Althought you can do that, there is a much easier and interesting way for doing that by installing it from **PowerShell Galery**.
+Althought you can do that, there is a much easier and interesting way for doing that by installing it from **PowerShell Gallery**.
 
 ### From PowerShell Gallery
 
@@ -32,14 +32,14 @@ Powershell modules today are easily shared just as Nuget packages but instead of
 * To install it on a specific folder just run:
 
 ``` powershell
-PS> Save-Module -Name Orleans -Path <path>
+PS> Save-Module -Name OrleansPSUtil -Path <path>
 
 ```
 
 * To install it on your PowerShell modules path (**the recommended way**), just run:
 
 ``` powershell
-PS> Install-Module -Name Orleans
+PS> Install-Module -Name OrleansPSUtil
 
 ```
 
@@ -53,7 +53,7 @@ PS> Install-Module -Name Orleans
 Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:
 
 ``` powershell
-PS> Import-Module "Orleans"
+PS> Import-Module OrleansPSUtils
 ```
 
 **Note**:
@@ -113,7 +113,7 @@ This Cmdlet return a grain reference of the type passed by as parameter on `-Gra
 A simple example on calling `MyInterfacesNamespace.IMyGrain.SayHeloTo` grain method:
 
 ``` powershell
-PS> Import-Module "Orleans"
+PS> Import-Module OrleansPSUtils
 PS> $configFilePath = Resolve-Path(".\ClientConfig.xml").Path
 PS> Start-GrainClient -ConfigFilePath $configFilePath
 PS> Add-Type -Path .\MyGrainInterfaceAssembly.dll
