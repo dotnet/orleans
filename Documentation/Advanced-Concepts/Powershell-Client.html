@@ -77,23 +77,23 @@
 <p>The Orleans PowerShell Client Module is a set of <a href="https://technet.microsoft.com/en-us/library/dd772285.aspx">PowerShell Cmdlets</a> that wraps
 <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs">GrainClient</a> in a set of convenient commands making possible to interact with not just
 <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs">ManagementGrain</a> but any <code>IGrain</code> just as a regular Orleans application can by using Powershell scripts.</p>
-<p>These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershel scripts.</p>
+<p>These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershell scripts.</p>
 <p>Here is how to use it:</p>
 <h2 id="installing-the-module">Installing the module</h2>
 <h3 id="from-source">From Source</h3>
 <p>You can build from source the <code>OrleansPSUtils</code> project and just import it with:</p>
 <pre><code class="lang-powershell">PS&gt; Import-Module .\projectOutputDir\Orleans.psd1
-</code></pre><p>Althought you can do that, there is a much easier and interesting way for doing that by installing it from <strong>PowerShell Galery</strong>.</p>
+</code></pre><p>Althought you can do that, there is a much easier and interesting way for doing that by installing it from <strong>PowerShell Gallery</strong>.</p>
 <h3 id="from-powershell-gallery">From PowerShell Gallery</h3>
 <p>Powershell modules today are easily shared just as Nuget packages but instead of nuget.org, they are hosted on <a href="https://www.powershellgallery.com/">PowerShell Gallery</a>.</p>
 <ul>
 <li>To install it on a specific folder just run:</li>
 </ul>
-<pre><code class="lang-powershell">PS&gt; Save-Module -Name Orleans -Path &lt;path&gt;
+<pre><code class="lang-powershell">PS&gt; Save-Module -Name OrleansPSUtil -Path &lt;path&gt;
 </code></pre><ul>
 <li>To install it on your PowerShell modules path (<strong>the recommended way</strong>), just run:</li>
 </ul>
-<pre><code class="lang-powershell">PS&gt; Install-Module -Name Orleans
+<pre><code class="lang-powershell">PS&gt; Install-Module -Name OrleansPSUtil
 </code></pre><ul>
 <li>If you plan to use this module on an <a href="https://azure.microsoft.com/en-us/services/automation/">Azure Automation</a>, just click on the button bellow:
 <button style="border:none;background-image:none; background-color:transparent " type="button" title="Deploy this module to Azure Automation." onclick="window.open('https://www.powershellgallery.com/packages/Orleans/DeployItemToAzureAutomation?itemType=PSModule', target = '_blank')">
@@ -102,7 +102,7 @@
 </ul>
 <h2 id="using-the-module">Using the module</h2>
 <p>Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:</p>
-<pre><code class="lang-powershell">PS&gt; Import-Module &quot;Orleans&quot;
+<pre><code class="lang-powershell">PS&gt; Import-Module OrleansPSUtils
 </code></pre><p><strong>Note</strong>:
 In case of building from source, you must import it as suggested on the Install section by using the path to the <code>.psd1</code> instead of using the module name since it will not be on the <code>$env:PSModulePath</code> PowerShell runtime variable.
 Again, it is highly recommended that you install from PowerShell Gallery instead.</p>
@@ -152,7 +152,7 @@ The <code>Timeout</code> parameter is optional and if it is informed and greater
 <p>This Cmdlet return a grain reference of the type passed by as parameter on <code>-GrainType</code>.</p>
 <h2 id="example">Example:</h2>
 <p>A simple example on calling <code>MyInterfacesNamespace.IMyGrain.SayHeloTo</code> grain method:</p>
-<pre><code class="lang-powershell">PS&gt; Import-Module &quot;Orleans&quot;
+<pre><code class="lang-powershell">PS&gt; Import-Module OrleansPSUtils
 PS&gt; $configFilePath = Resolve-Path(&quot;.\ClientConfig.xml&quot;).Path
 PS&gt; Start-GrainClient -ConfigFilePath $configFilePath
 PS&gt; Add-Type -Path .\MyGrainInterfaceAssembly.dll
