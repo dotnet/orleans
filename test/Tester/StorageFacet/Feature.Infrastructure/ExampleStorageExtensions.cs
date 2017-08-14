@@ -9,7 +9,7 @@ namespace Tester.StorageFacet.Infrastructure
         public static void UseExampleStorage(this IServiceCollection services)
         {
             // storage feature factory infrastructure
-            services.AddScoped<INamedExampleStorageFactory, NamedExampleStorageFactory>();
+            services.AddTransient<INamedExampleStorageFactory, NamedExampleStorageFactory>();
 
             // storage feature facet attribute mapper
             services.AddSingleton(typeof(IAttributeToFactoryMapper<ExampleStorageAttribute>), typeof(ExampleStorageAttributeMapper));
@@ -18,7 +18,7 @@ namespace Tester.StorageFacet.Infrastructure
         public static void UseAsDefaultExampleStorage<TFactoryType>(this IServiceCollection services)
             where TFactoryType : class, IExampleStorageFactory
         {
-            services.AddScoped<IExampleStorageFactory,TFactoryType>();
+            services.AddTransient<IExampleStorageFactory,TFactoryType>();
         }
     }
 }
