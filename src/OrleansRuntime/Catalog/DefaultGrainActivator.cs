@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     /// </summary>
     public class DefaultGrainActivator : IGrainActivator
     {
-        private readonly ConstructorArguementFactory argumentFactory;
+        private readonly ConstructorArgumentFactory argumentFactory;
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache;
 
         /// <summary>
@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         /// <param name="serviceProvider"></param>
         public DefaultGrainActivator(IServiceProvider serviceProvider)
         {
-            this.argumentFactory = new ConstructorArguementFactory(serviceProvider);
+            this.argumentFactory = new ConstructorArgumentFactory(serviceProvider);
             this.typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
         }
 

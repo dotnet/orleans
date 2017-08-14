@@ -32,20 +32,20 @@ namespace Tester
                     // - Set default feature implementation - optional
 
                     // Setup infrastructure
-                    services.UseStorageFeature();
+                    services.UseExampleStorage();
                     // Default storage feature factory - optional
-                    services.UseAsDefaultStorageFeature<TableStorageFeatureFactory>();
+                    services.UseAsDefaultExampleStorage<TableExampleStorageFactory>();
 
 
                     // Service will need to add types they want to use to collection
                     // - Call extension functions from each implementation assembly to register it's classes.
 
                     // Blob - from blob extension assembly
-                    services.UseBlobStorageFeature("Blob");
+                    services.UseBlobExampleStorage("Blob");
                     // Table - from table extension assembly
-                    services.UseTableStorageFeature("Table");
+                    services.UseTableExampleStorage("Table");
                     // Blarg - from blarg extension assembly
-                    // services.UseBlargStorageFeature("Blarg");
+                    // services.UseBlargExampleStorage("Blarg");
 
                     return services.BuildServiceProvider();
                 }
@@ -58,18 +58,18 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public Task StorageFeatureFacetHappyPath()
+        public Task ExampleStorageFacetHappyPath()
         {
-            return StorageFeatureHappyPath<IStorageFacetGrain>();
+            return ExampleStorageHappyPath<IStorageFacetGrain>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public Task StorageFeatureFactoryHappyPath()
+        public Task ExampleStorageFactoryHappyPath()
         {
-            return StorageFeatureHappyPath<IStorageFactoryGrain>();
+            return ExampleStorageHappyPath<IStorageFactoryGrain>();
         }
 
-        public async Task StorageFeatureHappyPath<TGrainInterface>()
+        public async Task ExampleStorageHappyPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
@@ -84,18 +84,18 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public Task StorageFeatureFacetDefaultPath()
+        public Task ExampleStorageFacetDefaultPath()
         {
-            return StorageFeatureDefaultPath<IStorageDefaultFacetGrain>();
+            return ExampleStorageDefaultPath<IStorageDefaultFacetGrain>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public Task StorageFeatureFactoryDefaultPath()
+        public Task ExampleStorageFactoryDefaultPath()
         {
-            return StorageFeatureDefaultPath<IStorageDefaultFactoryGrain>();
+            return ExampleStorageDefaultPath<IStorageDefaultFactoryGrain>();
         }
 
-        public async Task StorageFeatureDefaultPath<TGrainInterface>()
+        public async Task ExampleStorageDefaultPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);

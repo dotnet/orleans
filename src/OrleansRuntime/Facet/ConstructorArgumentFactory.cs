@@ -1,25 +1,25 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime
 {
-    internal class ConstructorArguementFactory
+    internal class ConstructorArgumentFactory
     {
         /// <summary>
         /// Cached constructor Argument factorys by type
         /// TODO: consider storing in grain type data and constructing at startup to avoid runtime errors. - jbragg
         /// </summary>
-        private readonly ConcurrentDictionary<Type, ArgumentFactory> argumentsFactorys;
+        private readonly CachedReadConcurrentDictionary<Type, ArgumentFactory> argumentsFactorys;
         private readonly IServiceProvider services;
 
-        public ConstructorArguementFactory(IServiceProvider services)
+        public ConstructorArgumentFactory(IServiceProvider services)
         {
             this.services = services;
-            argumentsFactorys = new ConcurrentDictionary<Type, ArgumentFactory>();
+            argumentsFactorys = new CachedReadConcurrentDictionary<Type, ArgumentFactory>();
         }
 
         public Type[] ArgumentTypes(Type type)
@@ -55,7 +55,7 @@ namespace Orleans.Runtime
                     if (attribute == null) continue;
                     // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
                     MethodInfo getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                    var argumentFactory = getFactory.Invoke(this, new object[] { services, parameter, attribute }) as Factory<IGrainActivationContext, object>;
+                    var argumentFactory = (Factory < IGrainActivationContext, object> )getFactory.Invoke(this, new object[] { services, parameter, attribute });
                     if (argumentFactory == null) continue;
                     // cache arguement factory
                     this.argumentFactorys.Add(argumentFactory);
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
                 where TAttribute : FacetAttribute
             {
                 var factoryMapper = services.GetRequiredService<IAttributeToFactoryMapper<TAttribute>>();
-                return factoryMapper.GetFactory(parameter, attribute as TAttribute);
+                return factoryMapper.GetFactory(parameter, (TAttribute)attribute);
             }
         }
     }

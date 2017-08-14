@@ -13,12 +13,12 @@ namespace Tester
 
     public class StorageFacetGrain : Grain, IStorageFacetGrain
     {
-        private readonly IStorageFeature<string> first;
-        private readonly IStorageFeature<string> second;
+        private readonly IExampleStorage<string> first;
+        private readonly IExampleStorage<string> second;
 
         public StorageFacetGrain(
-            [StorageFeature("Blob", "FirstState")] IStorageFeature<string> first,
-            [StorageFeature("Table")] IStorageFeature<string> second)
+            [ExampleStorage("Blob", "FirstState")] IExampleStorage<string> first,
+            [ExampleStorage("Table")] IExampleStorage<string> second)
         {
             this.first = first;
             this.second = second;
@@ -40,14 +40,14 @@ namespace Tester
     }
     public class StorageFactoryGrain : Grain, IStorageFactoryGrain
     {
-        private readonly IStorageFeature<string> first;
-        private readonly IStorageFeature<string> second;
+        private readonly IExampleStorage<string> first;
+        private readonly IExampleStorage<string> second;
 
         public StorageFactoryGrain(
-            INamedStorageFeatureFactory namedStorageFeatureFactory)
+            INamedExampleStorageFactory namedExampleStorageFactory)
         {
-            this.first = namedStorageFeatureFactory.Create<string>("Blob", new StorageFeatureConfig("FirstState"));
-            this.second = namedStorageFeatureFactory.Create<string>("Table", new StorageFeatureConfig("second"));
+            this.first = namedExampleStorageFactory.Create<string>("Blob", new ExampleStorageConfig("FirstState"));
+            this.second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
         }
 
         public Task<string[]> GetNames()
@@ -67,14 +67,14 @@ namespace Tester
 
     public class StorageDefaultFactoryGrain : Grain, IStorageDefaultFactoryGrain
     {
-        private readonly IStorageFeature<string> first;
-        private readonly IStorageFeature<string> second;
+        private readonly IExampleStorage<string> first;
+        private readonly IExampleStorage<string> second;
 
         public StorageDefaultFactoryGrain(
-            IStorageFeatureFactory StorageFeatureFactory)
+            IExampleStorageFactory ExampleStorageFactory)
         {
-            this.first = StorageFeatureFactory.Create<string>(new StorageFeatureConfig("FirstState"));
-            this.second = StorageFeatureFactory.Create<string>(new StorageFeatureConfig("second"));
+            this.first = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("FirstState"));
+            this.second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
         }
 
         public Task<string[]> GetNames()
@@ -94,12 +94,12 @@ namespace Tester
 
     public class StorageDefaultFacetGrain : Grain, IStorageDefaultFacetGrain
     {
-        private readonly IStorageFeature<string> first;
-        private readonly IStorageFeature<string> second;
+        private readonly IExampleStorage<string> first;
+        private readonly IExampleStorage<string> second;
 
         public StorageDefaultFacetGrain(
-            [StorageFeature(stateName: "FirstState")] IStorageFeature<string> first,
-            [StorageFeature] IStorageFeature<string> second)
+            [ExampleStorage(stateName: "FirstState")] IExampleStorage<string> first,
+            [ExampleStorage] IExampleStorage<string> second)
         {
             this.first = first;
             this.second = second;

@@ -7,7 +7,7 @@ namespace Tester.StorageFacet.Abstractions
     ///  This is the actual functionality the users need.
     /// </summary>
     /// <typeparam name="TState"></typeparam>
-    public interface IStorageFeature<TState>
+    public interface IExampleStorage<TState>
     {
         TState State { get; set; }
 
@@ -22,7 +22,7 @@ namespace Tester.StorageFacet.Abstractions
     /// Feature configuration information which application layer can provide to the
     ///  feature per instance (by grain type if using attributes).
     /// </summary>
-    public interface IStorageFeatureConfig
+    public interface IExampleStorageConfig
     {
         string StateName { get; }
     }
@@ -30,9 +30,9 @@ namespace Tester.StorageFacet.Abstractions
     /// <summary>
     /// Feature configuration utility class
     /// </summary>
-    public class StorageFeatureConfig : IStorageFeatureConfig
+    public class ExampleStorageConfig : IExampleStorageConfig
     {
-        public StorageFeatureConfig(string stateName)
+        public ExampleStorageConfig(string stateName)
         {
             this.StateName = stateName;
         }
@@ -43,16 +43,16 @@ namespace Tester.StorageFacet.Abstractions
     /// <summary>
     /// Creates a storage feature from a configuration
     /// </summary>
-    public interface IStorageFeatureFactory
+    public interface IExampleStorageFactory
     {
-        IStorageFeature<TState> Create<TState>(IStorageFeatureConfig config);
+        IExampleStorage<TState> Create<TState>(IExampleStorageConfig config);
     }
 
     /// <summary>
     /// Creates a storage feature by name from a configuration
     /// </summary>
-    public interface INamedStorageFeatureFactory
+    public interface INamedExampleStorageFactory
     {
-        IStorageFeature<TState> Create<TState>(string name, IStorageFeatureConfig config);
+        IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig config);
     }
 }

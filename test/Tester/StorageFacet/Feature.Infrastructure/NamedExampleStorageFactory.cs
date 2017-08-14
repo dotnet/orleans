@@ -5,20 +5,20 @@ using Tester.StorageFacet.Abstractions;
 
 namespace Tester.StorageFacet.Infrastructure
 {
-    public class NamedStorageFeatureFactory : INamedStorageFeatureFactory
+    public class NamedExampleStorageFactory : INamedExampleStorageFactory
     {
         private readonly IServiceProvider services;
 
-        public NamedStorageFeatureFactory(IServiceProvider services)
+        public NamedExampleStorageFactory(IServiceProvider services)
         {
             this.services = services;
         }
 
-        public IStorageFeature<TState> Create<TState>(string name, IStorageFeatureConfig cfg)
+        public IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig cfg)
         {
-            IStorageFeatureFactory factory = string.IsNullOrEmpty(name)
-                ? this.services.GetService<IStorageFeatureFactory>()
-                : this.services.GetServiceByName<IStorageFeatureFactory>(name);
+            IExampleStorageFactory factory = string.IsNullOrEmpty(name)
+                ? this.services.GetService<IExampleStorageFactory>()
+                : this.services.GetServiceByName<IExampleStorageFactory>(name);
             if (factory != null) return factory.Create<TState>(cfg);
             throw new InvalidOperationException($"Storage feature with name {name} not found.");
         }

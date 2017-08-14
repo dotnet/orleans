@@ -6,17 +6,17 @@ using Tester.StorageFacet.Abstractions;
 
 namespace Tester.StorageFacet.Infrastructure
 {
-    public class StorageFeatureAttributeMapper : IAttributeToFactoryMapper<StorageFeatureAttribute>
+    public class ExampleStorageAttributeMapper : IAttributeToFactoryMapper<ExampleStorageAttribute>
     {
-        private static readonly MethodInfo create = typeof(INamedStorageFeatureFactory).GetMethod("Create");
+        private static readonly MethodInfo create = typeof(INamedExampleStorageFactory).GetMethod("Create");
 
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, StorageFeatureAttribute attribute)
+        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, ExampleStorageAttribute attribute)
         {
-            IStorageFeatureConfig config = attribute;
+            IExampleStorageConfig config = attribute;
             // set state name to parameter name, if not already specified
             if (string.IsNullOrEmpty(config.StateName))
             {
-                config = new StorageFeatureConfig(parameter.Name);
+                config = new ExampleStorageConfig(parameter.Name);
             }
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
@@ -26,7 +26,7 @@ namespace Tester.StorageFacet.Infrastructure
 
         private object Create(IGrainActivationContext context, MethodInfo genericCreate, object[] args)
         {
-            INamedStorageFeatureFactory factory = context.ActivationServices.GetRequiredService<INamedStorageFeatureFactory>();
+            INamedExampleStorageFactory factory = context.ActivationServices.GetRequiredService<INamedExampleStorageFactory>();
             return genericCreate.Invoke(factory, args);
         }
     }
