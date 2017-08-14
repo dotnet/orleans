@@ -101,7 +101,7 @@ These principles are also [included in the database scripts](https://github.com/
 
 ## Some ideas on applying customized scripts
 
-1. Alter scripts in `OrleansQuery` for [grain persistence](../Getting-Started-With-Orleans/Grain-Persistence.md) with `IF ELSE`
+1. Alter scripts in `OrleansQuery` for [grain persistence](../Core-Features/Grain-Persistence.md) with `IF ELSE`
    so that some state is saved using the default `INSERT` while some grain state uses, for instance, [memory optimized tables](https://docs.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/memory-optimized-tables).
    The `SELECT` queries need to be altered accordingly.
 2. The idea in `1.` can be used to take advantage of other deployment or vendor specific aspects. Such as splitting data between `SSD` or `HDD`, putting some data on encrypted tables,

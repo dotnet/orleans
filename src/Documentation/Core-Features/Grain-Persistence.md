@@ -444,7 +444,3 @@ This is an implementation of [IStorageSerializationPicker](https://github.com/do
 or using (de)serializers can be seen at [RelationalStorageTests](https://github.com/dotnet/orleans/blob/master/test/TesterSQLUtils/StorageTests/Relational/RelationalStorageTests.cs).
 
 Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
-
-## Next
-
-[Grains](Grains.md)

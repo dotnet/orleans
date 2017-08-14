@@ -4,17 +4,13 @@
   href: Developing-a-Grain.md
 - name: Developing a Client
   href: Developing-a-Client.md
-- name: Grain Persistence
-  href: Grain-Persistence.md
-- name: Observers
-  href: Observers.md
 - name: Running the Application
   href: Running-the-Application.md
 - name: Silos
   href: Silos.md
 - name: Clients
   href: Clients.md
-- name: Grain Life Cycle
+- name: Grain Lifecycle
   href: Grain-LifeCycle.md
 - name: Debugging
   href: Debugging.md

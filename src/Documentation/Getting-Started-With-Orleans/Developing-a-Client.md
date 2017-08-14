@@ -26,7 +26,7 @@ Before a grain client can be used for making calls to grains hosted in an Orlean
 
 Configuration is provided via a `ClientConfiguration` object that contains a hierarchy of configuration properties for programmatically configuring a client.
 There is also a way to configure a client via a XML file, but that option will be deprecated in the future.
-More information is in the [Client Configuration guide](..\Orleans-Configuration-Guide\Client-Configuration.md).
+More information is in the [Client Configuration guide](../Deployment-and-Operations/Configuration-Guide/Client-Configuration.md).
 Here we will simply use a helper method that creates a configuration object hardcoded for connecting to a local silo running as `localhost`.
 ```csharp
 ClientConfiguration clientConfig = ClientConfiguration.LocalhostSilo(); 
@@ -67,7 +67,7 @@ Orleans does not provide any such guarantee on the client side, and so it is up 
 There are situations in which a simple request-response pattern is not enough, and the client needs to receive asynchronous notifications.
 For example, a user might want to be notified when a new message has been published by someone that she is following.
 
-[Observers](Observers.md) is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
+[Observers](../Core-Features/Observers.md) is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
 Calls to observers do not provide any indication of success or failure, as they are sent as one-way best effort message.
 So it is a responsibility of the application code to build a higher level reliability mechanism on top of observers where necessary. 
 
@@ -161,4 +161,4 @@ namespace PlayerWatcher
 
 ### Next
 
-[Grain Persistence](Grain-Persistence.md)
+[Running the application](Running-the-Application.md)

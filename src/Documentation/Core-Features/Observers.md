@@ -111,7 +111,3 @@ Now whenever our grain on the server calls the `SendUpdateMessage` method, all s
 
 **Note:** Observers are inherently unreliable since you don't get any response back to know if the message is received and processed or simply failed due to any condition which might arise in a distributed system. Because of that your observers should poll the grain periodically or use any other mechanism to ensure that they received all messages which they should have received.
 In some situations you can afford to lose some messages and you don't need any additional mechanism but if you need to make sure that all observers are always receiving the messages and are receiving all of them, both periodic resubscriptions and polling the observer grain, can help to ensure eventual processing of all messages.
-
-## Next
-
-Next we look at [Running the Application](Running-the-Application.md)
