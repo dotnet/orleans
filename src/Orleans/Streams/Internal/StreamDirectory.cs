@@ -20,7 +20,14 @@ namespace Orleans.Streams
 
         internal IAsyncStream<T> GetOrAddStream<T>(StreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {
-            return allStreams.GetOrAdd(streamId, _ => streamCreator()) as IAsyncStream<T>;
+            var stream = allStreams.GetOrAdd(streamId, _ => streamCreator());
+            var streamOfT = stream as IAsyncStream<T>;
+            if (streamOfT == null)
+            {
+                throw new Runtime.OrleansException($"Stream type mismatch. A stream can only support a single type of data. The generic type of the stream requested does not match the previously requested type {stream.GetType()}.");
+            }
+
+            return streamOfT;
         }
 
         internal async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
