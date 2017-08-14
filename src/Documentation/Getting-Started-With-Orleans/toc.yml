@@ -10,7 +10,7 @@
   href: Silos.md
 - name: Clients
   href: Clients.md
-- name: Grain Life Cycle
+- name: Grain Lifecycle
   href: Grain-LifeCycle.md
 - name: Debugging
   href: Debugging.md
