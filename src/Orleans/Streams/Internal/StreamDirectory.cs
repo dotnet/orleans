@@ -24,7 +24,7 @@ namespace Orleans.Streams
             var streamOfT = stream as IAsyncStream<T>;
             if (streamOfT == null)
             {
-                throw new Runtime.OrleansException($"Stream type mismatch. A stream can only support a single type of data. The generic type of the stream requested does not match the previously requested type {stream.GetType()}.");
+                throw new Runtime.OrleansException($"Stream type mismatch. A stream can only support a single type of data. The generic type of the stream requested ({typeof(T)}) does not match the previously requested type ({stream.GetType().GetGenericArguments().FirstOrDefault()}).");
             }
 
             return streamOfT;
