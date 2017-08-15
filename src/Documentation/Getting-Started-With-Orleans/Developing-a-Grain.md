@@ -199,6 +199,14 @@ await joinedTask;
 // Execution of the rest of the method will continue asynchronously after joinedTask is resolve.
 ```
 
+### Virtual methods
+
+A grain class can optionally override `OnActivateAsync` and `OnDeactivateAsync` virtual methods that get invoked by the Orleans runtime upon activation and deactivation of each grain of the class.
+This gives the grain code a chance to perform additional initialization and cleanup operations.
+An exception throw by `OnActivateAsync` fails the activation process.
+While `OnActivateAsync`, if overridden, is always called as part of the grain activation process, `OnDeactivateAsync` is not guaranteed to get called in all situations, for example, in case of a server failure or other abnormal events.
+Because of that, applications should not rely on OnDeactivateAsync for performing critical operations, such as persistence of state changes, and only use it for best effort operations.
+
 ### Next
 
 [Developing a Client](Developing-a-Client.md)
