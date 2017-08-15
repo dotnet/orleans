@@ -6,10 +6,6 @@
   href: Developing-a-Client.md
 - name: Running the Application
   href: Running-the-Application.md
-- name: Silos
-  href: Silos.md
-- name: Clients
-  href: Clients.md
 - name: Grain Lifecycle
   href: Grain-LifeCycle.md
 - name: Debugging
