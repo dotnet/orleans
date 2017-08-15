@@ -52,10 +52,10 @@ namespace Orleans.Runtime.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloBuilder ConfigureServiceProvider(Func<IServiceCollection, IServiceProvider> configureServiceProvider)
+        public ISiloBuilder UseServiceProviderFactory(Func<IServiceCollection, IServiceProvider> configureServiceProvider)
         {
             if (configureServiceProvider == null) throw new ArgumentNullException(nameof(configureServiceProvider));
-            if (this.containerBuilder != null) throw new InvalidOperationException($"The {nameof(this.ConfigureServiceProvider)} delegate has already been specified.");
+            if (this.containerBuilder != null) throw new InvalidOperationException($"The {nameof(this.UseServiceProviderFactory)} delegate has already been specified.");
             this.containerBuilder = configureServiceProvider;
             return this;
         }

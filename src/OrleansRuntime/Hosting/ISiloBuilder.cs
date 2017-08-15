@@ -21,12 +21,12 @@ namespace Orleans.Runtime.Hosting
         /// <param name="configureServices">The service configuration delegate.</param>
         /// <returns>The builder.</returns>
         ISiloBuilder ConfigureServices(Action<IServiceCollection> configureServices);
-        
+
         /// <summary>
-        /// Specified how the <see cref="IServiceProvider"/> for this silo is configured. 
+        /// Specifies how the <see cref="IServiceProvider"/> for this silo is configured. 
         /// </summary>
         /// <param name="configureServiceProvider">The service provider configuration method.</param>
         /// <returns>The builder.</returns>
-        ISiloBuilder ConfigureServiceProvider(Func<IServiceCollection, IServiceProvider> configureServiceProvider);
+        ISiloBuilder UseServiceProviderFactory(Func<IServiceCollection, IServiceProvider> configureServiceProvider);
     }
 }

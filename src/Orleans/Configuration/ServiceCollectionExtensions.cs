@@ -10,7 +10,7 @@ namespace Orleans.Configuration
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// Attempts to use an existing registration of <typeparamref name="TImplementation"/> to satisfy the service type <typeparamref name="TService"/>.
+        /// Registers an existing registration of <typeparamref name="TImplementation"/> as a provider of service type <typeparamref name="TService"/>.
         /// </summary>
         /// <typeparam name="TService">The service type being provided.</typeparam>
         /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
@@ -29,22 +29,17 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Attempts to use an existing registration of <typeparamref name="TImplementation"/> to satisfy the service type <typeparamref name="TService"/>.
+        /// Registers an existing registration of <typeparamref name="TImplementation"/> as a provider of <typeparamref name="TService"/> if there are no existing <typeparamref name="TService"/> implementations.
         /// </summary>
         /// <typeparam name="TService">The service type being provided.</typeparam>
         /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
         /// <param name="services">The service collection.</param>
         internal static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
-            var implementation = services.FirstOrDefault(service => service.ServiceType == typeof(TImplementation));
             var providedService = services.FirstOrDefault(service => service.ServiceType == typeof(TService));
-            if (providedService == null && implementation != null)
+            if (providedService == null)
             {
-                var newRegistration = new ServiceDescriptor(
-                    typeof(TService),
-                    sp => sp.GetRequiredService<TImplementation>(),
-                    implementation.Lifetime);
-                services.Add(newRegistration);
+                services.AddFromExisting<TService, TImplementation>();
             }
         }
 

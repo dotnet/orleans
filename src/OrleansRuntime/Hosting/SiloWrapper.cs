@@ -24,7 +24,11 @@ namespace Orleans.Runtime.Hosting
         /// <inheritdoc />
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            this.silo.Start();
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                this.silo.Start();
+            }
+
             return Task.CompletedTask;
         }
 

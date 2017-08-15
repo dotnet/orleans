@@ -72,23 +72,14 @@ namespace Orleans.Runtime.Hosting
         }
 
         /// <summary>
-        /// Configures a startup class.
+        /// Specifies how the <see cref="IServiceProvider"/> for this silo is configured. 
         /// </summary>
-        /// <typeparam name="TStartup">The startup class, which must conform to the correct shape.</typeparam>
         /// <param name="builder">The silo builder.</param>
+        /// <param name="factory">The service provider configuration method.</param>
         /// <returns>The silo builder.</returns>
-        /// <remarks>
-        /// The provided <typeparamref name="TStartup"/> type must have a method matching this signature:
-        /// <code>
-        /// IServiceProvider ConfigureServices(IServiceCollection);
-        /// </code>
-        /// </remarks>
-        public static ISiloBuilder UseLegacyStartup<TStartup>(this ISiloBuilder builder) where TStartup : class
+        public static ISiloBuilder UseServiceProviderFactory<TContainerBuilder>(ISiloBuilder builder, IServiceProviderFactory<TContainerBuilder> factory)
         {
-            var configureServicesMethod = StartupBuilder.FindConfigureServicesDelegate(typeof(TStartup));
-            if (configureServicesMethod == null) throw new ArgumentException($"Type {typeof(TStartup)} does not have a suitable method for configuring a service provider.");
-            if (configureServicesMethod.MethodInfo.IsStatic) throw new ArgumentException($"Method {configureServicesMethod} on type {typeof(TStartup)} must not be static.");
-            return builder.ConfigureServiceProvider(svc => StartupBuilder.ConfigureStartup(typeof(TStartup).AssemblyQualifiedName, svc));
+            return builder.UseServiceProviderFactory(services => factory.CreateServiceProvider(factory.CreateBuilder(services)));
         }
     }
 }
