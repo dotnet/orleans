@@ -47,20 +47,22 @@ namespace Orleans.Runtime
             {
                 this.argumentFactorys = new List<Factory<IGrainActivationContext, object>>();
                 List<Type> types = new List<Type>();
+                // find constructor - supports only single public constructor
                 IEnumerable<ParameterInfo> parameters = type.GetConstructors()
                                                             .FirstOrDefault()?
                                                             .GetParameters() ?? Enumerable.Empty<ParameterInfo>();
                 foreach (ParameterInfo parameter in parameters)
                 {
+                    // look for attribute with a facet marker interface - supports only single facet attribute
                     var attribute = parameter.GetCustomAttributes()
                                              .FirstOrDefault(attrib => FacetMarkerInterfaceType.IsInstanceOfType(attrib));
                     if (attribute == null) continue;
                     // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
                     MethodInfo getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                    var argumentFactory = (Factory<IGrainActivationContext,object> )getFactory.Invoke(this, new object[] { services, parameter, attribute });
-                    if (argumentFactory == null) throw new OrleansException($"Missing attribute mapper for attribute {attribute.GetType()} used in grain constructor for grain type {type}.");
+                    var argumentFactory = (Factory<IGrainActivationContext,object> )getFactory.Invoke(this, new object[] { services, parameter, attribute, type });
                     // cache arguement factory
                     this.argumentFactorys.Add(argumentFactory);
+                    // cache arguement type
                     types.Add(parameter.ParameterType);
                 }
                 this.ArgumentTypes = types.ToArray();
@@ -79,11 +81,14 @@ namespace Orleans.Runtime
                 return results;
             }
 
-            private static Factory<IGrainActivationContext, object> GetFactory<TMetadata>(IServiceProvider services, ParameterInfo parameter, IFacetMetadata metadata)
+            private static Factory<IGrainActivationContext, object> GetFactory<TMetadata>(IServiceProvider services, ParameterInfo parameter, IFacetMetadata metadata, Type type)
                 where TMetadata : IFacetMetadata
             {
-                var factoryMapper = services.GetRequiredService<IAttributeToFactoryMapper<TMetadata>>();
-                return factoryMapper.GetFactory(parameter, (TMetadata)metadata);
+                var factoryMapper = services.GetService<IAttributeToFactoryMapper<TMetadata>>();
+                if (factoryMapper == null) throw new OrleansException($"Missing attribute mapper for attribute {metadata.GetType()} used in grain constructor for grain type {type}.");
+                Factory<IGrainActivationContext, object> factory = factoryMapper.GetFactory(parameter, (TMetadata)metadata);
+                if(factory == null) throw new OrleansException($"Attribute mapper {factoryMapper.GetType()} failed to create a factory for grain type {type}.");
+                return factory;
             }
         }
     }
