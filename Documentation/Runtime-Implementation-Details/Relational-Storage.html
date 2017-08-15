@@ -151,7 +151,7 @@ TExpected queryResult = SpecificQuery12InOrleans&lt;TExpected&gt;(query, Param1,
 </code></pre><p>These principles are also <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/">included in the database scripts</a>.</p>
 <h2 id="some-ideas-on-applying-customized-scripts">Some ideas on applying customized scripts</h2>
 <ol>
-<li>Alter scripts in <code>OrleansQuery</code> for <a href="../Getting-Started-With-Orleans/Grain-Persistence.html">grain persistence</a> with <code>IF ELSE</code>
+<li>Alter scripts in <code>OrleansQuery</code> for <a href="../Core-Features/Grain-Persistence.html">grain persistence</a> with <code>IF ELSE</code>
 so that some state is saved using the default <code>INSERT</code> while some grain state uses, for instance, <a href="https://docs.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/memory-optimized-tables">memory optimized tables</a>.
 The <code>SELECT</code> queries need to be altered accordingly.</li>
 <li>The idea in <code>1.</code> can be used to take advantage of other deployment or vendor specific aspects. Such as splitting data between <code>SSD</code> or <code>HDD</code>, putting some data on encrypted tables,

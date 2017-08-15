@@ -75,7 +75,7 @@
 <h3 id="what-is-grain-client">What Is Grain Client?</h3>
 
 <p>The term &quot;Client&quot; or sometimes &quot;Grain Client&quot; is used for application code that interacts with grains but itself is not part of a grain logic.
-Client code runs outside of the cluster of <a href="Silos.html">Orleans servers called &quot;silos&quot;</a> where grains are hosted.
+Client code runs outside of the cluster of Orleans servers called silos where grains are hosted.
 Hence, a client acts as a connector or conduit to the cluster and to all grains of the application.</p>
 <p><img src="Frontend-Cluster.png" alt=""></p>
 <p>Usually, clients are used on the frontend web servers to connect to an Orleans cluster that serves as a middle tier with grains executing business logic.
@@ -92,7 +92,7 @@ In a typical setup, a frontend web server:</p>
 <p>Before a grain client can be used for making calls to grains hosted in an Orleans cluster, it needs to be configured, initialized, and connected to the cluster.</p>
 <p>Configuration is provided via a <code>ClientConfiguration</code> object that contains a hierarchy of configuration properties for programmatically configuring a client.
 There is also a way to configure a client via a XML file, but that option will be deprecated in the future.
-More information is in the <a href="../Orleans-Configuration-Guide/Client-Configuration.html">Client Configuration guide</a>.
+More information is in the <a href="../Deployment-and-Operations/Configuration-Guide/Client-Configuration.html">Client Configuration guide</a>.
 Here we will simply use a helper method that creates a configuration object hardcoded for connecting to a local silo running as <code>localhost</code>.</p>
 <pre><code class="lang-csharp">ClientConfiguration clientConfig = ClientConfiguration.LocalhostSilo(); 
 </code></pre><p>Once we have a configuration object, we can build a client via the <code>ClientBuilder</code> class.</p>
@@ -115,7 +115,7 @@ Orleans does not provide any such guarantee on the client side, and so it is up 
 <h3 id="receiving-notifications">Receiving notifications</h3>
 <p>There are situations in which a simple request-response pattern is not enough, and the client needs to receive asynchronous notifications.
 For example, a user might want to be notified when a new message has been published by someone that she is following.</p>
-<p><a href="Observers.html">Observers</a> is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
+<p><a href="../Core-Features/Observers.html">Observers</a> is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
 Calls to observers do not provide any indication of success or failure, as they are sent as one-way best effort message.
 So it is a responsibility of the application code to build a higher level reliability mechanism on top of observers where necessary. </p>
 <p>Another mechanism that can be used for delivering asynchronous messages to clients is <a href="../Orleans-Streams/index.html">Streams</a>. Streams expose indications of success or failure of delivery of individual messages, and hence enable reliable communication back to the client.</p>
@@ -201,7 +201,7 @@ So it is a responsibility of the application code to build a higher level reliab
     }
 }
 </code></pre><h3 id="next">Next</h3>
-<p><a href="Grain-Persistence.html">Grain Persistence</a></p>
+<p><a href="Running-the-Application.html">Running the Application</a></p>
 </article>
           </div>
           

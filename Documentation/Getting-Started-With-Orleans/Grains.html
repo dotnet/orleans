@@ -101,12 +101,12 @@ This is one of the biggest advantages of the Orleans programming model - we neve
 We can write our code as if all possible grains, for example millions of user profiles, are always in memory waiting for us to call them.
 Behind the scenes, the Orleans runtime performs all the heavy lifting of managing resources to transparently bring grains to memory when needed.   </p>
 <h3 id="behind-the-scenes---grain-lifecycle">Behind the scenes - Grain Lifecycle</h3>
-<p>Grains live in execution containers called <a href="Silos.html">Silos</a>.
+<p>Grains live in execution containers called silos.
 Silos form a cluster that combines resources of multiple physical or virtual machines.
 When there is work (request) for a grain, Orleans ensures there is an instance of the grain on one of the Silos in the cluster.
 If there is no instance of the grain on any silo, the Orleans runtime creates one. 
 This process is called Activation.
-In case a grain is using <a href="Grain-Persistence.html">Grain Persistence</a>, the runtime automatically reads the state from the backing store upon activation.
+In case a grain is using <a href="../Core-Features/Grain-Persistence.html">Grain Persistence</a>, the runtime automatically reads the state from the backing store upon activation.
 Once activated on a silo, a grain processes incoming requests (method calls) from other grains or from outside of the cluster (usually from frontend web servers).
 In the course of processing a request a grain may call other grains or some external services.
 If a grain stops receiving requests and stays idle, after a configurable period of inactivity Orleans removes the grain from memory (deactivates it) to free up resources for other grains.
