@@ -6,7 +6,5 @@
   href: Developing-a-Client.md
 - name: Running the Application
   href: Running-the-Application.md
-- name: Grain Lifecycle
-  href: Grain-LifeCycle.md
 - name: Debugging
   href: Debugging.md
