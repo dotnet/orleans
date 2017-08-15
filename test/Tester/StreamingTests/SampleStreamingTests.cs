@@ -42,6 +42,17 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public void SampleStreamingTests_StreamTypeMismatch_ShouldThrowOrleansException()
+        {
+            var streamId = Guid.NewGuid();
+            var streamNameSpace = "SmsStream";
+            var stream = this.fixture.Client.GetStreamProvider(StreamProvider).GetStream<int>(streamId, streamNameSpace);
+            Assert.Throws<Orleans.Runtime.OrleansException>(() => {
+                this.fixture.Client.GetStreamProvider(StreamProvider).GetStream<string>(streamId, streamNameSpace);
+                });
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SampleStreamingTests_1()
         {
             this.logger.Info("************************ SampleStreamingTests_1 *********************************");
