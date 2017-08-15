@@ -22,7 +22,7 @@ It can be instantiated and populated directly, load settings from a file, or cre
 For local testing, the easiest way to go is to use `ClusterConfiguration.LocalhostPrimarySilo()` helper method.
 The configuration object is then passed to a new instance of `SiloHost` class, that can be initialized and started after that.
 
-You can create an empty consol application project targeting .NET Framework 4.6.1 or higher for hosting a silo.
+You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo.
 Add the `Microsoft.Orleans.Server` NuGet meta-package to the project.
 
 ```
@@ -56,7 +56,7 @@ The configuration object is then passed to a new instance of `ClientBuilder` cla
 After that `Build` method of the `ClientBuilder` object is called to get an implementation of `IClusterClient` interface.
 Finally, we call `Connect()` method on the returned object to connect to the cluster.
 
-You can create an empty consol application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the consol application project you created for hosting a silo.
+You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.
 Add the `Microsoft.Orleans.Client` NuGet meta-package to the project.
 
 ```
