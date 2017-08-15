@@ -44,7 +44,7 @@ Behind the scenes, the Orleans runtime performs all the heavy lifting of managin
 
 ### Behind the scenes - Grain Lifecycle
 
-Grains live in execution containers called [Silos](Silos.md).
+Grains live in execution containers called silos.
 Silos form a cluster that combines resources of multiple physical or virtual machines.
 When there is work (request) for a grain, Orleans ensures there is an instance of the grain on one of the Silos in the cluster.
 If there is no instance of the grain on any silo, the Orleans runtime creates one. 

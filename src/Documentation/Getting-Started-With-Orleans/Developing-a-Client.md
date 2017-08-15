@@ -6,7 +6,7 @@ title: Developing a Client
 ### What Is Grain Client?
 
 The term "Client" or sometimes "Grain Client" is used for application code that interacts with grains but itself is not part of a grain logic.
-Client code runs outside of the cluster of [Orleans servers called "silos"](Silos.md) where grains are hosted.
+Client code runs outside of the cluster of Orleans servers called silos where grains are hosted.
 Hence, a client acts as a connector or conduit to the cluster and to all grains of the application.
 
 ![](Frontend-Cluster.png)
@@ -161,4 +161,4 @@ namespace PlayerWatcher
 
 ### Next
 
-[Running the application](Running-the-Application.md)
+[Running the Application](Running-the-Application.md)
