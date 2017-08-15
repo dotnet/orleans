@@ -36,6 +36,8 @@ var user = grainFactory.GetGrain<IUserProfile>(userEmail);
 await user.UpdateAddress(newAddress);
 ```
 
+A call to GetGrain is an inexpensive local operation of constructing a grain reference with an embedded identity and type of the target grain.
+
 Note that there is no need to create or instantiate the target grain.
 We make a call to it to update user's address as if the user's grain is already instantiated for us.
 This is one of the biggest advantages of the Orleans programming model - we never need to create, instantiate or delete grains.
