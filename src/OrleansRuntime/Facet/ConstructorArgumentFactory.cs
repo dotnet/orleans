@@ -9,6 +9,7 @@ namespace Orleans.Runtime
 {
     internal class ConstructorArgumentFactory
     {
+        private static readonly Type FacetMarkerInterfaceType = typeof(IFacetMetadata);
         /// <summary>
         /// Cached constructor Argument factorys by type
         /// TODO: consider storing in grain type data and constructing at startup to avoid runtime errors. - jbragg
@@ -51,12 +52,13 @@ namespace Orleans.Runtime
                                                             .GetParameters() ?? Enumerable.Empty<ParameterInfo>();
                 foreach (ParameterInfo parameter in parameters)
                 {
-                    var attribute = parameter.GetCustomAttribute<FacetAttribute>();
+                    var attribute = parameter.GetCustomAttributes()
+                                             .FirstOrDefault(attrib => FacetMarkerInterfaceType.IsInstanceOfType(attrib));
                     if (attribute == null) continue;
                     // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
                     MethodInfo getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                    var argumentFactory = (Factory < IGrainActivationContext, object> )getFactory.Invoke(this, new object[] { services, parameter, attribute });
-                    if (argumentFactory == null) continue;
+                    var argumentFactory = (Factory<IGrainActivationContext,object> )getFactory.Invoke(this, new object[] { services, parameter, attribute });
+                    if (argumentFactory == null) throw new OrleansException($"Missing attribute mapper for attribute {attribute.GetType()} used in grain constructor for grain type {type}.");
                     // cache arguement factory
                     this.argumentFactorys.Add(argumentFactory);
                     types.Add(parameter.ParameterType);
@@ -77,11 +79,11 @@ namespace Orleans.Runtime
                 return results;
             }
 
-            private static Factory<IGrainActivationContext, object> GetFactory<TAttribute>(IServiceProvider services, ParameterInfo parameter, FacetAttribute attribute)
-                where TAttribute : FacetAttribute
+            private static Factory<IGrainActivationContext, object> GetFactory<TMetadata>(IServiceProvider services, ParameterInfo parameter, IFacetMetadata metadata)
+                where TMetadata : IFacetMetadata
             {
-                var factoryMapper = services.GetRequiredService<IAttributeToFactoryMapper<TAttribute>>();
-                return factoryMapper.GetFactory(parameter, (TAttribute)attribute);
+                var factoryMapper = services.GetRequiredService<IAttributeToFactoryMapper<TMetadata>>();
+                return factoryMapper.GetFactory(parameter, (TMetadata)metadata);
             }
         }
     }

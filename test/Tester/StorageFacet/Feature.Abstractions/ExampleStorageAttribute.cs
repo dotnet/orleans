@@ -4,7 +4,7 @@ using Orleans;
 namespace Tester.StorageFacet.Abstractions
 {
     [AttributeUsage(AttributeTargets.Parameter)]
-    public class ExampleStorageAttribute : FacetAttribute, IExampleStorageConfig
+    public class ExampleStorageAttribute : Attribute, IFacetMetadata, IExampleStorageConfig
     {
         public string StorageProviderName { get; }
 
