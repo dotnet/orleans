@@ -129,7 +129,7 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
     Task Hello();
 }
 </code></pre><p>In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory.</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;);
+<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;, null);
 </code></pre><p>To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
 <pre><code class="lang-csharp">public class ExampleGrain : Orleans.Grain, IExampleGrain
 {
