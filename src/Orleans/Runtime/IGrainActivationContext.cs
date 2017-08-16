@@ -29,5 +29,10 @@ namespace Orleans.Runtime
         /// Observable Grain life cycle
         /// </summary>
         IGrainLifecycle ObservableLifecycle { get; }
+
+        /// <summary>
+        /// Grain call filters for this instance.
+        /// </summary>
+        List<IGrainCallFilter> GrainCallFilters { get; }
     }
 }

@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     {
         private const bool USE_DEBUG_CONTEXT = true;
         private const bool USE_DEBUG_CONTEXT_PARAMS = false;
-        private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
+        private static readonly ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
         private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
         private readonly Logger logger;
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             this.serializationManager = serializationManager;
         }
 
-        public IRuntimeClient RuntimeClient { get; private set; }
+        public IRuntimeClient RuntimeClient { get; }
 
         /// <inheritdoc />
         public void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo)

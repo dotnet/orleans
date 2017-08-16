@@ -41,5 +41,6 @@ namespace UnitTests.GrainInterfaces
     { 
         Task<string> CallWithBadInterceptors(bool early, bool mid, bool late);
         Task<string> GetRequestContext();
+        Task<string> GetFavoriteColor();
     }
 }

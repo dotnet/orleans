@@ -14,7 +14,8 @@ namespace Orleans.Runtime
     {
         private readonly InvokeMethodRequest request;
         private readonly IGrainMethodInvoker rootInvoker;
-        private readonly List<IGrainCallFilter> filters;
+        private readonly List<IGrainCallFilter> siloFilters;
+        private readonly List<IGrainCallFilter> grainFilters;
         private readonly InvokeInterceptor deprecatedInvokeInterceptor;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private int stage;
@@ -25,23 +26,28 @@ namespace Orleans.Runtime
         /// <param name="grain">The grain.</param>
         /// <param name="request">The request.</param>
         /// <param name="rootInvoker">The generated invoker.</param>
-        /// <param name="filters">The invocation interceptors.</param>
+        /// <param name="siloFilters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
         /// <param name="invokeInterceptor">The deprecated silo-wide interceptor.</param>
         public GrainMethodInvoker(
             IAddressable grain,
             InvokeMethodRequest request,
             IGrainMethodInvoker rootInvoker,
-            List<IGrainCallFilter> filters,
+            List<IGrainCallFilter> siloFilters,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             InvokeInterceptor invokeInterceptor)
         {
             this.request = request;
             this.rootInvoker = rootInvoker;
             this.Grain = grain;
-            this.filters = filters;
+            this.siloFilters = siloFilters;
             this.deprecatedInvokeInterceptor = invokeInterceptor;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
+
+            if (grain is Grain g && g.Data is IGrainActivationContext gac)
+            {
+                this.grainFilters = gac.GrainCallFilters;
+            }
         }
 
         /// <inheritdoc />
@@ -88,13 +94,22 @@ namespace Orleans.Runtime
         {
             // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
             // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
-            var numFilters = filters.Count;
-            if (stage < numFilters)
+            var numFilters = this.siloFilters.Count + this.grainFilters?.Count ?? 0;
+            if (stage < this.siloFilters.Count)
             {
-                // Call each of the specified interceptors.
-                var systemWideFilter = this.filters[stage];
+                // Call each of the specified silo-wide interceptors.
+                var systemWideFilter = this.siloFilters[stage];
                 stage++;
                 await systemWideFilter.Invoke(this);
+                return;
+            }
+
+            if (stage < numFilters)
+            {
+                // Call each of the specified grain-wide interceptors.
+                var grainFilter = this.grainFilters[stage - this.siloFilters.Count];
+                stage++;
+                await grainFilter.Invoke(this);
                 return;
             }
 
