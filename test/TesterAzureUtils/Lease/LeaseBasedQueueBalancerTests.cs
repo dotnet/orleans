@@ -31,7 +31,7 @@ namespace Tester.AzureUtils.Lease
         public static readonly LeaseBasedQueueBalancerConfig BalancerConfig = new LeaseBasedQueueBalancerConfig()
         {
             LeaseProviderType = typeof(AzureBlobLeaseProvider),
-            LeaseLength = TimeSpan.FromSeconds(10)
+            LeaseLength = TimeSpan.FromSeconds(15)
         };
 
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
