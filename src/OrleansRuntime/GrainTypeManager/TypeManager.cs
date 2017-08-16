@@ -52,6 +52,11 @@ namespace Orleans.Runtime
             this.versionSelectorManager = versionSelectorManager;
             this.scheduler = scheduler;
             this.refreshClusterMapInterval = refreshClusterMapInterval;
+            // We need this so we can place needed local activations
+            this.grainTypeManager.SetInterfaceMapsBySilo(new Dictionary<SiloAddress, GrainInterfaceMap>
+            {
+                {this.Silo, grainTypeManager.GetTypeCodeMap()}
+            });
         }
 
         internal async Task Initialize(IVersionStore store)
