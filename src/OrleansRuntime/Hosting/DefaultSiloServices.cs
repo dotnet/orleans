@@ -162,6 +162,8 @@ namespace Orleans.Runtime.Hosting
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress);
                 });
+            
+            services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
         }
     }
 }

@@ -199,7 +199,6 @@ namespace Orleans.Runtime
 
             // Configure DI using Startup type
             if (services == null)
-            services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
             {
                 var serviceCollection = new ServiceCollection();
                 serviceCollection.AddSingleton<Silo>(this);

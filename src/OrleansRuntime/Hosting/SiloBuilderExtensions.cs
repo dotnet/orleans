@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Startup;
 
 namespace Orleans.Runtime.Hosting
 {
@@ -80,6 +79,18 @@ namespace Orleans.Runtime.Hosting
         public static ISiloBuilder UseServiceProviderFactory<TContainerBuilder>(ISiloBuilder builder, IServiceProviderFactory<TContainerBuilder> factory)
         {
             return builder.UseServiceProviderFactory(services => factory.CreateServiceProvider(factory.CreateBuilder(services)));
+        }
+
+        /// <summary>
+        /// Specifies how the <see cref="IServiceProvider"/> for this silo is configured. 
+        /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="configureServiceProvider">The service provider configuration method.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder UseServiceProviderFactory(this ISiloBuilder builder, Func<IServiceCollection, IServiceProvider> configureServiceProvider)
+        {
+            if (configureServiceProvider == null) throw new ArgumentNullException(nameof(configureServiceProvider));
+            return builder.UseServiceProviderFactory(new DelegateServiceProviderFactory(configureServiceProvider));
         }
     }
 }

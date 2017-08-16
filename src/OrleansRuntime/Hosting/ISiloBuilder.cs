@@ -19,14 +19,21 @@ namespace Orleans.Runtime.Hosting
         /// Adds a service configuration delegate to the configuration pipeline.
         /// </summary>
         /// <param name="configureServices">The service configuration delegate.</param>
-        /// <returns>The builder.</returns>
+        /// <returns>The silo builder.</returns>
         ISiloBuilder ConfigureServices(Action<IServiceCollection> configureServices);
 
         /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this silo is configured. 
         /// </summary>
-        /// <param name="configureServiceProvider">The service provider configuration method.</param>
-        /// <returns>The builder.</returns>
-        ISiloBuilder UseServiceProviderFactory(Func<IServiceCollection, IServiceProvider> configureServiceProvider);
+        /// <param name="factory">The service provider factory.</param>
+        /// <returns>The silo builder.</returns>
+        ISiloBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory);
+
+        /// <summary>
+        /// Adds a container configuration delegate.
+        /// </summary>
+        /// <typeparam name="TContainerBuilder">The container builder type.</typeparam>
+        /// <param name="configureContainer">The container builder configuration delegate.</param>
+        ISiloBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer);
     }
 }
