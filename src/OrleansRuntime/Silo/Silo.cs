@@ -70,7 +70,6 @@ namespace Orleans.Runtime
 
         private readonly TaskCompletionSource<int> siloTerminatedTask =
             new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
         private readonly AssemblyProcessor assemblyProcessor;
@@ -128,7 +127,9 @@ namespace Orleans.Runtime
         /// <summary>
         ///  Silo termination event used to signal shutdown of this silo.
         /// </summary>
-        public WaitHandle SiloTerminatedEvent { get { return siloTerminatedEvent; } } // one event for all types of termination (shutdown, stop and fast kill).
+        public WaitHandle SiloTerminatedEvent // one event for all types of termination (shutdown, stop and fast kill).
+            => ((IAsyncResult)this.siloTerminatedTask.Task).AsyncWaitHandle;
+
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
         /// <summary>
@@ -165,8 +166,6 @@ namespace Orleans.Runtime
             AsynchAgent.IsStarting = true;
             
             var startTime = DateTime.UtcNow;
-            
-            siloTerminatedEvent = new ManualResetEvent(false);
             
             if (!LogManager.IsInitialized)
                 LogManager.Initialize(LocalConfig);
@@ -848,9 +847,8 @@ namespace Orleans.Runtime
             SafeExecute(LogManager.Close);
 
             // Setting the event should be the last thing we do.
-            // Do nothijng after that!
-            siloTerminatedTask.SetResult(0);
-            siloTerminatedEvent.Set();
+            // Do nothing after that!
+            this.siloTerminatedTask.SetResult(0);
         }
 
         private void SafeExecute(Action action)
