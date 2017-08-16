@@ -592,7 +592,6 @@ namespace Orleans.Runtime
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
-            typeManager.Initialize(versionStore);
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating
@@ -624,6 +623,8 @@ namespace Orleans.Runtime
             scheduler.QueueTask(this.membershipOracle.BecomeActive, statusOracleContext)
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
+            scheduler.QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
+                .WaitWithThrow(this.initTimeout);
 
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
             if (GlobalConfig.HasMultiClusterNetwork) 
