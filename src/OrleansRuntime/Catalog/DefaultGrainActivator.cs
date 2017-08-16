@@ -10,17 +10,26 @@ namespace Orleans.Runtime
     /// </summary>
     public class DefaultGrainActivator : IGrainActivator
     {
-        private readonly Func<Type, ObjectFactory> createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
-        private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
+        private readonly ConstructorArgumentFactory argumentFactory;
+        private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache;
 
-        /// <inheritdoc />
-        public virtual object Create(IGrainActivationContext context)
+        /// <summary>
+        /// Public constructor
+        /// </summary>
+        /// <param name="serviceProvider"></param>
+        public DefaultGrainActivator(IServiceProvider serviceProvider)
+        {
+            this.argumentFactory = new ConstructorArgumentFactory(serviceProvider);
+            this.typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
+        }
+
+    /// <inheritdoc />
+    public virtual object Create(IGrainActivationContext context)
         {
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
             }
-
 
             var grainType = context.GrainType;
 
@@ -34,8 +43,8 @@ namespace Orleans.Runtime
             }
 
             var serviceProvider = context.ActivationServices;
-            var activator = this.typeActivatorCache.GetOrAdd(grainType, this.createFactory);
-            var grain = activator(serviceProvider, arguments: null);
+            var activator = this.typeActivatorCache.GetOrAdd(grainType, this.CreateFactory);
+            var grain = activator(serviceProvider, this.argumentFactory.CreateArguments(context));
             return grain;
         }
 
@@ -57,6 +66,11 @@ namespace Orleans.Runtime
             {
                 disposable.Dispose();
             }
+        }
+
+        private ObjectFactory CreateFactory(Type type)
+        {
+            return ActivatorUtilities.CreateFactory(type, this.argumentFactory.ArgumentTypes(type));
         }
     }
 }

@@ -2,6 +2,8 @@
 {
     /// <summary>
     /// Provides methods to create a grain.
+    /// Note:  Custom grain activator should only be used to create application grains.  All non-application
+    /// grains should be passed through to the DefaultGrainActivator for creation.
     /// </summary>
     public interface IGrainActivator
     {

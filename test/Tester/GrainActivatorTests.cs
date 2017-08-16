@@ -66,6 +66,10 @@ namespace UnitTests.General
                 public const string HardcodedValue = "Hardcoded Test Value";
                 private int numberOfReleasedInstances;
 
+                public HardcodedGrainActivator(IServiceProvider service) : base(service)
+                {
+                }
+
                 public override object Create(IGrainActivationContext context)
                 {
                     if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
