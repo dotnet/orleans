@@ -33,6 +33,7 @@ namespace Orleans
         private bool listenForMessages;
         private CancellationTokenSource listeningCts;
         private bool firstMessageReceived;
+        private bool disposing;
 
         private ClientProviderRuntime clientProviderRuntime;
         private StatisticsProviderManager statisticsProviderManager;
@@ -783,7 +784,9 @@ namespace Orleans
                 }
             }
             catch (Exception) { }
-            Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
+
+            Utils.SafeExecute(() => this.Dispose());
+
             try
             {
                 LogManager.UnInitialize();
@@ -870,22 +873,25 @@ namespace Orleans
 
         public void Dispose()
         {
+            if (this.disposing) return;
+            this.disposing = true;
+
             if (listeningCts != null)
             {
-                listeningCts.Dispose();
+                Utils.SafeExecute(() => listeningCts.Dispose());
                 listeningCts = null;
-
-                this.assemblyProcessor?.Dispose();
             }
 
-            transport?.Dispose();
+            Utils.SafeExecute(() => this.assemblyProcessor?.Dispose());
+
+            Utils.SafeExecute(() => transport?.Dispose());
             if (ClientStatistics != null)
             {
-                ClientStatistics.Dispose();
+                Utils.SafeExecute(() => ClientStatistics.Dispose());
                 ClientStatistics = null;
             }
 
-            (this.ServiceProvider as IDisposable)?.Dispose();
+            Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
             this.ServiceProvider = null;
             GC.SuppressFinalize(this);
         }
