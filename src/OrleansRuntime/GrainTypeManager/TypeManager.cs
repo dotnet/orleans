@@ -11,7 +11,7 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
-    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener
+    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener, IDisposable
     {
         private readonly Logger logger = LogManager.GetLogger("TypeManager");
         private readonly GrainTypeManager grainTypeManager;
@@ -20,9 +20,9 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly OrleansTaskScheduler scheduler;
-        private readonly TimeSpan refreshClusterMapTimeout;
+        private readonly TimeSpan refreshClusterMapInterval;
         private bool hasToRefreshClusterGrainInterfaceMap;
-        private AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
+        private IDisposable refreshClusterGrainInterfaceMapTimer;
         private IVersionStore versionStore;
 
         internal TypeManager(
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             GrainTypeManager grainTypeManager,
             ISiloStatusOracle oracle,
             OrleansTaskScheduler scheduler,
-            TimeSpan refreshClusterMapTimeout,
+            TimeSpan refreshClusterMapInterval,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             IInternalGrainFactory grainFactory,
             CachedVersionSelectorManager versionSelectorManager)
@@ -51,18 +51,21 @@ namespace Orleans.Runtime
             this.grainFactory = grainFactory;
             this.versionSelectorManager = versionSelectorManager;
             this.scheduler = scheduler;
-            this.refreshClusterMapTimeout = refreshClusterMapTimeout;
+            this.refreshClusterMapInterval = refreshClusterMapInterval;
         }
 
-        internal void Initialize(IVersionStore store)
+        internal async Task Initialize(IVersionStore store)
         {
             this.versionStore = store;
             this.hasToRefreshClusterGrainInterfaceMap = true;
-            this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
+
+            await this.OnRefreshClusterMapTimer(null);
+
+            this.refreshClusterGrainInterfaceMapTimer = this.RegisterTimer(
                 OnRefreshClusterMapTimer,
                 null,
-                TimeSpan.Zero,  // Force to do it once right now
-                refreshClusterMapTimeout);
+                this.refreshClusterMapInterval,
+                this.refreshClusterMapInterval);
         }
 
         public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
@@ -219,6 +222,14 @@ namespace Orleans.Runtime
                 logger.Error(ErrorCode.TypeManager_GetSiloGrainInterfaceMapError, $"Exception when trying to get GrainInterfaceMap for silos {siloAddress}", ex);
 				hasToRefreshClusterGrainInterfaceMap = true;
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, null);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (this.refreshClusterGrainInterfaceMapTimer != null)
+            {
+                this.refreshClusterGrainInterfaceMapTimer.Dispose();
             }
         }
     }
