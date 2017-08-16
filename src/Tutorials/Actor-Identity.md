@@ -104,7 +104,7 @@ public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
 In client code, this adds a second argument to the `GetGrain` method on the grain factory.
 
 ``` csharp
-var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!");
+var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!", null);
 ```
 
 To access the compound key in the grain, we can call an overload on the `GetPrimaryKey` method:
