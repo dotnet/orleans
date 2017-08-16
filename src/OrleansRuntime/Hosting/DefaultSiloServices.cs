@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Hosting
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().GlobalConfig);
             services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
-            services.TryAddSingleton<Func<NodeConfiguration>>(
+            services.TryAddSingleton<Factory<NodeConfiguration>>(
                 sp =>
                 {
                     var initializationParams = sp.GetRequiredService<SiloInitializationParameters>();
@@ -140,7 +140,7 @@ namespace Orleans.Runtime.Hosting
             services.TryAddSingleton<CachedVersionSelectorManager>();
             services.TryAddSingleton<IVersionStore, GrainVersionStore>();
 
-            services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
+            services.TryAddSingleton<Factory<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
             // Grain activation
             services.TryAddSingleton<Catalog>();

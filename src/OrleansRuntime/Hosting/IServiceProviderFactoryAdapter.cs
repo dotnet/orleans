@@ -4,9 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Runtime.Hosting
 {
     /// <summary>
-    /// Abstraction for integrating <see cref="IServiceProviderFactory{TContainerBuilder}"/> implementations.
+    /// Common interface for <see cref="IServiceProviderFactory{TContainerBuilder}"/> implementations.
     /// </summary>
-    internal interface IServiceProviderFactory
+    internal interface IServiceProviderFactoryAdapter
     {
         /// <summary>
         /// Creates a <see cref="IServiceProvider"/> from an <see cref="IServiceCollection" />.

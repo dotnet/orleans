@@ -5,10 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Runtime.Hosting
 {
     /// <summary>
-    /// Adapts an <see cref="IServiceProviderFactory{TContainerBuilder}"/> into an <see cref="IServiceProviderFactory"/>.
+    /// Adapts an <see cref="IServiceProviderFactory{TContainerBuilder}"/> into an <see cref="IServiceProviderFactoryAdapter"/>.
     /// </summary>
     /// <typeparam name="TContainerBuilder">The container builder type.</typeparam>
-    internal class ServiceProviderFactoryAdapter<TContainerBuilder> : IServiceProviderFactory
+    internal class ServiceProviderFactoryAdapter<TContainerBuilder> : IServiceProviderFactoryAdapter
     {
         private readonly IServiceProviderFactory<TContainerBuilder> serviceProviderFactory;
         private readonly List<Action<TContainerBuilder>> configureContainerDelegates = new List<Action<TContainerBuilder>>();

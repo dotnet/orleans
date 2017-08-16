@@ -22,18 +22,19 @@ namespace Orleans.Runtime.Hosting
         public Task Stopped { get; }
 
         /// <inheritdoc />
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             if (!cancellationToken.IsCancellationRequested)
             {
                 this.silo.Start();
             }
 
-            return Task.CompletedTask;
+            // Await to avoid compiler warnings.
+            await Task.CompletedTask;
         }
 
         /// <inheritdoc />
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -44,7 +45,7 @@ namespace Orleans.Runtime.Hosting
                 this.silo.Shutdown();
             }
 
-            return this.Stopped;
+            await this.Stopped;
         }
     }
 }

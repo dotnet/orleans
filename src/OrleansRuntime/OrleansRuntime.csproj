@@ -72,7 +72,7 @@
     <Compile Include="Facet\IAttributeToFactoryMapper.cs" />
     <Compile Include="Hosting\DelegateServiceProviderFactory.cs" />
     <Compile Include="Hosting\DefaultSiloServices.cs" />
-    <Compile Include="Hosting\IServiceProviderFactory.cs" />
+    <Compile Include="Hosting\IServiceProviderFactoryAdapter.cs" />
     <Compile Include="Hosting\ISilo.cs" />
     <Compile Include="Hosting\ISiloBuilder.cs" />
     <Compile Include="Hosting\ServiceProviderFactoryAdapter.cs" />

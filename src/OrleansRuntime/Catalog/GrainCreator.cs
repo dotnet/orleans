@@ -26,12 +26,12 @@ namespace Orleans.Runtime
         /// <param name="protocolServicesFactory"></param>
         public GrainCreator(
             IGrainActivator grainActivator,
-            Func<IGrainRuntime> getGrainRuntime,
+            Factory<IGrainRuntime> getGrainRuntime,
             Factory<Grain, IMultiClusterRegistrationStrategy, ProtocolServices> protocolServicesFactory)
         {
             this.grainActivator = grainActivator;
             this.protocolServicesFactory = protocolServicesFactory;
-            this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
+            this.grainRuntime = new Lazy<IGrainRuntime>(() => getGrainRuntime());
         }
 
         /// <summary>

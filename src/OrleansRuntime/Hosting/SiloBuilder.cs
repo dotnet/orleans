@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Hosting
     {
         private readonly List<Action<IServiceCollection>> configureServicesDelegates = new List<Action<IServiceCollection>>();
         private readonly List<object> configureContainerDelegates = new List<object>();
-        private IServiceProviderFactory serviceProviderFactory;
+        private IServiceProviderFactoryAdapter serviceProviderFactory;
         private bool built;
 
         /// <inheritdoc />
