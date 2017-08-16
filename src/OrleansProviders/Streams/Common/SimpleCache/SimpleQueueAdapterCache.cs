@@ -17,7 +17,6 @@ namespace Orleans.Providers.Streams.Common
 
         private readonly int cacheSize;
         private readonly Logger logger;
-        private readonly ConcurrentDictionary<QueueId, IQueueCache> caches;
 
         /// <summary>
         /// Adapter for simple queue caches
@@ -30,7 +29,6 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
             this.cacheSize = cacheSize;
             this.logger = logger;
-            caches = new ConcurrentDictionary<QueueId, IQueueCache>();
         }
 
         /// <summary>
@@ -39,7 +37,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return caches.AddOrUpdate(queueId, (id) => new SimpleQueueCache(cacheSize, logger), (id, queueCache) => queueCache);
+            return new SimpleQueueCache(cacheSize, logger);
         }
 
         /// <summary>
