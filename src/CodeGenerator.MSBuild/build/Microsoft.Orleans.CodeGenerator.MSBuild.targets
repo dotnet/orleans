@@ -1,0 +1,35 @@
+<Project TreatAsLocalProperty="TaskFolder;TaskAssembly">
+  <PropertyGroup>
+    <TaskFolder Condition=" '$(TaskFolder)' == '' ">netstandard2.0</TaskFolder>
+    <TaskAssembly>$(MSBuildThisFileDirectory)..\tasks\$(TaskFolder)\Microsoft.Orleans.CodeGenerator.MSBuild.dll</TaskAssembly>
+    <CodeGenDirectory Condition="'$([System.IO.Path]::IsPathRooted($(IntermediateOutputPath)))' == 'true'">$(IntermediateOutputPath)</CodeGenDirectory>
+    <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
+    <OutputFileName>$(CodeGenDirectory)$(TargetName).$([System.DateTime]::UtcNow.Ticks).orleans.g.cs</OutputFileName>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Microsoft.Orleans.CodeGenerator.MSBuild.GenerateOrleansCode" AssemblyFile="$(TaskAssembly)" />
+
+  <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
+  <Target Name="OrleansCodeGeneration"
+          AfterTargets="BeforeCompile"
+          BeforeTargets="CoreCompile"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
+          Inputs="@(Compile);@(ReferencePath)"
+          Outputs="$(OutputFileName)">
+    <PropertyGroup>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
+      <IntermediateOutputPath>$(IntermediateOutputPath)codegen\</IntermediateOutputPath>
+      <InputAssembly>$(IntermediateOutputPath)$(TargetName)$(TargetExt)</InputAssembly>
+    </PropertyGroup>
+    <ItemGroup>
+      <Compile Include="$(OutputFileName)" />
+      <FileWrites Include="$(OutputFileName)" />
+      <_ResolveAssemblyReferenceResolvedFiles Include="$(InputAssembly)" />
+    </ItemGroup>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="IntermediateOutputPath=$(IntermediateOutputPath);OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <GenerateOrleansCode
+      InputAssembly="$(InputAssembly)"
+      ReferencePaths="@(ReferencePath)"
+      OutputFileName="$(OutputFileName)" />      
+  </Target>
+</Project>

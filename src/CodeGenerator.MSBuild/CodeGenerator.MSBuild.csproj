@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
+    <AssemblyName>Microsoft.Orleans.CodeGenerator.MSBuild</AssemblyName>
+    <RootNamespace>Microsoft.Orleans.CodeGenerator.MSBuild</RootNamespace>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="build\**\*">
+      <Pack>true</Pack>
+      <PackagePath>build\%(RecursiveDir)</PackagePath>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework" Version="15.3.409" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="15.3.409" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj">
+      <Bootstrap>true</Bootstrap>
+      <Private>true</Private>
+      <PrivateAssets>all</PrivateAssets>
+      <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+  </ItemGroup>
+
+  <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
+   <!-- 
+    The include needs to happen after output has been copied to build output folder
+    but before NuGet generates a nuspec. See https://github.com/NuGet/Home/issues/4704.
+  -->
+    <ItemGroup>
+      <_PackageFiles Include="bin\$(Configuration)\**\*" Exclude="bin\$(Configuration)\**\$(AssemblyName).*">
+        <PackagePath>tasks\%(RecursiveDir)</PackagePath>
+        <Visible>false</Visible>
+        <BuildAction>Content</BuildAction>
+      </_PackageFiles>
+    </ItemGroup>
+  </Target>
+</Project>
