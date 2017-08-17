@@ -4,7 +4,7 @@
     "Microsoft.ServiceFabric.Services": "2.4.145",
     "NSubstitute": "1.10.0",
     "System.Runtime.Numerics": "4.3.0",
-    "xunit": "2.1.0"
+    "xunit": "2.2.0"
   },
   "frameworks": {
     "net461": {}

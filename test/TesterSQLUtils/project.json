@@ -6,9 +6,9 @@
     "Newtonsoft.Json": "10.0.3",
     "Npgsql": "3.1.9",
     "system.data.sqlclient": "4.3.0",
-    "xunit": "2.1.0",
-    "xunit.runner.visualstudio": "2.1.0",
-    "Xunit.SkippableFact": "1.2.14"
+    "xunit": "2.2.0",
+    "xunit.runner.visualstudio": "2.2.0",
+    "Xunit.SkippableFact": "1.3.3"
   },
   "frameworks": {
     "net461": {}

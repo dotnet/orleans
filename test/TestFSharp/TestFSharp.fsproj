@@ -36,10 +36,10 @@
   <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
   <Choose>
     <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.1.17\tools\Microsoft.FSharp.Targets')">
-  <PropertyGroup>
+      <PropertyGroup>
         <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.1.17\tools\Microsoft.FSharp.Targets</FSharpTargets>
         <PackagesRestored>true</PackagesRestored>
-  </PropertyGroup>
+      </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
@@ -82,8 +82,18 @@
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.Console">
+      <HintPath>..\..\src\packages\System.Console.4.0.0\lib\net46\System.Console.dll</HintPath>
+    </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Threading.Thread">
+      <HintPath>..\..\src\packages\System.Threading.Thread.4.0.0\lib\net46\System.Threading.Thread.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.ThreadPool">
+      <HintPath>..\..\src\packages\System.Threading.ThreadPool.4.0.10\lib\net46\System.Threading.ThreadPool.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <!--END: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
 </Project>
