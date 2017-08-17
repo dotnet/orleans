@@ -18,9 +18,11 @@ namespace Orleans
 
         private enum LifecycleState
         {
+            Invalid,
             Created,
             Starting,
             Started,
+            Disposing,
             Disposed,
         }
 
@@ -42,16 +44,6 @@ namespace Orleans
         public IGrainFactory GrainFactory => this.InternalGrainFactory;
 
         /// <inheritdoc />
-        internal IInternalGrainFactory InternalGrainFactory
-        {
-            get
-            {
-                this.ThrowIfDisposedOrNotInitialized();
-                return this.runtimeClient.InternalGrainFactory;
-            }
-        }
-
-        /// <inheritdoc />
         public Logger Logger
         {
             get
@@ -69,6 +61,22 @@ namespace Orleans
 
         /// <inheritdoc />
         IStreamProviderRuntime IInternalClusterClient.StreamProviderRuntime => this.runtimeClient.CurrentStreamProviderRuntime;
+
+        /// <inheritdoc />
+        private IInternalGrainFactory InternalGrainFactory
+        {
+            get
+            {
+                this.ThrowIfDisposedOrNotInitialized();
+                return this.runtimeClient.InternalGrainFactory;
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether or not this instance is being disposed.
+        /// </summary>
+        private bool IsDisposing => this.state == LifecycleState.Disposed ||
+                                    this.state == LifecycleState.Disposing;
 
         /// <inheritdoc />
         public IEnumerable<IStreamProvider> GetStreamProviders()
@@ -118,26 +126,31 @@ namespace Orleans
 
         private async Task Stop(bool gracefully)
         {
-            if (this.state == LifecycleState.Disposed) return;
-
+            if (this.IsDisposing) return;
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
-                if (gracefully)
+                try
                 {
-                    Utils.SafeExecute(() => this.runtimeClient.Disconnect());
-                }
+                    this.state = LifecycleState.Disposing;
+                    if (gracefully)
+                    {
+                        Utils.SafeExecute(() => this.runtimeClient.Disconnect());
+                    }
 
-                Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
-                this.Dispose();
+                    Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
+                    this.Dispose(true);
+                }
+                finally
+                {
+                    // If disposal failed, the system is in an invalid state.
+                    if (this.state == LifecycleState.Disposing) this.state = LifecycleState.Invalid;
+                }
             }
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            this.Dispose(true);
-        }
+        void IDisposable.Dispose() => this.Abort();
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
@@ -256,7 +269,7 @@ namespace Orleans
 
         private void ThrowIfDisposed()
         {
-            if (this.state == LifecycleState.Disposed)
+            if (this.IsDisposing)
                 throw new ObjectDisposedException(
                     nameof(ClusterClient),
                     $"Client has been disposed either by a call to {nameof(Dispose)} or because it has been stopped.");
