@@ -164,11 +164,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
-            catch (OrleansGrainActivationFailedException exc)
+            catch (ApplicationException exc)
             {
-                Assert.NotNull(exc.InnerException);
-                Assert.IsType<ApplicationException>(exc.InnerException);
-                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
+                Assert.Contains("Application-OnActivateAsync", exc.Message);
             }
         }
 
@@ -184,11 +182,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
             }
-            catch (OrleansGrainActivationFailedException exc)
+            catch (ApplicationException exc)
             {
-                Assert.NotNull(exc.InnerException);
-                Assert.IsType<ApplicationException>(exc.InnerException);
-                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
+                Assert.Contains("Application-OnActivateAsync", exc.Message);
             }
         }
 
@@ -204,11 +200,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
-            catch (OrleansGrainActivationFailedException exc)
+            catch (ApplicationException exc)
             {
-                Assert.NotNull(exc.InnerException);
-                Assert.IsType<ApplicationException>(exc.InnerException);
-                Assert.Contains("Application-OnActivateAsync", exc.InnerException.Message);
+                Assert.Contains("Application-OnActivateAsync", exc.Message);
             }
         }
 
@@ -272,12 +266,12 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 string activation = await grain.DoSomething();
                 Assert.True(false, "Should have thrown.");
             }
-            catch(Exception exc)
+            catch(InvalidOperationException exc)
             {
                 this.Logger.Info("Thrown as expected:", exc);
-                Exception e = exc.GetBaseException();
-                Assert.True(e.Message.Contains("Forwarding failed"),
-                        "Did not get expected exception message returned: " + e.Message);
+                Assert.True(
+                    exc.Message.Contains("DeactivateOnIdle from within OnActivateAsync"),
+                    "Did not get expected exception message returned: " + exc.Message);
             }  
         }
 

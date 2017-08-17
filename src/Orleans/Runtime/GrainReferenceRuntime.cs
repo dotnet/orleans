@@ -166,7 +166,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
 
                     default:
-                        rejection = message.GetDeserializedBody(this.serializationManager) as OrleansException;
+                        rejection = message.GetDeserializedBody(this.serializationManager) as Exception;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))

@@ -1375,7 +1375,7 @@ namespace Orleans.Runtime
 
                 activationsFailedToActivate.Increment();
 
-                throw new OrleansGrainActivationFailedException(nameof(Grain.OnActivateAsync) + " failed", exc);
+                throw;
             }
 
             if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
