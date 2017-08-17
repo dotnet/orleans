@@ -324,6 +324,11 @@ namespace Orleans.Serialization
             Register(typeof(IList<>));
             Register(typeof(IDictionary<,>));
             Register(typeof(IEnumerable<>));
+            Register(typeof(ICollection<>));
+            Register(typeof(ISet<>));
+            Register(typeof(IReadOnlyDictionary<,>));
+            Register(typeof(IReadOnlyCollection<>));
+            Register(typeof(IReadOnlyList<>));
 
             // Enum names we need to recognize
             Register(typeof(Message.Categories));
