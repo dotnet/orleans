@@ -1,23 +1,42 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
-    <Title>Microsoft Orleans Build-time Code Generation</Title>
-    <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
-    <IsTool>true</IsTool>
-    <IncludeReferencedProjects>true</IncludeReferencedProjects>
+    <Title>Microsoft Orleans Build-time Code Generator</Title>
+    <Description>Microsoft Orleans build-time code generator to install in all grain interface &amp; implementation projects.</Description>
   </PropertyGroup>
 
   <PropertyGroup>
+    <TargetFramework />
+    <TargetFrameworks>netcoreapp2.0;net461</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <RootNamespace>Orleans.CodeGeneration</RootNamespace>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
     <AssemblyName>ClientGenerator</AssemblyName>
-    <TargetFramework>net461</TargetFramework>
+    <RootNamespace>Orleans.CodeGeneration</RootNamespace>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <Content Include="build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets">
+      <Pack>true</Pack>
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+    </Content>
+    <Content Include="buildMultiTargeting\Microsoft.Orleans.OrleansCodeGenerator.Build.targets">
+      <Pack>true</Pack>
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" PrivateAssets="All" />
+    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" PrivateAssets="All" />
+    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftDependencyModelVersion)" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,17 +51,17 @@
     </ProjectReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\Orleans.SDK.targets">
-      <Pack>true</Pack>
-      <PackagePath>build\$(PackageId).targets</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/*.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-  </ItemGroup>
-
+  <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
+   <!-- 
+    The include needs to happen after output has been copied to build output folder
+    but before NuGet generates a nuspec. See https://github.com/NuGet/Home/issues/4704.
+  -->
+    <ItemGroup>
+      <_PackageFiles Include="bin\$(Configuration)\**\*" Exclude="bin\$(Configuration)\**\$(AssemblyName).*">
+        <PackagePath>tasks\%(RecursiveDir)</PackagePath>
+        <Visible>false</Visible>
+        <BuildAction>Content</BuildAction>
+      </_PackageFiles>
+    </ItemGroup>
+  </Target>
 </Project>

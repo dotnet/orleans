@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ClientGenerator</AssemblyName>
+    <RootNamespace>Microsoft.Orleans.CodeGenerator.MSBuild</RootNamespace>
+    <SourceDir>$(SourceRoot)src/ClientGenerator/</SourceDir>
+    <PublishDir>$(SourceRoot)Bootstrap/$(BuildFlavor)/$(Configuration)/</PublishDir>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateBindingRedirects>true</GenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceDir)**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs">
+      <!-- Hide the files and folder structure in the editor. -->
+      <Link>_%(Filename).%(Extension)</Link>
+      <Visible>false</Visible>
+    </Compile>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftDependencyModelVersion)" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.Bootstrap.csproj" />
+    <ProjectReference Include="..\Orleans\Orleans.Bootstrap.csproj" />
+  </ItemGroup>
+
+</Project>

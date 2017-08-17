@@ -1,32 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Core</PackageId>
-    <Title>Microsoft Orleans Core Library</Title>
-    <Description>Core library of Microsoft Orleans used both on the client and server.</Description>
-  </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
-    <OrleansBuildTimeCodeGen Condition="'$(Bootstrap)' != 'true'">true</OrleansBuildTimeCodeGen>
+    <SourceDir>$(SourceRoot)src/Orleans/</SourceDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Update="Configuration\OrleansConfiguration.xsd">
-      <SubType>Designer</SubType>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>false</Pack>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Statistics\RuntimeStatisticsGroup.cs" />
+    <Compile Include="$(SourceDir)**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs">
+      <!-- Hide the files and folder structure in the editor. -->
+      <Link>_%(Filename).%(Extension)</Link>
+      <Visible>false</Visible>
+    </Compile>
+    <Compile Remove="$(SourceDir)Statistics\RuntimeStatisticsGroup.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjection)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
+    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
+    <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
     <PackageReference Include="System.ComponentModel.TypeConverter" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.FileVersionInfo" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.Process" Version="$(SystemRuntimeVersion)" />
@@ -36,7 +30,6 @@
     <PackageReference Include="System.Net.NetworkInformation" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
     <PackageReference Include="System.Reflection.TypeExtensions" Version="$(SystemReflectionTypeExtensionsVersion)" />
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
@@ -44,23 +37,11 @@
     <PackageReference Include="System.Security.Cryptography.Algorithms" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Threading.Thread" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Threading.ThreadPool" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
   </ItemGroup>
-
-  <Target
-    Name="OrleansDllBootstrapUsingCodeGen"
-    BeforeTargets="GenerateOrleansCode" 
-    Inputs="@(Compile)"
-    Outputs="$(SourceRoot)Bootstrap/$(BuildFlavor)/$(Configuration)/ClientGenerator.exe">
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
-    <!-- Compile code generator -->
-    <MSBuild Projects="$(ProjectDir)..\BootstrapBuild\ClientGenerator\ClientGenerator.Bootstrap.csproj" Targets="Publish" Properties="OrleansCodeGenPrecompile=true" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="false" />
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator finished" Importance="high" />
-  </Target>
 </Project>
