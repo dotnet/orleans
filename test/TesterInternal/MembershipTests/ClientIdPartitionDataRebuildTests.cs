@@ -45,7 +45,8 @@ namespace UnitTests.MembershipTests
             this.output = output;
         }
 
-        [SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
+        [Fact(Skip = "Not reliable in PR build, skipping for now")]
+        //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Observer()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
@@ -69,7 +70,8 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 20, TimeSpan.FromSeconds(10));
         }
 
-        [SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
+        [Fact(Skip = "Not reliable in PR build, skipping for now")]
+        //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Request()
         {
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo2
