@@ -58,7 +58,7 @@ namespace Orleans.ServiceBus.Providers
 
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
-        private readonly Func<NodeConfiguration> getNodeConfig;
+        private readonly Factory<NodeConfiguration> getNodeConfig;
 
         public int GetMaxAddCount()
         {
@@ -70,7 +70,7 @@ namespace Orleans.ServiceBus.Providers
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
             IQueueAdapterReceiverMonitor monitor,
-            Func<NodeConfiguration> getNodeConfig,
+            Factory<NodeConfiguration> getNodeConfig,
             Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));

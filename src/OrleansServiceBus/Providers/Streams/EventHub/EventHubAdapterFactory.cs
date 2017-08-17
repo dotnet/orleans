@@ -305,7 +305,7 @@ namespace Orleans.ServiceBus.Providers
             receiverMonitorDimensions.GlobalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
 
             return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger), 
-                this.serviceProvider.GetRequiredService<Func<NodeConfiguration>>(),
+                this.serviceProvider.GetRequiredService<Factory<NodeConfiguration>>(),
                 this.EventHubReceiverFactory);
         }
 

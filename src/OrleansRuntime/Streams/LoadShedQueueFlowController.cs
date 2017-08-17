@@ -16,7 +16,7 @@ namespace Orleans.Streams
         /// </summary>
         public const int DefaultPercentOfLoadSheddingLimit = 95;
 
-        private readonly Func<NodeConfiguration> getNodeConfig;
+        private readonly Factory<NodeConfiguration> getNodeConfig;
         private readonly double loadSheddingLimit;
         private FloatValueStatistic cpuStatistic;
 
@@ -28,7 +28,7 @@ namespace Orleans.Streams
         /// <param name="getNodeConfig">The method used to get the current node configuration.</param>
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
         /// <returns></returns>
-        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(Func<NodeConfiguration> getNodeConfig, int percentOfSiloSheddingLimit = DefaultPercentOfLoadSheddingLimit)
+        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(Factory<NodeConfiguration> getNodeConfig, int percentOfSiloSheddingLimit = DefaultPercentOfLoadSheddingLimit)
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
@@ -42,7 +42,7 @@ namespace Orleans.Streams
         /// <param name="loadSheddingLimit">Percentage of CPU which triggers queue read rate reduction</param>
         /// <param name="getNodeConfig">The method used to get the current node configuration.</param>
         /// <returns></returns>
-        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, Func<NodeConfiguration> getNodeConfig)
+        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, Factory<NodeConfiguration> getNodeConfig)
         {
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
             return new LoadShedQueueFlowController(loadSheddingLimit, getNodeConfig);
@@ -53,7 +53,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="loadSheddingLimit"></param>
         /// <param name="getNodeConfig">The method used to get the current node configuration.</param>
-        private LoadShedQueueFlowController(int loadSheddingLimit, Func<NodeConfiguration> getNodeConfig)
+        private LoadShedQueueFlowController(int loadSheddingLimit, Factory<NodeConfiguration> getNodeConfig)
         {
             this.getNodeConfig = getNodeConfig;
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
