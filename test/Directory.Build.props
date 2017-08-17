@@ -8,7 +8,7 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <!-- Needed for tests to force the generation of binding redirects -->
-    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 

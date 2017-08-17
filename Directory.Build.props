@@ -49,10 +49,12 @@
     <!-- Microsoft packages -->
     <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
 
-    <MicrosoftExtensionsConfigurationBinderVersion>1.1.1</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>1.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>1.1.1</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>1.1.1</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>1.1.2</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>1.1.2</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>1.1.2</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>1.1.2</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsOptionsVersion>1.1.2</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>1.1.2</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
     <MicrosoftExtensionsDependencyInjection>1.1.1</MicrosoftExtensionsDependencyInjection>
 
     <MicrosoftDataSQLiteVersion>1.1.0</MicrosoftDataSQLiteVersion>
@@ -69,6 +71,7 @@
     <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
+    <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
 
     <!-- Test related packages -->
     <BenchmarkDotNetVersion>0.10.8</BenchmarkDotNetVersion>

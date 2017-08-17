@@ -12,9 +12,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\OrleansGCPUtils\OrleansGCPUtils.csproj" />
     <ProjectReference Include="..\..\src\OrleansGoogleUtils\OrleansGoogleUtils.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
