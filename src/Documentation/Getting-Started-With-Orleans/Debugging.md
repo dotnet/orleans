@@ -5,7 +5,7 @@ title: Debugging and Symbols
 
 ### Debugging
 
-An Orleans-based application can be easily debugged during development by attaching debugger to the [silo host process](Running-the-Application.md#configuring-and-starting-a-silo) or to the [client process](Running-the-Application.md#configuring-and-connecting-a-client).
+An Orleans-based application can be easily debugged during development by attaching a debugger to the [silo host process](Running-the-Application.md#configuring-and-starting-a-silo) or to the [client process](Running-the-Application.md#configuring-and-connecting-a-client).
 For fast development iterations, it is convenient to use a single process that combines a silos and a client, such as a console application project that gets created by the Orleans Dev/Test Host project template that is part of the [Microsoft Orleans Tools](https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio) extension for Visual Studio.
 Similarly, debugger can be attached to the Worker/Web Role instance process when running inside the Azure Compute Emulator.
 
