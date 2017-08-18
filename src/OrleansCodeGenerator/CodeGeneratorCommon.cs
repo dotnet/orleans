@@ -63,7 +63,7 @@ namespace Orleans.CodeGenerator
 
             // Reference everything which can be referenced.
             var assemblies =
-                AppDomain.CurrentDomain.GetAssemblies()
+                Orleans.AppDomain.CurrentDomain.GetAssemblies()
                     .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()

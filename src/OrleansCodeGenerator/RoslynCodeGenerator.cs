@@ -297,7 +297,7 @@ namespace Orleans.CodeGenerator
 #elif NETSTANDARD
             Assembly result;
             result = Orleans.PlatformServices.PlatformAssemblyLoader.LoadFromBytes(asm.RawBytes);
-            AppDomain.CurrentDomain.AddAssembly(result);
+            Orleans.AppDomain.CurrentDomain.AddAssembly(result);
             return result;
 #else
             return Assembly.Load(asm.RawBytes);

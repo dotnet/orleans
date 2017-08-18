@@ -40,13 +40,13 @@
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <TestProjectTargetFramework>net462</TestProjectTargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
     <TargetFramework>net461</TargetFramework>
-    <TestProjectTargetFramework>net462</TestProjectTargetFramework>
+    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
   <!-- Shared Package Versions -->
