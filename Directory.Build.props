@@ -1,7 +1,7 @@
 <Project>
   <!-- Set the repository root into a variable -->
   <PropertyGroup>
-    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <SourceRoot>$(MSBuildThisFileDirectory)</SourceRoot>
   </PropertyGroup>
 
   <!-- Set common properties regarding assembly information and nuget packages -->
@@ -144,6 +144,6 @@
 
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>
-    <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(RepoRoot)/Artifacts/$(BuildFlavor)/$(Configuration)</PackageOutputPath>
+    <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(BuildFlavor)/$(Configuration)</PackageOutputPath>
   </PropertyGroup>
 </Project>

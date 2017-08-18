@@ -80,7 +80,7 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
     <PropertyGroup>
       <!-- Visual Studio or MsBuild .sln build -->
-      <BootstrapOutputPath>$(ProjectDir)..\Bootstrap\</BootstrapOutputPath>
+      <BootstrapOutputPath>$(SourceRoot)/Bootstrap/$(BuildFlavor)/$(Configuration)/</BootstrapOutputPath>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN;ORLEANS_BOOTSTRAP</ExcludeCodeGen>
     </PropertyGroup>
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
