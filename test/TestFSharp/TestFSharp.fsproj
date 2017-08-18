@@ -13,4 +13,9 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ValueTuple" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="FSharp.Core" Version="$(FSharpCoreVersion)" />
+  </ItemGroup>
 </Project>

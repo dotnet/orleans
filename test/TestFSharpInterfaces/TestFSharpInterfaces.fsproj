@@ -8,4 +8,9 @@
     <Compile Include="IFSharpBaseInterface.fs" />
     <Compile Include="IFSharpParameters.fs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ValueTuple" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="FSharp.Core" Version="$(FSharpCoreVersion)" />
+  </ItemGroup>
 </Project>
