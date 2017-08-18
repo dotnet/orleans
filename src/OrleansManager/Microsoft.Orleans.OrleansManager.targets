@@ -1,4 +1,4 @@
-<Project ToolsVersion="15.0" DefaultTargets="Build">
+<Project DefaultTargets="Build">
 
   <Target Name="CopyOrleansManagerTools" BeforeTargets="AfterBuild">
     <ItemGroup>
