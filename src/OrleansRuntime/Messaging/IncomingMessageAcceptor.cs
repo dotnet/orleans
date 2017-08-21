@@ -321,7 +321,7 @@ namespace Orleans.Runtime.Messaging
 
                 // First check to see if we're shutting down, in which case there's no point in doing anything other
                 // than closing the accepting socket and returning.
-                if (ima.Cts.IsCancellationRequested)
+                if (ima.Cts == null || ima.Cts.IsCancellationRequested)
                 {
                     SocketManager.CloseSocket(ima.AcceptingSocket);
                     ima.Log.Info(ErrorCode.Messaging_IMA_ClosingSocket, "Closing accepting socket during shutdown");
