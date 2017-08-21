@@ -38,7 +38,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansCodeGeneration"
           BeforeTargets="AssignTargetPaths"
-          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true' and '$(DesignTimeBuild)' != 'true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
