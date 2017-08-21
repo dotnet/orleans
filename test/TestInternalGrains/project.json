@@ -1,6 +1,6 @@
-{
+﻿{
   "dependencies": {
-    "xunit.assert": "2.1.0"
+    "xunit.assert": "2.2.0"
   },
   "frameworks": {
     "net461": {}
