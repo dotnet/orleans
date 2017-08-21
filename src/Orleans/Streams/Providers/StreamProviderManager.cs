@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
-
 namespace Orleans.Streams
 {
     internal class StreamProviderManager : IStreamProviderManager
@@ -20,7 +19,7 @@ namespace Orleans.Streams
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)) return;
 
-            appStreamProviders.LoadProviders(configs[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME].Providers, this);
+            appStreamProviders.LoadProviders(configs[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME].Providers, this, providerRuntime.ServiceProvider);
             await appStreamProviders.InitProviders(providerRuntime);
         }
 

@@ -8,6 +8,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
 using Orleans.LogConsistency;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.LogConsistency
 {
@@ -33,7 +34,7 @@ namespace Orleans.Runtime.LogConsistency
             if (!configs.ContainsKey(ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME))
                 return Task.CompletedTask;
 
-            providerLoader.LoadProviders(configs[ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME].Providers, this);
+            providerLoader.LoadProviders(configs[ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME].Providers, this, this.ServiceProvider);
             return providerLoader.InitProviders(this);
         }
 

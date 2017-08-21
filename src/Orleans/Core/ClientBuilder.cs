@@ -67,6 +67,7 @@ namespace Orleans
 
         private static void AddBasicServices(IServiceCollection services, ClientConfiguration clientConfiguration)
         {
+            services.AddSingleton<LoadedProviderTypeLoaders>();
             services.AddSingleton(clientConfiguration);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();

@@ -52,7 +52,7 @@ namespace Orleans.Providers
                 throw new ArgumentOutOfRangeException(providerKind + "Providers",
                     string.Format("Only a single {0} provider is supported.", providerKind));
             }
-            statisticsProviderLoader.LoadProviders(statsProviders, this);
+            statisticsProviderLoader.LoadProviders(statsProviders, this, this.ServiceProvider);
             await statisticsProviderLoader.InitProviders(runtime);
             return statisticsProviderLoader.GetProviders().First().Name;
         }
@@ -71,7 +71,7 @@ namespace Orleans.Providers
         internal async Task LoadEmptyProviders()
         {
             statisticsProviderLoader = new ProviderLoader<IProvider>();
-            statisticsProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
+            statisticsProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this, this.ServiceProvider);
             await statisticsProviderLoader.InitProviders(runtime);
         }
 
