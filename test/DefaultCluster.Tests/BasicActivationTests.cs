@@ -67,7 +67,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
-        public void BasicActivation_Fail()
+        public async Task BasicActivation_Fail()
         {
             bool failed;
             long key = 0;
@@ -75,12 +75,11 @@ namespace DefaultCluster.Tests.General
             {
                 // Key values of -2 are not allowed in this case
                 ITestGrain fail = this.GrainFactory.GetGrain<ITestGrain>(-2);
-                key = fail.GetKey().Result;
+                key = await fail.GetKey();
                 failed = false;
             }
-            catch (Exception e)
+            catch (ArgumentException e)
             {
-                Assert.IsAssignableFrom<OrleansException>(e.GetBaseException()) ;
                 failed = true;
             }
 

@@ -89,7 +89,7 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, OrleansException ex = null)
+        public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception ex = null)
         {
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;

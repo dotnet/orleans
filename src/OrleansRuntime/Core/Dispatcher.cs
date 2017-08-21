@@ -219,7 +219,7 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = this.messagefactory.CreateRejectionResponse(message, rejectType, str, exc as OrleansException);
+                Message rejection = this.messagefactory.CreateRejectionResponse(message, rejectType, str, exc);
                 SendRejectionMessage(rejection);
             }
             else
@@ -469,7 +469,8 @@ namespace Orleans.Runtime
             ActivationAddress oldAddress,
             ActivationAddress forwardingAddress, 
             string failedOperation,
-            Exception exc = null)
+            Exception exc = null,
+            bool rejectMessages = false)
         {
             // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
@@ -491,7 +492,15 @@ namespace Orleans.Runtime
                 {
                     foreach (var message in messages)
                     {
-                        TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                        if (rejectMessages)
+                        {
+                            RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                        }
+                        else
+                        {
+                            TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                        }
+                        
                     }
                 }
                 ), catalog.SchedulingContext);
