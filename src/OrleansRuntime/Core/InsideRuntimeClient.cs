@@ -17,6 +17,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Transactions;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -25,9 +26,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal class InsideRuntimeClient : ISiloRuntimeClient
     {
-        private static readonly Logger logger = LogManager.GetLogger("InsideRuntimeClient", LoggerType.Runtime);
-        private static readonly Logger invokeExceptionLogger = LogManager.GetLogger("Grain.InvokeException", LoggerType.Application);
-        private static readonly Logger appLogger = LogManager.GetLogger("Application", LoggerType.Application);
+        private readonly ILogger logger;
+        private readonly ILogger invokeExceptionLogger;
 
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
@@ -56,7 +56,8 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             MessageFactory messageFactory,
             IEnumerable<IGrainCallFilter> registeredInterceptors,
-            Factory<ITransactionAgent> transactionAgent)
+            Factory<ITransactionAgent> transactionAgent,
+            ILoggerFactory loggerFactory)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -73,6 +74,8 @@ namespace Orleans.Runtime
             tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             this.siloInterceptors = new List<IGrainCallFilter>(registeredInterceptors);
+            this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
+            this.invokeExceptionLogger =loggerFactory.CreateLogger("Grain.InvokeException");
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -356,7 +359,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc1)
                 {
-                    if (invokeExceptionLogger.IsVerbose || message.Direction == Message.Directions.OneWay)
+                    if (invokeExceptionLogger.IsEnabled(LogLevel.Debug) || message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
@@ -554,12 +557,12 @@ namespace Orleans.Runtime
                 if (!message.TargetSilo.Matches(this.CurrentSilo))
                 {
                     // gatewayed message - gateway back to sender
-                    if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
                     this.Dispatcher.Transport.SendMessage(message);
                     return;
                 }
 
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
                 switch (message.RejectionType)
                 {
                     case Message.RejectionTypes.DuplicateRequest:
@@ -602,13 +605,9 @@ namespace Orleans.Runtime
             }
             else
             {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_NoCallbackForResp,
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
                     "No callback for response message: " + message);
             }
-        }
-        public Logger AppLogger
-        {
-            get { return appLogger; }
         }
 
         public string CurrentActivationIdentity

@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Providers;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -49,7 +50,7 @@ namespace Orleans.Runtime
         internal static void RegisterCancellationTokens(
             IAddressable target,
             InvokeMethodRequest request,
-            Logger logger,
+            ILogger logger,
             ISiloRuntimeClient siloRuntimeClient)
         {
             for (var i = 0; i < request.Arguments.Length; i++)

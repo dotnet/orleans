@@ -80,6 +80,7 @@ namespace Orleans
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+			services.AddLogging();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();

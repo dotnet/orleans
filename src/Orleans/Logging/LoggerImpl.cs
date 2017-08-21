@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// The LoggerImpl class is the internal <see cref="Logger"/> implementation.  It directs log messages to sinks in <see cref="LogManager"/>
     /// </summary>
     [Serializable]
+    //TODO: delete this
     internal class LoggerImpl : Logger
     {
         internal int defaultCopiedCounter;
