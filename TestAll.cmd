@@ -11,6 +11,6 @@ set TEST_FILTERS=-trait "Category=BVT" -trait "Category=SlowBVT" -trait "Categor
 
 @REM Note: We transfer _complete_ control to the Test.cmd script here because we don't use CALL.
 
-"%CMDHOME%\Test.cmd"
+"%CMDHOME%\Test.cmd" %1
 
 @REM Note: Execution will NOT return here, and the exit code returned to the caller will be whatever the other script returned.
