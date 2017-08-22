@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -25,13 +27,15 @@ namespace Orleans.Runtime.ReminderService
         private readonly CounterStatistic ticksDeliveredStat;
         private readonly GlobalConfiguration config;
         private readonly TimeSpan initTimeout;
+        private readonly ILoggerFactory loggerFactory;
 
         internal LocalReminderService(
             Silo silo,
             GrainId id,
             IReminderTable reminderTable,
             GlobalConfiguration config,
-            TimeSpan initTimeout)
+            TimeSpan initTimeout,
+            ILoggerFactory loggerFactory)
             : base(id, silo, null)
         {
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
@@ -39,6 +43,7 @@ namespace Orleans.Runtime.ReminderService
             this.config = config;
             this.initTimeout = initTimeout;
             localTableSequence = 0;
+            this.loggerFactory = loggerFactory;
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
@@ -54,7 +59,7 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init(config, Logger).WithTimeout(initTimeout);
+            await reminderTable.Init(config, this.loggerFactory).WithTimeout(initTimeout);
 
             await base.Start();
         }

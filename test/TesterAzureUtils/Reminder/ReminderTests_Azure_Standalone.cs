@@ -10,6 +10,8 @@ using Orleans.Runtime.ReminderService;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -25,13 +27,14 @@ namespace Tester.AzureUtils.TimerTests
 
         private Guid ServiceId;
 
-        private Logger log;
-        
+        private ILogger log;
+        private ILoggerFactory loggerFactory;
         public ReminderTests_Azure_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
-            log = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            this.loggerFactory = TestingUtils.CreateDefaultLogFactory($"{GetType().Name}.log");
+            log = loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
             ServiceId = Guid.NewGuid();
 
@@ -50,7 +53,7 @@ namespace Tester.AzureUtils.TimerTests
                 DeploymentId = "TMSLocalTesting",
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
-            await table.Init(config, log);
+            await table.Init(config, this.loggerFactory);
 
             await TestTableInsertRate(table, 10);
             await TestTableInsertRate(table, 500);
@@ -67,7 +70,7 @@ namespace Tester.AzureUtils.TimerTests
                 DeploymentId = deploymentId,
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
-            await table.Init(config, log);
+            await table.Init(config, this.loggerFactory);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
             Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);

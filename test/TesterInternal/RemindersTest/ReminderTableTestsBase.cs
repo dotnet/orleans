@@ -11,6 +11,8 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
+using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.RemindersTest
 {
@@ -18,7 +20,7 @@ namespace UnitTests.RemindersTest
     public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
         protected readonly TestEnvironmentFixture ClusterFixture;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private readonly IReminderTable remindersTable;
 
@@ -26,8 +28,9 @@ namespace UnitTests.RemindersTest
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture)
         {
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
             this.ClusterFixture = clusterFixture;
-            logger = new LoggerWrapper<MembershipTableTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
+            logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
 
@@ -44,7 +47,7 @@ namespace UnitTests.RemindersTest
             };
 
             var rmndr = CreateRemindersTable();
-            rmndr.Init(globalConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            rmndr.Init(globalConfiguration, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
             remindersTable = rmndr;
         }
 
