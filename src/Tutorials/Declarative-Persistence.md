@@ -58,7 +58,7 @@ var config = ClusterConfiguration.LocalhostPrimarySilo();
 config.AddMemoryStorageProvider();
 
 // Add this line to use the Azure storage emulator
-// config.AddAzureBlobStorageProvider("AzureStore", "UseDevelopmentStorage=true");
+// config.AddAzureTableStorageProvider("AzureStore", "UseDevelopmentStorage=true");
 // Add this line to use an Azure storage account
 // config.AddAzureBlobStorageProvider("AzureStore", "[insert data connection string]");
 
