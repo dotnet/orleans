@@ -187,7 +187,7 @@ public class Employee : Grain, Interfaces.IEmployee
 and
 
 ``` csharp
-public class Manager : Employee, IManager
+public class Manager : Grain, IManager
 {
     public Task AddDirectReport(IEmployee employee)
     {
