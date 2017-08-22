@@ -215,7 +215,7 @@ This ability is essential in making the programming model a smooth transition fr
         return TaskDone.Done;
     }
 </code></pre><p>and</p>
-<pre><code class="lang-csharp">public class Manager : Employee, IManager
+<pre><code class="lang-csharp">public class Manager : Grain, IManager
 {
     public Task AddDirectReport(IEmployee employee)
     {
