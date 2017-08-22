@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.AzureUtils
 {
@@ -15,7 +15,7 @@ namespace Orleans.AzureUtils
 
         #region Implementation of IGatewayListProvider
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration conf, Logger logger)
+        public async Task InitializeGatewayListProvider(ClientConfiguration conf)
         {
             config = conf;
             siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);

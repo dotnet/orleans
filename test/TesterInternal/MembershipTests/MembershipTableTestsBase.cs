@@ -13,6 +13,8 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
+using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.MembershipTests
 {
@@ -42,8 +44,9 @@ namespace UnitTests.MembershipTests
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
             this.environment = environment;
-            LogManager.Initialize(new NodeConfiguration());
-            logger = new LoggerWrapper<MembershipTableTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
+            logger = new LoggerWrapper<MembershipTableTestsBase>(loggerFactory);
+
             deploymentId = "test-" + Guid.NewGuid();
 
             logger.Info("DeploymentId={0}", deploymentId);
@@ -58,7 +61,7 @@ namespace UnitTests.MembershipTests
             };
 
             membershipTable = CreateMembershipTable(logger);
-            membershipTable.InitializeMembershipTable(globalConfiguration, true, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            membershipTable.InitializeMembershipTable(globalConfiguration, true, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
             var clientConfiguration = new ClientConfiguration
             {
@@ -68,7 +71,7 @@ namespace UnitTests.MembershipTests
             };
 
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;

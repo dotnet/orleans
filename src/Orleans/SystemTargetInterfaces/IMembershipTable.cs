@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {
@@ -19,8 +20,7 @@ namespace Orleans
         /// </summary>
         /// <param name="globalConfiguration">the give global configuration</param>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
-        /// <param name="logger">the logger used by the membership table</param>
-        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, Logger logger);
+        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion);
 
         /// <summary>
         /// Deletes all table entries of the given deploymentId

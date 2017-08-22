@@ -13,6 +13,7 @@ using OrleansAWSUtils;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using OrleansAWSUtils.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Storage
 {
@@ -58,6 +59,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Orleans Logger instance
         /// </summary>
+        [Obsolete]
         public Logger Log { get; private set; }
 
         private DynamoDBStorage storage;
@@ -101,7 +103,7 @@ namespace Orleans.Storage
 
             Log.Info(ErrorCode.StorageProviderBase, "AWS DynamoDB Provider: {0}", initMsg);
 
-            storage = new DynamoDBStorage(config.Properties[DATA_CONNECTION_STRING_PROPERTY_NAME], Log);
+            storage = new DynamoDBStorage(config.Properties[DATA_CONNECTION_STRING_PROPERTY_NAME], providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>());
             return storage.InitializeTable(tableName,
                 new List<KeySchemaElement>
                 {

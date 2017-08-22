@@ -11,6 +11,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -141,7 +143,7 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
-            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
+            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
             {
                 return Task.CompletedTask;
             }

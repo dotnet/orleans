@@ -249,7 +249,7 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal()
         {
-            await this.gatewayListProvider.InitializeGatewayListProvider(config, LogManager.GetLogger(gatewayListProvider.GetType().Name))
+            await this.gatewayListProvider.InitializeGatewayListProvider(config, this.loggerFactory)
                                .WithTimeout(initTimeout);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative

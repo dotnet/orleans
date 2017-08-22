@@ -6,7 +6,8 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class LoggerWrapper<T> : Logger
+    //TODO: Mark it as [Obsolete] and internal after all runtime has migrated
+    public class LoggerWrapper<T> : Logger
     {
         private readonly LoggerWrapper logger;
         public LoggerWrapper(ILoggerFactory loggerFactory)
@@ -99,8 +100,8 @@ namespace Orleans.Runtime
         }
     }
 
-    //TODO: Mark it as [Obsolete] after all runtime has migrated
-    internal class LoggerWrapper : Logger
+    //TODO: Mark it as [Obsolete] and internal after all runtime has migrated
+    public class LoggerWrapper : Logger
     {
         public override Severity SeverityLevel => this.maxSeverityLevel;
         public override string Name => this.name;

@@ -66,7 +66,7 @@ namespace Orleans.Messaging
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider(ClientConfiguration cfg, Logger logger)
+        public Task InitializeGatewayListProvider(ClientConfiguration cfg)
         {
             config = cfg;
             knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();

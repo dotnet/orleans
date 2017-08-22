@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Extension methods which preserves legacy orleans log methods style
     /// </summary>
-    internal static class OrleansLoggerExtension
+    public static class OrleansLoggerExtension
     {
         /// <summary>
         /// Writes a log entry at the Debug severity level.
