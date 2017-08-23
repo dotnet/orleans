@@ -413,11 +413,13 @@ namespace UnitTests.Serialization
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string hash set with comparer
             var result = deserialized as HashSet<string>;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string hash set with comparer
+#pragma warning disable xUnit2017 // Do not use Contains() to check if a value exists in a collection
             foreach (var key in source1)
             {
-                Assert.Contains(key, result); //key is missing after round-trip of string hash set with comparer
+                Assert.True(result.Contains(key)); //key is missing after round-trip of string hash set with comparer
             }
-            Assert.Contains("One", result); //Comparer is wrong after round-trip of string hash set with comparer
+            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string hash set with comparer
+#pragma warning restore xUnit2017 // Do not use Contains() to check if a value exists in a collection
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -479,11 +481,13 @@ namespace UnitTests.Serialization
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string sorted set with comparer
             var result = (SortedSet<string>)deserialized;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string sorted set with comparer
+#pragma warning disable xUnit2017 // Do not use Contains() to check if a value exists in a collection
             foreach (var key in source1)
             {
-                Assert.Contains(key, result); //key is missing after round-trip of string sorted set with comparer
+                Assert.True(result.Contains(key)); //key is missing after round-trip of string sorted set with comparer
             }
-            Assert.Contains("One", result); //Comparer is wrong after round-trip of string sorted set with comparer
+            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string sorted set with comparer
+#pragma warning restore xUnit2017 // Do not use Contains() to check if a value exists in a collection
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
