@@ -176,6 +176,7 @@ namespace UnitTests.StorageTests.Relational
         /// Writes to storage, clears and reads back and asserts both the version and the state.
         /// </summary>
         /// <typeparam name="T"></typeparam>
+        /// <param name="grainTypeName">The type of the grain.</param>
         /// <param name="grainReference">The grain reference as would be given by Orleans.</param>
         /// <param name="grainState">The grain state the grain would hold and Orleans pass.</param>
         /// <returns></returns>

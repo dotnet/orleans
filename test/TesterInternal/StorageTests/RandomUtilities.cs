@@ -156,7 +156,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="symbolSet">The set of symbols from which the random characters are drawn from.</param>
         /// <param name="count">The count of random symbols.</param>
         /// <returns>A random string.</returns>
-        /// <exception><see cref="ArgumentNullException"/>.
+        /// <exception cref="ArgumentNullException"/>.
         /// <exception cref="ArgumentOutOfRangeException"/>.
         public static string GetRandomCharacters(SymbolSet symbolSet, long count)
         {
@@ -170,7 +170,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="symbolSet">The set of symbols from which the random characters are drawn from.</param>
         /// <param name="count">The count of random symbols.</param>
         /// <returns>A random string.</returns>
-        /// <exception><see cref="ArgumentNullException"/>.
+        /// <exception cref="ArgumentNullException"/>.
         /// <exception cref="ArgumentOutOfRangeException"/>.
         public static string GetRandomCharacters(SymbolSet symbolSet, Range<long> count)
         {
@@ -221,6 +221,8 @@ namespace UnitTests.StorageTests.Relational
         /// <typeparam name="TGrainKey">The grain key type.</typeparam>
         /// <typeparam name="TGrainGeneric">The type of the generic part of a grain.</typeparam>
         /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="symbolSet">symbolset to use.</param>
+        /// <param name="symbolCount">number of symbols to take from symbol set.</param>
         /// <param name="keyExtension">Should an extension key be defined or not.</param>
         /// <returns>Random value of the given type.</returns>
         /// <exception cref="ArgumentException"/>.

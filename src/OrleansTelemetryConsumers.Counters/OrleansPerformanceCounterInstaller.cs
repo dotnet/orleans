@@ -27,7 +27,7 @@ namespace OrleansTelemetryConsumers.Counters
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);
             var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
-            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes(true).Keys.ToList();
+            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
             consumer = new OrleansPerfCounterTelemetryConsumer();
         }
 

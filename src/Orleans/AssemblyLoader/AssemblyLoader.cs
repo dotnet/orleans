@@ -306,7 +306,7 @@ namespace Orleans.Runtime
             {
                 matched = MatchWithLoadedAssembly(AssemblyName.GetAssemblyName(asmPathName));
             }
-            catch (BadImageFormatException ex)
+            catch (BadImageFormatException)
             {
                 // this can happen when System.Reflection.Metadata or System.Collections.Immutable assembly version is different (one requires the other) and there is no correct binding redirect in the app.config
                 complaints = null;

@@ -48,7 +48,7 @@ namespace Orleans.Runtime
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
         }
 
-        public void Start(bool strict = true)
+        public void Start()
         {
             // loading application assemblies now occurs in four phases.
             // 1. We scan the file system for assemblies meeting pre-determined criteria, specified in SiloAssemblyLoader.LoadApplicationAssemblies (called by the constructor).
@@ -58,10 +58,10 @@ namespace Orleans.Runtime
             this.serializationManager.LogRegisteredTypes();
 
             // 3. We scan types in memory for GrainTypeData objects that describe grain classes and their corresponding grain state classes.
-            InitializeGrainClassData(loader, strict);
+            InitializeGrainClassData(loader);
 
             // 4. We scan types in memory for grain method invoker objects.
-            InitializeInvokerMap(loader, strict);
+            InitializeInvokerMap(loader);
 
             InitializeInterfaceMap();
         }
@@ -174,15 +174,15 @@ namespace Orleans.Runtime
             return grainInterfaceMap.GetInterfaceVersion(ifaceId);
         }
 
-        private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
+        private void InitializeGrainClassData(SiloAssemblyLoader loader)
         {
-            grainTypes = loader.GetGrainClassTypes(strict);
+            grainTypes = loader.GetGrainClassTypes();
             LogManager.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
-        private void InitializeInvokerMap(SiloAssemblyLoader loader, bool strict)
+        private void InitializeInvokerMap(SiloAssemblyLoader loader)
         {
-            IEnumerable<KeyValuePair<int, Type>> types = loader.GetGrainMethodInvokerTypes(strict);
+            IEnumerable<KeyValuePair<int, Type>> types = loader.GetGrainMethodInvokerTypes();
             foreach (var i in types)
             {
                 int ifaceId = i.Key;

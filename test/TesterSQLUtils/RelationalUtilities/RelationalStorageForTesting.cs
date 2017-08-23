@@ -68,6 +68,7 @@ namespace UnitTests.General
         /// Converts the given script into batches to execute sequentially
         /// </summary>
         /// <param name="setupScript">the script. usually CreateOrleansTables_xxxx.sql</param>
+        /// <param name="databaseName">the name of the database</param>
         protected abstract IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName);
 
         public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string connectionString = null)

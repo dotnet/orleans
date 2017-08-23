@@ -151,9 +151,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
-        /// <param name="initializationParams">
-        /// The silo initialization parameters.
-        /// </param>
+        /// <param name="initializationParams">The silo initialization parameters.</param>
+        /// <param name="services">Dependency Injection container</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
         internal Silo(SiloInitializationParameters initializationParams, IServiceProvider services)
