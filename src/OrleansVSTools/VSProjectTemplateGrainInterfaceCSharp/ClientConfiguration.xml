@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<!-- 
-	This is a sample client configuration file. 
--->
-<ClientConfiguration xmlns="urn:orleans">
-  <GatewayProvider ProviderType="Config"/>
-  <Gateway Address="localhost" Port="30000"/>
-  <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
-</ClientConfiguration>

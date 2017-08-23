@@ -1,88 +1,59 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <DownloadNuGetExe>true</DownloadNuGetExe>
-    <NuGetPackageImportStamp>120dbc2c</NuGetPackageImportStamp>
+    <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
+    <Title>Microsoft Orleans Build-time Code Generation</Title>
+    <Description>Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.</Description>
+    <IsTool>true</IsTool>
+    <IncludeReferencedProjects>true</IncludeReferencedProjects>
   </PropertyGroup>
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform>AnyCPU</Platform>
-    <ProductVersion>10.0.20506</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{E782DD19-51F7-4F66-8217-BACAC33767E4}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.CodeGeneration</RootNamespace>
     <AssemblyName>ClientGenerator</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
-    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
-    <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <Prefer32Bit>false</Prefer32Bit>
-    <WarningsAsErrors>4014</WarningsAsErrors>
+
+  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <TargetFramework>net462</TargetFramework>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
-    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisFailOnMissingRules>false</CodeAnalysisFailOnMissingRules>
-    <Prefer32Bit>false</Prefer32Bit>
-    <WarningsAsErrors>4014</WarningsAsErrors>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Bootstrap)' == 'true'">
-    <OutputPath>$(BootstrapOutputPath)</OutputPath>
-    <OutDir>$(BootstrapOutputPath)</OutDir>
-    <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
-    <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>false</SignAssembly>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="System" />
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="ClientGenerator.cs" />
-    <Compile Include="Program.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
-      <Link>Properties\GlobalAssemblyInfo.cs</Link>
-    </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
-      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
-      <Name>OrleansCodeGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
-      <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
-      <Name>Orleans</Name>
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <PrivateAssets>all</PrivateAssets>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="project.json" />
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <ItemGroup>
+    <None Include="..\Orleans.SDK.targets">
+      <Pack>true</Pack>
+      <PackagePath>build\$(PackageId).targets</PackagePath>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(OutDir)/Orleans.PlatformServices.dll" Condition=" '$(BuildFlavor)' == 'Current' ">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
 </Project>

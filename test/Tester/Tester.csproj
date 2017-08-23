@@ -1,246 +1,35 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Tester</RootNamespace>
     <AssemblyName>Tester</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <WarningsAsErrors>4014</WarningsAsErrors>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Xml" />
+
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <Compile Remove="SiloInitializationTests.cs" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
-    <Compile Include="ClientConnectionTests\ClientDisconnectionEventTests.cs" />
-    <Compile Include="ClientConnectionTests\GatewayConnectionTests.cs" />
-    <Compile Include="CollectionFixtures.cs" />
-    <Compile Include="DependencyInjectionDisambiguationTests.cs" />
-    <Compile Include="Lifecycle\LifecycleTests.cs" />
-    <Compile Include="StorageFacet\Feature.Infrastructure\ExampleStorageExtensions.cs" />
-    <Compile Include="StorageFacet\Feature.Infrastructure\ExampleStorageAttributeMapper.cs" />
-    <Compile Include="StorageFacet\Feature.Implementations\BlobExampleStorage.cs" />
-    <Compile Include="StorageFacet\Feature.Implementations\TableExampleStorage.cs" />
-    <Compile Include="StorageFacet\Feature.Abstractions\ExampleStorageAttribute.cs" />
-    <Compile Include="StorageFacet\StorageFacetGrain.cs" />
-    <Compile Include="StorageFacet\Feature.Infrastructure\NamedExampleStorageFactory.cs" />
-    <Compile Include="StorageFacet\StorageFacetTests.cs" />
-    <Compile Include="StorageFacet\Feature.Abstractions\IExampleStorage.cs" />
-    <Compile Include="GrainActivatorTests.cs" />
-    <Compile Include="EventSourcingTests\AccountGrainTests.cs" />
-    <Compile Include="EventSourcingTests\ChatGrainTests.cs" />
-    <Compile Include="EventSourcingTests\CountersGrainPerfTests.cs" />
-    <Compile Include="EventSourcingTests\CountersGrainTests.cs" />
-    <Compile Include="EventSourcingTests\EventSourcingClusterFixture.cs" />
-    <Compile Include="EventSourcingTests\PersonGrainTests.cs" />
-    <Compile Include="FakeSerializer.cs" />
-    <Compile Include="Forwarding\ShutdownSiloTests.cs" />
-    <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
-    <Compile Include="GrainServiceTests\CustomGrainService.cs" />
-    <Compile Include="GrainServiceTests\GrainServiceTests.cs" />
-    <Compile Include="HeterogeneousSilosTests\UpgradeTests\RuntimeStrategyChangeTests.cs" />
-    <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTests.cs" />
-    <Compile Include="HeterogeneousSilosTests\UpgradeTests\UpgradeTestsBase.cs" />
-    <Compile Include="HeterogeneousSilosTests\UpgradeTests\VersionPlacementTests.cs" />
-    <Compile Include="Placement\CustomPlacementTests.cs" />
-    <Compile Include="SerializationTests\DeepCopyTests.cs" />
-    <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
-    <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
-    <Compile Include="SiloInitializationTests.cs" />
-    <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
-    <Compile Include="GeoClusterTests\MultiClusterDataTests.cs" />
-    <Compile Include="DependencyInjectionGrainTests.cs" />
-    <Compile Include="DuplicateActivationsTests.cs" />
-    <Compile Include="ExceptionPropagationTests.cs" />
-    <Compile Include="MembershipTests\LivenessTests.cs" />
-    <Compile Include="MembershipTests\SilosStopTests.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
-      <Link>Properties\GlobalAssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="GrainCallFilterTests.cs" />
-    <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
-    <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
-    <Compile Include="StreamingTests\ControllableStreamGeneratorProviderTests.cs" />
-    <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
-    <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
-    <Compile Include="StreamingTests\GeneratedStreamRecoveryTests.cs" />
-    <Compile Include="StreamingTests\PlugableQueueBalancerTests\LeaseBasedQueueBalancer.cs" />
-    <Compile Include="StreamingTests\PlugableQueueBalancerTests\LeaseManagerGrain.cs" />
-    <Compile Include="StreamingTests\PlugableQueueBalancerTests\PluggableQueueBalancerTestBase.cs" />
-    <Compile Include="StreamingTests\PlugableQueueBalancerTests\PluggableQueueBalancerTestsWithMemoryStreamProvider.cs" />
-    <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubcribeTests.cs" />
-    <Compile Include="StreamingTests\MemoryStreamProviderClientTests.cs" />
-    <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubscribeTestsWithDynamicProviderConfiguration.cs" />
-    <Compile Include="StreamingTests\ProgrammaticSubscribeTests\ProgrammaticSubscribeTestsWithImplicitSubscrbingGrains.cs" />
-    <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
-    <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />
-    <Compile Include="StreamingTests\SampleStreamingTests.cs" />
-    <Compile Include="StreamingTests\SMSClientStreamTests.cs" />
-    <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
-    <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
-    <Compile Include="StreamingTests\StreamFilteringTestsBase.cs" />
-    <Compile Include="StreamingTests\StreamFilteringTests_SMS.cs" />
-    <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
-    <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
-    <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
-    <Compile Include="TestStreamProviders\FailureInjectionStreamProvider.cs" />
-    <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
-    <Compile Include="TestUtils.cs" />
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
   </ItemGroup>
+
   <ItemGroup>
-    <Content Include="..\..\src\Build\Version.txt">
-      <Link>Version.txt</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\Deployment.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.csproj" />
+    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.csproj">
-      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
-      <Name>ClientGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
-      <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
-      <Name>OrleansAzureUtils</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
-      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
-      <Name>OrleansCodeGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj">
-      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
-      <Name>OrleansEventSourcing</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
-      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
-      <Name>OrleansProviders</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
-      <Name>OrleansRuntime</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
-      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
-      <Name>OrleansTestingHost</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
-      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
-      <Name>Orleans</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestFSharpInterfaces\TestFSharpInterfaces.fsproj">
-      <Project>{2375d7d5-9b30-493f-9c2e-a6b2811a3c5a}</Project>
-      <Name>TestFSharpInterfaces</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
-      <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
-      <Name>TestFSharp</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
-      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
-      <Name>TestGrainInterfaces</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
-      <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
-      <Name>TestGrains</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj">
-      <Project>{aeff3b6c-7986-4bf9-85f5-2571decf8959}</Project>
-      <Name>TestInterfaces</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
-      <Project>{8fd242b4-eda9-42cd-ba39-e410b98add26}</Project>
-      <Name>TestExtensions</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
-      <Project>{4682ABC1-1A51-4794-8012-DA8E59EBC72E}</Project>
-      <Name>TestInternalGrains</Name>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.csproj">
-      <Project>{668ac915-7c11-4ec7-a899-bb49011e529a}</Project>
-      <Name>TestVersionGrains</Name>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="ReadMe.md" />
+    <None Include="App.config" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="project.json" />
   </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

@@ -46,10 +46,11 @@ namespace Orleans.CodeGeneration
 
         /// <summary>
         /// Generates one GrainReference class for each Grain Type in the inputLib file 
-        /// and output one GrainClient.dll under outputLib directory
+        /// and output code file under outputLib directory
         /// </summary>
         private static bool CreateGrainClientAssembly(CodeGenOptions options)
         {
+            string generatedCode = null;
             AppDomain appDomain = null;
             try
             {
@@ -75,19 +76,36 @@ namespace Orleans.CodeGeneration
                         typeof(GrainClientGenerator).FullName);
 
                 // Call a method 
-                return generator.CreateGrainClient(options);
+                generatedCode = generator.CreateGrainClient(options);
             }
             finally
             {
                 if (appDomain != null) AppDomain.Unload(appDomain); // Unload the AppDomain
             }
+
+            if (generatedCode != null)
+            {
+                using (var sourceWriter = new StreamWriter(options.OutputFileName))
+                {
+                    sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
+                    DisableWarnings(sourceWriter, suppressCompilerWarnings);
+                    sourceWriter.WriteLine(generatedCode);
+                    RestoreWarnings(sourceWriter, suppressCompilerWarnings);
+                    sourceWriter.WriteLine("#endif");
+                }
+
+                ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", options.OutputFileName);
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
         /// Generate one GrainReference class for each Grain Type in the inputLib file 
-        /// and output one GrainClient.dll under outputLib directory
+        /// and output a string with the code
         /// </summary>
-        private bool CreateGrainClient(CodeGenOptions options)
+        private string CreateGrainClient(CodeGenOptions options)
         {
             // Load input assembly 
             // special case Orleans.dll because there is a circular dependency.
@@ -109,19 +127,8 @@ namespace Orleans.CodeGeneration
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);
-            
-            using (var sourceWriter = new StreamWriter(options.OutputFileName))
-            {
-                sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
-                DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine(codeGenerator.GenerateSourceForAssembly(grainAssembly));
-                RestoreWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine("#endif");
-            }
 
-            ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", options.OutputFileName);
-
-            return true;
+            return codeGenerator.GenerateSourceForAssembly(grainAssembly);
         }
 
         private static void DisableWarnings(TextWriter sourceWriter, IEnumerable<int> warnings)

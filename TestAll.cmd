@@ -1,28 +1,16 @@
-@if not defined _echo @echo off
-setlocal
+@setlocal
+@ECHO off
 
-if [%1]==[]                GOTO NETFX
-if [%1]==[netfx]           GOTO NETFX
-if [%1]==[netstandard-win] GOTO VNEXT
-if [%1]==[netstandard]     GOTO VNEXT
-if [%1]==[all]             GOTO ALL
+SET CMDHOME=%~dp0
+@REM Remove trailing backslash \
+set CMDHOME=%CMDHOME:~0,-1%
 
-:NETFX
-cmd /c "%~dp0src\TestAll.cmd"
-set exitcode=%errorlevel%
-GOTO END
+@REM Due to more of Windows .cmd script parameter passing quirks, we can't pass this value as cmdline argument, 
+@REM  so we need to pass it in through the back door as environment variable, scoped by setlocal
+set TEST_FILTERS=-trait "Category=BVT" -trait "Category=SlowBVT" -trait "Category=Functional"
 
-:VNEXT
-cmd /c "%~dp0vNext\TestAll.cmd"
-set exitcode=%errorlevel%
-GOTO END
+@REM Note: We transfer _complete_ control to the Test.cmd script here because we don't use CALL.
 
-:ALL
-cmd /c "%~dp0src\TestAll.cmd"
-set exitcode=%errorlevel%
-cmd /c "%~dp0vNext\TestAll.cmd"
-set /a exitcode=%errorlevel%+%exitcode%
+"%CMDHOME%\Test.cmd" %1
 
-:END
-endlocal&set exitcode=%exitcode%
-exit /B %exitcode%
+@REM Note: Execution will NOT return here, and the exit code returned to the caller will be whatever the other script returned.

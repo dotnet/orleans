@@ -9,9 +9,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <!-- Work out the path to ClientGenerator.exe -->
   <Choose>
     <!-- Using Orleans NuGet packages -->
-    <When Condition="Exists('$(MSBuildThisFileDirectory)..\tools\ClientGenerator.exe')">
+    <When Condition="Exists('$(MSBuildThisFileDirectory)../tools/ClientGenerator.exe')">
       <PropertyGroup>
-        <CodeGenToolExeDir>$(MSBuildThisFileDirectory)..\tools</CodeGenToolExeDir>
+        <CodeGenToolExeDir>$(MSBuildThisFileDirectory)../tools</CodeGenToolExeDir>
       </PropertyGroup>
     </When>
     <!-- Internal build within Orleans.sln -->
@@ -30,16 +30,15 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     </When>
     <Otherwise>
       <PropertyGroup>
-        <CodeGenToolExe>$(CodeGenToolExeDir)\ClientGenerator.exe</CodeGenToolExe>
+        <CodeGenToolExe>$(CodeGenToolExeDir)/ClientGenerator.exe</CodeGenToolExe>
       </PropertyGroup>
     </Otherwise>
   </Choose>
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansCodeGeneration"
-          AfterTargets="BeforeCompile"
-          BeforeTargets="CoreCompile"
-          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true' and '$(DesignTimeBuild)' != 'true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
