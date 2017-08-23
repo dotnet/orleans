@@ -235,16 +235,16 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect()
         {
-            ObserverTest_Disconnect(false);
+            ObserverTest_DisconnectRunner(false);
         }
 
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect2()
         {
-            ObserverTest_Disconnect(true);
+            ObserverTest_DisconnectRunner(true);
         }
 
-        public void ObserverTest_Disconnect(bool observeTwice)
+        public void ObserverTest_DisconnectRunner(bool observeTwice)
         {
             // this is for manual repro & validation in the debugger
             // wait to send event because it takes 60s to drop client grain

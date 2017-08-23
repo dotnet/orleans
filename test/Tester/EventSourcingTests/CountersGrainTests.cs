@@ -48,7 +48,7 @@ namespace Tester.EventSourcingTests
         public async Task ConcurrentIncrements()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
-            await ConcurrentIncrements(grain, 50, false);
+            await ConcurrentIncrementsRunner(grain, 50, false);
         }
 
 
@@ -57,7 +57,7 @@ namespace Tester.EventSourcingTests
         private string RandomKey() { return keys[random.Next(keys.Length)]; }
 
 
-        private async Task ConcurrentIncrements(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
+        private async Task ConcurrentIncrementsRunner(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
         {
             // increment (count) times, on random keys, concurrently
             var tasks = new List<Task>();

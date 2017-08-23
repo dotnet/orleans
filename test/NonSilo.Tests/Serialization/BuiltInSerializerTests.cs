@@ -54,7 +54,7 @@ namespace UnitTests.Serialization
             NoFallback
         }
 
-        public static object[] FallbackSerializers =
+        public static IEnumerable<object[]> FallbackSerializers = new[]
         {
             new object[] { SerializerToUse.Default },
 #if !NETSTANDARD_TODO

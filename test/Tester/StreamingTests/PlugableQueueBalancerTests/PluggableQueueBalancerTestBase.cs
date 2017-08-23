@@ -30,7 +30,7 @@ namespace Tester.StreamingTests
             return config;
         }
 
-        public virtual async Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
+        public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var responsibilityMap = await leaseManager.GetResponsibilityMap();

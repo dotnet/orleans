@@ -13,9 +13,9 @@ namespace AWSUtils.Tests.StorageTests
 {
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    internal class DynamoDBStorageProviderTests
+    public class DynamoDBStorageProviderTests
     {
-        protected CommonStorageTests PersistenceStorageTests { get; }
+        internal CommonStorageTests PersistenceStorageTests { get; }
         private IProviderRuntime DefaultProviderRuntime { get; }
         private const string TABLE_NAME = "DynamoDBStorageProviderTests";
 

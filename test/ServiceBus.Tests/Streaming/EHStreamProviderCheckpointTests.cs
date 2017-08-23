@@ -56,14 +56,14 @@ namespace ServiceBus.Tests.StreamingTests
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
-            await ReloadFromCheckpointTest(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
+            await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
         [Fact]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
-            await RestartSiloAfterCheckpointTest(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 8, 32);
+            await this.RestartSiloAfterCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 8, 32);
         }
 
         public override void Dispose()
@@ -74,7 +74,7 @@ namespace ServiceBus.Tests.StreamingTests
             base.Dispose();
         }
 
-        private async Task ReloadFromCheckpointTest(string streamNamespace, int streamCount, int eventsInStream)
+        private async Task ReloadFromCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
         {
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
@@ -94,7 +94,7 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        private async Task RestartSiloAfterCheckpointTest(string streamNamespace, int streamCount, int eventsInStream)
+        private async Task RestartSiloAfterCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
         {
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
