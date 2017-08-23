@@ -204,3 +204,6 @@ FakesAssemblies/
 src/SetupTestScriptOutput.txt
 
 \.DS_Store
+
+# Binary MSBuild Log files
+*.binlog
