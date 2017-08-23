@@ -1191,12 +1191,14 @@ namespace UnitTests.StorageTests
         {
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             // set up SetVal func args
-            var args = new MockStorageProvider.SetValueArgs();
-            args.Val = newValue;
-            args.Name = "Field1";
-            args.GrainType = grainType;
-            args.GrainReference = (GrainReference)grain;
-            args.StateType = typeof(PersistenceTestGrainState);
+            var args = new MockStorageProvider.SetValueArgs
+            {
+                Val = newValue,
+                Name = "Field1",
+                GrainType = grainType,
+                GrainReference = (GrainReference) grain,
+                StateType = typeof(PersistenceTestGrainState)
+            };
             mgmtGrain.SendControlCommandToProvider(providerTypeFullName,
                 providerName, (int)MockStorageProvider.Commands.SetValue, args).Wait();
         }

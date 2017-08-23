@@ -42,18 +42,32 @@ namespace UnitTests.Serialization
                 Assert.Equal(2, original[1][0]);
             }
             {
-                var original = new Dictionary<int, int>();
-                original[0] = 1;
-                original[1] = 2;
+                var original = new Dictionary<int, int>
+                {
+                    [0] = 1,
+                    [1] = 2
+                };
                 var copy = (Dictionary<int, int>)this.fixture.SerializationManager.DeepCopy(original);
                 copy[1] = 0;
                 Assert.Equal(2, original[1]);
             }
             {
-                var original = new Dictionary<string, Dictionary<string, string>>();
-                original["a"] = new Dictionary<string, string>();
-                original["a"]["0"] = "1";
-                original["a"]["1"] = "2";
+                var original = new Dictionary<string, Dictionary<string, string>>
+                {
+                    ["a"] = new Dictionary<string, string>
+                    {
+                        ["0"] = "1",
+                        ["1"] = "2"
+                    },
+                    ["a"] =
+                    {
+                        ["0"] = "1"
+                    },
+                    ["a"] =
+                    {
+                        ["1"] = "2"
+                    }
+                };
                 var copy = (Dictionary<string, Dictionary<string, string>>)this.fixture.SerializationManager.DeepCopy(original);
                 copy["a"]["1"] = "";
                 Assert.Equal("2", original["a"]["1"]);

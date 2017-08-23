@@ -457,10 +457,7 @@ namespace UnitTests.General
         public void StateChanged(int a, int b)
         {
             output.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
-            if (action != null)
-            {
-                action(a, b, result);
-            }
+            this.action?.Invoke(a, b, this.result);
         }
     }
 
