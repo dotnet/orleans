@@ -33,9 +33,11 @@ namespace UnitTests.OrleansRuntime.Streams
             FixedSizeBuffer buffer = pool.Allocate();
             ArraySegment<byte> segment;
             Assert.False(buffer.TryGetSegment(TestBlockSize + 1, out segment), "Should not be able to get segement that is bigger than block.");
-           Assert.Null(segment.Array);
+            Assert.Null(segment.Array);
             Assert.Equal(0, segment.Offset);
+#pragma warning disable xUnit2013 // Do not use equality check to check for collection size.
             Assert.Equal(0, segment.Count);
+#pragma warning restore xUnit2013 // Do not use equality check to check for collection size.
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -60,12 +62,14 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 Assert.True(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", i + 1));
                 Assert.Equal(i, segment.Offset);
-                Assert.Equal(1, segment.Count);
+                Assert.Single(segment);
             }
             Assert.False(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", TestBlockSize + 1));
-           Assert.Null(segment.Array);
+            Assert.Null(segment.Array);
             Assert.Equal(0, segment.Offset);
+#pragma warning disable xUnit2013 // Do not use equality check to check for collection size.
             Assert.Equal(0, segment.Count);
+#pragma warning restore xUnit2013 // Do not use equality check to check for collection size.
         }
 
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)

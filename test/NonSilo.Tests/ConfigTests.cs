@@ -76,7 +76,7 @@ namespace UnitTests
             Assert.Equal<IPEndPoint>(new IPEndPoint(IPAddress.IPv6Loopback, 22222), config.Globals.SeedNodes[1]); // Second seed node is set incorrectly
 
             Assert.Equal<int>(12345, config.Defaults.Port); // Default port is set incorrectly
-            Assert.Equal<string>("UnitTests.General.TestStartup,Tester", config.Defaults.StartupTypeName);
+            Assert.Equal("UnitTests.General.TestStartup,Tester", config.Defaults.StartupTypeName);
 
             NodeConfiguration nc;
             bool hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node1", out nc);
@@ -85,7 +85,7 @@ namespace UnitTests
             Assert.True(nc.IsPrimaryNode, "Node1 should be primary node");
             Assert.True(nc.IsSeedNode, "Node1 should be seed node");
             Assert.False(nc.IsGatewayNode, "Node1 should not be gateway node");
-            Assert.Equal<string>("UnitTests.General.TestStartup,Tester", nc.StartupTypeName); // Startup type should be copied automatically
+            Assert.Equal("UnitTests.General.TestStartup,Tester", nc.StartupTypeName); // Startup type should be copied automatically
 
             hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node2", out nc);
             Assert.True(hasNodeConfig, "Node Node2 has config");
@@ -356,10 +356,10 @@ namespace UnitTests
             Assert.Equal(filename, cfg.SourceFile);
 
             LogManager.Initialize(cfg);
-            Assert.Equal(1, LogManager.LogConsumers.Count);
+            Assert.Single(LogManager.LogConsumers);
             Assert.Equal(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName); // Log consumer type #1
 
-            Assert.Equal(1, LogManager.TelemetryConsumers.Count);
+            Assert.Single(LogManager.TelemetryConsumers);
             Assert.Equal(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName); // TelemetryConsumers consumer type #1
         }
 
@@ -378,7 +378,7 @@ namespace UnitTests
 
             var actualLogConsumers = LogManager.LogConsumers.Select(x => x.GetType()).ToList();
             Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
-            Assert.Equal(1, actualLogConsumers.Count);
+            Assert.Single(actualLogConsumers);
 
             var actualTelemetryConsumers = LogManager.TelemetryConsumers.Select(x => x.GetType()).ToList();
             Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
@@ -985,7 +985,7 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.Equal(null, config.SourceFile); // SourceFile should be blank for programmatic config
+            Assert.Null(config.SourceFile); // SourceFile should be blank for programmatic config
             Assert.Equal(11, config.PreferedGatewayIndex); // PreferedGatewayIndex picked up from config object
 
             config.CheckGatewayProviderSettings();

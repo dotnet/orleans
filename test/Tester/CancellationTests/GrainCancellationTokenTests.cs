@@ -91,7 +91,7 @@ namespace UnitTests.CancellationTests
             await Task.Delay(TimeSpan.FromMilliseconds(100));
             await tcs.Cancel();
             var result = await grainTask;
-            Assert.Equal(true, result);
+            Assert.True(result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
@@ -103,7 +103,7 @@ namespace UnitTests.CancellationTests
             var grainTask = grains.Item1.CallOtherCancellationTokenCallbackResolve(grains.Item2);
             await tcs.Cancel();
             var result = await grainTask;
-            Assert.Equal(true, result);
+            Assert.True(result);
         }
 
         [Fact, TestCategory("Cancellation")]

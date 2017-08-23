@@ -62,7 +62,7 @@ namespace DefaultCluster.Tests.Management
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
-            SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Initial");
+            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Initial");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
             foreach (var s in stats)
             {
@@ -86,7 +86,7 @@ namespace DefaultCluster.Tests.Management
             where TGrainInterface : IGrainWithIntegerKey
             where TGrain : TGrainInterface
         {
-            SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
+            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Before Create");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
             string grainType = typeof(TGrain).FullName;
@@ -94,14 +94,14 @@ namespace DefaultCluster.Tests.Management
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             var grain1 = this.GrainFactory.GetGrain<TGrainInterface>(random.Next());
             callGrainMethodAction(grain1); // Call grain method
-            stats = GetSimpleGrainStatistics("After Invoke");
+            stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
             int expectedActivationsCount = initialActivationsCount + 1;
             int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             Assert.Equal(expectedActivationsCount, actualActivationsCount);
         }
 
-        private SimpleGrainStatistic[] GetSimpleGrainStatistics(string when)
+        private SimpleGrainStatistic[] GetSimpleGrainStatisticsRunner(string when)
         {
             SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
             StringBuilder sb = new StringBuilder();

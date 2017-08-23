@@ -215,9 +215,9 @@ namespace UnitTests.MembershipTests
         }
 
         //[Fact, TestCategory("Functional"), TestCategory("Membership")]
-        public async Task Liveness_Grain_5_ShutdownRestartZeroLoss()
+        /*public async Task Liveness_Grain_5_ShutdownRestartZeroLoss()
         {
             await Do_Liveness_OracleTest_3();
-        }
+        }*/
     }
 }

@@ -72,7 +72,7 @@ namespace UnitTests.RemindersTest
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j => remindersTable.UpsertRow(reminder)));
             }));
-            Assert.False(upserts.Any(i => i.Distinct().Count() != 5));
+            Assert.DoesNotContain(upserts, i => i.Distinct().Count() != 5);
         }
 
         protected async Task ReminderSimple()

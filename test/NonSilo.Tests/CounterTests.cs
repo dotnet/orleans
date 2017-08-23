@@ -21,7 +21,7 @@ namespace UnitTests
             StatisticName name = new StatisticName(CounterName);
             ICounter<long> ctr = CounterStatistic.FindOrCreate(name);
             Assert.Equal(name.ToString(), ctr.Name);
-            Assert.True(ctr.ToString().Contains(name.Name));
+            Assert.Contains(name.Name, ctr.ToString());
             Assert.Equal(0, ctr.GetCurrentValue());
         }
 

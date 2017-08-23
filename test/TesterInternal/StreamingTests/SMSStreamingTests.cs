@@ -167,10 +167,10 @@ namespace UnitTests.StreamingTests
         }
 
         //[Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task SMS_16_Deactivation_OneProducerGrainOneConsumerGrain()
+/*        public async Task SMS_16_Deactivation_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain();
-        }
+        }*/
 
         //public async Task SMS_17_Persistence_OneProducerGrainOneConsumerGrain()
         //{

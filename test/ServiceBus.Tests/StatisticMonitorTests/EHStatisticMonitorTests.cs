@@ -118,9 +118,9 @@ namespace ServiceBus.Tests.MonitorTests
         {
             Assert.True(totalCacheMonitorCallCounters.TrackCachePressureMonitorStatusChangeCallCounter > 0);
             Assert.True(totalCacheMonitorCallCounters.TrackMemoryAllocatedCallCounter > 0);
-            Assert.Equal(totalCacheMonitorCallCounters.TrackMemoryReleasedCallCounter, 0);
+            Assert.Equal(0, totalCacheMonitorCallCounters.TrackMemoryReleasedCallCounter);
             Assert.True(totalCacheMonitorCallCounters.TrackMessageAddedCounter > 0);
-            Assert.Equal(totalCacheMonitorCallCounters.TrackMessagePurgedCounter, 0);
+            Assert.Equal(0, totalCacheMonitorCallCounters.TrackMessagePurgedCounter);
         }
 
         private void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
@@ -128,13 +128,13 @@ namespace ServiceBus.Tests.MonitorTests
             Assert.Equal(totalReceiverMonitorCallCounters.TrackInitializationCallCounter, ehPartitionCountPerSilo);
             Assert.True(totalReceiverMonitorCallCounters.TrackMessagesReceivedCallCounter > 0);
             Assert.True(totalReceiverMonitorCallCounters.TrackReadCallCounter > 0);
-            Assert.Equal(totalReceiverMonitorCallCounters.TrackShutdownCallCounter, 0);
+            Assert.Equal(0, totalReceiverMonitorCallCounters.TrackShutdownCallCounter);
         }
 
         private void AssertObjectPoolMonitorCallCounters(ObjectPoolMonitorCounters totalObjectPoolMonitorCallCounters)
         {
             Assert.True(totalObjectPoolMonitorCallCounters.TrackObjectAllocatedByCacheCallCounter > 0);
-            Assert.Equal(totalObjectPoolMonitorCallCounters.TrackObjectReleasedFromCacheCallCounter, 0);
+            Assert.Equal(0, totalObjectPoolMonitorCallCounters.TrackObjectReleasedFromCacheCallCounter);
         }
     }
 }

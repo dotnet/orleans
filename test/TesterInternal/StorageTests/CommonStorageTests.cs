@@ -58,7 +58,7 @@ namespace UnitTests.StorageTests.Relational
                 //A sanity checker that the first version really has null as its state. Then it is stored
                 //to the database and a new version is acquired.
                 var firstVersion = grainData.Item2.ETag;
-                Assert.Equal(firstVersion, null);
+                Assert.Null(firstVersion);
 
                 await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
                 var secondVersion = grainData.Item2.ETag;

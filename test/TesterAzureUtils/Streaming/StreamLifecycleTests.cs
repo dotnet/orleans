@@ -187,7 +187,7 @@ namespace UnitTests.StreamingTests
             var activations = await watcher.GetActivateCalls();
             var deactivations = await watcher.GetDeactivateCalls();
             Assert.Equal(2, activations.Length);
-            Assert.Equal(0, deactivations.Length);
+            Assert.Empty(deactivations);
 
             int expectedNumProducers;
             if (uncleanShutdown)
@@ -203,7 +203,7 @@ namespace UnitTests.StreamingTests
             await WaitForDeactivation();
 
             deactivations = await watcher.GetDeactivateCalls();
-            Assert.Equal(1, deactivations.Length);
+            Assert.Single(deactivations);
 
             // Test grains that did unclean shutdown will not have cleaned up yet, so PubSub counts are unchanged here for them
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, "after deactivate first producer", expectedNumProducers, 1,

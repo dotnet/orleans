@@ -118,11 +118,11 @@ namespace UnitTests.MembershipTests
             var entries = new List<string>(gateways.Select(g => g.ToString()));
 
             // only members with a non-zero Gateway port
-            Assert.False(entries.Contains(membershipEntries[3].SiloAddress.ToGatewayUri().ToString()));
+            Assert.DoesNotContain(membershipEntries[3].SiloAddress.ToGatewayUri().ToString(), entries);
 
             // only Active members
-            Assert.True(entries.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString()));
-            Assert.True(entries.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString()));
+            Assert.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString(), entries);
+            Assert.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString(), entries);
             Assert.Equal(2, entries.Count);
         }
 

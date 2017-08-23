@@ -108,7 +108,7 @@ namespace PSUtils.Tests
 
             }
 
-            Assert.Equal(0, nonPdbFiles.Count);
+            Assert.Empty(nonPdbFiles);
 
             string[] cacheFilesAfterScript = Directory.GetFiles(factoryCacheFolder, "*.*", SearchOption.AllDirectories);
             int cacheFileCountAfterScript = cacheFilesAfterScript.Count();

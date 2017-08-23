@@ -46,7 +46,7 @@ namespace Tester.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_BadFunc()
         {
-            await Assert.ThrowsAsync(typeof(ArgumentException), () =>
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                  Test_Filter_BadFunc());
         }
 

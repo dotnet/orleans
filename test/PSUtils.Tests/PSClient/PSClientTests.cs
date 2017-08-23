@@ -134,7 +134,7 @@ namespace PSUtils.Tests
 
             var results = _ps.Invoke<IManagementGrain>();
             //Must be exactly 1 but powershell APIs always return a list
-            Assert.Equal(results.Count, 1);
+            Assert.Single(results);
             _ps.Commands.Clear();
 
             var mgmtGrain = results[0];
@@ -158,7 +158,7 @@ namespace PSUtils.Tests
 
             var stringGrainsResults = _ps.Invoke<IStringGrain>();
             //Must be exactly 1 but powershell APIs always return a list
-            Assert.Equal(stringGrainsResults.Count, 1);
+            Assert.Single(stringGrainsResults);
             _ps.Commands.Clear();
 
             var stringGrain = stringGrainsResults[0];
@@ -172,7 +172,7 @@ namespace PSUtils.Tests
 
             var guidGrainsResults = _ps.Invoke<IGuidGrain>();
             //Must be exactly 1 but powershell APIs always return a list
-            Assert.Equal(guidGrainsResults.Count, 1);
+            Assert.Single(guidGrainsResults);
             _ps.Commands.Clear();
 
             var guidGrain = guidGrainsResults[0];

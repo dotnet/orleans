@@ -51,49 +51,49 @@ namespace Tester.EventSourcingTests
         public async Task Perf_ConfirmEachUpdate_MemoryStateStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await ConcurrentIncrementsRunner(grain, iterations, true);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmAtEndOnly_MemoryStateStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await ConcurrentIncrementsRunner(grain, iterations, false);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmEachUpdate_MemoryLogStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await ConcurrentIncrementsRunner(grain, iterations, true);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmAtEndOnly_MemoryLogStore_NonReentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_NonReentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await ConcurrentIncrementsRunner(grain, iterations, false);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmEachUpdate_MemoryStateStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await ConcurrentIncrementsRunner(grain, iterations, true);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmAtEndOnly_MemoryStateStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_StateStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await ConcurrentIncrementsRunner(grain, iterations, false);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmEachUpdate_MemoryLogStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, true);
+            await ConcurrentIncrementsRunner(grain, iterations, true);
         }
         [Fact, TestCategory("EventSourcing")]
         public async Task Perf_ConfirmAtEndOnly_MemoryLogStore_Reentrant()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain_LogStore_Reentrant");
-            await ConcurrentIncrements(grain, iterations, false);
+            await ConcurrentIncrementsRunner(grain, iterations, false);
         }
 
 

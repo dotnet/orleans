@@ -17,7 +17,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Ambiguous()
         {
-            Xunit.Assert.Throws(typeof(OrleansException), () =>
+            Assert.Throws<OrleansException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId());
             });
@@ -48,7 +48,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_AmbiguousPrefix()
         {
-            Xunit.Assert.Throws(typeof(OrleansException), () =>
+            Assert.Throws<OrleansException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "UnitTests.Grains");
             });
@@ -57,7 +57,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_WrongPrefix()
         {
-            Xunit.Assert.Throws(typeof(ArgumentException), () =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo");
             });
@@ -99,7 +99,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithWrongPrefix()
         {
-            Xunit.Assert.Throws(typeof(ArgumentException), () =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo");
             });

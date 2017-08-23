@@ -31,13 +31,13 @@ namespace DefaultCluster.Tests.StorageTests
 
             List<string> names = await grainWithState.GetNames();
             Assert.NotNull(names);
-            Assert.Equal(0, names.Count);
+            Assert.Empty(names);
 
             // first write
             await grainWithState.AddName("Bob");
             names = await grainWithState.GetNames();
             Assert.NotNull(names);
-            Assert.Equal(1, names.Count);
+            Assert.Single(names);
             Assert.Equal("Bob", names[0]);
 
             // secodn write

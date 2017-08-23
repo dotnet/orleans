@@ -70,13 +70,13 @@ namespace Tester.AzureUtils.TimerTests
             await table.Init(config, log);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
-            Assert.Equal(0,  rows.Count()); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);
+            Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);
 
             ReminderEntry expected = NewReminderEntry();
             await table.UpsertRow(expected);
             rows = (await GetAllRows(table)).ToArray();
 
-            Assert.Equal(1,  rows.Count()); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, deploymentId);
+            Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, deploymentId);
             ReminderEntry actual = rows[0];
             Assert.Equal(expected.GrainRef,  actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, deploymentId);
             Assert.Equal(expected.ReminderName,  actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, deploymentId);

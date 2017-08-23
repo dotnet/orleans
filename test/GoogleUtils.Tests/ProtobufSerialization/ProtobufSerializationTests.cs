@@ -39,7 +39,7 @@ namespace GoogleUtils.Tests.Serialization
             AddressBook restored = AddressBook.Parser.ParseFrom(bytes);
 
             Assert.NotSame(book, restored); //The serializer returned an instance of the same object
-            Assert.Equal(1, restored.People.Count); //The serialization didn't preserve the same number of inner values
+            Assert.Single(restored.People); //The serialization didn't preserve the same number of inner values
             Assert.Equal(book.People[0], restored.People[0]); //The serialization didn't preserve the proper inner value
             Assert.Equal(book, restored); //The serialization didn't preserve the proper value
         }

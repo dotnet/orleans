@@ -559,8 +559,8 @@ namespace UnitTests.SchedulerTests
             task3.Ignore();
             Assert.True(result1.Task.Wait(TwoSeconds), "First ContinueWith did not fire.");
             Assert.True(result2.Task.Wait(TwoSeconds), "Second ContinueWith did not fire.");
-            Assert.Equal(true,  failed1);  // "First ContinueWith did not fire error handler."
-            Assert.Equal(true,  failed2);  // "Second ContinueWith did not fire error handler."
+            Assert.True(failed1);  // "First ContinueWith did not fire error handler."
+            Assert.True(failed2);  // "Second ContinueWith did not fire error handler."
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

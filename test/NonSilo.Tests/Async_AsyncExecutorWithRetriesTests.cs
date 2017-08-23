@@ -123,7 +123,7 @@ namespace NonSilo.Tests
             int value = promise.Result;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
             Assert.Equal(counter, value);
-            Assert.Equal(counter, 1);
+            Assert.Equal(1, counter);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -166,9 +166,9 @@ namespace NonSilo.Tests
             catch (Exception exc)
             {
                 Exception baseExc = exc.GetBaseException();
-                Assert.Equal(baseExc.GetType(), typeof(ArgumentException));
+                Assert.Equal(typeof(ArgumentException), baseExc.GetType());
                 this.output.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
-                Assert.Equal(counter, 3); // "Counter == Returned value"
+                Assert.Equal(3, counter); // "Counter == Returned value"
             }
         }
     }
