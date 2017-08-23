@@ -53,6 +53,7 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
+    <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemCollectionsImmutableVersion>1.3.1</SystemCollectionsImmutableVersion>
 
     <!-- Microsoft packages -->
@@ -91,7 +92,7 @@
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <!-- System packages -->
-    <SystemNetHttpVersion>4.3.1</SystemNetHttpVersion>
+    <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftApplicationInsightsVersion>2.2.0</MicrosoftApplicationInsightsVersion>

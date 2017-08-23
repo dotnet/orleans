@@ -78,7 +78,7 @@ namespace DefaultCluster.Tests.General
                 key = await fail.GetKey();
                 failed = false;
             }
-            catch (ArgumentException e)
+            catch (ArgumentException)
             {
                 failed = true;
             }

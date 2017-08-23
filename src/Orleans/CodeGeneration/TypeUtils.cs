@@ -567,19 +567,6 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public static IEnumerable<Type> GetTypes(List<string> assemblies, Predicate<Type> whereFunc, Logger logger)
-        {
-            var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            var result = new List<Type>();
-            foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
-            {
-                // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc, logger);
-                result.AddRange(types);
-            }
-            return result;
-        }
-
         /// <summary>
         /// Returns a value indicating whether or not the provided <paramref name="methodInfo"/> is a grain method.
         /// </summary>

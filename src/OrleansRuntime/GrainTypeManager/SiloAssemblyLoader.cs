@@ -16,7 +16,6 @@ namespace Orleans.Runtime
     {
         private readonly List<string> excludedGrains;
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
-        private List<string> discoveredAssemblyLocations;
         private readonly Dictionary<string, SearchOption> directories;
         private readonly MultiClusterRegistrationStrategyManager registrationManager;
 
@@ -69,16 +68,14 @@ namespace Orleans.Runtime
                         typeof(IProvider))
                 };
 
-            discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
+            AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
 #endif
         }
 
-        public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
+        public IDictionary<string, GrainTypeData> GetGrainClassTypes()
         {
             var result = new Dictionary<string, GrainTypeData>();
-            Type[] grainTypes = strict
-                ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass, logger).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass, logger).ToArray();
+            Type[] grainTypes = TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass, logger).ToArray();
 
             foreach (var grainType in grainTypes)
             {
@@ -123,12 +120,10 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes(bool strict)
+        public IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes()
         {
             var result = new Dictionary<int, Type>();
-            Type[] types = strict
-                ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType, logger).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
+            Type[] types = TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
 
             foreach (var type in types)
             {

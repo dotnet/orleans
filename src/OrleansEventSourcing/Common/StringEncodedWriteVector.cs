@@ -22,6 +22,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Gets one of the bits in writeVector
         /// </summary>
+        /// <param name="writeVector">The write vector which we want get the bit from</param>
         /// <param name="Replica">The replica for which we want to look up the bit</param>
         /// <returns></returns>
         public static bool GetBit(string writeVector, string Replica)

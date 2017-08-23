@@ -15,6 +15,7 @@
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <Compile Remove="TestingSiloHost.cs" />
     <Compile Remove="TestingSiloOptions.cs" />
+    <Compile Remove="TestingClientOptions.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Condition=" '$(BuildFlavor)' == 'Current' " Include="App.config" />
     <None Update="ClientConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

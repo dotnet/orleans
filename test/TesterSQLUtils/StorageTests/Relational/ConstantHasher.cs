@@ -20,7 +20,6 @@ namespace UnitTests.StorageTests.Relational
         public string Description { get; } = $"Returns {ConstantHash} to all input, thus inducing hash collisions.";
 
         /// <summary>
-        /// /// <summary>
         /// <see cref="IHasher.Hash(byte[])"/>.
         /// </summary>
         public int Hash(byte[] data) { return ConstantHash; }

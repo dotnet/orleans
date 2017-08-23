@@ -584,7 +584,7 @@ namespace PSUtils.Tests
         /// <summary>
         /// Run the .\DeployOrleansSilos.ps1 script using the supplied configuration file, and test the results.
         /// </summary>
-        /// <param name="testName">A name for the test.  Don't include spaces, or any Filename\Path characters.</param>
+        /// <param name="testRootFolder">Root folder of the tests.</param>
         /// <param name="deploymentConfigFile">The configuration file to use in the test.</param>
         private void TestOrleansDeployment(string testRootFolder, string deploymentConfigFile)
         {

@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>
-        /// <param name="numStorageGrains">The number of storage grains to use.</param>
+        /// <param name="primaryCluster">The name of the primary cluster to use.</param>
         public static void AddCustomStorageInterfaceBasedLogConsistencyProvider(
             this ClusterConfiguration config,
             string providerName = "LogStorage",

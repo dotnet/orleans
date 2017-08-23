@@ -10,7 +10,7 @@ namespace DefaultCluster.Tests.General
 {
     /// <summary>
     /// Unit tests for grains implementing generic interfaces
-    /// </summary
+    /// </summary>
     public class KnownAssemblyAttributeTests : HostedTestClusterEnsureDefaultStarted
     {
         public KnownAssemblyAttributeTests(DefaultClusterFixture fixture) : base(fixture)

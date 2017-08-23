@@ -13,7 +13,7 @@ using Xunit.Sdk;
 /// to mimic the MSTest one and avoid replace it on every exitent test. 
 /// The tests can be filtered by xunit runners by usage of "-trait" on the command line with the expresion like
 /// <code>-trait "Category=BVT"</code> for example that will only run the tests with [TestCategory("BVT")] on it.
-/// More on Trait extensibility <see cref="https://github.com/xunit/samples.xunit/tree/master/TraitExtensibility"/>
+/// More on Trait extensibility <see href="https://github.com/xunit/samples.xunit/tree/master/TraitExtensibility" />
 /// </summary>
 
 [TraitDiscoverer("CategoryDiscoverer", "TestExtensions")]
