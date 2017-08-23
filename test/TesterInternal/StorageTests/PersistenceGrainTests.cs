@@ -124,7 +124,7 @@ namespace UnitTests.StorageTests
             object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
                MockStorageProviderName1, (int)MockStorageProvider.Commands.InitCount, null);
 
-            Assert.True(replies.Contains(1)); // StorageProvider #Init
+            Assert.Contains(1, replies); // StorageProvider #Init
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -360,7 +360,7 @@ namespace UnitTests.StorageTests
             await grain.DoDelete();
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
             Assert.Equal(initialDeleteCount + 1, providerState.ProviderStateForTest.DeleteCount); // StorageProvider #Deletes
-            Assert.Equal(null, providerState.LastStoredGrainState); // Store-AfterDelete-Empty
+            Assert.Null(providerState.LastStoredGrainState); // Store-AfterDelete-Empty
 
             int val = await grain.GetValue(); // Returns current in-memory null data without re-read.
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName); // update state

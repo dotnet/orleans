@@ -92,18 +92,18 @@ namespace TestServiceFabric
             await this.oracle.BecomeActive();
             var allSilos = this.oracle.GetApproximateSiloStatuses(false);
             var livingSilos = this.oracle.GetApproximateSiloStatuses(true);
-            Assert.Equal(1, allSilos.Count);
-            Assert.Equal(1, livingSilos.Count);
+            Assert.Single(allSilos);
+            Assert.Single(livingSilos);
             Assert.Equal(2, listener.Notifications.Count);
-            Assert.Equal(1, listener.Silos.Count);
+            Assert.Single(listener.Silos);
 
             await this.oracle.Stop();
             allSilos = this.oracle.GetApproximateSiloStatuses(false);
             livingSilos = this.oracle.GetApproximateSiloStatuses(true);
-            Assert.Equal(1, allSilos.Count);
-            Assert.Equal(0, livingSilos.Count);
+            Assert.Single(allSilos);
+            Assert.Empty(livingSilos);
             Assert.Equal(3, listener.Notifications.Count);
-            Assert.Equal(1, listener.Silos.Count);
+            Assert.Single(listener.Silos);
         }
 
         /// <summary>

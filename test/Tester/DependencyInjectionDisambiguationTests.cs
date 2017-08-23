@@ -24,9 +24,9 @@ namespace UnitTests.General
         {
             IServiceProvider services = ConfigureServices();
             string actualThis = services.GetServiceByName<IValue<string>>("this").Value;
-            Assert.StrictEqual("this", actualThis);
+            Assert.Equal("this", actualThis);
             string actualThat = services.GetServiceByName<IValue<string>>("that").Value;
-            Assert.StrictEqual("that", actualThat);
+            Assert.Equal("that", actualThat);
         }
 
         private interface IValue<out TValue>

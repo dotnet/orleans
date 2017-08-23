@@ -33,8 +33,8 @@ namespace Tester.EventSourcingTests
             var expectedprefix = "<!--This chat room was created by TestGrains.ChatGrain-->\r\n<root>\r\n  <created>";
             var expectedsuffix = "</created>\r\n  <posts />\r\n</root>";
  
-            Assert.True(content.StartsWith(expectedprefix));
-            Assert.True(content.EndsWith(expectedsuffix));
+            Assert.StartsWith(expectedprefix, content);
+            Assert.EndsWith(expectedsuffix, content);
         }
 
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
@@ -49,7 +49,7 @@ namespace Tester.EventSourcingTests
                 var content = (await chat.GetChat()).ToString();
                 var doc = XDocument.Load(new StringReader(content));
                 var container = doc.GetPostsContainer();
-                Assert.Equal(1, container.Elements("post").Count());
+                Assert.Single(container.Elements("post"));
             }
 
             await chat.Delete(guid);
@@ -58,7 +58,7 @@ namespace Tester.EventSourcingTests
                 var content = (await chat.GetChat()).ToString();
                 var doc = XDocument.Load(new StringReader(content));
                 var container = doc.GetPostsContainer();
-                Assert.Equal(0, container.Elements("post").Count());
+                Assert.Empty(container.Elements("post"));
             }
         }
 

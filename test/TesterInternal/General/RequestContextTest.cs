@@ -258,11 +258,11 @@ namespace UnitTests.General
 
             result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId 2 should not exist"
-            Assert.Equal(null,  RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
+            Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
 
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
-                Assert.Equal(null,  RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
+                Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
 
                 result = await grain.E2EActivityId();
 

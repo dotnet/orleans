@@ -169,7 +169,7 @@ namespace DefaultCluster.Tests
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             Task<bool> promise = grain.ExecuteDelayed(TimeSpan.FromMilliseconds(2000));
             bool result = await promise;
-            Assert.Equal(true, result);
+            Assert.True(result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
@@ -244,7 +244,7 @@ namespace DefaultCluster.Tests
             ObserverTest_DisconnectRunner(true);
         }
 
-        public void ObserverTest_DisconnectRunner(bool observeTwice)
+        private void ObserverTest_DisconnectRunner(bool observeTwice)
         {
             // this is for manual repro & validation in the debugger
             // wait to send event because it takes 60s to drop client grain

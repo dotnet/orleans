@@ -74,7 +74,7 @@ namespace UnitTests.StreamingTests
             await ValidateControllableGeneratedStreams();
         }
 
-        public async Task ValidateControllableGeneratedStreams()
+        private async Task ValidateControllableGeneratedStreams()
         {
             try
             {

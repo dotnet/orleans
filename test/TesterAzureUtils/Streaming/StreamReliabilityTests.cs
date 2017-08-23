@@ -499,7 +499,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        public async Task Test_PubSub_Unsubscribe(string testName, string streamProviderName)
+        private async Task Test_PubSub_Unsubscribe(string testName, string streamProviderName)
         {
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;

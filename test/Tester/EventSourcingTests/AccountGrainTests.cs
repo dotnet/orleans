@@ -20,7 +20,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        public async Task TestSequence(IAccountGrain account, bool hasLogStored)
+        private async Task TestSequence(IAccountGrain account, bool hasLogStored)
         {
             Assert.Equal(0u, await account.Balance());
 
@@ -55,8 +55,7 @@ namespace Tester.EventSourcingTests
             }
             else
             {
-                await Assert.ThrowsAsync(typeof(NotSupportedException), 
-                    async () => await account.GetTransactionLog());
+                await Assert.ThrowsAsync<NotSupportedException>(async () => await account.GetTransactionLog());
             }
         }
 

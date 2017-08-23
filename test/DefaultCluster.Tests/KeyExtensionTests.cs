@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void EmptyKeyExtensionsAreDisallowed()
         {
-            Xunit.Assert.Throws(typeof(ArgumentException), () =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var baseKey = Guid.NewGuid();
 
@@ -69,7 +69,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void WhiteSpaceKeyExtensionsAreDisallowed()
         {
-            Xunit.Assert.Throws(typeof(ArgumentException), () =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var baseKey = Guid.NewGuid();
 
@@ -80,7 +80,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void NullKeyExtensionsAreDisallowed()
         {
-            Xunit.Assert.Throws(typeof(ArgumentNullException), () =>
+            Assert.Throws<ArgumentNullException>(() =>
             {
                 var baseKey = Guid.NewGuid();
 

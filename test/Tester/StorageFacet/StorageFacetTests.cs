@@ -69,7 +69,7 @@ namespace Tester
             return ExampleStorageHappyPath<IStorageFactoryGrain>();
         }
 
-        public async Task ExampleStorageHappyPath<TGrainInterface>()
+        private async Task ExampleStorageHappyPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
@@ -95,7 +95,7 @@ namespace Tester
             return ExampleStorageDefaultPath<IStorageDefaultFactoryGrain>();
         }
 
-        public async Task ExampleStorageDefaultPath<TGrainInterface>()
+        private async Task ExampleStorageDefaultPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);

@@ -110,7 +110,7 @@ namespace DefaultCluster.Tests.General
 
             var result = await grain.Get();
 
-            Assert.Equal(1, result.Count);
+            Assert.Single(result);
             Assert.Equal(0.1f, result[0]);
         }
 
@@ -568,7 +568,7 @@ namespace DefaultCluster.Tests.General
 
             var id = Guid.NewGuid();
             var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
-            await Xunit.Assert.ThrowsAsync(typeof(OrleansException), async () =>
+            await Assert.ThrowsAsync<OrleansException>(async () =>
             {
                 try
                 {
@@ -590,7 +590,7 @@ namespace DefaultCluster.Tests.General
             var s2 = await grain.Ping(s1);
             Assert.Equal(s1, s2);
             var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
-            await Xunit.Assert.ThrowsAsync(typeof(OrleansException), async () =>
+            await Assert.ThrowsAsync<OrleansException>(async () =>
             {
                 try
                 {
@@ -708,7 +708,7 @@ namespace DefaultCluster.Tests.General
 
             var result = await castRef.Hello();
 
-            Assert.Equal(result, "Hello!");
+            Assert.Equal("Hello!", result);
         }
 
         [Fact(Skip= "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
@@ -719,7 +719,7 @@ namespace DefaultCluster.Tests.General
 
             var result = await castRef.Hello();
 
-            Assert.Equal(result, "Hello!");
+            Assert.Equal("Hello!", result);
         }
         
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
@@ -730,7 +730,7 @@ namespace DefaultCluster.Tests.General
 
             var result = await castRef.Hello();
 
-            Assert.Equal(result, "Hello!");
+            Assert.Equal("Hello!", result);
         }
         
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
@@ -741,7 +741,7 @@ namespace DefaultCluster.Tests.General
 
             var result = await castRef.Hello();
 
-            Assert.Equal(result, "Hello!");
+            Assert.Equal("Hello!", result);
         }
         
         /// <summary>
@@ -813,7 +813,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -825,7 +825,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
             
 
@@ -866,7 +866,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -880,7 +880,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
             
 
@@ -906,7 +906,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -918,7 +918,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await castRef.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -976,7 +976,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await grain.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -988,7 +988,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await grain.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
             
 
@@ -1026,7 +1026,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await grain.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
 
@@ -1038,7 +1038,7 @@ namespace DefaultCluster.Tests.General
 
                 var response = await grain.Hello();
 
-                Assert.Equal(response, "Hello!");
+                Assert.Equal("Hello!", response);
             }
 
         }

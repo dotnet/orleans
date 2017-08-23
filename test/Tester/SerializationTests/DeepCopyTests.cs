@@ -27,19 +27,19 @@ namespace UnitTests.Serialization
                 var original = new int[] { 0, 1, 2 };
                 var copy = (int[])this.fixture.SerializationManager.DeepCopy(original);
                 copy[2] = 0;
-                Assert.Equal(original[2], 2);
+                Assert.Equal(2, original[2]);
             }
             {
                 var original = new int[] { 0, 1, 2 }.ToList();
                 var copy = (List<int>)this.fixture.SerializationManager.DeepCopy(original);
                 copy[2] = 0;
-                Assert.Equal(original[2], 2);
+                Assert.Equal(2, original[2]);
             }
             {
                 var original = new int[][] { new int[] { 0, 1 }, new int[] { 2, 3 } };
                 var copy = (int[][])this.fixture.SerializationManager.DeepCopy(original);
                 copy[1][0] = 0;
-                Assert.Equal(original[1][0], 2);
+                Assert.Equal(2, original[1][0]);
             }
             {
                 var original = new Dictionary<int, int>();
@@ -47,7 +47,7 @@ namespace UnitTests.Serialization
                 original[1] = 2;
                 var copy = (Dictionary<int, int>)this.fixture.SerializationManager.DeepCopy(original);
                 copy[1] = 0;
-                Assert.Equal(original[1], 2);
+                Assert.Equal(2, original[1]);
             }
             {
                 var original = new Dictionary<string, Dictionary<string, string>>();
@@ -56,7 +56,7 @@ namespace UnitTests.Serialization
                 original["a"]["1"] = "2";
                 var copy = (Dictionary<string, Dictionary<string, string>>)this.fixture.SerializationManager.DeepCopy(original);
                 copy["a"]["1"] = "";
-                Assert.Equal(original["a"]["1"], "2");
+                Assert.Equal("2", original["a"]["1"]);
             }
         }
 
@@ -123,7 +123,7 @@ namespace UnitTests.Serialization
                 Assert.Equal(1, copy.GetNumber("a"));
                 Assert.Equal(2, copy.GetNumber("b"));
                 Assert.Equal(CampaignEnemyTestType.Enemy3, copy.GetEnemy(0));
-                Assert.Equal(true, copy.GetBit(19));
+                Assert.True(copy.GetBit(19));
                 // change copy
                 copy.SetNumber("b", 0);
                 copy.SetEnemy(0, CampaignEnemyTestType.Brute);
@@ -131,7 +131,7 @@ namespace UnitTests.Serialization
                 // original must be unchanged
                 Assert.Equal(2, original.GetNumber("b"));
                 Assert.Equal(CampaignEnemyTestType.Enemy3, original.GetEnemy(0));
-                Assert.Equal(true, original.GetBit(19));
+                Assert.True(original.GetBit(19));
             }
         }
 

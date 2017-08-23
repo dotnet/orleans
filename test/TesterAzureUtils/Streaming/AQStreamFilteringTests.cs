@@ -67,7 +67,7 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Filter_BadFunc()
         {
-            await Assert.ThrowsAsync(typeof(ArgumentException), () =>
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                 Test_Filter_BadFunc());
         }
 

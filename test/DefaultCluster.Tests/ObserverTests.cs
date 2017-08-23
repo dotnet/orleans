@@ -28,7 +28,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        public void TestInitialize()
+        private void TestInitialize()
         {
             callbackCounter = 0;
             callbacksRecieved[0] = false;
@@ -282,7 +282,7 @@ namespace DefaultCluster.Tests.General
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
             TestInitialize();
-            await Xunit.Assert.ThrowsAsync(typeof(NotSupportedException), async () =>
+            await Assert.ThrowsAsync<NotSupportedException>(async () =>
             {
                 var result = new AsyncResultHandle();
 

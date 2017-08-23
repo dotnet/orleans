@@ -29,7 +29,7 @@ namespace Tester.EventSourcingTests
 
             var currentstate = await grain.GetTentativeState();
             Assert.NotNull(currentstate);
-            Assert.Equal(0, currentstate.Count());
+            Assert.Empty(currentstate);
 
             await grain.Add("Alice", 1, false);
             await grain.Add("Alice", 1, false);
@@ -41,7 +41,7 @@ namespace Tester.EventSourcingTests
             // reset all counters to zero, and wait for confirmation
             await grain.Reset(true);
 
-            Assert.Equal(0, (await grain.GetTentativeState()).Count());
+            Assert.Empty((await grain.GetTentativeState()));
         }
 
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]

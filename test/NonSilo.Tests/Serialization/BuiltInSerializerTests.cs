@@ -338,7 +338,7 @@ namespace UnitTests.Serialization
             var deserialized = OrleansSerializationLoop(environment.SerializationManager, source1);
             ValidateDictionary<string, string>(source1, deserialized, "case-insensitive string/string");
             Dictionary<string, string> result1 = deserialized as Dictionary<string, string>;
-            Assert.Equal<string>(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
+            Assert.Equal(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
 
             Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
             source2[3] = DateTime.Now;
@@ -415,9 +415,9 @@ namespace UnitTests.Serialization
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string hash set with comparer
             foreach (var key in source1)
             {
-                Assert.True(result.Contains(key)); //key is missing after round-trip of string hash set with comparer
+                Assert.Contains(key, result); //key is missing after round-trip of string hash set with comparer
             }
-            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string hash set with comparer
+            Assert.Contains("One", result); //Comparer is wrong after round-trip of string hash set with comparer
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -439,7 +439,7 @@ namespace UnitTests.Serialization
             var resIter = result.GetEnumerator();
             while (srcIter.MoveNext() && resIter.MoveNext())
             {
-                Assert.Equal<string>(srcIter.Current, resIter.Current); //Data is wrong after round-trip of string stack
+                Assert.Equal(srcIter.Current, resIter.Current); //Data is wrong after round-trip of string stack
             }
         }
 
@@ -481,9 +481,9 @@ namespace UnitTests.Serialization
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string sorted set with comparer
             foreach (var key in source1)
             {
-                Assert.True(result.Contains(key)); //key is missing after round-trip of string sorted set with comparer
+                Assert.Contains(key, result); //key is missing after round-trip of string sorted set with comparer
             }
-            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string sorted set with comparer
+            Assert.Contains("One", result); //Comparer is wrong after round-trip of string sorted set with comparer
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -542,11 +542,11 @@ namespace UnitTests.Serialization
             var result = Assert.IsAssignableFrom<HashSet<string>[][]>(deserialized); //Array of arrays of hash sets type is wrong on deserialization
             Assert.Equal(3, result.Length); //Outer array size wrong on array of array of sets
             Assert.Equal(2, result[0][0].Count); //Inner set size wrong on array of array of sets, element 0,0
-            Assert.Equal(0, result[0][1].Count); //Inner set size wrong on array of array of sets, element 0,1
-            Assert.Equal(1, result[1][0].Count); //Inner set size wrong on array of array of sets, element 1,0
+            Assert.Empty(result[0][1]); //Inner set size wrong on array of array of sets, element 0,1
+            Assert.Single(result[1][0]); //Inner set size wrong on array of array of sets, element 1,0
             Assert.Null(result[1][1]); //Inner set not null on array of array of sets, element 1, 1
-            Assert.Equal(1, result[1][2].Count); //Inner set size wrong on array of array of sets, element 1,2
-            Assert.Equal(1, result[2][0].Count); //Inner set size wrong on array of array of sets, element 2,0
+            Assert.Single(result[1][2]); //Inner set size wrong on array of array of sets, element 1,2
+            Assert.Single(result[2][0]); //Inner set size wrong on array of array of sets, element 2,0
 
             var source4 = new GrainReference[3][];
             source4[0] = new GrainReference[2];
@@ -875,17 +875,17 @@ namespace UnitTests.Serialization
 
             // 1: {[1}, {2], 3}
             Assert.Equal(0, actual1[0].Offset);
-            Assert.Equal(1, actual1[0].Count);
+            Assert.Single(actual1[0]);
             Assert.Equal(array1, actual1[0].Array);
             Assert.Equal(0, actual1[1].Offset);
-            Assert.Equal(1, actual1[1].Count);
+            Assert.Single(actual1[1]);
             Assert.Equal(array2, actual1[1].Array);
             // 2: {2, [3}, {4], 5, 6}
             Assert.Equal(1, actual2[0].Offset);
-            Assert.Equal(1, actual2[0].Count);
+            Assert.Single(actual2[0]);
             Assert.Equal(array2, actual2[0].Array);
             Assert.Equal(0, actual2[1].Offset);
-            Assert.Equal(1, actual2[1].Count);
+            Assert.Single(actual2[1]);
             Assert.Equal(array3, actual2[1].Array);
             // 3: {4, [5, 6]}
             Assert.Equal(1, actual3[0].Offset);

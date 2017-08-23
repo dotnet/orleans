@@ -35,7 +35,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.False(buffer.TryGetSegment(TestBlockSize + 1, out segment), "Should not be able to get segement that is bigger than block.");
            Assert.Null(segment.Array);
             Assert.Equal(0, segment.Offset);
-            Assert.Equal(0, segment.Count);
+            Assert.Empty(segment);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -60,12 +60,12 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 Assert.True(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", i + 1));
                 Assert.Equal(i, segment.Offset);
-                Assert.Equal(1, segment.Count);
+                Assert.Single(segment);
             }
             Assert.False(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", TestBlockSize + 1));
            Assert.Null(segment.Array);
             Assert.Equal(0, segment.Offset);
-            Assert.Equal(0, segment.Count);
+            Assert.Empty(segment);
         }
 
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)

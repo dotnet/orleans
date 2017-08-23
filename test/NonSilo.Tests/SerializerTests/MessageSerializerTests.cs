@@ -125,7 +125,7 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             for (int k = 0; k < numItems; k++)
             {
                 Assert.IsAssignableFrom<string>(responseList[k]); //Body list item " + k + " has wrong type
-                Assert.Equal<string>((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
+                Assert.Equal((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
             }
         }
 

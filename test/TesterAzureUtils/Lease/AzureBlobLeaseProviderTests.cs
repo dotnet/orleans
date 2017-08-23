@@ -84,8 +84,8 @@ namespace Tester.AzureUtils.Lease
             //two entity tries to acquire lease on the same release
             var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //one attempt succeeded and one attemp failed
-            Assert.True(results.Any(result => result.StatusCode == ResponseCode.OK));
-            Assert.True(results.Any(result => result.StatusCode == ResponseCode.LeaseNotAvailable));
+            Assert.Contains(results, result => result.StatusCode == ResponseCode.OK);
+            Assert.Contains(results, result => result.StatusCode == ResponseCode.LeaseNotAvailable);
         }
 
         [SkippableFact]

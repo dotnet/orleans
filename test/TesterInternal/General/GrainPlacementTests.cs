@@ -145,7 +145,7 @@ namespace UnitTests.General
         }
 
         //[Fact, TestCategory("Placement"), TestCategory("Functional")]
-        public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()
+        /*public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations ******************************");
@@ -157,7 +157,7 @@ namespace UnitTests.General
             var grain = this.GrainFactory.GetGrain<ILocalPlacementTestGrain>(Guid.Empty);
             int actual = ActivationCount(grain, expected * 5);
             Assert.Equal(expected, actual);  //"A grain instantiated with the local placement strategy should create multiple activations acording to the parameterization of the strategy."
-        }
+        }*/
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateActivationsOnLocalSilo()
