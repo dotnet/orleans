@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Providers
 {
@@ -17,6 +18,7 @@ namespace Orleans.Providers
         {
             providerKind = kind;
             this.runtime = runtime;
+            statisticsProviderLoader = new ProviderLoader<IProvider>(this.ServiceProvider.GetRequiredService<LoadedProviderTypeLoaders>());
         }
 
         public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
@@ -37,8 +39,6 @@ namespace Orleans.Providers
 
         public async Task<string> LoadProvider(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            statisticsProviderLoader = new ProviderLoader<IProvider>();
-
             if (!configs.ContainsKey(providerKind))
                 return null;
 
@@ -52,7 +52,7 @@ namespace Orleans.Providers
                 throw new ArgumentOutOfRangeException(providerKind + "Providers",
                     string.Format("Only a single {0} provider is supported.", providerKind));
             }
-            statisticsProviderLoader.LoadProviders(statsProviders, this, this.ServiceProvider);
+            statisticsProviderLoader.LoadProviders(statsProviders, this);
             await statisticsProviderLoader.InitProviders(runtime);
             return statisticsProviderLoader.GetProviders().First().Name;
         }
@@ -70,8 +70,7 @@ namespace Orleans.Providers
         // used only for testing
         internal async Task LoadEmptyProviders()
         {
-            statisticsProviderLoader = new ProviderLoader<IProvider>();
-            statisticsProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this, this.ServiceProvider);
+            statisticsProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
             await statisticsProviderLoader.InitProviders(runtime);
         }
 

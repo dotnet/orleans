@@ -458,9 +458,9 @@ namespace Orleans.Runtime
 
             // Validate the configuration.
             GlobalConfig.Application.ValidateConfiguration(logger);
-            
+
             // Initialize storage providers once we have a basic silo runtime environment operating
-            storageProviderManager = new StorageProviderManager(grainFactory, Services, siloProviderRuntime);
+            storageProviderManager = this.Services.GetRequiredService<StorageProviderManager>();
             scheduler.QueueTask(
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
@@ -472,7 +472,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating
-            logConsistencyProviderManager = new LogConsistencyProviderManager(grainFactory, Services, siloProviderRuntime);
+            logConsistencyProviderManager = this.Services.GetRequiredService<LogConsistencyProviderManager>();
             scheduler.QueueTask(
                 () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
@@ -546,7 +546,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                this.bootstrapProviderManager = new BootstrapProviderManager();
+                this.bootstrapProviderManager = this.Services.GetRequiredService<BootstrapProviderManager>();
                 this.scheduler.QueueTask(
                     () => this.bootstrapProviderManager.LoadAppBootstrapProviders(siloProviderRuntime, this.GlobalConfig.ProviderConfigurations),
                     this.providerManagerSystemTarget.SchedulingContext)

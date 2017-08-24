@@ -35,14 +35,15 @@ namespace Orleans.Providers
         private readonly Dictionary<string, TProvider> providers;
         private IDictionary<string, IProviderConfiguration> providerConfigs;
         private readonly Logger logger;
-
-        public ProviderLoader()
+        private readonly LoadedProviderTypeLoaders loadedProviderTypeLoaders;
+        public ProviderLoader(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             logger = LogManager.GetLogger("ProviderLoader/" + typeof(TProvider).Name, LoggerType.Runtime);
             providers = new Dictionary<string, TProvider>();
+            this.loadedProviderTypeLoaders = loadedProviderTypeLoaders;
         }
 
-        public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager, IServiceProvider serviceProvider)
+        public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
         {
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
@@ -52,7 +53,7 @@ namespace Orleans.Providers
             }
 
             // Load providers
-            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType, serviceProvider.GetRequiredService<LoadedProviderTypeLoaders>());
+            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType, this.loadedProviderTypeLoaders);
 
             ValidateProviders();
         }

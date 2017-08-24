@@ -57,7 +57,8 @@ namespace UnitTests.StorageTests.Relational
             DefaultProviderRuntime = new StorageProviderManager(
                 this.GrainFactory,
                 this.Services,
-                new ClientProviderRuntime(this.InternalGrainFactory, this.Services));
+                new ClientProviderRuntime(this.InternalGrainFactory, this.Services),
+                new LoadedProviderTypeLoaders());
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
         }
 

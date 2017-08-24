@@ -28,6 +28,7 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
+using Orleans.Runtime.Storage;
 
 namespace Orleans.Runtime.Hosting
 {
@@ -59,6 +60,9 @@ namespace Orleans.Runtime.Hosting
             services.TryAddTransient<ConsistentRingQueueBalancer>();
             services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
+            services.TryAddSingleton<StorageProviderManager>();
+            services.TryAddSingleton<LogConsistencyProviderManager>();
+            services.TryAddSingleton<BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();

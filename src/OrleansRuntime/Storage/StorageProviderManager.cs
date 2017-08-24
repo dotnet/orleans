@@ -14,21 +14,21 @@ namespace Orleans.Runtime.Storage
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
 
-        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime)
+        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             this.providerRuntime = providerRuntime;
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
+            storageProviderLoader = new ProviderLoader<IStorageProvider>(loadedProviderTypeLoaders);
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                 return Task.CompletedTask;
 
-            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this, this.ServiceProvider);
+            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
@@ -105,9 +105,7 @@ namespace Orleans.Runtime.Storage
         // used only for testing
         internal Task LoadEmptyStorageProviders()
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>(this.ServiceProvider.GetRequiredService<ILoggerFactory>());
-
-            storageProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this, this.ServiceProvider);
+            storageProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
