@@ -86,10 +86,14 @@
     &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
+</code></pre><p>Silo configuration via code is as follows.</p>
+<pre><code class="lang-c#">var config = ClusterConfiguration.LocalhostPrimarySilo(11111, 30000);
 </code></pre><p>To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine. The Orleans client that can be started by running a project created with the <em>Orleans Dev/Test Host</em> template is configured as follows in DevTestClientConfiguration.xml</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;localhost&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
+</code></pre><p>Client configuration via code is as follows.</p>
+<pre><code class="lang-c#">var config = ClientConfiguration.LocalhostSilo(30000);
 </code></pre><h2 id="reliable-production-deployment-using-azure">Reliable Production Deployment Using Azure</h2>
 <p>For a reliable production deployment using Azure, you need to use the Azure Table option for cluster membership. This configuration is typical of deployments to either on-premise servers or Azure virtual machine instances.</p>
 <p> The format of the DataConnection string is &quot;DefaultEndpointsProtocol=https;AccountName=<azure storage="" account="">;AccountKey=<azure table="" storage="" account="" key="">&quot;<p>
