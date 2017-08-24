@@ -109,7 +109,7 @@ else
 
 var config = new ClusterConfiguration{    
     Globals =    
-    {        
+    {        _siloName
         DataConnectionString = connectionString,
         DeploymentId = "<your deployment ID>",
         
@@ -129,7 +129,7 @@ var config = new ClusterConfiguration{   
         TraceFilePattern = @"Silo_{0}-{1}.log"
     }};
         
-var siloHost = new SiloHost(_siloName, config);
+var siloHost = new SiloHost(System.Net.Dns.GetHostName(), config);
 ```
 
 Clients need to be configured to use SQL server for discovering the gateways, as with Azure and Zookeeper, the addresses of the Orleans servers are not statically known to the clients.
