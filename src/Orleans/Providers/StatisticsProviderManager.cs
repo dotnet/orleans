@@ -14,11 +14,11 @@ namespace Orleans.Providers
         private readonly string providerKind;
         private readonly IProviderRuntime runtime;
 
-        public StatisticsProviderManager(string kind, IProviderRuntime runtime)
+        public StatisticsProviderManager(string kind, IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             providerKind = kind;
             this.runtime = runtime;
-            statisticsProviderLoader = new ProviderLoader<IProvider>(this.ServiceProvider.GetRequiredService<LoadedProviderTypeLoaders>());
+            statisticsProviderLoader = new ProviderLoader<IProvider>(loadedProviderTypeLoaders);
         }
 
         public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
