@@ -50,9 +50,8 @@ namespace Orleans.Streams
     /// indicating that the balance of queues has changed.
     /// It should be implemented by components interested in stream queue load balancing.
     /// When change notification is received, listener should request updated list of queues from the queue balancer.
-    /// This interface inherit from IAddressable for threading-safe concern
     /// </summary>
-    public interface IStreamQueueBalanceListener :IAddressable
+    public interface IStreamQueueBalanceListener
     {
         /// <summary>
         /// Receive notifications about adapter queue responsibility changes. 

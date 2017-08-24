@@ -85,8 +85,7 @@ namespace Orleans.Streams
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
             await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
-            var meAsQueueBalanceListener = this.AsReference<IStreamQueueBalanceListener>();
-            queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
+            queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
             Log(ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
@@ -133,6 +132,11 @@ namespace Orleans.Streams
         /// and don't execute an older notification if a newer one was already delivered.
         /// </summary>
         public Task QueueDistributionChangeNotification()
+        {
+            return this.ScheduleTask(() => this.HandleQueueDistributionChangeNotification());
+        }
+
+        public Task HandleQueueDistributionChangeNotification()
         {
             latestRingNotificationSequenceNumber++;
             int notificationSeqNumber = latestRingNotificationSequenceNumber;

@@ -27,7 +27,7 @@ using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, ISiloStatusListener
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime
     {
         [Serializable]
         internal class NonExistentActivationException : Exception
@@ -169,6 +169,7 @@ namespace Orleans.Runtime
             });
             maxWarningRequestProcessingTime = this.config.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.config.MaxRequestProcessingTime;
+            grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
         }
 
         /// <summary>
@@ -1561,17 +1562,15 @@ namespace Orleans.Runtime
 
 #endregion
 
-#region Implementation of ISiloStatusListener
-
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
-        {
+        private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
+        { 
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
 
             // We deactivate those activations when silo goes either of ShuttingDown/Stopping/Dead states,
             // since this is what Directory is doing as well. Directory removes a silo based on all those 3 statuses,
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
-            // We may review the directory behaiviour in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
+            // We may review the directory behavior in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
             if (!status.IsTerminating()) return;
             if (status == SiloStatus.Dead)
             {
@@ -1594,7 +1593,7 @@ namespace Orleans.Runtime
 
                             lock (activationData)
                             {
-                                // adapted from InsideGarinClient.DeactivateOnIdle().
+                                // adapted from InsideGrainClient.DeactivateOnIdle().
                                 activationData.ResetKeepAliveRequest();
                                 activationsToShutdown.Add(activationData);
                             }
@@ -1602,12 +1601,12 @@ namespace Orleans.Runtime
                         catch (Exception exc)
                         {
                             logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
-                                String.Format("Catalog has thrown an exception while executing SiloStatusChangeNotification of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
+                                String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
                         }
                     }
                 }
                 logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
-                    String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partiton to these grain ids.",
+                    String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
                         activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
             }
             finally
@@ -1619,7 +1618,5 @@ namespace Orleans.Runtime
                 }
             }
         }
-
-#endregion
     }
 }
