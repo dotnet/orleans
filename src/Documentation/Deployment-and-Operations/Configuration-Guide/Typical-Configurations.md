@@ -92,7 +92,7 @@ Clients need to be configured to use ZooKeeper for discovering the gateways, the
 ## Reliable Production Deployment Using SQL Server
 For a reliable production deployment using SQL server, a SQL server connection string needs to be supplied.
 
-Silo configuration via code is as follows, and includes registering a SQL server storage provider and logging configuration.
+Silo configuration via code is as follows, and includes logging configuration.
 
 ``` c#
 var connectionString = @"Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
@@ -128,13 +128,6 @@ var config = new ClusterConfiguration{   
         TraceToConsole = false,
         TraceFilePattern = @"Silo_{0}-{1}.log"
     }};
-
-config.Globals.RegisterStorageProvider<AdoNetStorageProvider>(
-    "OrleansSqlStore", 
-    new Dictionary<string, string>(){
-        ["AdoInvariant"] = "System.Data.SqlClient",
-        ["DataConnectionString"] = connectionString,
-        ["UseJsonFormat"] = "true"});
         
 var siloHost = new SiloHost(_siloName, config);
 ```
