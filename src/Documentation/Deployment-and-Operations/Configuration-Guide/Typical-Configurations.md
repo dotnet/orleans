@@ -98,18 +98,9 @@ Silo configuration via code is as follows, and includes logging configuration.
 var connectionString = @"Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
     Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True";
 
-IPAddress address;
-var hostName = Dns.GetHostName();
-var hostEntry = Dns.GetHostEntry(hostName);
-
-if (hostEntry.AddressList.Length > 0)
-    address = hostEntry.AddressList[0];
-else
-    throw new Exception("Could not get address");
-
 var config = new ClusterConfiguration{    
     Globals =    
-    {        _siloName
+    {
         DataConnectionString = connectionString,
         DeploymentId = "<your deployment ID>",
         
@@ -119,14 +110,9 @@ var config = new ClusterConfiguration{   
     },
     Defaults =
     {        
-        HostNameOrIPAddress = address.ToString(),
         Port = 11111,
         ProxyGatewayEndpoint = new IPEndPoint(address, 30000),
-        PropagateActivityId = true,
-        
-        DefaultTraceLevel = Severity.Info,
-        TraceToConsole = false,
-        TraceFilePattern = @"Silo_{0}-{1}.log"
+        PropagateActivityId = true
     }};
         
 var siloHost = new SiloHost(System.Net.Dns.GetHostName(), config);
@@ -145,11 +131,7 @@ var config = new ClientConfiguration{
     DataConnectionString = connectionString,
     
     DeploymentId = "<your deployment ID>",    
-    PropagateActivityId = true,
-    
-    DefaultTraceLevel = Severity.Info,
-    TraceToConsole = false,
-    TraceFilePattern = @"Client_{0}-{1}.log"
+    PropagateActivityId = true
 };
 
 var client = new ClientBuilder().UseConfiguration(config).Build();
