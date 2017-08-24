@@ -22,12 +22,24 @@ For local development, where there is only one silo running locally on the progr
 </OrleansConfiguration>
 ```
 
+Silo configuration via code is as follows.
+
+``` c#
+var config = ClusterConfiguration.LocalhostPrimarySilo(11111, 30000);
+```
+
 To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine. The Orleans client that can be started by running a project created with the *Orleans Dev/Test Host* template is configured as follows in DevTestClientConfiguration.xml
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
   <Gateway Address="localhost" Port="30000"/>
 </ClientConfiguration>
+```
+
+Client configuration via code is as follows.
+
+``` c#
+var config = ClientConfiguration.LocalhostSilo(30000);
 ```
 
 ## Reliable Production Deployment Using Azure
