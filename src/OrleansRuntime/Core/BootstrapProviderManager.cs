@@ -10,7 +10,7 @@ namespace Orleans.Runtime
         private readonly PluginManager<IBootstrapProvider> pluginManager;
         private readonly string configCategoryName;
 
-        internal BootstrapProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public BootstrapProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             var logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
