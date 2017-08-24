@@ -129,6 +129,46 @@
 &lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot; DeploymentId=&quot;target deployment ID&quot; DataConnectionString=&quot;&lt;&lt;see comment above&gt;&gt;&quot;/&gt;
 &lt;/ClientConfiguration&gt;
+</code></pre><h2 id="reliable-production-deployment-using-sql-server">Reliable Production Deployment Using SQL Server</h2>
+<p>For a reliable production deployment using SQL server, a SQL server connection string needs to be supplied.</p>
+<p>Silo configuration via code is as follows, and includes logging configuration.</p>
+<pre><code class="lang-c#">var connectionString = @&quot;Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
+    Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+
+var config = new ClusterConfiguration{    
+    Globals =    
+    {
+        DataConnectionString = connectionString,
+        DeploymentId = &quot;&lt;your deployment ID&gt;&quot;,
+
+        LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer,
+        LivenessEnabled = true,
+        ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer
+    },
+    Defaults =
+    {        
+        Port = 11111,
+        ProxyGatewayEndpoint = new IPEndPoint(address, 30000),
+        PropagateActivityId = true
+    }};
+
+var siloHost = new SiloHost(System.Net.Dns.GetHostName(), config);
+</code></pre><p>Clients need to be configured to use SQL server for discovering the gateways, as with Azure and Zookeeper, the addresses of the Orleans servers are not statically known to the clients.</p>
+<pre><code class="lang-c#">
+var connectionString = @&quot;Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
+    Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+
+var config = new ClientConfiguration{
+    GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer,
+    AdoInvariant = &quot;System.Data.SqlClient&quot;,
+    DataConnectionString = connectionString,
+
+    DeploymentId = &quot;&lt;your deployment ID&gt;&quot;,    
+    PropagateActivityId = true
+};
+
+var client = new ClientBuilder().UseConfiguration(config).Build();
+await client.Connect();
 </code></pre><h2 id="unreliable-deployment-on-a-cluster-of-dedicated-servers">Unreliable Deployment on a Cluster of Dedicated Servers</h2>
 <p>For testing on a cluster of dedicated servers when reliability isn’t a concern you can leverage MembershipTableGrain and avoid dependency on Azure Table. You just need to designate one of the nodes as a Primary.</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
