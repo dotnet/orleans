@@ -14,9 +14,9 @@ namespace Orleans.Providers
         private readonly string providerKind;
         private readonly IProviderRuntime runtime;
 
-        public StatisticsProviderManager(string kind, IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public StatisticsProviderManager(IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
-            providerKind = kind;
+            providerKind = ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME;
             this.runtime = runtime;
             statisticsProviderLoader = new ProviderLoader<IProvider>(loadedProviderTypeLoaders);
         }

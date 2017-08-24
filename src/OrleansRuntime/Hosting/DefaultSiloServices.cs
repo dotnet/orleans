@@ -60,6 +60,7 @@ namespace Orleans.Runtime.Hosting
             services.TryAddTransient<ConsistentRingQueueBalancer>();
             services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
+            services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<StorageProviderManager>();
             services.TryAddSingleton<LogConsistencyProviderManager>();
             services.TryAddSingleton<BootstrapProviderManager>();
@@ -111,6 +112,7 @@ namespace Orleans.Runtime.Hosting
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
+            services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<Factory<string, Logger>>(LogManager.GetLogger);

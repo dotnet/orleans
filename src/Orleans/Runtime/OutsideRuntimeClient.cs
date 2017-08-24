@@ -150,7 +150,7 @@ namespace Orleans
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
-                statisticsProviderManager = ActivatorUtilities.CreateInstance<StatisticsProviderManager>(this.ServiceProvider, "Statistics", clientProviderRuntime);
+                statisticsProviderManager = this.ServiceProvider.GetRequiredService<StatisticsProviderManager>();
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);
                 if (statsProviderName != null)
