@@ -184,6 +184,11 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
+            this.ScheduleTask(() => { Utils.SafeExecute(() => this.OnSiloStatusChange(updatedSilo, status), this.logger); }).Ignore();
+        }
+
+        private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
+        {
             if (!status.IsTerminating()) return;
 
             if (Equals(updatedSilo, this.Silo))

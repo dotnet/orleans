@@ -29,6 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory grainFactory;
+        private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
 
         // Consider: move these constants into an apropriate place
         internal const int HOP_LIMIT = 3; // forward a remote request no more than two times
@@ -57,8 +58,6 @@ namespace Orleans.Runtime.GrainDirectory
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
 
         public string ClusterId { get; }
-
-        internal ISiloStatusListener CatalogSiloStatusListener { get; set; }
 
         internal GlobalSingleInstanceActivationMaintainer GsiActivationMaintainer { get; private set; }
 
@@ -261,6 +260,16 @@ namespace Orleans.Runtime.GrainDirectory
             stopPreparationResolver.TrySetException(ex);
         }
 
+        /// <inheritdoc />
+        public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> callback)
+        {
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            lock (membershipCache)
+            {
+                this.catalogOnSiloRemoved = callback;
+            }
+        }
+
         #region Handling membership events
         protected void AddServer(SiloAddress silo)
         {
@@ -299,12 +308,12 @@ namespace Orleans.Runtime.GrainDirectory
                     return;
                 }
 
-                if (CatalogSiloStatusListener != null)
+                if (this.catalogOnSiloRemoved != null)
                 {
                     try
                     {
-                        // only call SiloStatusChangeNotification once on the catalog and the order is important: call BEFORE updating membershipRingList.
-                        CatalogSiloStatusListener.SiloStatusChangeNotification(silo, status);
+                        // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
+                        this.catalogOnSiloRemoved(silo, status);
                     }
                     catch (Exception exc)
                     {
