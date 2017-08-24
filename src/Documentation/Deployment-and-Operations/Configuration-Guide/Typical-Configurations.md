@@ -89,6 +89,55 @@ Clients need to be configured to use ZooKeeper for discovering the gateways, the
 </ClientConfiguration>
 ```
 
+## Reliable Production Deployment Using SQL Server
+For a reliable production deployment using SQL server, a SQL server connection string needs to be supplied.
+
+Silo configuration via code is as follows, and includes logging configuration.
+
+``` c#
+var connectionString = @"Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
+    Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True";
+
+var config = new ClusterConfiguration{    
+    Globals =    
+    {
+        DataConnectionString = connectionString,
+        DeploymentId = "<your deployment ID>",
+        
+        LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer,
+        LivenessEnabled = true,
+        ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer
+    },
+    Defaults =
+    {        
+        Port = 11111,
+        ProxyGatewayEndpoint = new IPEndPoint(address, 30000),
+        PropagateActivityId = true
+    }};
+        
+var siloHost = new SiloHost(System.Net.Dns.GetHostName(), config);
+```
+
+Clients need to be configured to use SQL server for discovering the gateways, as with Azure and Zookeeper, the addresses of the Orleans servers are not statically known to the clients.
+
+``` c#
+
+var connectionString = @"Data Source=MSSQLDBServer;Initial Catalog=Orleans;Integrated Security=True;
+    Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True";
+
+var config = new ClientConfiguration{
+    GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer,
+    AdoInvariant = "System.Data.SqlClient",
+    DataConnectionString = connectionString,
+    
+    DeploymentId = "<your deployment ID>",    
+    PropagateActivityId = true
+};
+
+var client = new ClientBuilder().UseConfiguration(config).Build();
+await client.Connect();
+```
+
 ## Unreliable Deployment on a Cluster of Dedicated Servers
 For testing on a cluster of dedicated servers when reliability isn’t a concern you can leverage MembershipTableGrain and avoid dependency on Azure Table. You just need to designate one of the nodes as a Primary.
 
