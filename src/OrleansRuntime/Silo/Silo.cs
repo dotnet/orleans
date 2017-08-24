@@ -143,7 +143,11 @@ namespace Orleans.Runtime
         /// Test hook connection for white-box testing of silo.
         /// </summary>
         internal TestHooksSystemTarget testHook;
-        
+
+        private SchedulingContext membershipOracleContext;
+        private SchedulingContext multiClusterOracleContext;
+        private SchedulingContext reminderServiceContext;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
@@ -473,7 +477,6 @@ namespace Orleans.Runtime
             healthCheckParticipants.Add(membershipOracle);
 
             catalog.SiloStatusOracle = this.membershipOracle;
-            localGrainDirectory.CatalogSiloStatusListener = catalog;
             this.membershipOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
             messageCenter.SiloDeadOracle = this.membershipOracle.IsDeadSilo;
 
@@ -613,11 +616,12 @@ namespace Orleans.Runtime
             // Load and init grain services before silo becomes active.
             CreateGrainServices(GlobalConfig.GrainServiceConfigurations);
 
-            ISchedulingContext statusOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext;
-            scheduler.QueueTask(() => this.membershipOracle.Start(), statusOracleContext)
+            this.membershipOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext ??
+                                       this.providerManagerSystemTarget.SchedulingContext;
+            scheduler.QueueTask(() => this.membershipOracle.Start(), this.membershipOracleContext)
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle created successfully."); }
-            scheduler.QueueTask(this.membershipOracle.BecomeActive, statusOracleContext)
+            scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
             scheduler.QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
@@ -629,8 +633,9 @@ namespace Orleans.Runtime
                 logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
                     GlobalConfig.ServiceId, GlobalConfig.ClusterId);
 
-                ISchedulingContext clusterStatusContext = (multiClusterOracle as SystemTarget)?.SchedulingContext;
-                scheduler.QueueTask(() => multiClusterOracle.Start(), clusterStatusContext)
+                this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
+                                                          this.providerManagerSystemTarget.SchedulingContext;
+                scheduler.QueueTask(() => multiClusterOracle.Start(), multiClusterOracleContext)
                                     .WaitWithThrow(initTimeout);
                 if (logger.IsVerbose) { logger.Verbose("multicluster oracle created successfully."); }
             }
@@ -654,7 +659,9 @@ namespace Orleans.Runtime
                 if (this.reminderService != null)
                 {
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    this.scheduler.QueueTask(this.reminderService.Start, (this.reminderService as SystemTarget)?.SchedulingContext)
+                    this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
+                                                           this.providerManagerSystemTarget.SchedulingContext;
+                    this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
                         .WaitWithThrow(this.initTimeout);
                     if (this.logger.IsVerbose)
                     {
@@ -848,14 +855,14 @@ namespace Orleans.Runtime
                     {
                         logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
                         // 1: Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
-                        scheduler.QueueTask(this.membershipOracle.ShutDown, (this.membershipOracle as SystemTarget)?.SchedulingContext)
+                        scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
                             .WaitWithThrow(stopTimeout);
                     }
                     else
                     {
                         logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
                         // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
-                        scheduler.QueueTask(this.membershipOracle.Stop, (this.membershipOracle as SystemTarget)?.SchedulingContext)
+                        scheduler.QueueTask(this.membershipOracle.Stop, this.membershipOracleContext)
                             .WaitWithThrow(stopTimeout);
                     }
                 }
@@ -868,7 +875,7 @@ namespace Orleans.Runtime
                 if (reminderService != null)
                 {
                     // 2: Stop reminder service
-                    scheduler.QueueTask(reminderService.Stop, (reminderService as SystemTarget)?.SchedulingContext)
+                    scheduler.QueueTask(reminderService.Stop, this.reminderServiceContext)
                         .WaitWithThrow(stopTimeout);
                 }
 
@@ -940,7 +947,7 @@ namespace Orleans.Runtime
             if (!GlobalConfig.LivenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
                 // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
-                SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, (this.membershipOracle as SystemTarget)?.SchedulingContext)
+                SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
                     .WaitWithThrow(stopTimeout));
             }
 
