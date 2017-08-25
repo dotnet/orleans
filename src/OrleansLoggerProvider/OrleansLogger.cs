@@ -84,31 +84,12 @@ namespace Orleans.Extensions.Logging
             switch (logLevel)
             {
                 case LogLevel.None: return Severity.Off;
-                case LogLevel.Critical: return Severity.Critical;
+                case LogLevel.Critical: return Severity.Error;
                 case LogLevel.Error: return Severity.Error;
                 case LogLevel.Warning: return Severity.Warning;
                 case LogLevel.Information: return Severity.Info;
                 case LogLevel.Debug: return Severity.Verbose;
                 default: return Severity.Verbose3;
-            }
-        }
-
-        /// <summary>
-        /// Map Severity to LogLevel
-        /// </summary>
-        /// <param name="severity"></param>
-        /// <returns></returns>
-        public static LogLevel SeverityToLogLevel(Severity severity)
-        {
-            switch (severity)
-            {
-                case Severity.Off: return LogLevel.None;
-                case Severity.Critical: return LogLevel.Critical;
-                case Severity.Error: return LogLevel.Error;
-                case Severity.Warning: return LogLevel.Warning;
-                case Severity.Info: return LogLevel.Information;
-                case Severity.Verbose: return LogLevel.Debug;
-                default: return LogLevel.Trace;
             }
         }
 
