@@ -1,13 +1,13 @@
-﻿using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+﻿using Orleans.Runtime;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
-namespace Orleans.Extensions.Logging
+namespace Orleans.Runtime
 {
 
     /// <summary>

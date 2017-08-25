@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-//TODO: need to move Orleans.Extensions.Logging to an extension project
 namespace Orleans.Extensions.Logging
 {
     public static class OrleansLoggingFactoryExtension
@@ -16,6 +15,7 @@ namespace Orleans.Extensions.Logging
         /// <param name="logConsumers">log consumers which user want to write log events to</param>
         /// <param name="messageBulkingConfig">config for message bulking feature</param>
         /// <returns></returns>
+        [Obsolete]
         public static ILoggerFactory AddOrleansLogging(
             this ILoggerFactory factory,
             List<ILogConsumer> logConsumers,
@@ -35,6 +35,7 @@ namespace Orleans.Extensions.Logging
         /// <param name="severityOverrides"></param>
         /// <param name="messageBulkingConfig">config for message bulking feature</param>
         /// <returns></returns>
+        [Obsolete]
         public static ILoggerFactory AddOrleansLogging(
             this ILoggerFactory factory,
             List<ILogConsumer> logConsumers,

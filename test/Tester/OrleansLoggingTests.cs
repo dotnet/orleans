@@ -20,7 +20,7 @@ namespace Tester
         {
             //configure default logging
             IServiceCollection serviceCollection = new ServiceCollection();
-            Silo.ConfigureDefaultLogging(serviceCollection, $"{this.GetType().Name}.log", new IPEndPoint(102187443, 11113));
+            serviceCollection.AddLogging();
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
             //get logger
@@ -28,13 +28,14 @@ namespace Tester
             Assert.NotNull(logger);
             logger.Log<string>(LogLevel.Information, OrleansLoggingDecorator.CreateEventId(0, 0), "Successfully logged one message", null, (msg, exc) => msg);
             //supports orleans legacy log method
-            logger.Info(0,"Successfully logged one message", null);
+            logger.LogInformation("Successfully logged");
 
             //dispose log providers
             this.DisposeLogProviders(serviceProvider);
         }
 
         [Fact]
+        [Obsolete]
         public void OrleansLoggingCanConfigurePerCategoryServeriyOverrides()
         {
             //configure logging with severity overrides
@@ -42,7 +43,12 @@ namespace Tester
             var loggerProvider = new OrleansLoggerProvider()
                 .AddLogConsumer(new FileLogConsumer($"{this.GetType().Name}.log", new IPEndPoint(102187443, 11113)))
                 .AddSeverityOverrides(this.GetType().FullName, Severity.Warning);
-            serviceCollection.AddLogging(builder => builder.AddProvider(loggerProvider));
+            var loggerFac = new LoggerFactory();
+            loggerFac.AddProvider(loggerProvider);
+            serviceCollection.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
+            serviceCollection.AddSingleton<ILoggerFactory>(loggerFac);
+            //swtich to serviceCollection.AddLogging(builder => builder.AddProvider(loggerProvider)) after upgrade to Microsoft.Extensions.Logging 2.0
+            // logBuilder is not supported in 1.1.3
             var serviceProvider = serviceCollection.BuildServiceProvider();
             //get logger
             var logger = serviceProvider.GetRequiredService<ILogger<OrleansLoggingTests>>();
@@ -52,8 +58,9 @@ namespace Tester
             //dispose log providers
             this.DisposeLogProviders(serviceProvider);
         }
-
+        /*
         [Fact]
+        TODO: enable this after upgrade to Microsoft.Extensions.Logging 2.0. LogFilter or LogBuilder isn't supported in 1.1.2
         public void MicrosoftExtensionsLogging_LoggingFilter_CanAlsoConfigurePerCategoryLogLevel()
         {
             //configure logging with severity overrides
@@ -72,7 +79,7 @@ namespace Tester
 
             //dispose log providers
             this.DisposeLogProviders(serviceProvider);
-        }
+        }*/
 
         private void DisposeLogProviders(IServiceProvider svc)
         {

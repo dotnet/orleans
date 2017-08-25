@@ -12,6 +12,7 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// FileLogConsumer, which logs message into a file in orleans logging message style
     /// </summary>
+    [Obsolete]
     public class FileLogConsumer : ICloseableLogConsumer, IFlushableLogConsumer
     {
         private StreamWriter logOutput;

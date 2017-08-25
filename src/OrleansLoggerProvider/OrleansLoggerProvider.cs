@@ -13,6 +13,7 @@ namespace Orleans.Extensions.Logging
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">, message bulking. 
     /// OrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
+    [Obsolete]
     public class OrleansLoggerProvider : ILoggerProvider
     {
         /// <summary>
@@ -123,6 +124,7 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// Orleans severity overrides on a per logger base
     /// </summary>
+    [Obsolete]
     public class OrleansLoggerSeverityOverrides
     {
         /// <summary>
