@@ -119,4 +119,24 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
 </Project>
