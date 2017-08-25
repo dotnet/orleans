@@ -13,6 +13,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -117,7 +118,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("CodeGen")]
         public void InternalSerializableTypesHaveSerializers()
         {
-            var environment = InitializeSerializer(SerializerToUse.Default);
+            var environment = InitializeSerializer(SerializerToUse.NoFallback);
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(AddressesAndTag)),
                 $"Should be able to serialize internal type {nameof(AddressesAndTag)}.");
@@ -133,6 +134,12 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(PubSubGrainState)),
                 $"Should be able to serialize internal type {nameof(PubSubGrainState)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(EventHubBatchContainer)),
+                $"Should be able to serialize internal type {nameof(EventHubBatchContainer)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(EventHubSequenceTokenV2)),
+                $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]

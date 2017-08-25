@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
+using Orleans.ServiceBus.Providers;
 
 #if !EXCLUDE_ASSEMBLYINFO // TODO remove after source tree merge
 
@@ -22,3 +24,4 @@ using System.Runtime.InteropServices;
 #endif
 
 [assembly: InternalsVisibleTo("ServiceBus.Tests")]
+[assembly: KnownAssembly(typeof(EventHubSequenceTokenV2), TreatTypesAsSerializable = true)]
