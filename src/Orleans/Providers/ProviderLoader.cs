@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Providers
 {
@@ -34,11 +35,12 @@ namespace Orleans.Providers
         private readonly Dictionary<string, TProvider> providers;
         private IDictionary<string, IProviderConfiguration> providerConfigs;
         private readonly Logger logger;
-
-        public ProviderLoader()
+        private readonly LoadedProviderTypeLoaders loadedProviderTypeLoaders;
+        public ProviderLoader(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             logger = LogManager.GetLogger("ProviderLoader/" + typeof(TProvider).Name, LoggerType.Runtime);
             providers = new Dictionary<string, TProvider>();
+            this.loadedProviderTypeLoaders = loadedProviderTypeLoaders;
         }
 
         public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
@@ -51,7 +53,7 @@ namespace Orleans.Providers
             }
 
             // Load providers
-            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
+            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType, this.loadedProviderTypeLoaders);
 
             ValidateProviders();
         }

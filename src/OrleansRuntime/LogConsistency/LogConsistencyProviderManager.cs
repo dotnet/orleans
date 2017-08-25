@@ -8,6 +8,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
 using Orleans.LogConsistency;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.LogConsistency
 {
@@ -19,16 +20,16 @@ namespace Orleans.Runtime.LogConsistency
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime runtime)
+        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
             this.runtime = runtime;
+            providerLoader = new ProviderLoader<ILogConsistencyProvider>(loadedProviderTypeLoaders);
         }
 
         internal Task LoadLogConsistencyProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            providerLoader = new ProviderLoader<ILogConsistencyProvider>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME))
                 return Task.CompletedTask;

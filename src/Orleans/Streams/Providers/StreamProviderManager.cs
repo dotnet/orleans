@@ -5,19 +5,19 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
-
 namespace Orleans.Streams
 {
     internal class StreamProviderManager : IStreamProviderManager
     {
         private ProviderLoader<IStreamProviderImpl> appStreamProviders;
-
+        public StreamProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        {
+            appStreamProviders = new ProviderLoader<IStreamProviderImpl>(loadedProviderTypeLoaders);
+        }
         internal async Task LoadStreamProviders(
             IDictionary<string, ProviderCategoryConfiguration> configs,
             IStreamProviderRuntime providerRuntime)
         {
-            if(appStreamProviders == null) appStreamProviders = new ProviderLoader<IStreamProviderImpl>();
-
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)) return;
 
             appStreamProviders.LoadProviders(configs[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME].Providers, this);

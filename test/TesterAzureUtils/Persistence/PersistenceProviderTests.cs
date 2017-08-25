@@ -34,7 +34,8 @@ namespace Tester.AzureUtils.Persistence
             storageProviderManager = new StorageProviderManager(
                 fixture.GrainFactory,
                 fixture.Services,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services));
+                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services),
+                new LoadedProviderTypeLoaders());
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
         }

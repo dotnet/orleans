@@ -67,6 +67,8 @@ namespace Orleans
 
         private static void AddBasicServices(IServiceCollection services, ClientConfiguration clientConfiguration)
         {
+            services.AddSingleton<LoadedProviderTypeLoaders>();
+            services.AddSingleton<StatisticsProviderManager>();
             services.AddSingleton(clientConfiguration);
             services.AddSingleton<TypeMetadataCache>();
             services.AddSingleton<AssemblyProcessor>();
@@ -90,6 +92,7 @@ namespace Orleans
             services.AddSingleton<ClientStatisticsManager>();
             services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
             services.AddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
+            services.AddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.AddSingleton<CodeGeneratorManager>();
             services.AddSingleton<IInternalClusterClient, ClusterClient>();

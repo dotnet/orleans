@@ -27,7 +27,8 @@ namespace AWSUtils.Tests.StorageTests
             DefaultProviderRuntime = new StorageProviderManager(
                 fixture.GrainFactory,
                 fixture.Services,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services));
+                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services),
+                new LoadedProviderTypeLoaders());
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
 
             var properties = new Dictionary<string, string>();

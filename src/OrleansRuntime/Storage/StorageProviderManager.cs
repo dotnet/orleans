@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Storage
 {
@@ -13,16 +14,16 @@ namespace Orleans.Runtime.Storage
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
 
-        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime)
+        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
         {
             this.providerRuntime = providerRuntime;
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
+            storageProviderLoader = new ProviderLoader<IStorageProvider>(loadedProviderTypeLoaders);
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                 return Task.CompletedTask;
@@ -104,8 +105,6 @@ namespace Orleans.Runtime.Storage
         // used only for testing
         internal Task LoadEmptyStorageProviders()
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>();
-
             storageProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
