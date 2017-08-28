@@ -38,15 +38,15 @@ call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES
 
 SET CURRENT_CONFIGURATION=Debug
 
-call %_dotnet% restore /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Restore.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% restore %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Restore.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo RESTORE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Build.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Build.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -54,15 +54,15 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_C
 
 SET CURRENT_CONFIGURATION=Release
 
-call %_dotnet% restore /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Restore.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% restore %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Restore.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo RESTORE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Build.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Build.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo BUILD ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -73,7 +73,7 @@ goto :BuildFinished
 
 SET CURRENT_CONFIGURATION=Debug
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -81,7 +81,7 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_C
 
 SET CURRENT_CONFIGURATION=Release
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog;ProjectImports=Embed /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
