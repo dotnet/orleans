@@ -14,6 +14,7 @@ The idea is to track end-user facing changes as they occur.*
   - Dispose `IServiceProvider` during client shutdown #3249
   - `ClusterClient.Dispose()` is now equivalent to `Abort()` #3306
   - Avoid `BadImageFormatException` from being written in the log during Silo or client startup #3216
+  - Add build-time code generation to `Microsoft.Orleans.OrleansServiceBus` package #3344
   - Several minor bug fixes and perf improvements, as well as reliability in our test code #3234 #3250 #3258 #3283 #3301 #3309 #3311
 
 ### [1.5.0]
