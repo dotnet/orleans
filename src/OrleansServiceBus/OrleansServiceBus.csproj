@@ -9,6 +9,7 @@
   <PropertyGroup>
     <AssemblyName>OrleansServiceBus</AssemblyName>
     <RootNamespace>OrleansServiceBus</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
