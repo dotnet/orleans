@@ -68,6 +68,10 @@
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OrleansBootstrapSteps>
       OrleansDllBootstrapUsingCodeGen
