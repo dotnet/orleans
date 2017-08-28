@@ -1,12 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansLoggerProvider</PackageId>
+    <Title>Microsoft Orleans Logger Provider</Title>
+    <Description>Library of OrleansLoggerProvider.</Description>
+    <PackageTags>$(PackageTags) Orleans</PackageTags>
+  </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.5</TargetFramework>
+    <AssemblyName>OrleansLoggerProvider</AssemblyName>
+    <RootNamespace>Orleans.Extensions.Logging</RootNamespace>
+    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
   </ItemGroup>
-
 </Project>
