@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
