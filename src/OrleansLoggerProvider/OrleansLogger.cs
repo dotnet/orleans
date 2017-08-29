@@ -28,7 +28,6 @@ namespace Orleans.Extensions.Logging
         /// <param name="categoryName"></param>
         /// <param name="logConsumers"></param>
         /// <param name="maxSeverityLevel"></param>
-        /// <param name="bulkingConfig"></param>
         public OrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, Severity maxSeverityLevel)
         {
             this.logConsumers = logConsumers;
@@ -67,11 +66,9 @@ namespace Orleans.Extensions.Logging
         /// <param name="formatter"></param>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            var errorCode = OrleansLoggingDecorator.GetOrleansErrorCode(eventId);
-            //if cannot get error code, then make it zero, which means unknown error code
-            var finalErrorCode = errorCode.HasValue ? errorCode.Value : 0;
+            var errorCode = eventId.Id;
             var severity = LogLevelToSeverity(logLevel);
-            WriteLogMessageToLogConsumers(finalErrorCode, severity, formatter(state, exception), exception);
+            WriteLogMessageToLogConsumers(errorCode, severity, formatter(state, exception), exception);
         }
 
         /// <summary>

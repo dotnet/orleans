@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Default bulk message limit. 
         /// </summary>
-        public const int DefaultBulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
+        public const int DefaultBulkMessageLimit = 5;
 
         /// <summary>
         /// Time limit for bulk message output.
@@ -42,20 +42,20 @@ namespace Orleans.Runtime
 
     /// <summary>
     /// OrleansLoggingDecorator class. User can plug in their own ILogger implementation into this decorator class to add message bulking feature on top of their logger. 
+    /// Message bulking feature will just log eventId count if the same eventId has appear more than BulkMessageLimit in a certain BulkMessageInterval.
     /// </summary>
     public class OrleansLoggingDecorator : ILogger
     {
         private static readonly int[] excludedBulkLogCodes = {
             0,
-            (int)ErrorCode.Runtime
+            100000 //internal runtime error code
         };
         private const int BulkMessageSummaryOffset = 500000;
-        private const string LogCodeString = "OrleansLogCode: ";
 
-        private MessageBulkingConfig messageBulkingConfig;
-        private ConcurrentDictionary<int, int> recentLogMessageCounts = new ConcurrentDictionary<int, int>();
+        private readonly MessageBulkingConfig messageBulkingConfig;
+        private readonly ConcurrentDictionary<int, int> recentLogMessageCounts = new ConcurrentDictionary<int, int>();
         private long lastBulkLogMessageFlushTicks = DateTime.MinValue.Ticks;
-        private ILogger thirdPartyLogger;
+        private readonly ILogger thirdPartyLogger;
 
         /// <summary>
         /// Constructor
@@ -68,51 +68,12 @@ namespace Orleans.Runtime
             this.thirdPartyLogger = thirdPartyLogger;
         }
 
-        /// <summary>
-        /// Create EventId in a format which supports message bulking
-        /// </summary>
-        /// <param name="eventId"></param>
-        /// <param name="errorCode"></param>
-        /// <returns></returns>
-        public static EventId CreateEventId(int eventId, int errorCode)
-        {
-            return new EventId(eventId, $"{LogCodeString}{errorCode}");
-        }
-
-        /// <summary>
-        /// Get error code from EventId
-        /// </summary>
-        /// <param name="eventId"></param>
-        /// <returns></returns>
-        public static int? GetOrleansErrorCode(EventId eventId)
-        {
-            if (eventId.Name.Contains(LogCodeString))
-            {
-                var errorCodeString = eventId.Name.Substring(LogCodeString.Length);
-                int errorCode;
-                if (int.TryParse(errorCodeString, out errorCode))
-                {
-                    return errorCode;
-                }
-            }
-            return null;
-        }
-
         /// <inheritdoc/>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            var errorCode = GetOrleansErrorCode(eventId);
-            if (errorCode.HasValue)
-            {
-                //message bulking based on errorCode
-                if (CheckBulkMessageLimits(errorCode.Value, logLevel))
-                    this.thirdPartyLogger.Log<TState>(logLevel, eventId, state, exception, formatter);
-            }
-            else
-            {
-                //normal logging style
+            var errorCode = eventId.Id;
+            if (CheckBulkMessageLimits(errorCode, logLevel))
                 this.thirdPartyLogger.Log<TState>(logLevel, eventId, state, exception, formatter);
-            }
         }
 
         /// <inheritdoc/>
@@ -162,8 +123,8 @@ namespace Orleans.Runtime
                     // Output summary counts for any pending bulk message occurrances
                     foreach (var logCodeCountPair in bulkMessageCounts)
                     {
-                        this.thirdPartyLogger.Log<string>(LogLevel.Information, CreateEventId(0, logCodeCountPair.Key + BulkMessageSummaryOffset),
-                                $"Log code {logCodeCountPair.Key} occurred {logCodeCountPair.Value - this.messageBulkingConfig.BulkMessageLimit} additional time(s) in previous {new TimeSpan(sinceIntervalTicks)}", 
+                        this.thirdPartyLogger.Log<string>(LogLevel.Information, new EventId(logCodeCountPair.Key + BulkMessageSummaryOffset),
+                                $"EventId {logCodeCountPair.Key} occurred {logCodeCountPair.Value - this.messageBulkingConfig.BulkMessageLimit} additional time(s) in previous {new TimeSpan(sinceIntervalTicks)}", 
                                 null, (msg, exc) => msg);
                     }
                 }
