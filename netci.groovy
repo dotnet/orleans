@@ -34,6 +34,9 @@ def branch = GithubBranchName
             else {
                 Utilities.addGithubPRTriggerForBranch(newJob, branch, newJobName)
             }
+
+            // args: archive *.binlog, don't exclude anything, don't fail if there are no files, archive in case of failure too
+            Utilities.addArchival(newJob, '*.binlog', '', true, false)
         }
     }
 }
