@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Functionality for building <see cref="ISilo"/> instances.

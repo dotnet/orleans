@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.CodeGeneration;
@@ -28,9 +27,10 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Storage;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {

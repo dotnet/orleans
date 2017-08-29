@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Represents a silo instance.

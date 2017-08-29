@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 #if NETSTANDARD
 using System.Reflection;
 #endif
@@ -14,6 +15,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
+using Orleans.Hosting;
 using Orleans.LogConsistency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -31,7 +33,6 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
-using Orleans.Runtime.Hosting;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 

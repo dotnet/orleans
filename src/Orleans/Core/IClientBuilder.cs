@@ -30,5 +30,19 @@ namespace Orleans
         /// <remarks>This method may only be called once per builder instance.</remarks>
         /// <returns>The builder.</returns>
         IClientBuilder UseConfiguration(ClientConfiguration configuration);
+
+        /// <summary>
+        /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 
+        /// </summary>
+        /// <param name="factory">The service provider factory.</param>
+        /// <returns>The builder.</returns>
+        IClientBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory);
+
+        /// <summary>
+        /// Adds a container configuration delegate.
+        /// </summary>
+        /// <typeparam name="TContainerBuilder">The container builder type.</typeparam>
+        /// <param name="configureContainer">The container builder configuration delegate.</param>
+        IClientBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer);
     }
 }

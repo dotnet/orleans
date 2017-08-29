@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans
@@ -102,6 +103,17 @@ namespace Orleans
         public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, ConnectionToClusterLostHandler handler)
         {
             builder.ConfigureServices(services => services.AddSingleton(handler));
+            return builder;
+        }
+
+        /// <summary>
+        /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 
+        /// </summary>
+        /// <param name="factory">The service provider factory.</param>
+        /// <returns>The builder.</returns>
+        public static IClientBuilder UseServiceProviderFactory(this IClientBuilder builder, Func<IServiceCollection, IServiceProvider> factory)
+        {
+            builder.UseServiceProviderFactory(new DelegateServiceProviderFactory(factory));
             return builder;
         }
     }
