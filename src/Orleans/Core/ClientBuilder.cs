@@ -1,8 +1,9 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -18,7 +19,7 @@ namespace Orleans
     /// </summary>
     public class ClientBuilder : IClientBuilder
     {
-        private readonly List<Action<IServiceCollection>> configureServicesDelegates = new List<Action<IServiceCollection>>();
+        private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
         private ClientConfiguration clientConfiguration;
 
@@ -27,25 +28,22 @@ namespace Orleans
         {
             if (this.built) throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(ClientBuilder)} instance.");
             this.built = true;
-
-            // If no configuration has been specified, use a default instance.
-            this.clientConfiguration = this.clientConfiguration ?? ClientConfiguration.StandardLoad();
             
-            // Configure the container.
-            var services = new ServiceCollection();
-            AddBasicServices(services, this.clientConfiguration);
-            foreach (var configureServices in this.configureServicesDelegates)
-            {
-                configureServices(services);
-            }
+            // Configure default services and build the container.
+            this.serviceProviderBuilder.ConfigureServices(
+                services =>
+                {
+                    services.TryAddSingleton(this.clientConfiguration ?? ClientConfiguration.StandardLoad());
+                    services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+                    services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
+                });
+            this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider();
 
-            // Build the container and configure the runtime client.
-            var serviceProvider = services.BuildServiceProvider();
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
 
             // Construct and return the cluster client.
-            var result = serviceProvider.GetRequiredService<IClusterClient>();
-            return result;
+            return serviceProvider.GetRequiredService<IClusterClient>();
         }
 
         /// <inheritdoc />
@@ -60,43 +58,53 @@ namespace Orleans
         /// <inheritdoc />
         public IClientBuilder ConfigureServices(Action<IServiceCollection> configureServices)
         {
-            if (configureServices == null) throw new ArgumentNullException(nameof(configureServices));
-            this.configureServicesDelegates.Add(configureServices);
+            this.serviceProviderBuilder.ConfigureServices(configureServices);
             return this;
         }
 
-        private static void AddBasicServices(IServiceCollection services, ClientConfiguration clientConfiguration)
+        /// <inheritdoc />
+        public IClientBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
         {
-            services.AddSingleton<LoadedProviderTypeLoaders>();
-            services.AddSingleton<StatisticsProviderManager>();
-            services.AddSingleton(clientConfiguration);
-            services.AddSingleton<TypeMetadataCache>();
-            services.AddSingleton<AssemblyProcessor>();
-            services.AddSingleton<OutsideRuntimeClient>();
-            services.AddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
-            services.AddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
-            services.AddSingleton<GrainFactory>();
-            services.AddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
-            services.AddFromExisting<IGrainFactory, GrainFactory>();
-            services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
-            services.AddFromExisting<IGrainReferenceConverter, GrainFactory>();
-            services.AddSingleton<ClientProviderRuntime>();
-            services.AddFromExisting<IMessagingConfiguration, ClientConfiguration>();
-            services.AddFromExisting<ITraceConfiguration, ClientConfiguration>();
-            services.AddSingleton<IGatewayListProvider>(
+            this.serviceProviderBuilder.UseServiceProviderFactory(factory);
+            return this;
+        }
+
+        /// <inheritdoc />
+        public IClientBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
+        {
+            this.serviceProviderBuilder.ConfigureContainer(configureContainer);
+            return this;
+        }
+
+        private static void AddDefaultServices(IServiceCollection services)
+        {
+            services.TryAddSingleton<LoadedProviderTypeLoaders>();
+            services.TryAddSingleton<StatisticsProviderManager>();
+            services.TryAddSingleton<TypeMetadataCache>();
+            services.TryAddSingleton<AssemblyProcessor>();
+            services.TryAddSingleton<OutsideRuntimeClient>();
+            services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
+            services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
+            services.TryAddSingleton<GrainFactory>();
+            services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
+            services.TryAddFromExisting<IGrainFactory, GrainFactory>();
+            services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
+            services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
+            services.TryAddSingleton<ClientProviderRuntime>();
+            services.TryAddSingleton<IGatewayListProvider>(
                 sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
-            services.AddSingleton<SerializationManager>();
-            services.AddSingleton<MessageFactory>();
-            services.AddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
-            services.AddSingleton<StreamProviderManager>();
-            services.AddSingleton<ClientStatisticsManager>();
-            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
-            services.AddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
-            services.AddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
-            services.AddSingleton<CodeGeneratorManager>();
-            services.AddSingleton<IInternalClusterClient, ClusterClient>();
-            services.AddFromExisting<IClusterClient, IInternalClusterClient>();
+            services.TryAddSingleton<SerializationManager>();
+            services.TryAddSingleton<MessageFactory>();
+            services.TryAddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
+            services.TryAddSingleton<StreamProviderManager>();
+            services.TryAddSingleton<ClientStatisticsManager>();
+            services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();
+            services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
+            services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
+            services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
+            services.TryAddSingleton<CodeGeneratorManager>();
+            services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
+            services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
         }
     }
 }

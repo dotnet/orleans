@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Hosting
 {
@@ -11,9 +10,7 @@ namespace Orleans.Runtime.Hosting
     /// </summary>
     public class SiloBuilder : ISiloBuilder
     {
-        private readonly List<Action<IServiceCollection>> configureServicesDelegates = new List<Action<IServiceCollection>>();
-        private readonly List<object> configureContainerDelegates = new List<object>();
-        private IServiceProviderFactoryAdapter serviceProviderFactory;
+        private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
 
         /// <inheritdoc />
@@ -23,65 +20,40 @@ namespace Orleans.Runtime.Hosting
                 throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(SiloBuilder)} instance.");
             this.built = true;
             
-            // Configure the container.
-            var services = new ServiceCollection();
-            foreach (var configureServices in this.configureServicesDelegates)
-            {
-                configureServices(services);
-            }
-
-            // Configure a default silo name and add the default services.
+            // Configure the container, including the default silo name & services.
             this.Configure<SiloIdentityOptions>(
                 options => options.SiloName = options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
-            services.TryAddSingleton<SiloInitializationParameters>();
-            services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
-            DefaultSiloServices.AddDefaultServices(services);
-
-            // If no service provider factory has been specified, set a default.
-            if (this.serviceProviderFactory == null)
-            {
-                var factory = new DelegateServiceProviderFactory(svc => svc.BuildServiceProvider());
-                this.UseServiceProviderFactory(factory);
-            }
-
-            // Create the service provider using the configured factory.
-            var serviceProvider = this.serviceProviderFactory.BuildServiceProvider(services);
+            this.serviceProviderBuilder.ConfigureServices(
+                services =>
+                {
+                    services.TryAddSingleton<SiloInitializationParameters>();
+                    services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
+                });
+            this.serviceProviderBuilder.ConfigureServices(DefaultSiloServices.AddDefaultServices);
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider();
             
             // Construct and return the silo.
-            var result = serviceProvider.GetRequiredService<ISilo>();
-            return result;
+            return serviceProvider.GetRequiredService<ISilo>();
         }
 
         /// <inheritdoc />
         public ISiloBuilder ConfigureServices(Action<IServiceCollection> configureServices)
         {
-            if (configureServices == null) throw new ArgumentNullException(nameof(configureServices));
-            this.configureServicesDelegates.Add(configureServices);
+            this.serviceProviderBuilder.ConfigureServices(configureServices);
             return this;
         }
 
         /// <inheritdoc />
         public ISiloBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
         {
-            if (this.serviceProviderFactory != null)
-                throw new InvalidOperationException("The service provider factory has already been specified.");
-            this.serviceProviderFactory = new ServiceProviderFactoryAdapter<TContainerBuilder>(factory);
-            foreach (var builder in this.configureContainerDelegates)
-            {
-                var typedDelegate = (Action<TContainerBuilder>) builder;
-                this.serviceProviderFactory.ConfigureContainer(typedDelegate);
-            }
-
-            this.configureContainerDelegates.Clear();
+            this.serviceProviderBuilder.UseServiceProviderFactory(factory);
             return this;
         }
 
         /// <inheritdoc />
         public ISiloBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
         {
-            if (this.serviceProviderFactory != null) this.serviceProviderFactory.ConfigureContainer(configureContainer);
-            else this.configureContainerDelegates.Add(configureContainer);
-
+            this.serviceProviderBuilder.ConfigureContainer(configureContainer);
             return this;
         }
     }

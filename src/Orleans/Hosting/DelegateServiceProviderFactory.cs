@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     internal class DelegateServiceProviderFactory : IServiceProviderFactory<IServiceCollection>
     {

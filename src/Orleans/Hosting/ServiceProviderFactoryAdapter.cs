@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Adapts an <see cref="IServiceProviderFactory{TContainerBuilder}"/> into an <see cref="IServiceProviderFactoryAdapter"/>.
