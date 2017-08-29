@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -29,8 +30,7 @@ namespace Orleans.Hosting
             // If no service provider factory has been specified, set a default.
             if (this.serviceProviderFactory == null)
             {
-                var factory = new DelegateServiceProviderFactory(svc => svc.BuildServiceProvider());
-                this.UseServiceProviderFactory(factory);
+                this.UseDefaultServiceProviderFactory();
             }
 
             // Create the service provider using the configured factory.
@@ -76,6 +76,13 @@ namespace Orleans.Hosting
         {
             if (this.serviceProviderFactory != null) this.serviceProviderFactory.ConfigureContainer(configureContainer);
             else this.configureContainerDelegates.Add(configureContainer);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void UseDefaultServiceProviderFactory()
+        {
+            var factory = new DelegateServiceProviderFactory(svc => svc.BuildServiceProvider());
+            this.UseServiceProviderFactory(factory);
         }
     }
 }

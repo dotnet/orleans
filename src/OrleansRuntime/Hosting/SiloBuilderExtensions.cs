@@ -1,9 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Extensions for <see cref="ISiloBuilder"/> instances.

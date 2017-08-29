@@ -1,8 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
     internal class SiloWrapper : ISilo
     {
