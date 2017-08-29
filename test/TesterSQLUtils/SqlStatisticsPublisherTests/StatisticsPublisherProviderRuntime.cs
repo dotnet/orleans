@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -48,6 +49,13 @@ namespace UnitTests.SqlStatisticsPublisherTests
         public InvokeInterceptor GetInvokeInterceptor()
         {
             return this.invokeInterceptor;
+        }
+
+        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : IGrainExtension
+            where TExtensionInterface : IGrainExtension
+        {
+            throw new NotImplementedException();
         }
     }
 }

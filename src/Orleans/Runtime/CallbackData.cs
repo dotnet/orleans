@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
@@ -30,6 +31,8 @@ namespace Orleans.Runtime
         private ITimeInterval timeSinceIssued;
         private static readonly Logger logger = LogManager.GetLogger("CallbackData");
 
+        public TransactionInfo TransactionInfo { get; set; }
+
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
         public CallbackData(
@@ -52,6 +55,8 @@ namespace Orleans.Runtime
             unregister = unregisterDelegate;
             alreadyFired = false;
             this.config = config;
+
+            this.TransactionInfo = TransactionContext.GetTransactionInfo();
         }
 
         /// <summary>

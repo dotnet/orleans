@@ -1,7 +1,8 @@
+
 using System;
-using System.Collections.Generic;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
@@ -26,9 +27,17 @@ namespace Orleans.Runtime
                 Id = CorrelationId.GetNext(),
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
+                IsTransactionRequired = (options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0,
                 BodyObject = request,
                 IsUsingInterfaceVersions = request.InterfaceVersion > 0,
             };
+
+            TransactionInfo transactionInfo = message.IsTransactionRequired ? TransactionContext.GetTransactionInfo() : null;
+            if (transactionInfo != null)
+            {
+                transactionInfo.PendingCalls++;
+                message.TransactionInfo = new TransactionInfo(transactionInfo);
+            }
 
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
@@ -46,7 +55,8 @@ namespace Orleans.Runtime
                 Id = request.Id,
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
-                TargetSilo = request.SendingSilo
+                TargetSilo = request.SendingSilo,
+                TransactionInfo = request.TransactionInfo
             };
 
             if (request.SendingGrain != null)
