@@ -1,4 +1,4 @@
-﻿#if NETSTANDARD
+﻿#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -37,7 +37,7 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     internal class EventHubReceiverProxy: IEventHubReceiver
     {
-#if NETSTANDARD
+#if USE_EVENTHUB
         private PartitionReceiver receiver;
         public EventHubReceiverProxy(PartitionReceiver receiver)
         {

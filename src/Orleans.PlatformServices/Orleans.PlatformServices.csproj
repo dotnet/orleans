@@ -10,25 +10,25 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework />
-    <TargetFrameworks>net462;netstandard1.5</TargetFrameworks>
+<!--    <TargetFramework />
+    <TargetFramework>netstandard2.0</TargetFramework>-->
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <RootNamespace>Orleans.PlatformServices</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net462'">
+  <PropertyGroup>
     <DefineConstants>$(DefineConstants);NET46</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard1.5'">
+<!--  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard1.5'">
     <DefineConstants>$(DefineConstants);NETCORE</DefineConstants>
-  </PropertyGroup>
+  </PropertyGroup>-->
 
   <ItemGroup>
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.5'">
+<!--  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.5'">
     <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
-  </ItemGroup>
+  </ItemGroup>-->
 </Project>

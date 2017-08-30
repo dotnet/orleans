@@ -206,7 +206,8 @@ namespace Orleans.Runtime
 
         private void TrackContextSwitches()
         {
-#if !NETSTANDARD_TODO
+//ATTILA
+/*#if !NETSTANDARD_TODO
             // TODO: this temporary exclusion should be resolved by #2147
             PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
             PerformanceCounter[] performanceCountersForThisThread = null;
@@ -235,7 +236,7 @@ namespace Orleans.Runtime
                     FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
                 }
             }
-#endif
+#endif*/
         }
     }
 }

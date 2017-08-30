@@ -215,23 +215,27 @@ namespace Orleans.Streams
             streamId = (StreamId)info.GetValue("StreamId", typeof(StreamId));
             isRewindable = info.GetBoolean("IsRewindable");
             initLock = new object();
-#if !NETSTANDARD_TODO
-            this.OnDeserialized(context);
-#endif
+//ATTILA
+            var serializerContext = context.Context as ISerializerContext;
+            ((IOnDeserialized)this).OnDeserialized(serializerContext);
+
+//#if !NETSTANDARD_TODO
+//            this.OnDeserialized(context);
+//#endif
         }
 
-#if !NETSTANDARD_TODO
+//#if !NETSTANDARD_TODO
         /// <summary>
         /// Called by BinaryFormatter after deserialization has completed.
         /// </summary>
         /// <param name="context">The context.</param>
-        [OnDeserialized]
-        private void OnDeserialized(StreamingContext context)
-        {
-            var serializerContext = context.Context as ISerializerContext;
-            ((IOnDeserialized)this).OnDeserialized(serializerContext);
-        }
-#endif
+//        [OnDeserialized]
+//        private void OnDeserialized(StreamingContext context)
+//        {
+//            var serializerContext = context.Context as ISerializerContext;
+//            ((IOnDeserialized)this).OnDeserialized(serializerContext);
+//        }
+//#endif
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {

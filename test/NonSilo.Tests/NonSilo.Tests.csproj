@@ -8,6 +8,10 @@
     <Compile Remove="AssemblyLoaderTests.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />

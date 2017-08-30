@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Text;
-
-#if NETSTANDARD
+#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
-
 using Microsoft.ServiceBus.Messaging;
-
 #endif
-
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -66,7 +62,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
                 StreamSequenceToken token =
-#if NETSTANDARD
+#if USE_EVENTHUB
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
                 new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);

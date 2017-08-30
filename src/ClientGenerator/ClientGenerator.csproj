@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <TargetFramework>net462</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

@@ -39,9 +39,10 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <TestProjectTargetFramework>net462</TestProjectTargetFramework>
+<!--    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>-->
+    <DefineConstants>$(DefineConstants);USE_EVENTHUB</DefineConstants>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
@@ -55,6 +56,7 @@
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemCollectionsImmutableVersion>1.3.1</SystemCollectionsImmutableVersion>
+    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
@@ -93,6 +95,7 @@
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <!-- System packages -->
     <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
+    <SystemReflectionMetadataVersion>1.4.2</SystemReflectionMetadataVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftApplicationInsightsVersion>2.2.0</MicrosoftApplicationInsightsVersion>

@@ -614,12 +614,13 @@ namespace Orleans.Runtime.Configuration
         {
             var sb = new StringBuilder();
             sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
-#if !NETSTANDARD_TODO
+//ATTILA
+/*#if !NETSTANDARD_TODO
             // TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
             sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile);
-#endif
+#endif*/
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))

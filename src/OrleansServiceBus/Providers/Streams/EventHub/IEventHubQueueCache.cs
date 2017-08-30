@@ -1,6 +1,5 @@
-﻿
-using System;
-#if NETSTANDARD
+﻿using System;
+#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;

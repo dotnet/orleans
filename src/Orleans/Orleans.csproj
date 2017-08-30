@@ -25,11 +25,12 @@
 
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <Compile Remove="Statistics\RuntimeStatisticsGroup.cs" />
+    <Compile Remove="Shims\AppDomain.cs" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Compile Remove="Shims\AppDomain.cs" />
     <Compile Remove="Shims\RuntimeStatisticsGroup.cs" />
+    <Compile Remove="Shims\AppDomain.cs" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
@@ -40,10 +41,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjection)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
-    <PackageReference Include="System.ValueTuple" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+  <ItemGroup>
     <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
   </ItemGroup>
 
