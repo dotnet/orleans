@@ -120,6 +120,12 @@ namespace UnitTests.Serialization
         {
             var environment = InitializeSerializer(SerializerToUse.NoFallback);
             Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(int)),
+                $"Should be able to serialize internal type {nameof(Int32)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(List<int>)),
+                $"Should be able to serialize internal type {nameof(List<int>)}.");
+            Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(AddressesAndTag)),
                 $"Should be able to serialize internal type {nameof(AddressesAndTag)}.");
             Assert.True(
@@ -140,6 +146,9 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(EventHubSequenceTokenV2)),
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(ValueTuple<int, AddressAndTag>)),
+                $"Should be able to serialize internal type {nameof(ValueTuple<int, AddressAndTag>)}.");
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]

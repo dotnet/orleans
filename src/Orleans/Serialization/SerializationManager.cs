@@ -1067,6 +1067,7 @@ namespace Orleans.Serialization
                 Serializer ser;
                 if (serializers.TryGetValue(t.TypeHandle, out ser)) return true;
                 var typeInfo = t.GetTypeInfo();
+                if (typeInfo.IsOrleansPrimitive()) return true;
                 if (!typeInfo.IsGenericType) return false;
                 var genericTypeDefinition = typeInfo.GetGenericTypeDefinition();
                 return serializers.TryGetValue(genericTypeDefinition.TypeHandle, out ser) &&
