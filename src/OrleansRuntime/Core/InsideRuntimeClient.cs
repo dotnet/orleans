@@ -43,7 +43,7 @@ namespace Orleans.Runtime
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
         private readonly List<IGrainCallFilter> siloInterceptors;
-        private readonly ITransactionAgent transactionAgent;
+        private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
         
         public InsideRuntimeClient(
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             MessageFactory messageFactory,
             IEnumerable<IGrainCallFilter> registeredInterceptors,
-            ITransactionAgent transactionAgent)
+            Lazy<ITransactionAgent> transactionAgent)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -307,7 +307,7 @@ namespace Orleans.Runtime
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    transactionInfo = await this.transactionAgent.StartTransaction(message.IsReadOnly, transactionTimeout);
+                    transactionInfo = await this.transactionAgent.Value.StartTransaction(message.IsReadOnly, transactionTimeout);
                     startNewTransaction = true;
                 }
 
@@ -371,7 +371,7 @@ namespace Orleans.Runtime
                         {
                             var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
                                 new OrleansTransactionAbortedException(transactionInfo.TransactionId, exc1);
-                            this.transactionAgent.Abort(transactionInfo, abortException);
+                            this.transactionAgent.Value.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
                     }
@@ -406,7 +406,7 @@ namespace Orleans.Runtime
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     if (startNewTransaction)
                     {
-                        this.transactionAgent.Abort(TransactionContext.GetTransactionInfo(), abortException);
+                        this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                     }
  
 
@@ -421,7 +421,7 @@ namespace Orleans.Runtime
                 if (startNewTransaction)
                 {
                     // This request started the transaction, so we try to commit before returning.
-                    await this.transactionAgent.Commit(transactionInfo);
+                    await this.transactionAgent.Value.Commit(transactionInfo);
                 }
 
                 if (message.Direction == Message.Directions.OneWay) return;
@@ -444,7 +444,7 @@ namespace Orleans.Runtime
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     var abortException = (exc2 as OrleansTransactionAbortedException) ?? 
                         new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
-                    this.transactionAgent.Abort(TransactionContext.GetTransactionInfo(), abortException);
+                    this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                 }
             }
             finally
