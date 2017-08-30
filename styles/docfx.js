@@ -63,7 +63,7 @@ $(function () {
       placement: 'left',
       visible: 'touch'
     };
-    anchors.add('article h2, article h3, article h4, article h5, article h6');
+    anchors.add('article h2:not(.no-anchor), article h3:not(.no-anchor), article h4:not(.no-anchor)');
   })();
 
   // Open links to different host in a new window.

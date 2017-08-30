@@ -139,9 +139,9 @@ Here is an example of a grain call filter which logs the results of every grain 
 {
     private readonly Logger log;
 
-    public LoggingCallFilter(IProviderRuntime providerRuntime)
+    public LoggingCallFilter(Factory&lt;string, Logger&gt; loggerFactory)
     {
-        this.log = providerRuntime.GetLogger(nameof(LoggingCallFilter));
+        this.log = loggerFactory(nameof(LoggingCallFilter));
     }
 
     public async Task Invoke(IGrainCallContext context)
