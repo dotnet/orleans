@@ -14,7 +14,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Threading;
-#if NETSTANDARD
+#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus;

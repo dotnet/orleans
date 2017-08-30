@@ -11,10 +11,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Orleans.CodeGeneration</RootNamespace>
     <AssemblyName>ClientGenerator</AssemblyName>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <TargetFramework>net462</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -45,7 +42,7 @@
       <PackagePath>build\$(PackageId).targets</PackagePath>
       <Visible>false</Visible>
     </None>
-    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
+    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.Core.Abstractions.dll;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>

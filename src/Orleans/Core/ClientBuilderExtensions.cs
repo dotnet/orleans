@@ -109,6 +109,7 @@ namespace Orleans
         /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 
         /// </summary>
+        /// <param name="builder">The builder.</param>
         /// <param name="factory">The service provider factory.</param>
         /// <returns>The builder.</returns>
         public static IClientBuilder UseServiceProviderFactory(this IClientBuilder builder, Func<IServiceCollection, IServiceProvider> factory)

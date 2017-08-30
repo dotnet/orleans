@@ -9,7 +9,7 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-#if NETSTANDARD
+#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -60,7 +60,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
         }
         //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
-#if !NETSTANDARD
+#if !USE_EVENTHUB
         [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {

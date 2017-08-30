@@ -61,6 +61,13 @@
   <Target Name="Clean">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Cleaning code generators for bootstrap" Importance="high" />
     <MSBuild
+      Projects="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Clean"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
       Condition=" '$(BuildFlavor)' == 'Current' "
       Projects="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj"
       Properties="$(MsBuildProperties)"

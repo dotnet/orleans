@@ -10,13 +10,11 @@ set CMDHOME=%CMDHOME:~0,-1%
 pushd "%CMDHOME%"
 @cd
 
-SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%\TestResults
+SET TestResultDir=%CMDHOME%\Binaries\%BuildFlavor%\%CONFIGURATION%\TestResults
 
 if not exist %TestResultDir% md %TestResultDir%
 
-SET _Directory=bin\%CONFIGURATION%\net462\win10-x64
-
-if [%BuildFlavor%]==[Legacy] SET _Directory=bin\%CONFIGURATION%\net461\win10-x64
+SET _Directory=bin\%CONFIGURATION%\net461\win10-x64
 
 rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
 if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1

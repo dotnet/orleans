@@ -1,9 +1,8 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-#if NETSTANDARD
+#if USE_EVENTHUB
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -17,7 +16,7 @@ using Orleans.Runtime;
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// This is a tightly packed cached structure containing an event hub message.  
+    /// This is a tightly packed cached structure containing an event hub message.
     /// It should only contain value types.
     /// </summary>
     public struct CachedEventHubMessage
@@ -209,12 +208,12 @@ namespace Orleans.ServiceBus.Providers
         {
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
             cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
-#if NETSTANDARD
+#if USE_EVENTHUB
             cachedMessage.SequenceNumber = queueMessage.SystemProperties.SequenceNumber;
             cachedMessage.EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc;
 #else
             cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
-            cachedMessage.EnqueueTimeUtc = queueMessage.EnqueuedTimeUtc; 
+            cachedMessage.EnqueueTimeUtc = queueMessage.EnqueuedTimeUtc;
 #endif
             cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
             cachedMessage.Segment = EncodeMessageIntoSegment(streamPosition, queueMessage);
@@ -260,18 +259,18 @@ namespace Orleans.ServiceBus.Providers
         public virtual StreamPosition GetStreamPosition(EventData queueMessage)
         {
             Guid streamGuid =
-#if NETSTANDARD
+#if USE_EVENTHUB
             Guid.Parse(queueMessage.SystemProperties.PartitionKey);
 #else
-            Guid.Parse(queueMessage.PartitionKey); 
+            Guid.Parse(queueMessage.PartitionKey);
 #endif
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
             IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
             StreamSequenceToken token =
-#if NETSTANDARD
+#if USE_EVENTHUB
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
-                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0); 
+                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);
 #endif
             return new StreamPosition(stremIdentity, token);
         }
@@ -303,19 +302,19 @@ namespace Orleans.ServiceBus.Providers
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
-#if NETSTANDARD
+#if USE_EVENTHUB
             byte[] payload = queueMessage.Body.Array;
 #else
-            byte[] payload = queueMessage.GetBytes(); 
+            byte[] payload = queueMessage.GetBytes();
 #endif
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
-#if NETSTANDARD
+#if USE_EVENTHUB
             SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.Offset) +
             SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.PartitionKey) +
 #else
             SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
-            SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) + 
+            SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +
 #endif
             SegmentBuilder.CalculateAppendSize(propertiesBytes) +
             SegmentBuilder.CalculateAppendSize(payload);
@@ -326,18 +325,18 @@ namespace Orleans.ServiceBus.Providers
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
-#if NETSTANDARD
+#if USE_EVENTHUB
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.Offset);
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.PartitionKey);
 #else
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey); 
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey);
 #endif
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);
 
             return segment;
         }
-       
+
     }
 }
