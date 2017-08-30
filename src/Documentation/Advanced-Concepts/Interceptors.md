@@ -83,9 +83,9 @@ public class LoggingCallFilter : IGrainCallFilter
 {
     private readonly Logger log;
 
-    public LoggingCallFilter(IProviderRuntime providerRuntime)
+    public LoggingCallFilter(Factory<string, Logger> loggerFactory)
     {
-        this.log = providerRuntime.GetLogger(nameof(LoggingCallFilter));
+        this.log = loggerFactory(nameof(LoggingCallFilter));
     }
 
     public async Task Invoke(IGrainCallContext context)
