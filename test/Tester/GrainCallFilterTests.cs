@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -54,7 +55,21 @@ namespace UnitTests.General
             Assert.NotNull(context);
             Assert.Equal("123456", context);
         }
-        
+
+        /// <summary>
+        /// Ensures that grain call filters can be configured via <see cref="IGrainActivationContext"/>.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Fact]
+        public async Task GrainCallFilter_ActivationContext_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
+            
+            var color = await grain.GetFavoriteColor();
+            Assert.NotNull(color);
+            Assert.Equal("turkey", color);
+        }
+
         /// <summary>
         /// Ensures that the invocation interceptor is invoked for stream subscribers.
         /// </summary>
@@ -224,6 +239,9 @@ namespace UnitTests.General
 
                 return context.Invoke();
             });
+
+            // Inject a filter as a scoped service.
+            services.AddScoped<InjectedGrainLevelFilter>();
 
             return services.BuildServiceProvider();
         }

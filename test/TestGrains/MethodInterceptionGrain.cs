@@ -143,11 +143,35 @@ namespace UnitTests.Grains
         public Task<int> GetBestNumber() => Task.FromResult(38);
     }
 
+    public class InjectedGrainLevelFilter : IGrainCallFilter
+    {
+        public InjectedGrainLevelFilter(IGrainActivationContext context)
+        {
+            context.GrainCallFilters.Add(this);
+        }
+
+        public async Task Invoke(IGrainCallContext context)
+        {
+            await context.Invoke();
+            if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetFavoriteColor)))
+            {
+                context.Result = "turkey";
+            }
+        }
+    }
+
 #pragma warning disable 618
     public class GrainCallFilterTestGrain : Grain, IGrainCallFilterTestGrain, IGrainCallFilter, IGrainInvokeInterceptor
 #pragma warning restore 618
     {
         private const string Key = GrainCallFilterTestConstants.Key;
+        private readonly InjectedGrainLevelFilter injected;
+
+        public GrainCallFilterTestGrain(InjectedGrainLevelFilter injected)
+        {
+            // Injected configures itself as a call filter in its constructor using IGrainActivationContext.
+            this.injected = injected;
+        }
 
         // Note, this class misuses the context. It should not be stored for later use.
         private IGrainCallContext context;
@@ -164,6 +188,7 @@ namespace UnitTests.Grains
         }
 
         public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "6");
+        public Task<string> GetFavoriteColor() => Task.FromResult("red");
 
         public async Task Invoke(IGrainCallContext ctx)
         {

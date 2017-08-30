@@ -215,6 +215,8 @@ namespace Orleans.Runtime
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
+        public List<IGrainCallFilter> GrainCallFilters { get; set; }
+
         #region Method invocation
 
         private ExtensionInvoker extensionInvoker;
@@ -290,6 +292,7 @@ namespace Orleans.Runtime
         {
             this.GrainTypeData = typeData;
             this.Items = new Dictionary<object, object>();
+            this.GrainCallFilters = new List<IGrainCallFilter>();
             this.serviceScope = grainServices.CreateScope();
 
             SetGrainActivationContextInScopedServices(this.ActivationServices, this);
