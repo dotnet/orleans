@@ -26,13 +26,13 @@ namespace OrleansXO.Grains
         public Task AddGame(Guid gameId, string name)
         {
             cache.Add(gameId.ToString(), name, new DateTimeOffset(DateTime.UtcNow).AddHours(1));
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task RemoveGame(Guid gameId)
         {
             cache.Remove(gameId.ToString());
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<PairingSummary[]> GetGames()

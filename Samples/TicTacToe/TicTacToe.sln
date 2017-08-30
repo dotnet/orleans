@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TicTacToe.Web", "OrleansXO.Web\TicTacToe.Web.csproj", "{24B22FFC-541F-4B2C-A0A2-3BBD658A1B9C}"
 EndProject
@@ -48,5 +48,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FFB34773-C2BC-451A-9363-84AA4B7C63DE}
 	EndGlobalSection
 EndGlobal
