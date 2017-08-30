@@ -183,7 +183,7 @@ namespace OrleansXO.Grains
         public Task SetName(string name)
         {
             this.name = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
 

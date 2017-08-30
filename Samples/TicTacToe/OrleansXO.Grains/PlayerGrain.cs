@@ -91,7 +91,7 @@ namespace OrleansXO.Grains
             if (outcome == GameOutcome.Lose)
                 loses++;
 
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public async Task<List<GameSummary>> GetGameSummaries()
@@ -109,7 +109,7 @@ namespace OrleansXO.Grains
         public Task SetUsername(string name)
         {
             this.username = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         public Task<string> GetUsername()
