@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Orleans.Transactions
 {
@@ -37,7 +38,7 @@ namespace Orleans.Transactions
         public long HighestActiveTransactionIdAtCheckpoint { get; set; }
 
         // Time the transaction was completed (i.e. either committed or aborted)
-        public long CompletionTime { get; set; }
+        public DateTime CompletionTimeUtc { get; set; }
 
         public OrleansTransactionAbortedException AbortingException { get; set; }
 

@@ -31,5 +31,4 @@ using Orleans.Transactions;
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
 
-[assembly: GenerateSerializer(typeof(CommitRecord))]
 [assembly: GenerateSerializer(typeof(TransactionalExtensionExtensions.TransactionalResourceExtensionWrapper))]

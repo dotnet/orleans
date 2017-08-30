@@ -50,7 +50,7 @@ namespace Orleans.Transactions
 
         public static string ToShortString(this ITransactionalResource resource)
         {
-            // meant to help humans when debugging or reading traces
+            // Meant to help humans when debugging or reading traces
             return resource.GetHashCode().ToString("x4").Substring(0,4);
         }
     }
@@ -100,7 +100,9 @@ namespace Orleans.Transactions
         {
             if (TransactionId != other.TransactionId)
             {
-                // TODO: freak out
+                IsAborted = true;
+                string error = $"Attempting to perform union between different Transactions.  Attempted union between Transactions {TransactionId} and {other.TransactionId}";
+                throw new InvalidOperationException(error);
             }
 
             if (other.IsAborted)
