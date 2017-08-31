@@ -52,7 +52,7 @@ namespace UnitTests.General
             Assert.Equal(initialReleasedInstances, secondReleasedInstances);
 
             await grain1.DoDeactivate();
-            await Task.Delay(100);
+            await Task.Delay(250);
 
             ISimpleDIGrain grain3 = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             long finalReleasedInstances = await grain3.GetLongValue();
