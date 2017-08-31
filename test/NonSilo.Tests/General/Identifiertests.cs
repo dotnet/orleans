@@ -29,6 +29,24 @@ namespace UnitTests.General
             this.environment = fixture;
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyToByteArray()
+        {
+            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: "hello world");
+
+            var result = key.ToByteArray();
+
+            var sw = new BinaryTokenStreamWriter();
+            sw.Write(key);
+            var expected = sw.ToByteArray();
+
+            Assert.Equal(expected.Length, result.Length);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.Equal(expected[i], result[i]);
+            }
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void ID_IsSystem()
         {
