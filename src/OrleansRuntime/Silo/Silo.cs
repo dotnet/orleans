@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Reflection;
-#if NETSTANDARD
-using System.Reflection;
-#endif
 using System.Runtime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
@@ -33,6 +30,7 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 
@@ -341,6 +339,13 @@ namespace Orleans.Runtime
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
 
+            var transactionAgent = this.Services.GetRequiredService<ITransactionAgent>() as SystemTarget;
+            if (transactionAgent != null)
+            {
+                logger.Verbose("Creating {0} System Target", "TransactionAgent");
+                RegisterSystemTarget(transactionAgent);
+            }
+
             logger.Verbose("Finished creating System Targets for this silo.");
         }
 
@@ -468,6 +473,12 @@ namespace Orleans.Runtime
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
+
+            ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
+            ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
+            scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
+                        .WaitWithThrow(initTimeout);
+
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }

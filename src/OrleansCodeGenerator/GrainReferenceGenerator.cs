@@ -269,6 +269,16 @@ namespace Orleans.CodeGenerator
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.AlwaysInterleave.ToString()));
             }
 
+            if (GrainInterfaceUtils.IsNewTransactionRequired(method))
+            {
+                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequiresNew.ToString()));
+            }
+
+            if (GrainInterfaceUtils.IsTransactionRequired(method))
+            {
+                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequired.ToString()));
+            }
+
             ExpressionSyntax allOptions;
             if (options.Count <= 1)
             {

@@ -64,5 +64,10 @@ namespace Orleans.CodeGeneration
 
         /// <summary>The invocation can interleave with any other request type, including write requests.</summary>
         AlwaysInterleave = 0x100,
+
+        // Transactional method options. 
+        // NOTE: keep in sync with TransactionOption enum.
+        TransactionRequired = 0x200,
+        TransactionRequiresNew = 0x400,
     }
 }

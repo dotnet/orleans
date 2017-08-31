@@ -77,6 +77,11 @@ namespace Orleans.Runtime.Storage
 #pragma warning restore 618
         }
 
+        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension
+        {
+            return providerRuntime.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+        }
+
         /// <summary>
         /// Get list of providers loaded in this silo.
         /// </summary>

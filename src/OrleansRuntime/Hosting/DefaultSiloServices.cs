@@ -29,6 +29,8 @@ using Orleans.Versions.Selector;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Storage;
+using Orleans.Transactions;
+using System;
 
 namespace Orleans.Hosting
 {
@@ -172,6 +174,12 @@ namespace Orleans.Hosting
                 });
             
             services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
+
+            // Transactions
+            services.AddSingleton<ITransactionAgent,TransactionAgent>();
+            services.AddSingleton(sp => new Lazy<ITransactionAgent>(() => sp.GetRequiredService<ITransactionAgent>()));
+            services.AddSingleton<TransactionServiceGrainFactory>();
+            services.AddSingleton(sp => sp.GetRequiredService<TransactionServiceGrainFactory>().CreateTransactionManagerService() );
         }
     }
 }
