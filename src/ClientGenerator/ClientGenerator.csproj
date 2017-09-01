@@ -30,12 +30,6 @@
     </ProjectReference>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj">
-      <PrivateAssets>all</PrivateAssets>
-    </ProjectReference>
-  </ItemGroup>
-
   <ItemGroup>
     <None Include="..\Orleans.SDK.targets">
       <Pack>true</Pack>
@@ -43,11 +37,6 @@
       <Visible>false</Visible>
     </None>
     <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.Core.Abstractions.dll;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Orleans.PlatformServices.dll" Condition=" '$(BuildFlavor)' == 'Current' ">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>

@@ -8,11 +8,7 @@ namespace Orleans.Runtime
         {
             get
             {
-#if !NETSTANDARD
                 return Environment.UserInteractive;
-#else
-                return true;
-#endif
             }
         }
 

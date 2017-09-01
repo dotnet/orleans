@@ -63,10 +63,7 @@ namespace Orleans.CodeGenerator
                 .AddAttributes(
                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
                     SF.Attribute(typeof(SerializableAttribute).GetNameSyntax()),
-#if !NETSTANDARD_TODO
-                    //ExcludeFromCodeCoverageAttribute became an internal class in netstandard
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
-#endif
                     markerAttribute);
 
             var className = CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix;

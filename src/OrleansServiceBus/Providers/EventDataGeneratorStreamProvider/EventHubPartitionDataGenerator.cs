@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 using static Microsoft.Azure.EventHubs.EventData;
 #else
@@ -63,7 +63,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 this.SequenceNumberCounter.Increment();
                 var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
                     this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContext.Export(this.serializationManager));
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
                 //set partition key
                 eventData.SetPartitionKey(this.StreamId.Guid.ToString());
 #endif

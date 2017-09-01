@@ -39,13 +39,12 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <DefineConstants>$(DefineConstants);BUILDFLAVOR_CURRENT;USE_EVENTHUB</DefineConstants>
     <TargetFramework>netstandard2.0</TargetFramework>
     <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <DefineConstants>$(DefineConstants);BUILDFLAVOR_LEGACY</DefineConstants>
+    <DefineConstants>$(DefineConstants);BUILD_FLAVOR_LEGACY</DefineConstants>
     <TargetFramework>net461</TargetFramework>
     <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>

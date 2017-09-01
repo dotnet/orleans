@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -208,7 +208,7 @@ namespace Orleans.ServiceBus.Providers
         {
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
             cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             cachedMessage.SequenceNumber = queueMessage.SystemProperties.SequenceNumber;
             cachedMessage.EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc;
 #else
@@ -259,7 +259,7 @@ namespace Orleans.ServiceBus.Providers
         public virtual StreamPosition GetStreamPosition(EventData queueMessage)
         {
             Guid streamGuid =
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             Guid.Parse(queueMessage.SystemProperties.PartitionKey);
 #else
             Guid.Parse(queueMessage.PartitionKey);
@@ -267,7 +267,7 @@ namespace Orleans.ServiceBus.Providers
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
             IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
             StreamSequenceToken token =
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
                 new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);
@@ -302,14 +302,14 @@ namespace Orleans.ServiceBus.Providers
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             byte[] payload = queueMessage.Body.Array;
 #else
             byte[] payload = queueMessage.GetBytes();
 #endif
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.Offset) +
             SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.PartitionKey) +
 #else
@@ -325,7 +325,7 @@ namespace Orleans.ServiceBus.Providers
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.Offset);
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.PartitionKey);
 #else

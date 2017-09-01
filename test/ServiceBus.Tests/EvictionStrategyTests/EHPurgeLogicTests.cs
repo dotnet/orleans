@@ -9,7 +9,7 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -60,7 +60,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
         }
         //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
-#if !USE_EVENTHUB
+#if !!BUILD_FLAVOR_LEGACY
         [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {
@@ -78,7 +78,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = true;
 
             //perform purge
-            IList<IBatchContainer> ignore; 
+            IList<IBatchContainer> ignore;
             this.receiver1.TryPurgeFromCache(out ignore);
             this.receiver2.TryPurgeFromCache(out ignore);
 
@@ -228,8 +228,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
         private Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
-            while (count > 0) 
-            { 
+            while (count > 0)
+            {
                 count--;
                 //just to make compiler happy
                 byte[] ignore = { 12, 23 };
@@ -252,7 +252,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         {
             var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
-            var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool), 
+            var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool),
                 EventHubDataComparer.Instance, this.logger, evictionStrategy);
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);

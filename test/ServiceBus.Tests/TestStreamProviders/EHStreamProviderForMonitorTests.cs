@@ -14,7 +14,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Threading;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus;
@@ -29,7 +29,7 @@ namespace ServiceBus.Tests.TestStreamProviders
         public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
             private CachePressureInjectionMonitor cachePressureInjectionMonitor;
-            
+
             public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
             {
                 this.ReceiverMonitorFactory = (dimensions, logger) => EventHubReceiverMonitorForTesting.Instance;
@@ -74,7 +74,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             }
             public enum QueryCommands
             {
-                GetCacheMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 10, 
+                GetCacheMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 10,
                 GetReceiverMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 11,
                 GetObjectPoolMonitorCallCounters = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 12,
                 ChangeCachePressure = (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange + 13

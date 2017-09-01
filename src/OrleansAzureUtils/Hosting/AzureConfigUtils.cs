@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Host
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));
             });
-#if BUILDFLAVOR_LEGACY
+#if BUILD_FLAVOR_LEGACY
             //System.Web namespace is deprecated in netstandard, considering drop this block, since it's expressing an obsolte way to looking for rootPath in IIS web app
             Utils.SafeExecute(() =>
             {

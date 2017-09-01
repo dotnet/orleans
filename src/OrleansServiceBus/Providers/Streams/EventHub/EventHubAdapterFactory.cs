@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus;
@@ -228,7 +228,7 @@ namespace Orleans.ServiceBus.Providers
                 throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
             }
             EventData eventData = EventHubBatchContainer.ToEventData(this.SerializationManager, streamGuid, streamNamespace, events, requestContext);
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             return client.SendAsync(eventData, streamGuid.ToString());
 #else
             return client.SendAsync(eventData);
@@ -261,7 +261,7 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(hubSettings.ConnectionString)
             {
                 EntityPath = hubSettings.Path
@@ -314,7 +314,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
             return runtimeInfo.PartitionIds;
 #else

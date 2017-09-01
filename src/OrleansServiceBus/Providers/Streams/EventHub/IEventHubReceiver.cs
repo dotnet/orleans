@@ -1,4 +1,4 @@
-﻿#if USE_EVENTHUB
+﻿#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -37,7 +37,7 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     internal class EventHubReceiverProxy: IEventHubReceiver
     {
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
         private PartitionReceiver receiver;
         public EventHubReceiverProxy(PartitionReceiver receiver)
         {

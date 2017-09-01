@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
@@ -125,11 +124,9 @@ namespace Orleans.LogConsistency
             : base(msg, exc)
         { }
 
-#if !NETSTANDARD
         protected ProtocolTransportException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
-#endif
 
         public override string ToString()
         {
@@ -139,6 +136,4 @@ namespace Orleans.LogConsistency
                 return Message;
         }
     }
-
-  
 }

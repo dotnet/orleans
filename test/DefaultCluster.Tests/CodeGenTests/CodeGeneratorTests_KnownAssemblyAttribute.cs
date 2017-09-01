@@ -54,8 +54,6 @@ namespace DefaultCluster.Tests.General
             ClientSerializerExists(typeof(FSharpOption<>));
         }
 
-#if !NETSTANDARD_TODO
-        // wait for FSharp projetcs ported over
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task Silo_Serializer_Exists_for_Type_In_Grain_Assembly_containing_KnownAssemblyAttribute()
         {
@@ -67,6 +65,5 @@ namespace DefaultCluster.Tests.General
         {
             ClientSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
         }
-#endif
     }
 }

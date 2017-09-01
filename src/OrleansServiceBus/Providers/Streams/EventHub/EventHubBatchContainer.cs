@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -121,7 +121,7 @@ namespace Orleans.ServiceBus.Providers
                 RequestContext = requestContext
             };
             var bytes = serializationManager.SerializeToByteArray(payload);
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             var eventData = new EventData(bytes);
 #else
             var eventData = new EventData(bytes) { PartitionKey = streamGuid.ToString() };

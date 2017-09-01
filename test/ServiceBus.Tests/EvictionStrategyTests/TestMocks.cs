@@ -1,4 +1,4 @@
-﻿#if USE_EVENTHUB
+﻿#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -20,7 +20,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
             :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, null, null)
             { }
-        
+
         public int ItemCount => this.cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy

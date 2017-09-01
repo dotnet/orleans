@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -171,7 +171,7 @@ namespace Orleans.ServiceBus.Providers
 
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             DateTime oldestMessageEnqueueTime = messages[0].SystemProperties.EnqueuedTimeUtc;
             DateTime newestMessageEnqueueTime = messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
 #else
@@ -189,7 +189,7 @@ namespace Orleans.ServiceBus.Providers
             if (!checkpointer.CheckpointExists)
             {
                 checkpointer.Update(
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
                     messages[0].SystemProperties.Offset,
 #else
                     messages[0].Offset,
@@ -273,7 +273,7 @@ namespace Orleans.ServiceBus.Providers
         private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
         {
             bool offsetInclusive = true;
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)
             {
                 EntityPath = partitionSettings.Hub.Path
@@ -297,7 +297,7 @@ namespace Orleans.ServiceBus.Providers
             else
             {
                 // to start reading from most recent data, we get the latest offset from the partition.
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
                 EventHubPartitionRuntimeInformation partitionInfo =
 #else
                 PartitionRuntimeInformation partitionInfo =
@@ -307,7 +307,7 @@ namespace Orleans.ServiceBus.Providers
                 offsetInclusive = false;
                 logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
             }
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
             PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
 
             if (partitionSettings.Hub.PrefetchCount.HasValue)

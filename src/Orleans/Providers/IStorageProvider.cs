@@ -69,11 +69,10 @@ namespace Orleans.Storage
         public BadProviderConfigException(string msg, Exception exc)
             : base(msg, exc)
         { }
-#if !NETSTANDARD
+
         protected BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
-#endif
     }
 
     /// <summary>
@@ -101,7 +100,7 @@ namespace Orleans.Storage
         public InconsistentStateException(string msg, Exception exc)
             : base(msg, exc)
         { }
-#if !NETSTANDARD
+
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -109,7 +108,6 @@ namespace Orleans.Storage
             this.CurrentEtag = info.GetString(nameof(CurrentEtag));
             this.IsSourceActivation = info.GetBoolean(nameof(this.IsSourceActivation));
         }
-#endif
 
         public InconsistentStateException(
           string errorMsg,
@@ -140,7 +138,6 @@ namespace Orleans.Storage
                 Message, StoredEtag, CurrentEtag, InnerException);
         }
 
-#if !NETSTANDARD
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             if (info == null) throw new ArgumentNullException(nameof(info));
@@ -150,6 +147,5 @@ namespace Orleans.Storage
             info.AddValue(nameof(this.IsSourceActivation), this.IsSourceActivation);
             base.GetObjectData(info, context);
         }
-#endif
     }
 }

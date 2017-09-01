@@ -32,11 +32,9 @@ namespace Benchmarks.Serialization
                 case SerializerToUse.IlBasedFallbackSerializer:
                     fallback = typeof(ILBasedSerializer).GetTypeInfo();
                     break;
-#if !NETSTANDARD_TODO
                 case SerializerToUse.BinaryFormatterFallbackSerializer:
                     fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
                     break;
-#endif
                 default:
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }

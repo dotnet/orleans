@@ -1,4 +1,3 @@
-#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 
@@ -22,4 +21,3 @@ namespace Orleans.Runtime
         {}
     }
 }
-#endif

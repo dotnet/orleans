@@ -115,7 +115,6 @@ namespace Orleans.Runtime
 
         public static void Import(Dictionary<string, object> contextData)
         {
-#if !NETSTANDARD
             if (PropagateActivityId)
             {
                 object activityIdObj = Guid.Empty;
@@ -128,7 +127,6 @@ namespace Orleans.Runtime
                     Trace.CorrelationManager.ActivityId = Guid.Empty;
                 }
             }
-#endif
 
             if (contextData != null && contextData.Count > 0)
             {
@@ -148,7 +146,6 @@ namespace Orleans.Runtime
         {
             var values = CallContextData.Value;
 
-#if !NETSTANDARD
             if (PropagateActivityId)
             {
                 var activityIdOverride = Trace.CorrelationManager.ActivityId;
@@ -165,7 +162,6 @@ namespace Orleans.Runtime
                     }
                 }
             }
-#endif
 
             return (values != null && values.Count > 0)
                 ? (Dictionary<string, object>)serializationManager.DeepCopy(values)

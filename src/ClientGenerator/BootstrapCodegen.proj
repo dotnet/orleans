@@ -16,21 +16,13 @@
       GeneratePackageOnBuild=false;
     </MsBuildProperties>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+<!--  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <ExcludeCodegenConstants>$(ExcludeCodegenConstants);NETSTANDARD;NETSTANDARD_TODO</ExcludeCodegenConstants>
-  </PropertyGroup>
+  </PropertyGroup>-->
   <Target Name="Build">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
     <MSBuild
       Projects="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj"
-      Properties="$(MsBuildProperties)"
-      Targets="Build"
-      UnloadProjectsOnCompletion="true"
-      UseResultsCache="false"
-      BuildInParallel="false" />
-    <MSBuild
-      Condition=" '$(BuildFlavor)' == 'Current' "
-      Projects="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj"
       Properties="$(MsBuildProperties)"
       Targets="Build"
       UnloadProjectsOnCompletion="true"
@@ -62,14 +54,6 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Cleaning code generators for bootstrap" Importance="high" />
     <MSBuild
       Projects="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj"
-      Properties="$(MsBuildProperties)"
-      Targets="Clean"
-      UnloadProjectsOnCompletion="true"
-      UseResultsCache="false"
-      BuildInParallel="false" />
-    <MSBuild
-      Condition=" '$(BuildFlavor)' == 'Current' "
-      Projects="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj"
       Properties="$(MsBuildProperties)"
       Targets="Clean"
       UnloadProjectsOnCompletion="true"

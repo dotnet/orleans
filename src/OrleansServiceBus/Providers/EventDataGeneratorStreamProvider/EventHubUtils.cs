@@ -1,4 +1,4 @@
-﻿#if USE_EVENTHUB
+﻿#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 using static Microsoft.Azure.EventHubs.EventData;
 #else
@@ -47,7 +47,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             EventDataMethodCache.Instance.SetEnqueuedTimeUtc(eventData, enqueueTime);
         }
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
         /// <summary>
         /// Setter for EventData.PartitionKey
         /// </summary>
@@ -59,7 +59,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         }
 #endif
     }
-#if USE_EVENTHUB
+#if !BUILD_FLAVOR_LEGACY
     internal class EventDataMethodCache
     {
         public static EventDataMethodCache Instance = new EventDataMethodCache();

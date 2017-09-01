@@ -42,10 +42,8 @@ namespace Orleans.Serialization
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
                 TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
 
-#if !NETSTANDARD_TODO
                 // Types such as GrainReference need context during deserialization, so provide that context now.
                 Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
-#endif
                 Formatting = Formatting.None
             };
 

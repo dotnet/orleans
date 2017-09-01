@@ -19,7 +19,6 @@ namespace Orleans.Storage.Internal
             ReceivedEtag = receivedEtag;
         }
 
-#if !NETSTANDARD
         protected MemoryStorageEtagMismatchException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -35,7 +34,6 @@ namespace Orleans.Storage.Internal
             info.AddValue(nameof(ReceivedEtag), this.ReceivedEtag);
             base.GetObjectData(info, context);
         }
-#endif
 
         public InconsistentStateException AsInconsistentStateException()
         {

@@ -226,19 +226,12 @@ namespace DefaultCluster.Tests.General
             {
                 var formatter = new BinaryFormatter
                 {
-#if !NETSTANDARD_TODO
                     Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(this.HostedCluster.SerializationManager))
-#endif
                 };
                 formatter.Serialize(memoryStream, obj);
                 memoryStream.Flush();
                 memoryStream.Position = 0; // Reset to start
                 other = (T)formatter.Deserialize(memoryStream);
-#if NETSTANDARD_TODO
-                // On .NET Standard, currently we need to manually fixup grain references.
-                var otherAsRef = other as Orleans.Runtime.GrainReference;
-                if (otherAsRef != null) this.GrainFactory.BindGrainReference(otherAsRef);
-#endif
             }
             return other;
         }

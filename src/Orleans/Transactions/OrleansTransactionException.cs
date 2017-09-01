@@ -15,12 +15,11 @@ namespace Orleans.Transactions
         public OrleansTransactionException(string message) : base(message) { }
 
         public OrleansTransactionException(string message, Exception innerException) : base(message, innerException) { }
-#if !NETSTANDARD
+
         protected OrleansTransactionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -34,12 +33,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansStartTransactionFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -56,7 +53,6 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
-#if !NETSTANDARD
         public OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -68,7 +64,6 @@ namespace Orleans.Transactions
             base.GetObjectData(info, context);
             info.AddValue(nameof(this.TransactionId), this.TransactionId);
         }
-#endif
     }
 
     /// <summary>
@@ -95,7 +90,6 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
-#if !NETSTANDARD
         public OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -107,7 +101,6 @@ namespace Orleans.Transactions
             base.GetObjectData(info, context);
             info.AddValue(nameof(this.TransactionId), this.TransactionId);
         }
-#endif
     }
 
     /// <summary>
@@ -120,12 +113,10 @@ namespace Orleans.Transactions
         { 
         }
 
-#if !NETSTANDARD
         public OrleansValidationFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -142,7 +133,6 @@ namespace Orleans.Transactions
             this.DependentTransactionId = dependentId;
         }
 
-#if !NETSTANDARD
         public OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -154,7 +144,6 @@ namespace Orleans.Transactions
             base.GetObjectData(info, context);
             info.AddValue(nameof(this.DependentTransactionId), this.DependentTransactionId);
         }
-#endif
     }
 
     /// <summary>
@@ -170,12 +159,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansOrphanCallException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -189,12 +176,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansPrepareFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -208,12 +193,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansTransactionTimeoutException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -227,12 +210,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansTransactionWaitDieException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -246,12 +227,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansReadOnlyViolatedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -269,12 +248,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansTransactionVersionDeletedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     /// <summary>
@@ -288,12 +265,10 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansTransactionUnstableVersionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     [Serializable]
@@ -303,11 +278,9 @@ namespace Orleans.Transactions
         {
         }
 
-#if !NETSTANDARD
         public OrleansTransactionServiceNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 }

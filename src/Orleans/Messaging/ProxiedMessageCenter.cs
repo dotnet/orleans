@@ -329,7 +329,6 @@ namespace Orleans.Messaging
 #endif
                 return msg;
             }
-#if !NETSTANDARD
             catch (ThreadAbortException exc)
             {
                 // Silo may be shutting-down, so downgrade to verbose log
@@ -337,7 +336,6 @@ namespace Orleans.Messaging
                 Thread.ResetAbort();
                 return null;
             }
-#endif
             catch (OperationCanceledException exc)
             {
                 logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);

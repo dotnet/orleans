@@ -59,9 +59,7 @@ namespace Orleans.CodeGenerator
             var attributes = new List<AttributeSyntax>
             {
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
-#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
-#endif
                 SF.Attribute(typeof(SerializerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
@@ -426,11 +424,8 @@ namespace Orleans.CodeGenerator
             {
                 // Create an unformatted object.
                 Expression<Func<object>> getUninitializedObject =
-#if NETSTANDARD
-                    () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
-#else
                     () => FormatterServices.GetUninitializedObject(default(Type));
-#endif
+
                 result = SF.CastExpression(
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
