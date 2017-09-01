@@ -31,7 +31,7 @@ namespace Tester
             logger.LogInformation("Successfully logged");
 
             //dispose log providers
-            this.DisposeLogProviders(serviceProvider);
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
         [Fact]
@@ -43,20 +43,19 @@ namespace Tester
             var loggerProvider = new OrleansLoggerProvider()
                 .AddLogConsumer(new FileLogConsumer($"{this.GetType().Name}.log", new IPEndPoint(102187443, 11113)))
                 .AddSeverityOverrides(this.GetType().FullName, Severity.Warning);
-            var loggerFac = new LoggerFactory();
-            loggerFac.AddProvider(loggerProvider);
-            serviceCollection.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-            serviceCollection.AddSingleton<ILoggerFactory>(loggerFac);
+            serviceCollection.AddLogging();
             //swtich to serviceCollection.AddLogging(builder => builder.AddProvider(loggerProvider)) after upgrade to Microsoft.Extensions.Logging 2.0
             // logBuilder is not supported in 1.1.3
             var serviceProvider = serviceCollection.BuildServiceProvider();
+            serviceProvider.GetService<ILoggerFactory>().AddProvider(loggerProvider);
+
             //get logger
             var logger = serviceProvider.GetRequiredService<ILogger<OrleansLoggingTests>>();
             Assert.True(logger.IsEnabled(LogLevel.Warning));
             Assert.False(logger.IsEnabled(LogLevel.Information));
 
             //dispose log providers
-            this.DisposeLogProviders(serviceProvider);
+            (serviceProvider as IDisposable)?.Dispose();
         }
         /*
         [Fact]
@@ -80,14 +79,5 @@ namespace Tester
             //dispose log providers
             this.DisposeLogProviders(serviceProvider);
         }*/
-
-        private void DisposeLogProviders(IServiceProvider svc)
-        {
-            var providers = svc.GetServices<ILoggerProvider>();
-            foreach (var provider in providers)
-            {
-                provider.Dispose();
-            }
-        }
     }
 }
