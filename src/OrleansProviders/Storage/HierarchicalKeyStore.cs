@@ -8,9 +8,7 @@ using System.Text;
 namespace Orleans.Storage
 {
     internal class HierarchicalKeyStore :
-#if !NETSTANDARD_TODO
         MarshalByRefObject,
-#endif
         ILocalDataStore
     {
         public string Etag { get; private set; }

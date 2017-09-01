@@ -1,8 +1,7 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;

@@ -461,24 +461,10 @@ namespace Orleans.Runtime
                 genericArg = null;
             genericArguments = genericArg;
 
-#if !NETSTANDARD_TODO
-            this.OnDeserialized(context);
-#endif
-        }
-
-#if !NETSTANDARD_TODO
-        /// <summary>
-        /// Called by BinaryFormatter after deserialization has completed.
-        /// </summary>
-        /// <param name="context">The context.</param>
-        [OnDeserialized]
-        private void OnDeserialized(StreamingContext context)
-        {
             var serializerContext = context.Context as ISerializerContext;
             var runtimeClient = serializerContext?.AdditionalContext as IRuntimeClient;
             this.runtime = runtimeClient?.GrainReferenceRuntime;
         }
-#endif
 #endregion
     }
 }

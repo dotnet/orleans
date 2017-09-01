@@ -39,12 +39,12 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-    <TargetFramework>netstandard1.5</TargetFramework>
-    <TestProjectTargetFramework>net462</TestProjectTargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+    <DefineConstants>$(DefineConstants);BUILD_FLAVOR_LEGACY</DefineConstants>
     <TargetFramework>net461</TargetFramework>
     <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
@@ -93,6 +93,8 @@
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <!-- System packages -->
     <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
+    <SystemReflectionMetadataVersion>1.4.2</SystemReflectionMetadataVersion>
+    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftApplicationInsightsVersion>2.2.0</MicrosoftApplicationInsightsVersion>
@@ -111,6 +113,7 @@
   <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
     <!-- System packages -->
     <SystemReflectionMetadataVersion>1.4.2</SystemReflectionMetadataVersion>
+    <SystemValueTupleVersion>4.3.0</SystemValueTupleVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftApplicationInsightsVersion>1.2.3</MicrosoftApplicationInsightsVersion>

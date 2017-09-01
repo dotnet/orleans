@@ -1,10 +1,9 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus;
@@ -229,7 +228,7 @@ namespace Orleans.ServiceBus.Providers
                 throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
             }
             EventData eventData = EventHubBatchContainer.ToEventData(this.SerializationManager, streamGuid, streamNamespace, events, requestContext);
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
             return client.SendAsync(eventData, streamGuid.ToString());
 #else
             return client.SendAsync(eventData);
@@ -262,7 +261,7 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(hubSettings.ConnectionString)
             {
                 EntityPath = hubSettings.Path
@@ -274,9 +273,9 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Create a IEventHubQueueCacheFactory. It will create a EventHubQueueCacheFactory by default. 
-        /// User can override this function to return their own implementation of IEventHubQueueCacheFactory, 
-        /// and other customization of IEventHubQueueCacheFactory if they may. 
+        /// Create a IEventHubQueueCacheFactory. It will create a EventHubQueueCacheFactory by default.
+        /// User can override this function to return their own implementation of IEventHubQueueCacheFactory,
+        /// and other customization of IEventHubQueueCacheFactory if they may.
         /// </summary>
         /// <param name="providerSettings"></param>
         /// <returns></returns>
@@ -288,7 +287,7 @@ namespace Orleans.ServiceBus.Providers
             var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
             return new EventHubQueueCacheFactory(providerSettings, SerializationManager, sharedDimensions);
         }
- 
+
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
         {
             var config = new EventHubPartitionSettings
@@ -297,14 +296,14 @@ namespace Orleans.ServiceBus.Providers
                 Partition = streamQueueMapper.QueueToPartition(queueId),
             };
             Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
-            
+
             var receiverMonitorDimensions = new EventHubReceiverMonitorDimensions();
             receiverMonitorDimensions.EventHubPartition = config.Partition;
             receiverMonitorDimensions.EventHubPath = config.Hub.Path;
             receiverMonitorDimensions.NodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
             receiverMonitorDimensions.GlobalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
 
-            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger), 
+            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger),
                 this.serviceProvider.GetRequiredService<Factory<NodeConfiguration>>(),
                 this.EventHubReceiverFactory);
         }
@@ -315,7 +314,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
             EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
             return runtimeInfo.PartitionIds;
 #else

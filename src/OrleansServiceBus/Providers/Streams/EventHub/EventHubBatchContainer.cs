@@ -1,9 +1,8 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -49,7 +48,7 @@ namespace Orleans.ServiceBus.Providers
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
         private Body payload;
-        
+
         private Body GetPayload() => payload ?? (payload = this.serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
 
         [Serializable]
@@ -122,10 +121,10 @@ namespace Orleans.ServiceBus.Providers
                 RequestContext = requestContext
             };
             var bytes = serializationManager.SerializeToByteArray(payload);
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
             var eventData = new EventData(bytes);
 #else
-            var eventData = new EventData(bytes) { PartitionKey = streamGuid.ToString() }; 
+            var eventData = new EventData(bytes) { PartitionKey = streamGuid.ToString() };
 #endif
 
             if (!string.IsNullOrWhiteSpace(streamNamespace))
@@ -134,7 +133,7 @@ namespace Orleans.ServiceBus.Providers
             }
             return eventData;
         }
-       
+
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
             this.serializationManager = context.SerializationManager;

@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Reflection;
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
@@ -635,7 +635,6 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
-#if !NETSTANDARD_TODO
             if (LocalConfig.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
@@ -671,7 +670,6 @@ namespace Orleans.Runtime
             ServicePointManager.Expect100Continue = LocalConfig.Expect100Continue;
             ServicePointManager.DefaultConnectionLimit = LocalConfig.DefaultConnectionLimit;
             ServicePointManager.UseNagleAlgorithm = LocalConfig.UseNagleAlgorithm;
-#endif
         }
 
         /// <summary>

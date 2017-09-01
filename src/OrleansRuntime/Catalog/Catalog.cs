@@ -48,7 +48,6 @@ namespace Orleans.Runtime
                 IsStatelessWorker = isStatelessWorker;
             }
 
-#if !NETSTANDARD
             protected NonExistentActivationException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {
@@ -69,7 +68,6 @@ namespace Orleans.Runtime
                 // MUST call through to the base class to let it save its own state
                 base.GetObjectData(info, context);
             }
-#endif
         }
 
 

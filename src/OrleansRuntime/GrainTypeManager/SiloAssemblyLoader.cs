@@ -53,7 +53,6 @@ namespace Orleans.Runtime
 
         private void LoadApplicationAssemblies()
         {
-#if !NETSTANDARD_TODO
             AssemblyLoaderPathNameCriterion[] excludeCriteria =
                 {
                     AssemblyLoaderCriteria.ExcludeResourceAssemblies,
@@ -69,7 +68,6 @@ namespace Orleans.Runtime
                 };
 
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
-#endif
         }
 
         public IDictionary<string, GrainTypeData> GetGrainClassTypes()

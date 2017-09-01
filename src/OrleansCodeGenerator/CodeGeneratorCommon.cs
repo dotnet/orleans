@@ -63,11 +63,7 @@ namespace Orleans.CodeGenerator
 
             // Reference everything which can be referenced.
             var assemblies =
-#if NETSTANDARD
-                Orleans.AppDomain.CurrentDomain.GetAssemblies()
-#else
                 AppDomain.CurrentDomain.GetAssemblies()
-#endif
                     .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
@@ -77,7 +73,7 @@ namespace Orleans.CodeGenerator
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
 
-#if NETSTANDARD
+#if NETSTANDARD2_0
             // CoreFX bug https://github.com/dotnet/corefx/issues/5540 
             // to workaround it, we are calling internal WithTopLevelBinderFlags(BinderFlags.IgnoreCorLibraryDuplicatedTypes) 
             // TODO: this API will be public in the future releases of Roslyn. 

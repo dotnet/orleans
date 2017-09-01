@@ -12,9 +12,7 @@ namespace Orleans.Runtime.ConsistentRing
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal class VirtualBucketsRingProvider :
-#if !NETSTANDARD
         MarshalByRefObject,
-#endif
         IConsistentRingProvider, ISiloStatusListener
     {
         private readonly List<IRingRangeListener> statusListeners;

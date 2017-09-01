@@ -59,27 +59,6 @@ namespace Orleans.Serialization
 
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
         
-#if NETSTANDARD
-        // Workaround for CoreCLR where FormatterServices.GetUninitializedObject is not public (but might change in RTM so we could remove this then).
-        private static readonly Func<Type, object> getUninitializedObjectDelegate =
-            (Func<Type, object>)
-                typeof(string)
-                    .GetTypeInfo()
-                    .Assembly
-                    .GetType("System.Runtime.Serialization.FormatterServices")
-                    .GetMethod("GetUninitializedObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
-                    .CreateDelegate(typeof(Func<Type, object>));
-
-        /// <summary>
-        /// Returns an unitialized object with FormatterServices.
-        /// </summary>
-        /// <param name="type">The type to create</param>
-        public static object GetUninitializedObjectWithFormatterServices(Type type)
-        {
-            return getUninitializedObjectDelegate.Invoke(type);
-        }
-#endif
-
         #region Privates
 
         private HashSet<Type> registeredTypes;
@@ -210,9 +189,8 @@ namespace Orleans.Serialization
                 IsBuiltInSerializersRegistered = true;
             }
 
-#if !NETSTANDARD_TODO
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
-#endif
+
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
@@ -1914,18 +1892,13 @@ namespace Orleans.Serialization
             }
             else
             {
-#if NETSTANDARD
-                serializer = new ILBasedSerializer();
-#else
                 serializer = new BinaryFormatterSerializer();
-#endif
             }
 
             serializer.Initialize(this.logger);
             return serializer;
         }
 
-#if !NETSTANDARD_TODO
         private static Assembly OnResolveEventHandler(Object sender, ResolveEventArgs arg)
         {
             // types defined in assemblies loaded by path name (e.g. Assembly.LoadFrom) aren't resolved during deserialization without some help.
@@ -1936,7 +1909,6 @@ namespace Orleans.Serialization
 
             return null;
         }
-#endif
 
         private object FallbackSerializationDeepCopy(object obj, ICopyContext context)
         {

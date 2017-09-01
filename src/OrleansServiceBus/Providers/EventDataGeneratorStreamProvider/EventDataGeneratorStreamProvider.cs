@@ -1,4 +1,4 @@
-﻿#if NETSTANDARD
+﻿#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -52,7 +52,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         }
 
         /// <summary>
-        /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing. 
+        /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing.
         /// For example, if parition count set at 5, the generated partitions will be  partition-0, partition-1, partition-2, partition-3, partiton-4
         /// </summary>
         public int EventHubPartitionCount = DefaultEventHubPartitionCount;
@@ -223,7 +223,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             }
 
             /// <summary>
-            /// Execute Command 
+            /// Execute Command
             /// </summary>
             /// <param name="command"></param>
             /// <param name="arg"></param>
@@ -239,7 +239,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                         this.StopProducingOnStream(arg as IStreamIdentity);
                         break;
                     default: break;
-                        
+
                 }
                 return Task.FromResult((object)true);
             }

@@ -11,10 +11,6 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
-#if NETSTANDARD
-    using AppDomain = System.AppDomain;
-#endif
-
     /// <summary>
     /// Represents a handle to a silo that is deployed inside a remote AppDomain, but in the same process
     /// </summary>
@@ -82,9 +78,7 @@ namespace Orleans.TestingHost
                     Type = type,
                     AppDomain = appDomain,
                     additionalAssemblies = additionalAssemblies,
-#if !NETSTANDARD_TODO
                     AppDomainTestHook = siloHost.AppDomainTestHook,
-#endif
                 };
 
                 retValue.ImportGeneratedAssemblies();
