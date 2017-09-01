@@ -27,14 +27,9 @@ namespace UnitTests.StorageTests
     }
 
     [Serializable]
-    public class StorageProviderInjectedError : Exception
+    public class StorageProviderInjectedError : OrleansException
     {
         private readonly ErrorInjectionPoint errorInjectionPoint;
-
-        public StorageProviderInjectedError(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
 
         public StorageProviderInjectedError(ErrorInjectionPoint errorPoint)
         {
@@ -52,6 +47,11 @@ namespace UnitTests.StorageTests
             {
                 return "ErrorInjectionPoint=" + Enum.GetName(typeof(ErrorInjectionPoint), errorInjectionPoint);
             }
+        }
+
+        protected StorageProviderInjectedError(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
         }
     }
 

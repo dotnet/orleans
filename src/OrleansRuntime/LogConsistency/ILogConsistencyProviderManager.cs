@@ -12,6 +12,8 @@ namespace Orleans.LogConsistency
 
         int GetLoadedProvidersNum();
 
+        ILogConsistencyProvider GetDefaultProvider();
+        
         bool TryGetProvider(string name, out ILogConsistencyProvider provider, bool caseInsensitive = false);
     }
 

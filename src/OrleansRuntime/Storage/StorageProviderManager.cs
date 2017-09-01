@@ -5,11 +5,10 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Storage
 {
-    internal class StorageProviderManager : IStorageProviderManager, IStorageProviderRuntime
+    internal class StorageProviderManager : IStorageProviderManager, IStorageProviderRuntime, IKeyedServiceCollection<string,IStorageProvider>
     {
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
@@ -119,6 +118,12 @@ namespace Orleans.Runtime.Storage
         {
             await provider.Init(name, this, config);
             storageProviderLoader.AddProvider(name, provider, config);
+        }
+
+        public IStorageProvider GetService(IServiceProvider services, string key)
+        {
+            IStorageProvider provider;
+            return TryGetProvider(key, out provider) ? provider : default(IStorageProvider);
         }
     }
 }

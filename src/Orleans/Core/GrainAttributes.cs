@@ -347,7 +347,7 @@ namespace Orleans
         /// The [Orleans.Providers.LogConsistencyProvider] attribute is used to define which consistency provider to use for grains using the log-view state abstraction.
         /// <para>
         /// Specifying [Orleans.Providers.LogConsistencyProvider] property is recommended for all grains that derive
-        /// from ILogConsistentGrain, such as JournaledGrain.
+        /// from LogConsistentGrain, such as JournaledGrain.
         /// If no [Orleans.Providers.LogConsistencyProvider] attribute is  specified, then the runtime tries to locate
         /// one as follows. First, it looks for a
         /// "Default" provider in the configuration file, then it checks if the grain type defines a default.

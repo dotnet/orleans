@@ -1,8 +1,13 @@
 using System;
 using System.Threading.Tasks;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Storage;
+using Orleans.Providers;
+using System.Linq;
 
 namespace Orleans
 {
@@ -222,6 +227,20 @@ namespace Orleans
             {
                 throw new InvalidOperationException("Invoking of methods with one way flag must result in completed task");
             }
+        }
+        
+        public static IStorageProvider GetStorageProvider(this Grain grain, IServiceProvider services)
+        {
+            StorageProviderAttribute attr = grain.GetType().GetTypeInfo().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
+            IStorageProvider storageProvider = attr != null
+                ? services.GetServiceByName<IStorageProvider>(attr.ProviderName)
+                : services.GetService<IStorageProvider>();
+            if (storageProvider == null)
+            {
+                var errMsg = string.Format("No storage providers found loading grain type {0}", grain.GetType().FullName);
+                throw new BadProviderConfigException(errMsg);
+            }
+            return storageProvider;
         }
 
         private static void ThrowIfNullGrain(IAddressable grain)

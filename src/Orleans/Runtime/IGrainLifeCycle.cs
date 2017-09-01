@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     ///   stream cleanup should all eventually be triggered by the 
     ///   grain lifecycle.
     /// </summary>
-    public enum GrainLifecyleStage
+    public enum GrainLifecycleStage
     {
         //None,
         //Register,
@@ -20,7 +20,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Grain life cycle
     /// </summary>
-    public interface IGrainLifecycle : ILifecycleObservable<GrainLifecyleStage>
+    public interface IGrainLifecycle : ILifecycleObservable<GrainLifecycleStage>
     {
     }
 }
