@@ -59,8 +59,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
         }
+
         //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
-#if !!BUILD_FLAVOR_LEGACY
+#if BUILD_FLAVOR_LEGACY
         [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {
