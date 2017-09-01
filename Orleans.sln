@@ -120,11 +120,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansLoggerProvider", "src\OrleansLoggerProvider\OrleansLoggerProvider.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5A71FFF4-651D-4D9F-B57E-333D6CB38D27}"
 	ProjectSection(SolutionItems) = preProject
 		src\ClientGenerator\BootstrapCodegen.proj = src\ClientGenerator\BootstrapCodegen.proj
 	EndProjectSection
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansLoggerProvider", "src\OrleansLoggerProvider\OrleansLoggerProvider.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src\Orleans.Transactions\Orleans.Transactions.csproj", "{072B1B88-FE98-4354-86FA-AB6EF80EB9C4}"
 EndProject

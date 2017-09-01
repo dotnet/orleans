@@ -1,11 +1,7 @@
 ﻿using Orleans.Runtime;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Text;
-using System.Threading;
 
 namespace Orleans.Extensions.Logging
 {
@@ -18,23 +14,23 @@ namespace Orleans.Extensions.Logging
         private StreamWriter logOutput;
         private readonly object lockObj = new object();
         private string logFileName;
-        private IPEndPoint myIpEndPoint;
-        public FileLogConsumer(string fileName, IPEndPoint ipEndpoint) :this(new FileInfo(fileName), ipEndpoint)
+
+        public FileLogConsumer(string fileName)
         {
+            logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Write));
         }
 
-        public FileLogConsumer(FileInfo file, IPEndPoint ipEndpoint)
+        public void Log(
+            Severity severity,
+            LoggerType loggerType,
+            string caller,
+            string message,
+            IPEndPoint ipEndPoint,
+            Exception exception,
+            int eventCode = 0
+        )
         {
-            logFileName = file.FullName;
-            var fileExists = File.Exists(logFileName);
-            logOutput = fileExists ? file.AppendText() : file.CreateText();
-            file.Refresh();
-            this.myIpEndPoint = ipEndpoint;
-        }
-
-        public void Log(Severity severity, string caller, string message, Exception exception, int eventCode = 0)
-        {
-            var logMessage = OrleansLoggingUtils.FormatLogMessage(DateTime.UtcNow, severity, caller, message, this.myIpEndPoint, exception, eventCode, true);
+            var logMessage = OrleansLoggingUtils.FormatLogMessage(DateTime.UtcNow, severity, caller, message, ipEndPoint, exception, eventCode, true);
             lock (this.lockObj)
             {
                 if (this.logOutput == null) return;

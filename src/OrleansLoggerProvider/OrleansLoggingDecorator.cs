@@ -1,9 +1,6 @@
-﻿using Orleans.Runtime;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
@@ -103,7 +100,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                recentLogMessageCounts.AddOrUpdate(logCode, 1, (key, value) => value++);
+                recentLogMessageCounts.AddOrUpdate(logCode, 1, (key, value) => ++value);
                 recentLogMessageCounts.TryGetValue(logCode, out count);
             }
 
@@ -112,7 +109,7 @@ namespace Orleans.Runtime
             if (sinceIntervalTicks >= this.messageBulkingConfig.BulkMessageInterval.Ticks)
             {
                 // Take local copy of pending bulk message counts, now that this bulk message compaction period has finished
-                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value > this.messageBulkingConfig.BulkMessageLimit);
+                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value >= this.messageBulkingConfig.BulkMessageLimit).ToList();
                 recentLogMessageCounts.Clear();
                 //set lastBulkLogMessageFlushTicks to now
                 Interlocked.Exchange(ref this.lastBulkLogMessageFlushTicks, now.Ticks);
@@ -131,7 +128,7 @@ namespace Orleans.Runtime
             }
 
             // Should the current log message be output?
-            return isExcluded || (count <= this.messageBulkingConfig.BulkMessageLimit);
+            return isExcluded || (count < this.messageBulkingConfig.BulkMessageLimit);
         }
     }
 }

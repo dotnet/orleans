@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
+using System.Net;
 
 namespace Orleans.Extensions.Logging
 {
@@ -19,20 +19,24 @@ namespace Orleans.Extensions.Logging
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
         private DateTime lastFlush = DateTime.UtcNow;
 
-        private IList<ILogConsumer> logConsumers;
-        private Severity maxSeverityLevel;
-        private string name;
+        private readonly IList<ILogConsumer> logConsumers;
+        private readonly string name;
+        private readonly IList<IFlushableLogConsumer> flushableConsumers;
+        private readonly LoggerType loggerType;
+        private readonly IPEndPoint ipEndPoint;
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="categoryName"></param>
         /// <param name="logConsumers"></param>
         /// <param name="maxSeverityLevel"></param>
-        public OrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, Severity maxSeverityLevel)
+        public OrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, IPEndPoint ipEndPoint)
         {
             this.logConsumers = logConsumers;
-            this.maxSeverityLevel = maxSeverityLevel;
+            this.flushableConsumers = logConsumers.OfType<IFlushableLogConsumer>().ToList();
             this.name = categoryName;
+            this.loggerType = DetermineLoggerType(categoryName);
+            this.ipEndPoint = ipEndPoint;
         }
 
         /// <inheritdoc/>
@@ -49,14 +53,12 @@ namespace Orleans.Extensions.Logging
         /// <inheritdoc/>
         public bool IsEnabled(LogLevel logLevel)
         {
-            var severity = LogLevelToSeverity(logLevel);
-            return severity <= maxSeverityLevel;
+            return true;
         }
 
         /// <summary>
-        /// Log a message. Current logger supports legacy message bulking feature, only when <param name="eventId"> contains errorCode information in a certain format. 
-        /// For example, in order to use message bulking feature, one need to use eventId = OrleansLogger.CreateEventId(eventId, errorCode) to create a EventId which fulfils the certain format.
-        /// Or one can use extension method <see cref="ILogger.Log(this ILogger logger, int errorCode, Severity sev, string format, object[] args, Exception exception)"/> to achieve this.
+        /// Log a message. Current logger supports legacy message bulking feature. Message bulking feature will only log eventId code appearance count
+        /// if certain event appear more than <see cref="MessageBulkingConfig.BulkMessageLimit"/>> in <see cref="MessageBulkingConfig.BulkMessageInterval"/>
         /// </summary>
         /// <typeparam name="TState"></typeparam>
         /// <param name="logLevel"></param>
@@ -90,13 +92,41 @@ namespace Orleans.Extensions.Logging
             }
         }
 
+        private LoggerType DetermineLoggerType(string category)
+        {
+            LoggerType type = LoggerType.Application;
+            if (category.Contains("Orleans"))
+            {
+                type = LoggerType.Runtime;
+                if (category.Contains("Provider"))
+                    type = LoggerType.Provider;
+                if (category.Contains("Grain"))
+                    type = LoggerType.Grain;
+            }
+
+            return type;
+        }
+
+        internal static LogLevel SeverityToLogLevel(Severity severity)
+        {
+            switch (severity)
+            {
+                case Severity.Off: return LogLevel.None;
+                case Severity.Error: return LogLevel.Error;
+                case Severity.Warning: return LogLevel.Warning;
+                case Severity.Info: return LogLevel.Information;
+                case Severity.Verbose: return LogLevel.Debug;
+                default: return LogLevel.Trace;
+            }
+        }
+
         private void WriteLogMessageToLogConsumers(int errorCode, Severity sev, string message, Exception exception)
         {
             foreach (ILogConsumer consumer in this.logConsumers)
             {
                 try
                 {
-                    consumer.Log(sev, this.name, message, exception, errorCode);
+                    consumer.Log(sev, this.loggerType, this.name, message, this.ipEndPoint, exception, errorCode);
                 }
                 catch (Exception exc)
                 {
@@ -109,7 +139,7 @@ namespace Orleans.Extensions.Logging
             if ((DateTime.UtcNow - lastFlush) > flushInterval)
             {
                 lastFlush = DateTime.UtcNow;
-                foreach (IFlushableLogConsumer consumer in this.logConsumers.OfType<IFlushableLogConsumer>())
+                foreach (var consumer in flushableConsumers)
                 {
                     consumer.Flush();
                 }

@@ -3,14 +3,15 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
+using System.Net;
 
 namespace Orleans.Extensions.Logging
 {
     /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction
     /// OrleansLoggerProvider creates one ILogger implementation, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
-    /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">, message bulking. 
+    /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
     /// OrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
     [Obsolete]
@@ -21,35 +22,15 @@ namespace Orleans.Extensions.Logging
         /// </summary>
         public static Severity DefaultSeverity = Severity.Info;
 
-        private ConcurrentBag<ILogConsumer> logConsumers;
-        private OrleansLoggerSeverityOverrides loggerSeverityOverrides;
-        private MessageBulkingConfig messageBulkingConfig;
-
+        public ConcurrentBag<ILogConsumer> LogConsumers { get; private set; }
+        private readonly IPEndPoint ipEndPoint;
         /// <summary>
         /// Constructor
         /// </summary>
         public OrleansLoggerProvider()
-            :this(null, null, null)
+            :this(null, null)
         {
         }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="consumers">Registered log consumers</param>
-        public OrleansLoggerProvider(List<ILogConsumer> consumers)
-            :this(consumers, null, null)
-        {
-        }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="consumers"></param>
-        /// <param name="severityOverrides"></param>
-        public OrleansLoggerProvider(List<ILogConsumer> consumers, OrleansLoggerSeverityOverrides severityOverrides)
-            :this(consumers, severityOverrides, null)
-        { }
 
         /// <summary>
         /// Constructor
@@ -57,67 +38,28 @@ namespace Orleans.Extensions.Logging
         /// <param name="consumers">Registered log consumers</param>
         /// <param name="severityOverrides">per logger category Severity overides</param>
         /// <param name="messageBulkingConfig"></param>
-        public OrleansLoggerProvider(List<ILogConsumer> consumers, OrleansLoggerSeverityOverrides severityOverrides, MessageBulkingConfig messageBulkingConfig)
+        public OrleansLoggerProvider(List<ILogConsumer> consumers, IPEndPoint ipEndPoint)
         {
-            this.logConsumers = new ConcurrentBag<ILogConsumer>();
-            consumers?.ForEach(consumer => this.logConsumers.Add(consumer));
-            this.loggerSeverityOverrides = severityOverrides == null? new OrleansLoggerSeverityOverrides() : severityOverrides;
-            this.messageBulkingConfig = messageBulkingConfig == null ? new MessageBulkingConfig() : messageBulkingConfig;
-        }
-
-        /// <summary>
-        /// Find severity level for the logger with categoryName
-        /// </summary>
-        /// <param name="categoryName"></param>
-        /// <returns></returns>
-        public Severity FindSeverityLevel(string categoryName)
-        {
-            if (this.loggerSeverityOverrides.LoggerSeverityOverrides.ContainsKey(categoryName))
-                return this.loggerSeverityOverrides.LoggerSeverityOverrides[categoryName];
-            //if no severity override, return the default severity.
-            return DefaultSeverity;
+            this.LogConsumers = new ConcurrentBag<ILogConsumer>();
+            this.ipEndPoint = ipEndPoint;
+            consumers?.ForEach(consumer => this.LogConsumers.Add(consumer));
         }
 
         /// <inheritdoc/>
         public ILogger CreateLogger(string categoryName)
         {
-            return new OrleansLoggingDecorator(this.messageBulkingConfig, new OrleansLogger(categoryName, this.logConsumers.ToArray(), FindSeverityLevel(categoryName)));
-        }
-
-        /// <summary>
-        /// Register log consumer for OrleansLogger to write log message to
-        /// </summary>
-        /// <param name="logConsumer"></param>
-        /// <returns></returns>
-        public OrleansLoggerProvider AddLogConsumer(ILogConsumer logConsumer)
-        {
-            this.logConsumers.Add(logConsumer);
-            return this;
-        }
-
-        /// <summary>
-        /// Add severity overrides
-        /// </summary>
-        /// <param name="categoryName"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        public OrleansLoggerProvider AddSeverityOverrides(string categoryName, Severity value)
-        {
-            this.loggerSeverityOverrides.AddLoggerSeverityOverrides(categoryName, value);
-            return this;
+            return new OrleansLogger(categoryName, this.LogConsumers.ToArray(), ipEndPoint);
         }
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            foreach (var logConsumer in this.logConsumers)
+            foreach (var logConsumer in this.LogConsumers.OfType<ICloseableLogConsumer>())
             {
-                (logConsumer as ICloseableLogConsumer)?.Close();
+                logConsumer.Close();
             }
 
-            this.logConsumers = null;
-            this.loggerSeverityOverrides = null;
-            this.messageBulkingConfig = null;
+            this.LogConsumers = null;
         }
     }
 
@@ -138,18 +80,6 @@ namespace Orleans.Extensions.Logging
         public OrleansLoggerSeverityOverrides()
         {
             this.LoggerSeverityOverrides = new ConcurrentDictionary<string, Severity>();
-        }
-
-        /// <summary>
-        /// Add a severity override
-        /// </summary>
-        /// <param name="categoryName"></param>
-        /// <param name="loggerSeverity"></param>
-        /// <returns></returns>
-        public OrleansLoggerSeverityOverrides AddLoggerSeverityOverrides(string categoryName, Severity loggerSeverity)
-        {
-            this.LoggerSeverityOverrides.AddOrUpdate(categoryName, loggerSeverity, (name, sev) => sev);
-            return this;
         }
     }
 }

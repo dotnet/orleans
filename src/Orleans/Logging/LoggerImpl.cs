@@ -240,12 +240,13 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    consumer.Log(sev, Name, message, exception, errorCode);
+                    consumer.Log(sev, loggerType, Name, message, LogManager.MyIPEndPoint, exception, errorCode);
 
                     if (logMessageTruncated)
                     {
-                        consumer.Log(Severity.Warning, Name,
-                            "Previous log message was truncated - Max size = " + LogManager.MAX_LOG_MESSAGE_SIZE, exception,
+                        consumer.Log(Severity.Warning, loggerType, Name,
+                            "Previous log message was truncated - Max size = " + LogManager.MAX_LOG_MESSAGE_SIZE,
+                            LogManager.MyIPEndPoint, exception,
                             (int)ErrorCode.Logger_LogMessageTruncated);
                     }
                 }
