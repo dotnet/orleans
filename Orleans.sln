@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.10
+VisualStudioVersion = 15.0.26730.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
@@ -120,7 +120,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansLoggerProvider", "src\OrleansLoggerProvider\OrleansLoggerProvider.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LegacyOrleansLoggerProvider", "src\OrleansLoggerProvider\LegacyOrleansLoggerProvider.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5A71FFF4-651D-4D9F-B57E-333D6CB38D27}"
 	ProjectSection(SolutionItems) = preProject

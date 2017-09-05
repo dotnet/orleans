@@ -6,16 +6,16 @@ using System.Net;
 namespace Orleans.Extensions.Logging
 {
     /// <summary>
-    /// FileLogConsumer, which logs message into a file in orleans logging message style
+    /// LegacyFileLogConsumer, which logs message into a file in orleans logging message style
     /// </summary>
     [Obsolete]
-    public class FileLogConsumer : ICloseableLogConsumer, IFlushableLogConsumer
+    public class LegacyFileLogConsumer : ICloseableLogConsumer, IFlushableLogConsumer
     {
         private StreamWriter logOutput;
         private readonly object lockObj = new object();
         private string logFileName;
 
-        public FileLogConsumer(string fileName)
+        public LegacyFileLogConsumer(string fileName)
         {
             logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Write));
         }
@@ -30,7 +30,7 @@ namespace Orleans.Extensions.Logging
             int eventCode = 0
         )
         {
-            var logMessage = OrleansLoggingUtils.FormatLogMessage(DateTime.UtcNow, severity, caller, message, ipEndPoint, exception, eventCode, true);
+            var logMessage = OrleansLoggingUtils.FormatLogMessage(DateTime.UtcNow, severity, loggerType, caller, message, ipEndPoint, exception, eventCode, true);
             lock (this.lockObj)
             {
                 if (this.logOutput == null) return;

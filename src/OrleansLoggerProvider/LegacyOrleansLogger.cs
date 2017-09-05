@@ -10,11 +10,11 @@ using System.Net;
 namespace Orleans.Extensions.Logging
 {
     /// <summary>
-    /// OreansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,
+    /// LegacyOrleansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,
     /// <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
     /// </summary>
-    [Obsolete]
-    public class OrleansLogger : ILogger
+    [Obsolete("Use Microsoft.Extensions.Logging built-in loggers")]
+    public class LegacyOrleansLogger : ILogger
     {
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
         private DateTime lastFlush = DateTime.UtcNow;
@@ -30,7 +30,7 @@ namespace Orleans.Extensions.Logging
         /// <param name="categoryName"></param>
         /// <param name="logConsumers"></param>
         /// <param name="maxSeverityLevel"></param>
-        public OrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, IPEndPoint ipEndPoint)
+        public LegacyOrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, IPEndPoint ipEndPoint)
         {
             this.logConsumers = logConsumers;
             this.flushableConsumers = logConsumers.OfType<IFlushableLogConsumer>().ToList();
@@ -57,8 +57,8 @@ namespace Orleans.Extensions.Logging
         }
 
         /// <summary>
-        /// Log a message. Current logger supports legacy message bulking feature. Message bulking feature will only log eventId code appearance count
-        /// if certain event appear more than <see cref="MessageBulkingConfig.BulkMessageLimit"/>> in <see cref="MessageBulkingConfig.BulkMessageInterval"/>
+        /// Log a message. Current logger supports legacy event bulking feature. Message bulking feature will only log eventId code appearance count
+        /// if certain event appear more than <see cref="EventBulkingConfig.BulkEventLimit"/>> in <see cref="EventBulkingConfig.BulkEventInterval"/>
         /// </summary>
         /// <typeparam name="TState"></typeparam>
         /// <param name="logLevel"></param>

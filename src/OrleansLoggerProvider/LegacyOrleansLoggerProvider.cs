@@ -12,10 +12,10 @@ namespace Orleans.Extensions.Logging
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction
     /// OrleansLoggerProvider creates one ILogger implementation, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
-    /// OrleansLoggerProvider also supports configuration on those legacy features.
+    /// LegacyOrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
-    [Obsolete]
-    public class OrleansLoggerProvider : ILoggerProvider
+    [Obsolete("Use Microsoft.Extensions.Logging built-in logger providers")]
+    public class LegacyOrleansLoggerProvider : ILoggerProvider
     {
         /// <summary>
         /// Default Severity for all loggers
@@ -27,7 +27,7 @@ namespace Orleans.Extensions.Logging
         /// <summary>
         /// Constructor
         /// </summary>
-        public OrleansLoggerProvider()
+        public LegacyOrleansLoggerProvider()
             :this(null, null)
         {
         }
@@ -37,8 +37,7 @@ namespace Orleans.Extensions.Logging
         /// </summary>
         /// <param name="consumers">Registered log consumers</param>
         /// <param name="severityOverrides">per logger category Severity overides</param>
-        /// <param name="messageBulkingConfig"></param>
-        public OrleansLoggerProvider(List<ILogConsumer> consumers, IPEndPoint ipEndPoint)
+        public LegacyOrleansLoggerProvider(List<ILogConsumer> consumers, IPEndPoint ipEndPoint)
         {
             this.LogConsumers = new ConcurrentBag<ILogConsumer>();
             this.ipEndPoint = ipEndPoint;
@@ -48,7 +47,7 @@ namespace Orleans.Extensions.Logging
         /// <inheritdoc/>
         public ILogger CreateLogger(string categoryName)
         {
-            return new OrleansLogger(categoryName, this.LogConsumers.ToArray(), ipEndPoint);
+            return new LegacyOrleansLogger(categoryName, this.LogConsumers.ToArray(), ipEndPoint);
         }
 
         /// <inheritdoc/>
@@ -66,20 +65,12 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// Orleans severity overrides on a per logger base
     /// </summary>
-    [Obsolete]
+    [Obsolete("Use Microsoft.Extensions.Logging.LoggerFilterRule")]
     public class OrleansLoggerSeverityOverrides
     {
         /// <summary>
         /// LoggerSeverityOverrides, which key being logger category name, value being its overrided severity
         /// </summary>
-        public ConcurrentDictionary<string, Severity> LoggerSeverityOverrides { get; }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public OrleansLoggerSeverityOverrides()
-        {
-            this.LoggerSeverityOverrides = new ConcurrentDictionary<string, Severity>();
-        }
+        public Dictionary<string, Severity> LoggerSeverityOverrides { get; set; } = new Dictionary<string, Severity>();
     }
 }

@@ -10,27 +10,26 @@ namespace Orleans.Extensions.Logging
     /// </summary>
     public class OrleansLoggingUtils
     {
-        /// <summary>
-        /// Format message in orleans logging style
-        /// </summary>
-        /// <param name="timestamp"></param>
-        /// <param name="severity"></param>
-        /// <param name="caller"></param>
-        /// <param name="message"></param>
-        /// <param name="myIPEndPoint"></param>
-        /// <param name="exception"></param>
-        /// <param name="errorCode"></param>
-        /// <param name="includeStackTrace"></param>
+        /// <summary>The method to call during logging to format the log info into a string, which is orleans legacy logging style</summary>
+        /// <param name="timestamp">Timestamp of the log message.</param>
+        /// <param name="severity">The severity of the message being traced.</param>
+        /// <param name="loggerType">The type of logger the message is being traced through.</param>
+        /// <param name="caller">The name of the logger tracing the message.</param>
+        /// <param name="myIPEndPoint">The <see cref="IPEndPoint"/> of the Orleans client/server if known. May be null.</param>
+        /// <param name="message">The message to log.</param>
+        /// <param name="exception">The exception to log. May be null.</param>
+        /// <param name="errorCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'.</param>
         /// <returns></returns>
         public static string FormatLogMessage(
-           DateTime timestamp,
-           Severity severity,
-           string caller,
-           string message,
-           IPEndPoint myIPEndPoint,
-           Exception exception,
-           int errorCode,
-           bool includeStackTrace)
+            DateTime timestamp,
+            Severity severity,
+            LoggerType loggerType,
+            string caller,
+            string message,
+            IPEndPoint myIPEndPoint,
+            Exception exception,
+            int errorCode,
+            bool includeStackTrace)
         {
             if (severity == Severity.Error)
                 message = "!!!!!!!!!! " + message;
