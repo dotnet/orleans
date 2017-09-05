@@ -29,7 +29,7 @@ namespace Orleans
                 {
                     if (ct.IsCancellationRequested)
                     {
-                        throw new OperationCanceledException();
+                        throw new OrleansLifecycleCanceledException("Lifecycle start canceled by request");
                     }
                     this.highStage = observerGroup.Key;
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
@@ -39,7 +39,7 @@ namespace Orleans
             {
                 string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
                 this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
-                throw new OperationCanceledException(error, ex);
+                throw new OrleansLifecycleCanceledException(error, ex);
             }
         }
 
@@ -56,7 +56,7 @@ namespace Orleans
                 {
                     if (ct.IsCancellationRequested)
                     {
-                        throw new OperationCanceledException();
+                        throw new OrleansLifecycleCanceledException("Lifecycle stop canceled by request");
                     }
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                 }

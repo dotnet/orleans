@@ -22,13 +22,12 @@ namespace Orleans.Runtime
         internal Type Type { get; private set; }
         internal string GrainClass { get; private set; }
         internal List<Type> RemoteInterfaceTypes { get; private set; }
-        internal Type StateObjectType { get; private set; }
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
         internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
    
-        public GrainTypeData(Type type, Type stateObjectType, MultiClusterRegistrationStrategyManager registrationManager)
+        public GrainTypeData(Type type, MultiClusterRegistrationStrategyManager registrationManager)
         {
             var typeInfo = type.GetTypeInfo();
             Type = type;
@@ -36,8 +35,7 @@ namespace Orleans.Runtime
             // TODO: shouldn't this use GrainInterfaceUtils.IsStatelessWorker?
             IsStatelessWorker = typeInfo.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any();
             GrainClass = TypeUtils.GetFullName(typeInfo);
-            RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
-            StateObjectType = stateObjectType;
+            RemoteInterfaceTypes = GetRemoteInterfaces(type);
             MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
             MultiClusterRegistrationStrategy = registrationManager?.GetMultiClusterRegistrationStrategy(type);
         }

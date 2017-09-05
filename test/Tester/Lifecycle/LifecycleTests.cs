@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Xunit;
+using Orleans.Runtime;
 
 namespace Tester
 {
@@ -142,7 +143,7 @@ namespace Tester
             // run lifecycle
             if (failOnStart.HasValue)
             {
-                await Assert.ThrowsAsync<OperationCanceledException>(() => lifecycle.OnStart());
+                await Assert.ThrowsAsync<OrleansLifecycleCanceledException>(() => lifecycle.OnStart());
             }
             else
             {

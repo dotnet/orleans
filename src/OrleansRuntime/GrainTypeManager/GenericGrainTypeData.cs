@@ -13,7 +13,7 @@ namespace Orleans.Runtime
         private readonly Type stateObjectType;
 
         public GenericGrainTypeData(Type activationType, Type stateObjectType, MultiClusterRegistrationStrategyManager registrationManager) :
-            base(activationType, stateObjectType, registrationManager)
+            base(activationType, registrationManager)
         {
             if (!activationType.GetTypeInfo().IsGenericTypeDefinition)
                 throw new ArgumentException("Activation type is not generic: " + activationType.Name);
@@ -32,7 +32,7 @@ namespace Orleans.Runtime
                 ? GetGrainStateType(concreteActivationType.GetTypeInfo())
                 : this.stateObjectType;
 
-            return new GrainTypeData(concreteActivationType, concreteStateObjectType, this.registrationManager);
+            return new GrainTypeData(concreteActivationType, this.registrationManager);
         }
 
         private static Type GetGrainStateType(TypeInfo grainType)

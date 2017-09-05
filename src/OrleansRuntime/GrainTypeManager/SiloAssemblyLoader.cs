@@ -96,7 +96,7 @@ namespace Orleans.Runtime
                     if (parentTypeInfo.IsGenericType)
                     {
                         var definition = parentTypeInfo.GetGenericTypeDefinition();
-                        if (definition == typeof(Grain<>) || definition == typeof(LogConsistentGrainBase<>))
+                        if (definition == typeof(Grain<>) || definition == typeof(LogConsistentGrain<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
                             if (stateArg.GetTypeInfo().IsClass || stateArg.GetTypeInfo().IsValueType)
@@ -143,7 +143,7 @@ namespace Orleans.Runtime
         {
             return grainType.GetTypeInfo().IsGenericTypeDefinition ?
                 new GenericGrainTypeData(grainType, stateObjectType, this.registrationManager) :
-                new GrainTypeData(grainType, stateObjectType, this.registrationManager);
+                new GrainTypeData(grainType, this.registrationManager);
         }
 
         private static void LogGrainTypesFound(LoggerImpl logger, Dictionary<string, GrainTypeData> grainTypeData)

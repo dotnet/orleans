@@ -471,7 +471,6 @@ namespace Orleans.Runtime
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
 
             ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
@@ -489,7 +488,6 @@ namespace Orleans.Runtime
                 () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            catalog.SetLogConsistencyManager(logConsistencyProviderManager);
             if (logger.IsVerbose) { logger.Verbose("Log consistency provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
