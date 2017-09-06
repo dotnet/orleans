@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace Orleans.Extensions.Logging.Legacy
 {
@@ -14,7 +15,7 @@ namespace Orleans.Extensions.Logging.Legacy
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
     /// LegacyOrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
-    [Obsolete("Use Microsoft.Extensions.Logging built-in logger providers")]
+    [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
     public class LegacyOrleansLoggerProvider : ILoggerProvider
     {
         /// <summary>
@@ -37,11 +38,17 @@ namespace Orleans.Extensions.Logging.Legacy
         /// </summary>
         /// <param name="consumers">Registered log consumers</param>
         /// <param name="severityOverrides">per logger category Severity overides</param>
-        public LegacyOrleansLoggerProvider(List<ILogConsumer> consumers, IPEndPoint ipEndPoint)
+        public LegacyOrleansLoggerProvider(IEnumerable<ILogConsumer> consumers, IPEndPoint ipEndPoint)
         {
             this.LogConsumers = new ConcurrentBag<ILogConsumer>();
             this.ipEndPoint = ipEndPoint;
-            consumers?.ForEach(consumer => this.LogConsumers.Add(consumer));
+            if (consumers != null)
+            {
+                foreach (var consumer in consumers)
+                {
+                    this.LogConsumers.Add(consumer);
+                }
+            }
         }
 
         /// <inheritdoc/>

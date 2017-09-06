@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -8,9 +9,9 @@ namespace Orleans.Extensions.Logging
 {
 
     /// <summary>
-    /// Config for event bulking feature
+    /// options for event bulking feature
     /// </summary>
-    public class EventBulkingConfig
+    public class EventBulkingOptions
     {
         /// <summary>
         /// Count limit for bulk event output.
@@ -43,13 +44,13 @@ namespace Orleans.Extensions.Logging
     /// </summary>
     public class EventBulkingDecoratorLogger : ILogger
     {
-        private static readonly int[] excludedBulkLogCodes = {
+        private static readonly HashSet<int> excludedBulkLogCodes = new HashSet<int>(){
             0,
             100000 //internal runtime error code
         };
         private const int BulkEventSummaryOffset = 500000;
 
-        private readonly EventBulkingConfig eventBulkingConfig;
+        private readonly EventBulkingOptions eventBulkingConfig;
         private readonly ConcurrentDictionary<int, int> recentLogMessageCounts = new ConcurrentDictionary<int, int>();
         private long lastBulkLogMessageFlushTicks = DateTime.MinValue.Ticks;
         private readonly ILogger decoratedLogger;
@@ -59,9 +60,9 @@ namespace Orleans.Extensions.Logging
         /// </summary>
         /// <param name="config"></param>
         /// <param name="decoratedLogger"></param>
-        public EventBulkingDecoratorLogger(EventBulkingConfig config, ILogger decoratedLogger)
+        public EventBulkingDecoratorLogger(EventBulkingOptions config, ILogger decoratedLogger)
         {
-            this.eventBulkingConfig = config == null ? new EventBulkingConfig() : config;
+            this.eventBulkingConfig = config == null ? new EventBulkingOptions() : config;
             this.decoratedLogger = decoratedLogger;
         }
 
@@ -100,8 +101,7 @@ namespace Orleans.Extensions.Logging
             }
             else
             {
-                recentLogMessageCounts.AddOrUpdate(logCode, 1, (key, value) => ++value);
-                recentLogMessageCounts.TryGetValue(logCode, out count);
+                count = recentLogMessageCounts.AddOrUpdate(logCode, 1, (key, value) => ++value);
             }
 
             var sinceIntervalTicks = now.Ticks - lastBulkLogMessageFlushTicks;
@@ -109,21 +109,17 @@ namespace Orleans.Extensions.Logging
             if (sinceIntervalTicks >= this.eventBulkingConfig.BulkEventInterval.Ticks)
             {
                 // Take local copy of pending bulk message counts, now that this bulk message compaction period has finished
-                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value >= this.eventBulkingConfig.BulkEventLimit).ToList();
+                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value >= this.eventBulkingConfig.BulkEventLimit).ToArray();
                 recentLogMessageCounts.Clear();
                 //set lastBulkLogMessageFlushTicks to now
                 Interlocked.Exchange(ref this.lastBulkLogMessageFlushTicks, now.Ticks);
           
-                // Output any pending bulk compaction messages
-                if (bulkMessageCounts != null)
+                // Output summary counts for any pending bulk message occurrances
+                foreach (var logCodeCountPair in bulkMessageCounts)
                 {
-                    // Output summary counts for any pending bulk message occurrances
-                    foreach (var logCodeCountPair in bulkMessageCounts)
-                    {
-                        this.decoratedLogger.Log<string>(LogLevel.Information, new EventId(logCodeCountPair.Key + BulkEventSummaryOffset),
-                                $"EventId {logCodeCountPair.Key} occurred {logCodeCountPair.Value - this.eventBulkingConfig.BulkEventLimit} additional time(s) in previous {new TimeSpan(sinceIntervalTicks)}", 
-                                null, (msg, exc) => msg);
-                    }
+                    this.decoratedLogger.Log<string>(LogLevel.Information, new EventId(logCodeCountPair.Key + BulkEventSummaryOffset),
+                            $"EventId {logCodeCountPair.Key} occurred {logCodeCountPair.Value - this.eventBulkingConfig.BulkEventLimit} additional time(s) in previous {new TimeSpan(sinceIntervalTicks)}", 
+                            null, (msg, exc) => msg);
                 }
             }
 

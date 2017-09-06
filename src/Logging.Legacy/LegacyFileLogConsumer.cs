@@ -8,7 +8,7 @@ namespace Orleans.Extensions.Logging.Legacy
     /// <summary>
     /// LegacyFileLogConsumer, which logs message into a file in orleans logging message style
     /// </summary>
-    [Obsolete]
+    [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
     public class LegacyFileLogConsumer : ICloseableLogConsumer, IFlushableLogConsumer
     {
         private StreamWriter logOutput;
@@ -73,8 +73,6 @@ namespace Orleans.Extensions.Logging.Legacy
         {
             lock (this.lockObj)
             {
-                if (this.lockObj == null) return;
-
                 this.logOutput.Flush();
             }
         }

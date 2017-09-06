@@ -20,7 +20,7 @@ namespace Orleans.Extensions.Logging.Legacy
         /// <param name="exception">The exception to log. May be null.</param>
         /// <param name="errorCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'.</param>
         /// <returns></returns>
-        [Obsolete("Use your own formatter")]
+        [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
         public static string FormatLogMessageToLegacyStyle(
             DateTime timestamp,
             Severity severity,

@@ -17,7 +17,7 @@ namespace Tester
     public class OrleansLoggingTests
     {
         [Fact]
-        [Obsolete]
+#pragma warning disable 618
         public void OrleansLoggingCanConfigurePerCategoryServeriyOverrides()
         {
             //configure logging with severity overrides
@@ -40,7 +40,7 @@ namespace Tester
         }
        
         [Fact]
-        [Obsolete]
+#pragma warning disable 618
         public void MicrosoftExtensionsLogging_LoggingFilter_CanAlsoConfigurePerCategoryLogLevel()
         {
             //configure logging with severity overrides
@@ -62,11 +62,11 @@ namespace Tester
         }
 
         [Fact]
-        [Obsolete]
+#pragma warning disable 618
         public async Task MicrosoftExtensionsLogging_Messagebulking_ShouldWork()
         {
             var statefulLogConsumer = new StatefulLogConsumer();
-            var messageBulkingConfig = new EventBulkingConfig();
+            var messageBulkingConfig = new EventBulkingOptions();
             messageBulkingConfig.BulkEventInterval = TimeSpan.FromSeconds(2);
             var serviceProvider = new ServiceCollection().AddLogging(builder => 
             builder.AddLegacyOrleansLogging(new List<ILogConsumer>(){statefulLogConsumer}, null, messageBulkingConfig))

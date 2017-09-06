@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 
 namespace Orleans.Extensions.Logging
 {
@@ -13,18 +12,18 @@ namespace Orleans.Extensions.Logging
         where TDecoratedLoggerProvider : ILoggerProvider
     {
         private readonly ILoggerProvider provider;
-        private readonly EventBulkingConfig bulkingConfig;
+        private readonly EventBulkingOptions bulkingConfig;
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="provider"></param>
         /// <param name="bulkingConfig"></param>
-        public EventBulkingLoggerProvider(TDecoratedLoggerProvider provider, EventBulkingConfig bulkingConfig)
+        public EventBulkingLoggerProvider(TDecoratedLoggerProvider provider, EventBulkingOptions bulkingConfig)
         {
             if(provider == null)
                 throw new ArgumentException(nameof(provider));
             this.provider = provider;
-            this.bulkingConfig = bulkingConfig == null? new EventBulkingConfig() : bulkingConfig;
+            this.bulkingConfig = bulkingConfig == null? new EventBulkingOptions() : bulkingConfig;
         }
 
         /// <inheritdoc cref="ILoggerProvider"/>

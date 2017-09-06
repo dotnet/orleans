@@ -13,7 +13,7 @@ namespace Orleans.Extensions.Logging.Legacy
     /// LegacyOrleansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,
     /// <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
     /// </summary>
-    [Obsolete("Use Microsoft.Extensions.Logging built-in loggers")]
+    [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
     public class LegacyOrleansLogger : ILogger
     {
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
@@ -27,9 +27,9 @@ namespace Orleans.Extensions.Logging.Legacy
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="categoryName"></param>
-        /// <param name="logConsumers"></param>
-        /// <param name="maxSeverityLevel"></param>
+        /// <param name="categoryName">category name for current logger</param>
+        /// <param name="logConsumers">log consumers which this logger will log messages to</param>
+        /// <param name="ipEndPoint">ipEndpoint this logger is associated with </param>
         public LegacyOrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, IPEndPoint ipEndPoint)
         {
             this.logConsumers = logConsumers;
