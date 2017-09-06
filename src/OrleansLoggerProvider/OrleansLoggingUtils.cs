@@ -3,7 +3,7 @@ using System;
 using System.Net;
 using System.Threading;
 
-namespace Orleans.Extensions.Logging
+namespace Orleans.Extensions.Logging.Legacy
 {
     /// <summary>
     /// Utility method for OrleansLogging
@@ -20,7 +20,8 @@ namespace Orleans.Extensions.Logging
         /// <param name="exception">The exception to log. May be null.</param>
         /// <param name="errorCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'.</param>
         /// <returns></returns>
-        public static string FormatLogMessage(
+        [Obsolete("Use your own formatter")]
+        public static string FormatLogMessageToLegacyStyle(
             DateTime timestamp,
             Severity severity,
             LoggerType loggerType,

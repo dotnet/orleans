@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 
-namespace Orleans.Extensions.Logging
+namespace Orleans.Extensions.Logging.Legacy
 {
     /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction

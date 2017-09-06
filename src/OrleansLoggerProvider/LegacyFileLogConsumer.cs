@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Net;
 
-namespace Orleans.Extensions.Logging
+namespace Orleans.Extensions.Logging.Legacy
 {
     /// <summary>
     /// LegacyFileLogConsumer, which logs message into a file in orleans logging message style
@@ -30,7 +30,7 @@ namespace Orleans.Extensions.Logging
             int eventCode = 0
         )
         {
-            var logMessage = OrleansLoggingUtils.FormatLogMessage(DateTime.UtcNow, severity, loggerType, caller, message, ipEndPoint, exception, eventCode, true);
+            var logMessage = OrleansLoggingUtils.FormatLogMessageToLegacyStyle(DateTime.UtcNow, severity, loggerType, caller, message, ipEndPoint, exception, eventCode, true);
             lock (this.lockObj)
             {
                 if (this.logOutput == null) return;
