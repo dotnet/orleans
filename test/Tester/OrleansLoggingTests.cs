@@ -36,7 +36,7 @@ namespace Tester
             Assert.False(logger.IsEnabled(LogLevel.Information));
 
             //dispose log providers
-            using (serviceProvider as IDisposable) ;
+           (serviceProvider as IDisposable)?.Dispose();
         }
        
         [Fact]
@@ -58,7 +58,7 @@ namespace Tester
             Assert.False(logger.IsEnabled(LogLevel.Information));
 
             //dispose log providers
-            using (serviceProvider as IDisposable) ;
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
         [Fact]
@@ -87,7 +87,9 @@ namespace Tester
             logger.LogInformation(eventId, message);
             //after 3 seconds, the event cound summary message should be flushed to log consumers
             Assert.True(statefulLogConsumer.ReceivedMessages.Where(m => m.Contains("additional time(s) in previous")).Count() > 0);
-            using (serviceProvider as IDisposable) ;
+
+            //dispose log providers
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
 
