@@ -15,7 +15,7 @@ namespace Orleans.Extensions.Logging.Legacy
     /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
     /// LegacyOrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
-    [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
+    [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
     public class LegacyOrleansLoggerProvider : ILoggerProvider
     {
         /// <summary>

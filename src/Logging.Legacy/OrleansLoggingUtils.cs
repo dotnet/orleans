@@ -10,6 +10,8 @@ namespace Orleans.Extensions.Logging.Legacy
     /// </summary>
     public class OrleansLoggingUtils
     {
+        internal const string ObsoleteMessageString =
+                "The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer";
         /// <summary>The method to call during logging to format the log info into a string, which is orleans legacy logging style</summary>
         /// <param name="timestamp">Timestamp of the log message.</param>
         /// <param name="severity">The severity of the message being traced.</param>
@@ -20,7 +22,7 @@ namespace Orleans.Extensions.Logging.Legacy
         /// <param name="exception">The exception to log. May be null.</param>
         /// <param name="errorCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'.</param>
         /// <returns></returns>
-        [Obsolete("The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer")]
+        [Obsolete(ObsoleteMessageString)]
         public static string FormatLogMessageToLegacyStyle(
             DateTime timestamp,
             Severity severity,
