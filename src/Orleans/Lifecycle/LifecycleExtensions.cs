@@ -8,7 +8,7 @@ namespace Orleans
     {
         private static Func<CancellationToken, Task> NoOp => ct => Task.CompletedTask;
 
-        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+        public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             if (onStart == null) throw new ArgumentNullException(nameof(onStart));
@@ -17,7 +17,7 @@ namespace Orleans
             return observable.Subscribe(stage, new Observer(onStart, onStop));
         }
 
-        public static IDisposable Subscribe<TStage>(this ILifecycleObservable<TStage> observable, TStage stage, Func<CancellationToken, Task> onStart)
+        public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart)
         {
             return observable.Subscribe(stage, new Observer(onStart, NoOp));
         }

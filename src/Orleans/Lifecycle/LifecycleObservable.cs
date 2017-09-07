@@ -7,11 +7,11 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    public class LifecycleObservable<TStage> : ILifecycleObservable<TStage>, ILifecycleObserver
+    public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
         private readonly Logger logger;
-        private TStage highStage;
+        private int highStage;
 
         public LifecycleObservable(Logger logger)
         {
@@ -23,7 +23,7 @@ namespace Orleans
         {
             try
             {
-                foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
+                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
@@ -45,7 +45,7 @@ namespace Orleans
 
         public async Task OnStop(CancellationToken ct)
         {
-            foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
+            foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key)
                 // skip all until we hit the highest started stage
@@ -67,7 +67,7 @@ namespace Orleans
             }
         }
 
-        public IDisposable Subscribe(TStage stage, ILifecycleObserver observer)
+        public IDisposable Subscribe(int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
 
@@ -78,8 +78,7 @@ namespace Orleans
 
         private void Remove(object key)
         {
-            OrderedObserver o;
-            this.subscribers.TryRemove(key, out o);
+            this.subscribers.TryRemove(key, out OrderedObserver o);
         }
 
         private static async Task WrapExecution(CancellationToken ct, Func<CancellationToken, Task> action)
@@ -105,9 +104,9 @@ namespace Orleans
         private class OrderedObserver
         {
             public ILifecycleObserver Observer { get; }
-            public TStage Stage { get; }
+            public int Stage { get; }
 
-            public OrderedObserver(TStage stage, ILifecycleObserver observer)
+            public OrderedObserver(int stage, ILifecycleObserver observer)
             {
                 Stage = stage;
                 Observer = observer;

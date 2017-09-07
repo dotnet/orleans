@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             grain.Identity = context.GrainIdentity;
 
             // wire up to lifecycle
-            var participant = grain as ILifecycleParticipant<GrainLifecycleStage>;
+            var participant = grain as ILifecycleParticipant<IGrainLifecycle>;
             participant?.Participate(context.ObservableLifecycle);
 
             return grain;
