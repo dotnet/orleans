@@ -32,7 +32,7 @@ Hence, the pool of activations will eventually shrink to match the load.
 The following example defines a Stateless Worker grain class `MyStatelessWorkerGrain` with the default maximum activation number limit. 
 ``` csharp
 [StatelessWorker]
-public class MyStatelessWorkerGrain : IMyStatelessWorkerGrain
+public class MyStatelessWorkerGrain : Grain, IMyStatelessWorkerGrain
 {
  ...
 }
