@@ -2,12 +2,13 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
-using System.Reflection;
 using Orleans.Providers;
+using Orleans.MultiCluster;
 
 namespace Orleans.LogConsistency
 {
@@ -17,7 +18,7 @@ namespace Orleans.LogConsistency
     /// (SiloAssemblyLoader uses it to extract type)
     /// </summary>
     /// <typeparam name="TView">The type of the view</typeparam>
-    public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<GrainLifecycleStage>
+    public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<IGrainLifecycle>
 
     {
         /// <summary>
@@ -36,9 +37,15 @@ namespace Orleans.LogConsistency
         /// </summary>
         protected abstract ILogViewAdaptorFactory DefaultAdaptorFactory { get; }
 
-        public virtual void Participate(ILifecycleObservable<GrainLifecycleStage> lifecycle)
+        public override void Participate(IGrainLifecycle lifecycle)
         {
+            base.Participate(lifecycle);
             lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            if(this is ILogConsistencyProtocolParticipant)
+            {
+                lifecycle.Subscribe((int)GrainLifecycleStage.Activate - 1, PreActivate);
+                lifecycle.Subscribe((int)GrainLifecycleStage.Activate + 1, PostActivate);
+            }
         }
 
         private Task OnSetupState(CancellationToken ct)
@@ -50,6 +57,16 @@ namespace Orleans.LogConsistency
             IStorageProvider storageProvider = consistencyProvider.UsesStorageProvider ? this.GetStorageProvider(this.ServiceProvider) : null;
             InstallLogViewAdaptor(activationContext.RegistrationStrategy, protocolServicesFactory, consistencyProvider, storageProvider);
             return Task.CompletedTask;
+        }
+
+        private async Task PreActivate(CancellationToken ct)
+        {
+            await ((ILogConsistencyProtocolParticipant)this).PreActivateProtocolParticipant();
+        }
+
+        private async Task PostActivate(CancellationToken ct)
+        {
+            await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
         }
 
         private void InstallLogViewAdaptor(

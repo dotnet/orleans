@@ -8,8 +8,7 @@ namespace Orleans
     ///   when the stage is reached when starting, and stopping.
     /// Stages are started in ascending order, and stopped in decending order.
     /// </summary>
-    /// <typeparam name="TStage"></typeparam>
-    public interface ILifecycleObservable<in TStage>
+    public interface ILifecycleObservable
     {
         /// <summary>
         /// Subscribe for notification when a stage is reached while starting or stopping.
@@ -17,6 +16,6 @@ namespace Orleans
         /// <param name="stage">stage of interest</param>
         /// <param name="observer">stage observer</param>
         /// <returns>A disposable that can be disposed of to unsubscribe</returns>
-        IDisposable Subscribe(TStage stage, ILifecycleObserver observer);
+        IDisposable Subscribe(int stage, ILifecycleObserver observer);
     }
 }

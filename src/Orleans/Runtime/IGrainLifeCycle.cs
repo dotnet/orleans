@@ -1,4 +1,7 @@
-﻿
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -10,17 +13,36 @@ namespace Orleans.Runtime
     /// </summary>
     public enum GrainLifecycleStage
     {
-        //None,
-        //Register,
-        SetupState,  // Setup grain state prior to activation
-        //InvokeActivate,
-        //Completed
+        /// <summary>
+        /// Setup grain state prior to activation 
+        /// </summary>
+        SetupState = 1<<10,  
+
+        /// <summary>
+        /// Activate grain
+        /// </summary>
+        Activate = SetupState + 1<<10,
     }
 
-    /// <summary>
-    /// Grain life cycle
-    /// </summary>
-    public interface IGrainLifecycle : ILifecycleObservable<GrainLifecycleStage>
+    public interface IGrainLifecycle : ILifecycleObservable
     {
+    }
+
+    public static class GrainLifecycleExtensions
+    {
+        public static IDisposable Subscribe(this IGrainLifecycle observable, GrainLifecycleStage stage, ILifecycleObserver observer)
+        {
+            return observable.Subscribe((int)stage, observer);
+        }
+
+        public static IDisposable Subscribe(this ILifecycleObservable observable, GrainLifecycleStage stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+        {
+            return observable.Subscribe((int)stage, onStart, onStop);
+        }
+
+        public static IDisposable Subscribe(this ILifecycleObservable observable, GrainLifecycleStage stage, Func<CancellationToken, Task> onStart)
+        {
+            return observable.Subscribe((int)stage, onStart);
+        }
     }
 }

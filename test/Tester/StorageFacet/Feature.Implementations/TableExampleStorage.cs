@@ -7,7 +7,7 @@ using Tester.StorageFacet.Abstractions;
 
 namespace Tester.StorageFacet.Implementations
 {
-    public class TableExampleStorage<TState> : IExampleStorage<TState>, ILifecycleParticipant<GrainLifecycleStage>
+    public class TableExampleStorage<TState> : IExampleStorage<TState>, ILifecycleParticipant<IGrainLifecycle>
     {
         private IExampleStorageConfig config;
         private bool activateCalled;
@@ -31,7 +31,7 @@ namespace Tester.StorageFacet.Implementations
             return Task.CompletedTask;
         }
 
-        public void Participate(ILifecycleObservable<GrainLifecycleStage> lifecycle)
+        public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe(GrainLifecycleStage.SetupState, LoadState);
         }

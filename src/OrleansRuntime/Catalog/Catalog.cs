@@ -1136,18 +1136,11 @@ namespace Orleans.Runtime
             // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
             if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_BeforeCallingActivate, "About to call {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
 
-            // Call OnActivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
+            // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
                 RequestContext.Import(requestContextData);
                 await activation.Lifecycle.OnStart();
-                // TODO: Consider pre and post activation stages in lifecycle for PreActivateProtocolParticipant and PostActivateProtocolParticipant like behaviors
-                if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
-                {
-                    await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).PreActivateProtocolParticipant();
-                }
-                await activation.GrainInstance.OnActivateAsync();
-
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
 
                 lock (activation)
@@ -1162,10 +1155,6 @@ namespace Orleans.Runtime
                     }
                     // Run message pump to see if there is a new request is queued to be processed
                     this.Dispatcher.RunMessagePump(activation);
-                }
-                if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
-                {
-                    await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).PostActivateProtocolParticipant();
                 }
             }
             catch (Exception exc)
@@ -1207,7 +1196,6 @@ namespace Orleans.Runtime
                         activation.State == ActivationState.Deactivating)
                     {
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
-                        await activation.GrainInstance.OnDeactivateAsync();
                         await activation.Lifecycle.OnStop();
                     }
                     if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);

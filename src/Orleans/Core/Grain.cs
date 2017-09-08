@@ -14,7 +14,7 @@ namespace Orleans
     /// <summary>
     /// The abstract base class for all grain classes.
     /// </summary>
-    public abstract class Grain : IAddressable
+    public abstract class Grain : IAddressable, ILifecycleParticipant<IGrainLifecycle>
     {
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
@@ -264,13 +264,18 @@ namespace Orleans
                 throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
             }
         }
+
+        public virtual void Participate(IGrainLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
+        }
     }
 
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, ILifecycleParticipant<GrainLifecycleStage> where TGrainState : new()
+    public class Grain<TGrainState> : Grain where TGrainState : new()
     {
         private IStorage<TGrainState> storage;
 
@@ -321,8 +326,9 @@ namespace Orleans
             return storage.ReadStateAsync();
         }
 
-        public virtual void Participate(ILifecycleObservable<GrainLifecycleStage> lifecycle)
+        public override void Participate(IGrainLifecycle lifecycle)
         {
+            base.Participate(lifecycle);
             lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
         }
 
