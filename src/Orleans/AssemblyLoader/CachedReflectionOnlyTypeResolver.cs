@@ -64,7 +64,11 @@ namespace Orleans.Runtime
 
                 try
                 {
+#if BUILD_FLAVOR_LEGACY
+                    return Assembly.ReflectionOnlyLoadFrom(pathName);
+#else
                     return Assembly.LoadFrom(pathName);
+#endif
                 }
                 catch (FileNotFoundException)
                 {

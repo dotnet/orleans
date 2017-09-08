@@ -519,7 +519,11 @@ namespace Orleans.Runtime
 
         public static Type ToReflectionOnlyType(Type type)
         {
+#if BUILD_FLAVOR_LEGACY
+            return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+#else
             return type;
+#endif
         }
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)

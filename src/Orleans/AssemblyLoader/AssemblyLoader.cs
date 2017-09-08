@@ -216,8 +216,12 @@ namespace Orleans.Runtime
 
                         if (IsCompatibleWithCurrentProcess(j, out complaints))
                         {
+#if BUILD_FLAVOR_LEGACY
                             if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
+                            Assembly.ReflectionOnlyLoadFrom(j);
+#else
                             Assembly.LoadFrom(j);
+#endif
                         }
                         else
                         {
