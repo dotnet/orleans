@@ -168,16 +168,6 @@ namespace OrleansTelemetryConsumers.Counters
         /// <param name="name">metric name</param>
         /// <param name="value">metric value</param>
         public void DecrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Decrement, value);
-
-        /// <summary>
-        /// Write all pending metrics
-        /// </summary>
-        public void Flush() { }
-
-        /// <summary>
-        /// Close telemetry consumer
-        /// </summary>
-        public void Close() { }
         
         private bool Initialize()
         {
@@ -186,6 +176,7 @@ namespace OrleansTelemetryConsumers.Counters
                 // (1) Start with list of static counters
                 var newPerfCounterData = new List<PerfCounterConfigData>(PerfCounterConfigData.StaticPerfCounters);
 
+                // TODO: get rid of this static access. Telemetry consumers now allow being injected with dependencies, so extract it as such
                 var grainTypes = LogManager.GrainTypes;
                 if (grainTypes != null)
                 {

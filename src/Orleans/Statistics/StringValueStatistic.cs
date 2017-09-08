@@ -117,7 +117,7 @@ namespace Orleans.Runtime
             return Name + "=" + GetCurrentValue();
         }
 
-        public void TrackMetric(Logger logger)
+        public void TrackMetric(IMetricsWriter metricsWriter)
         {
             // String values are not tracked.
         }

@@ -38,17 +38,18 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionSettings settings;
-        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, IMetricsWriter, IEventHubQueueCache> cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly Logger baseLogger;
         private readonly Logger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
+        private readonly IMetricsWriter metricsWriter;
 
         private IEventHubQueueCache cache;
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory;
+        private Func<EventHubPartitionSettings, string, Logger, IMetricsWriter, Task<IEventHubReceiver>> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
@@ -66,18 +67,20 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>, Logger, IMetricsWriter, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
             IQueueAdapterReceiverMonitor monitor,
             Factory<NodeConfiguration> getNodeConfig,
-            Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
+            IMetricsWriter metricsWriter,
+            Func<EventHubPartitionSettings, string, Logger, IMetricsWriter, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
             if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
             if (monitor == null) throw new ArgumentNullException(nameof(monitor));
+            if (metricsWriter == null) throw new ArgumentNullException(nameof(metricsWriter));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
@@ -85,6 +88,7 @@ namespace Orleans.ServiceBus.Providers
             this.logger = baseLogger.GetSubLogger("receiver", "-");
             this.monitor = monitor;
             this.getNodeConfig = getNodeConfig;
+            this.metricsWriter = metricsWriter;
 
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
@@ -108,10 +112,10 @@ namespace Orleans.ServiceBus.Providers
             try
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
-                cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
+                cache = cacheFactory(settings.Partition, checkpointer, baseLogger, this.metricsWriter);
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
-                receiver = await this.eventHubReceiverFactory(settings, offset, logger);
+                receiver = await this.eventHubReceiverFactory(settings, offset, logger, this.metricsWriter);
                 watch.Stop();
                 monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
@@ -270,7 +274,7 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
+        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger, IMetricsWriter metricsWriter)
         {
             bool offsetInclusive = true;
 #if !BUILD_FLAVOR_LEGACY

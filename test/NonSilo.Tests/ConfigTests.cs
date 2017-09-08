@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -358,9 +359,6 @@ namespace UnitTests
             LogManager.Initialize(cfg);
             Assert.Single(LogManager.LogConsumers);
             Assert.Equal(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName); // Log consumer type #1
-
-            Assert.Single(LogManager.TelemetryConsumers);
-            Assert.Equal(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName); // TelemetryConsumers consumer type #1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
@@ -379,11 +377,43 @@ namespace UnitTests
             var actualLogConsumers = LogManager.LogConsumers.Select(x => x.GetType()).ToList();
             Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
             Assert.Single(actualLogConsumers);
+        }
 
-            var actualTelemetryConsumers = LogManager.TelemetryConsumers.Select(x => x.GetType()).ToList();
-            Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
-            Assert.Contains(typeof(ConsoleTelemetryConsumer), actualTelemetryConsumers);
-            Assert.Equal(2, actualTelemetryConsumers.Count);
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        public void ClientConfig_Metrics()
+        {
+            string filename = "Config_LogConsumers-ClientConfiguration.xml";
+
+            var cfg = ClientConfiguration.LoadFromFile(filename);
+            Assert.Equal(filename, cfg.SourceFile);
+
+            Assert.Single(cfg.MetricsConfiguration.Consumers);
+            var consumer = cfg.MetricsConfiguration.Consumers.First();
+            Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
+            Assert.Collection(consumer.Properties, kv => 
+            {
+                Assert.Equal("connString", kv.Key);
+                Assert.Equal("foo", kv.Value);
+            });
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        public void ServerConfig_Metrics()
+        {
+            string filename = "Config_LogConsumers-OrleansConfiguration.xml";
+
+            var cfg = new ClusterConfiguration();
+            cfg.LoadFromFile(filename);
+            Assert.Equal(filename, cfg.SourceFile);
+
+            Assert.Single(cfg.Defaults.MetricsConfiguration.Consumers);
+            var consumer = cfg.Defaults.MetricsConfiguration.Consumers.First();
+            Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
+            Assert.Collection(consumer.Properties, kv =>
+            {
+                Assert.Equal("connString", kv.Key);
+                Assert.Equal("foo", kv.Value);
+            });
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -1111,6 +1141,34 @@ namespace UnitTests
         public void Log(Severity severity, LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    public class DummyMetricTelemetryConsumer : IMetricTelemetryConsumer
+    {
+        public void DecrementMetric(string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void DecrementMetric(string name, double value)
+        {
+        }
+
+        public void IncrementMetric(string name)
+        {
+        }
+
+        public void IncrementMetric(string name, double value)
+        {
+        }
+
+        public void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
+        {
+        }
+
+        public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
+        {
         }
     }
 }

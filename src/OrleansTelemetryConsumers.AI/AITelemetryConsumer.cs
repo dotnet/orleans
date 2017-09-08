@@ -5,8 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.TelemetryConsumers.AI
 {
-    public class AITelemetryConsumer : ITraceTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer, 
-        IDependencyTelemetryConsumer, IMetricTelemetryConsumer, IRequestTelemetryConsumer
+    public class AITelemetryConsumer : IMetricTelemetryConsumer, IDisposable
     {
         private TelemetryClient _client;
 
@@ -40,21 +39,6 @@ namespace Orleans.TelemetryConsumers.AI
             _client.TrackMetric(name, value, null);
         }
 
-        public void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
-        {
-            _client.TrackDependency(dependencyName, commandName, startTime, duration, success);
-        }
-
-        public void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
-        {
-            _client.TrackEvent(eventName, properties, metrics);
-        }
-
-        public void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
-        {
-            _client.TrackException(exception, properties, metrics);
-        }
-
         public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
         {
             _client.TrackMetric(name, value.TotalMilliseconds, properties);
@@ -65,68 +49,9 @@ namespace Orleans.TelemetryConsumers.AI
             _client.TrackMetric(name, value, properties);
         }
 
-        public void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
+        public void Dispose()
         {
-            _client.TrackRequest(name, startTime, duration, responseCode, success);
+            _client.Flush();
         }
-
-        public void TrackTrace(string message)
-        {
-            TrackTrace(message, null);
-        }
-
-        public void TrackTrace(string message, IDictionary<string, string> properties)
-        {
-            if (properties != null)
-            {
-                _client.TrackTrace(message, Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information, properties);
-            }
-            else
-            {
-                _client.TrackTrace(message);
-            }
-        }
-
-        public void TrackTrace(string message, Severity severity)
-        {
-            TrackTrace(message, severity, null);
-        }
-
-        public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
-        {
-            Microsoft.ApplicationInsights.DataContracts.SeverityLevel sev;
-
-            switch (severity)
-            {
-                case Severity.Off:
-                    return;
-                case Severity.Error:
-                    sev = Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Error;
-                    break;
-                case Severity.Warning:
-                    sev = Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Warning;
-                    break;
-                case Severity.Verbose:
-                case Severity.Verbose2:
-                case Severity.Verbose3:
-                    sev = Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Verbose;
-                    break;
-                default:
-                    sev = Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information;
-                    break;
-            }
-
-            if (properties == null)
-            {
-                _client.TrackTrace(message, sev);
-            }
-            else
-            {
-                _client.TrackTrace(message, sev, properties);
-            }
-        }
-
-        public void Flush() { }
-        public void Close() { }
     }
 }

@@ -137,6 +137,8 @@ namespace Orleans.Runtime.Configuration
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
+        public MetricsTelemetryConfiguration MetricsConfiguration { get; } = new MetricsTelemetryConfiguration();
+
         public LimitManager LimitManager { get; private set; }
 
         private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
@@ -329,7 +331,7 @@ namespace Orleans.Runtime.Configuration
                             }
                             break;
                         case "Telemetry":
-                            ConfigUtilities.ParseTelemetry(child);
+                            ConfigUtilities.ParseTelemetry(child, this.MetricsConfiguration);
                             break;
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))

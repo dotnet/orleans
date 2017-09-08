@@ -15,9 +15,9 @@ namespace Orleans.ServiceBus.Providers
         /// Constructor
         /// </summary>
         /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
-        /// <param name="logger"></param>
-        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, Logger logger)
-            :base(logger)
+        /// <param name="metricsWriter"></param>
+        public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions, IMetricsWriter metricsWriter)
+            :base(metricsWriter)
         {
             this.LogProperties = new Dictionary<string, string>
             {

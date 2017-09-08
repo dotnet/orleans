@@ -31,7 +31,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
                 timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
             }
 
-            public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger)
+            public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger, IMetricsWriter metricsWriter)
             {
                 var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), null, null);
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);

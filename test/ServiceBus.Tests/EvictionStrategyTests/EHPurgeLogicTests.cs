@@ -37,6 +37,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private EventHubPartitionSettings ehSettings;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
+        private IMetricsWriter metricsWriter;
+
         public EHPurgeLogicTests()
         {
             //an mock eh settings
@@ -58,6 +60,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
             //set up logger
             this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
+            this.metricsWriter = new NullMetricsWriter();
         }
 
         //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
@@ -211,9 +214,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             monitorDimensions.NodeConfig = null;
 
             this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.metricsWriter), this.GetNodeConfiguration, this.metricsWriter);
             this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.logger), this.GetNodeConfiguration);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.metricsWriter), this.GetNodeConfiguration, this.metricsWriter);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
@@ -249,7 +252,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
         }
 
-        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger)
+        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger, IMetricsWriter metricsWriter)
         {
             var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);

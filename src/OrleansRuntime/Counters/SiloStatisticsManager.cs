@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Counters
         internal SiloPerformanceMetrics MetricsTable;
         private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
-        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, IMetricsWriter metricsWriter)
         {
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Counters
             runtimeStats = new RuntimeStatisticsGroup();
             this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager);
             this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, initializationParams.NodeConfig);
-            this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval);
+            this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval, metricsWriter);
 
             initializationParams.ClusterConfig.OnConfigChange(
                 "Defaults/LoadShedding",

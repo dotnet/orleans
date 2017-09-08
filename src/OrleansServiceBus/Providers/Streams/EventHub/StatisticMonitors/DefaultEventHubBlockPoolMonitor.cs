@@ -19,9 +19,9 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         /// Constructor
         /// </summary>
         /// <param name="dimensions"></param>
-        /// <param name="logger"></param>
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, Logger logger)
-            :base(logger)
+        /// <param name="metricsWriter"></param>
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, IMetricsWriter metricsWriter)
+            :base(metricsWriter)
         {
             this.LogProperties = new Dictionary<string, string>
             {
