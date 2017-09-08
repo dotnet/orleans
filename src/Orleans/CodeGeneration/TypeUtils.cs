@@ -519,7 +519,7 @@ namespace Orleans.Runtime
 
         public static Type ToReflectionOnlyType(Type type)
         {
-            return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+            return type;
         }
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
