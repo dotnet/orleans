@@ -217,7 +217,7 @@ namespace Orleans.Runtime
                         if (IsCompatibleWithCurrentProcess(j, out complaints))
                         {
                             if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
-                            Assembly.ReflectionOnlyLoadFrom(j);
+                            Assembly.LoadFrom(j);
                         }
                         else
                         {
@@ -344,7 +344,7 @@ namespace Orleans.Runtime
 
                 if (IsCompatibleWithCurrentProcess(pathName, out complaints))
                 {
-                    assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
+                    assembly = Assembly.LoadFrom(pathName);
                 }
                 else
                 {

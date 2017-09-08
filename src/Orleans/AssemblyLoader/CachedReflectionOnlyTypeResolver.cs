@@ -64,7 +64,7 @@ namespace Orleans.Runtime
 
                 try
                 {
-                    return Assembly.ReflectionOnlyLoadFrom(pathName);
+                    return Assembly.LoadFrom(pathName);
                 }
                 catch (FileNotFoundException)
                 {
