@@ -13,11 +13,15 @@ namespace Orleans.Runtime
     /// </summary>
     public enum GrainLifecycleStage
     {
-        //None,
-        //Register,
-        SetupState = 1<<10,  // Setup grain state prior to activation
-        Activate   = SetupState + 1<<10, // Acivate grain
-        //Completed
+        /// <summary>
+        /// Setup grain state prior to activation 
+        /// </summary>
+        SetupState = 1<<10,  
+
+        /// <summary>
+        /// Activate grain
+        /// </summary>
+        Activate = SetupState + 1<<10,
     }
 
     public interface IGrainLifecycle : ILifecycleObservable
