@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions.Abstractions
 {
     public interface ITransactionManager
     {

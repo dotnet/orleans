@@ -23,6 +23,23 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
+    /// Orleans transactions are disabled.
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionsDisabledException : OrleansTransactionException
+    {
+        public OrleansTransactionsDisabledException()
+            : base("Orleans transactions have not been enabled. Transactions are disabled by default and must be configured to be used.")
+        {
+        }
+
+        public OrleansTransactionsDisabledException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
     /// Signifies that the runtime was unable to start a transaction.
     /// </summary>
     [Serializable]

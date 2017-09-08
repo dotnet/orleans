@@ -34,7 +34,6 @@ namespace Orleans.Transactions
         {
             logger = LogManager.GetLogger("TransactionAgent");
             this.tmService = tmService;
-            tmService = null;
             ReadOnlyTransactionId = 0;
             //abortSequenceNumber = 0;
             abortLowerBound = 0;
@@ -187,40 +186,7 @@ namespace Orleans.Transactions
                 {
                     logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to start {0} transactions", startingTransactions.Count);
 
-                    startTransactionsTask = this.tmService.StartTransactions(startingTransactions).ContinueWith(
-                        async startRequest =>
-                        {
-                            try
-                            {
-                                var startResponse = await startRequest;
-                                var startedIds = startResponse.TransactionId;
-
-                                // reply to clients with results
-                                for (int i = 0; i < startCompletions.Count; i++)
-                                {
-                                    TransactionsStatisticsGroup.OnTransactionStarted();
-                                    startCompletions[i].SetResult(startedIds[i]);
-                                }
-
-                                // Refresh cached values using new values from TM.
-                                this.ReadOnlyTransactionId = Math.Max(this.ReadOnlyTransactionId, startResponse.ReadOnlyTransactionId);
-                                this.abortLowerBound = Math.Max(this.abortLowerBound, startResponse.AbortLowerBound);
-                                logger.Verbose(ErrorCode.Transactions_ReceivedTMResponse, "{0} transactions started. readOnlyTransactionId {1}, abortLowerBound {2}", startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
-                            }
-                            catch (Exception e)
-                            {
-                                logger.Error(ErrorCode.Transactions_TMError, "", e);
-
-                                foreach (var completion in startCompletions)
-                                {
-                                    TransactionsStatisticsGroup.OnTransactionStartFailed();
-                                    completion.SetException(new OrleansStartTransactionFailedException(e));
-                                }
-                            }
-
-                            startingTransactions.Clear();
-                            startCompletions.Clear();
-                        });
+                    startTransactionsTask = this.StartTransactions(startingTransactions, startCompletions);
                 }
 
                 if ((committingTransactions.Count > 0 || outstandingCommits.Count > 0) && commitTransactionsTask.IsCompleted)
@@ -305,6 +271,40 @@ namespace Orleans.Transactions
                 }
             }
 
+        }
+
+        private async Task StartTransactions(List<TimeSpan> startingTransactions, List<TaskCompletionSource<long>> startCompletions)
+        {
+            try
+            {
+                StartTransactionsResponse startResponse = await this.tmService.StartTransactions(startingTransactions);
+                List<long> startedIds = startResponse.TransactionId;
+
+                // reply to clients with results
+                for (int i = 0; i < startCompletions.Count; i++)
+                {
+                    TransactionsStatisticsGroup.OnTransactionStarted();
+                    startCompletions[i].SetResult(startedIds[i]);
+                }
+
+                // Refresh cached values using new values from TM.
+                this.ReadOnlyTransactionId = Math.Max(this.ReadOnlyTransactionId, startResponse.ReadOnlyTransactionId);
+                this.abortLowerBound = Math.Max(this.abortLowerBound, startResponse.AbortLowerBound);
+                logger.Verbose(ErrorCode.Transactions_ReceivedTMResponse, "{0} Transactions started. readOnlyTransactionId {1}, abortLowerBound {2}", startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
+            }
+            catch (Exception e)
+            {
+                logger.Error(ErrorCode.Transactions_TMError, "Transaction manager failed to start transactions.", e);
+
+                foreach (var completion in startCompletions)
+                {
+                    TransactionsStatisticsGroup.OnTransactionStartFailed();
+                    completion.SetException(new OrleansStartTransactionFailedException(e));
+                }
+            }
+
+            startingTransactions.Clear();
+            startCompletions.Clear();
         }
 
         private Task WaitForWork()

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -21,14 +22,14 @@ namespace Orleans.Transactions
             this.transactionManagerService = new TransactionManagerService(transactionManager);
         }
 
-        /// <summary>
-        /// This method is called at the end of the process of activating a grain.
-        /// It is called before any messages have been dispatched to the grain.
-        /// For grains with declared persistent state, this method is called after the State property has been populated.
-        /// </summary>
         public override async Task OnActivateAsync()
         {
             await transactionManager.StartAsync();
+        }
+
+        public override async Task OnDeactivateAsync()
+        {
+            await transactionManager.StopAsync();
         }
 
         public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)

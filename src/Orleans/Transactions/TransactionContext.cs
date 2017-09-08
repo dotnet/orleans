@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Orleans.Concurrency;
 using System.Linq;
 using Orleans.Runtime;
+using System.Collections.Concurrent;
 
 namespace Orleans.Transactions
 {
@@ -90,13 +91,40 @@ namespace Orleans.Transactions
 
         public bool IsAborted { get; set; }
 
-        public int PendingCalls { get; set; }
 
         public Dictionary<ITransactionalResource, TransactionalResourceVersion> ReadSet { get; }
         public Dictionary<ITransactionalResource, int> WriteSet { get; }
         public HashSet<long> DependentTransactions { get; }
 
-        public void Union(TransactionInfo other)
+        [NonSerialized]
+        public int PendingCalls;
+
+        [NonSerialized]
+        ConcurrentQueue<TransactionInfo> joined = new ConcurrentQueue<TransactionInfo>();
+        // protect from null ref in case join is accessed on serialized object.
+        private ConcurrentQueue<TransactionInfo> Joined => this.joined ?? (this.joined = new ConcurrentQueue<TransactionInfo>());
+
+        public void Join(TransactionInfo other)
+        {
+            this.Joined.Enqueue(other);
+        }
+
+        /// <summary>
+        /// Reconciles all pending calls that have join the transaction.
+        /// </summary>
+        /// <returns></returns>
+        public int ReconcilePending()
+        {
+            TransactionInfo trasactionInfo;
+            while(Joined.TryDequeue(out trasactionInfo))
+            {
+                Union(trasactionInfo);
+                PendingCalls--;
+            }
+            return PendingCalls;
+        }
+
+        private void Union(TransactionInfo other)
         {
             if (TransactionId != other.TransactionId)
             {
