@@ -137,7 +137,8 @@ namespace UnitTests.StorageTests.Relational
         [TestCategory("Functional")]
         internal async Task StorageDataSetGeneric_Json_WriteRead(string grainType, Func<IInternalGrainFactory, GrainReference> getGrainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            await this.Relational_Json_WriteRead(grainType, getGrainReference(this.Fixture.InternalGrainFactory), grainState);
+            var grainReference = getGrainReference(this.Fixture.InternalGrainFactory);
+            await this.Relational_Json_WriteRead(grainType, grainReference, grainState);
         }
 
 

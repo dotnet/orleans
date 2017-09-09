@@ -225,7 +225,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                     results.Add(obj);
                 }
 
-                await reader.NextResultAsync(cancellationToken);
+                await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
                 ++resultSetCount;
             }
 
