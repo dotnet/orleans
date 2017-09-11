@@ -3,7 +3,7 @@ using System;
 using System.Net;
 using System.Threading;
 
-namespace Orleans.Extensions.Logging.Legacy
+namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
     /// Utility method for OrleansLogging

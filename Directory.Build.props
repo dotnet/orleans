@@ -99,12 +99,6 @@
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>2.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
     <MicrosoftExtensionsDependencyInjection>2.0.0</MicrosoftExtensionsDependencyInjection>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>

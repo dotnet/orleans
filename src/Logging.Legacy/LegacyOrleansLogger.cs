@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 
-namespace Orleans.Extensions.Logging.Legacy
+namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
     /// LegacyOrleansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,

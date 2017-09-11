@@ -4,7 +4,7 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Orleans.Extensions.Logging.Legacy
+namespace Microsoft.Orleans.Logging.Legacy
 {
     public static class LegacyOrleansLoggingFactoryExtensions
     {
@@ -24,7 +24,7 @@ namespace Orleans.Extensions.Logging.Legacy
         {
             if (builder == null)
                 throw new ArgumentNullException(nameof(builder));
-            builder.AddMesageBulkingLoggerProvider<LegacyOrleansLoggerProvider>(new LegacyOrleansLoggerProvider(logConsumers, ipEndPoint), eventBulkingOptions);
+            builder.AddMessageBulkingLoggerProvider<LegacyOrleansLoggerProvider>(new LegacyOrleansLoggerProvider(logConsumers, ipEndPoint), eventBulkingOptions);
             return builder;
         }
 
@@ -50,7 +50,7 @@ namespace Orleans.Extensions.Logging.Legacy
             {
                 builder.AddFilter<EventBulkingLoggerProvider<LegacyOrleansLoggerProvider>>(severityOverride.Key, LegacyOrleansLogger.SeverityToLogLevel(severityOverride.Value));
             }
-            builder.AddMesageBulkingLoggerProvider<LegacyOrleansLoggerProvider>(new LegacyOrleansLoggerProvider(logConsumers, ipEndPoint), eventBulkingOptions);
+            builder.AddMessageBulkingLoggerProvider<LegacyOrleansLoggerProvider>(new LegacyOrleansLoggerProvider(logConsumers, ipEndPoint), eventBulkingOptions);
             return builder;
         }
 
@@ -62,7 +62,7 @@ namespace Orleans.Extensions.Logging.Legacy
         /// <param name="provider">logger provider</param>
         /// <param name="eventBulkingOptions">options for event bulking feature</param>
         /// <returns></returns>
-        public static ILoggingBuilder AddMesageBulkingLoggerProvider<TDecoratedLoggerProvider>(this ILoggingBuilder builder, TDecoratedLoggerProvider provider, EventBulkingOptions eventBulkingOptions = null)
+        public static ILoggingBuilder AddMessageBulkingLoggerProvider<TDecoratedLoggerProvider>(this ILoggingBuilder builder, TDecoratedLoggerProvider provider, EventBulkingOptions eventBulkingOptions = null)
             where TDecoratedLoggerProvider : ILoggerProvider
         {
             builder.AddProvider(new EventBulkingLoggerProvider<TDecoratedLoggerProvider>(provider, eventBulkingOptions));

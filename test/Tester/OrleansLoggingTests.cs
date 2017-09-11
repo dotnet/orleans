@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Extensions.Logging;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
@@ -8,7 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Extensions.Logging.Legacy;
+using Microsoft.Orleans.Logging.Legacy;
 using Xunit;
 
 namespace Tester

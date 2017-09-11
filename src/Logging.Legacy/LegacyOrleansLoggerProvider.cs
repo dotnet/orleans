@@ -7,7 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices.ComTypes;
 
-namespace Orleans.Extensions.Logging.Legacy
+namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Extensions.Logging
+namespace Microsoft.Orleans.Logging.Legacy
 {
 
     /// <summary>
