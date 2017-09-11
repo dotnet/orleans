@@ -59,7 +59,13 @@ namespace Orleans.Transactions
     [Serializable]
     public class TransactionInfo
     {
+        public TransactionInfo()
+        {
+            this.joined = new ConcurrentQueue<TransactionInfo>();
+        }
+
         public TransactionInfo(long id, bool readOnly = false)
+            : this()
         {
             TransactionId = id;
             IsReadOnly = readOnly;
@@ -75,6 +81,7 @@ namespace Orleans.Transactions
         /// </summary>
         /// <param name="other"></param>
         public TransactionInfo(TransactionInfo other)
+            : this()
         {
             TransactionId = other.TransactionId;
             IsReadOnly = other.IsReadOnly;
@@ -90,8 +97,7 @@ namespace Orleans.Transactions
         public bool IsReadOnly { get; }
 
         public bool IsAborted { get; set; }
-
-
+        
         public Dictionary<ITransactionalResource, TransactionalResourceVersion> ReadSet { get; }
         public Dictionary<ITransactionalResource, int> WriteSet { get; }
         public HashSet<long> DependentTransactions { get; }
@@ -100,13 +106,11 @@ namespace Orleans.Transactions
         public int PendingCalls;
 
         [NonSerialized]
-        ConcurrentQueue<TransactionInfo> joined = new ConcurrentQueue<TransactionInfo>();
-        // protect from null ref in case join is accessed on serialized object.
-        private ConcurrentQueue<TransactionInfo> Joined => this.joined ?? (this.joined = new ConcurrentQueue<TransactionInfo>());
+        private readonly ConcurrentQueue<TransactionInfo> joined;
 
         public void Join(TransactionInfo other)
         {
-            this.Joined.Enqueue(other);
+            this.joined.Enqueue(other);
         }
 
         /// <summary>
@@ -116,7 +120,7 @@ namespace Orleans.Transactions
         public int ReconcilePending()
         {
             TransactionInfo trasactionInfo;
-            while(Joined.TryDequeue(out trasactionInfo))
+            while(this.joined.TryDequeue(out trasactionInfo))
             {
                 Union(trasactionInfo);
                 PendingCalls--;
