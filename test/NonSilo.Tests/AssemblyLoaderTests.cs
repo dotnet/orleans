@@ -100,20 +100,8 @@ namespace UnitTests
             var directories =
                 new Dictionary<string, SearchOption>
                     {
-                        {Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), 
-                            SearchOption.AllDirectories}
+                        { Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath), SearchOption.AllDirectories }
                     };
-
-            //
-            // We need to add current directory in case if xUnit is running an isolated copy of this test dll.
-            //
-
-            var currentDirectory = Path.GetDirectoryName(Environment.CurrentDirectory);
-
-            if (!directories.ContainsKey(currentDirectory))
-            {
-                directories.Add(currentDirectory, SearchOption.AllDirectories);
-            }
 
             var excludeCriteria =
                 new AssemblyLoaderPathNameCriterion[]
