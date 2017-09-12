@@ -56,7 +56,7 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             MessageFactory messageFactory,
             IEnumerable<IGrainCallFilter> registeredInterceptors,
-            Lazy<ITransactionAgent> transactionAgent)
+            Factory<ITransactionAgent> transactionAgent)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
             config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
-            this.transactionAgent = transactionAgent;
+            this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
@@ -399,7 +399,8 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (transactionInfo != null && transactionInfo.PendingCalls > 0)
+                transactionInfo = TransactionContext.GetTransactionInfo();
+                if (transactionInfo != null && transactionInfo.ReconcilePending() > 0)
                 {
                     var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, transactionInfo.PendingCalls);
                     // Can't exit before the transaction completes.
@@ -593,8 +594,7 @@ namespace Orleans.Runtime
                 if (message.TransactionInfo != null)
                 {
                     // NOTE: Not clear if thread-safe, revise
-                    callbackData.TransactionInfo.Union(message.TransactionInfo);
-                    callbackData.TransactionInfo.PendingCalls--;
+                    callbackData.TransactionInfo.Join(message.TransactionInfo);
                 }
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 

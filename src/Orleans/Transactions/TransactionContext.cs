@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Orleans.Concurrency;
 using System.Linq;
 using Orleans.Runtime;
+using System.Collections.Concurrent;
 
 namespace Orleans.Transactions
 {
@@ -58,7 +59,13 @@ namespace Orleans.Transactions
     [Serializable]
     public class TransactionInfo
     {
+        public TransactionInfo()
+        {
+            this.joined = new ConcurrentQueue<TransactionInfo>();
+        }
+
         public TransactionInfo(long id, bool readOnly = false)
+            : this()
         {
             TransactionId = id;
             IsReadOnly = readOnly;
@@ -74,6 +81,7 @@ namespace Orleans.Transactions
         /// </summary>
         /// <param name="other"></param>
         public TransactionInfo(TransactionInfo other)
+            : this()
         {
             TransactionId = other.TransactionId;
             IsReadOnly = other.IsReadOnly;
@@ -89,14 +97,38 @@ namespace Orleans.Transactions
         public bool IsReadOnly { get; }
 
         public bool IsAborted { get; set; }
-
-        public int PendingCalls { get; set; }
-
+        
         public Dictionary<ITransactionalResource, TransactionalResourceVersion> ReadSet { get; }
         public Dictionary<ITransactionalResource, int> WriteSet { get; }
         public HashSet<long> DependentTransactions { get; }
 
-        public void Union(TransactionInfo other)
+        [NonSerialized]
+        public int PendingCalls;
+
+        [NonSerialized]
+        private readonly ConcurrentQueue<TransactionInfo> joined;
+
+        public void Join(TransactionInfo other)
+        {
+            this.joined.Enqueue(other);
+        }
+
+        /// <summary>
+        /// Reconciles all pending calls that have join the transaction.
+        /// </summary>
+        /// <returns></returns>
+        public int ReconcilePending()
+        {
+            TransactionInfo trasactionInfo;
+            while(this.joined.TryDequeue(out trasactionInfo))
+            {
+                Union(trasactionInfo);
+                PendingCalls--;
+            }
+            return PendingCalls;
+        }
+
+        private void Union(TransactionInfo other)
         {
             if (TransactionId != other.TransactionId)
             {

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Description>Core Transaction library of Microsoft Orleans used both on the client and server.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+</Project>

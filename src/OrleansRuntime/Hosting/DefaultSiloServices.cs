@@ -184,13 +184,12 @@ namespace Orleans.Hosting
                     return new ConsistentRingProvider(siloDetails.SiloAddress);
                 });
             
-            services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
+            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Transactions
-            services.AddSingleton<ITransactionAgent,TransactionAgent>();
-            services.AddSingleton(sp => new Lazy<ITransactionAgent>(() => sp.GetRequiredService<ITransactionAgent>()));
-            services.AddSingleton<TransactionServiceGrainFactory>();
-            services.AddSingleton(sp => sp.GetRequiredService<TransactionServiceGrainFactory>().CreateTransactionManagerService() );
+            services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
+            services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
+            services.TryAddSingleton<ITransactionManagerService, DisabledTransactionManagerService>();
         }
     }
 }
