@@ -2,12 +2,12 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Logging.Legacy</PackageId>
     <Title>Microsoft Orleans Legacy Logging</Title>
+    <Summary>Microsoft Orleans Legacy Logging library supports legacy features, including ILogComsumer, Severity and message bulking features</Summary>
     <Description>
       This package contains legacy types which is used
-      for logging to facilitate migration from Orleans 1.x but
-      will be removed in the near future. It is recommended that
-      you use the Microsoft.Extensions.Logging package and its
-      infrastructure and associated providers directly if not
+      for logging to facilitate migration from Orleans 1.x. 
+      It is recommended that you use the Microsoft.Extensions.Logging package 
+      and its infrastructure and associated providers directly if not
       upgrading any legacy ILogConsumer.</Description>
     <PackageTags>$(PackageTags) Logging Legacy</PackageTags>
   </PropertyGroup>
