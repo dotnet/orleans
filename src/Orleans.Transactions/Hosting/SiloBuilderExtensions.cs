@@ -43,7 +43,6 @@ namespace Orleans.Transactions
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
-            services.AddTransient(typeof(TransactionalState<>));
         }
 
         #endregion pre-siloBuilder
