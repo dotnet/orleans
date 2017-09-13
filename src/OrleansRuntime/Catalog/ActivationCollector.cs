@@ -300,7 +300,7 @@ namespace Orleans.Runtime
                         {
                             if (activation.GetIdleness(now) >= ageLimit)
                             {
-                                if (bucket.TryCancel(activation))
+                                if (bucket.TryRemove(activation))
                                 {
                                     // we removed the activation from the collector. it's our responsibility to deactivate it.
                                     activation.PrepareForDeactivation();
@@ -430,21 +430,9 @@ namespace Orleans.Runtime
 
             public bool TryRemove(ActivationData item)
             {
-                if (!TryCancel(item)) return false;
-
-                // actual removal is a memory optimization and isn't technically necessary to cancel the timeout.
-                ActivationData unused;
-                return items.TryRemove(item.ActivationId, out unused);
-            }
-
-            public bool TryCancel(ActivationData item)
-            {
                 if (!item.TrySetCollectionCancelledFlag()) return false;
 
-                // we need to null out the ActivationData reference in the bucket in order to ensure that the memory gets collected. if we've succeeded in setting the cancellation flag, then we should have won the right to do this, so we throw an exception if we fail.
-                if (items.TryUpdate(item.ActivationId, null, item)) return true;
-                    
-                throw new InvalidOperationException("unexpected failure to cancel deactivation");
+                return items.TryRemove(item.ActivationId, out ActivationData unused);
             }
 
             public IEnumerable<ActivationData> CancelAll()

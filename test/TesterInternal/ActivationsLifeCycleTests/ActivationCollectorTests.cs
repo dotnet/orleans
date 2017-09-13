@@ -59,6 +59,35 @@ namespace UnitTests.ActivationsLifeCycleTests
         }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorForceCollection()
+        {
+            Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            const int grainCount = 1000;
+            var fullGrainTypeName = typeof(IdleActivationGcTestGrain1).FullName;
+
+            List<Task> tasks = new List<Task>();
+            logger.Info("ActivationCollectorForceCollection: activating {0} grains.", grainCount);
+            for (var i = 0; i < grainCount; ++i)
+            {
+                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
+                tasks.Add(g.Nop());
+            }
+            await Task.WhenAll(tasks);
+
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            var grain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+
+            await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
+
+            await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
+        }
+
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivations()
         {
             Initialize(DEFAULT_IDLE_TIMEOUT);
