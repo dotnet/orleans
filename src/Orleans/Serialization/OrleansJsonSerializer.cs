@@ -17,6 +17,7 @@ namespace Orleans.Serialization
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
+        public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly JsonSerializerSettings settings;
         private Logger logger;
 
@@ -81,6 +82,15 @@ namespace Orleans.Serialization
                 if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
                 {
                     settings.Formatting = Formatting.Indented;
+                }
+            }
+
+            if (config.Properties.ContainsKey(TypeNameHandlingProperty))
+            {
+                TypeNameHandling typeNameHandling;
+                if (Enum.TryParse<TypeNameHandling>(config.Properties[TypeNameHandlingProperty], out typeNameHandling))
+                {
+                    settings.TypeNameHandling = typeNameHandling;
                 }
             }
             return settings;
