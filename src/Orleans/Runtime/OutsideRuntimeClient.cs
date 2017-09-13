@@ -265,13 +265,16 @@ namespace Orleans
             Task.Run(
                 () =>
                 {
-                    try
+                    while (listenForMessages && !ct.IsCancellationRequested)
                     {
-                        RunClientMessagePump(ct);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                        try
+                        {
+                            RunClientMessagePump(ct);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                        }
                     }
                 },
                 ct).Ignore();
