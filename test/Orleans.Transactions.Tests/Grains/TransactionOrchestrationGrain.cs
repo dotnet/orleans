@@ -72,11 +72,13 @@ namespace Orleans.Transactions.Tests
 
             public Task Abort(long transactionId)
             {
+                logger.Info($"Transaction {transactionId} was aborted for grain {grain}.");
                 return this.resultGrain.RecordAbort(transactionId);
             }
 
             public Task Commit(long transactionId)
             {
+                logger.Info($"Transaction {transactionId} was committed for grain {grain}.");
                 this.stableVersion = transactionId;
                 return this.resultGrain.RecordCommit(transactionId);
             }
@@ -84,6 +86,7 @@ namespace Orleans.Transactions.Tests
             public void JoinTransaction()
             {
                 TransactionInfo info = TransactionContext.GetTransactionInfo();
+                logger.Info($"Grain {grain} is joining transaction {info.TransactionId}.");
 
                 // are we already part of the transaction?
                 if (this.transactions.Contains(info.TransactionId))

@@ -7,7 +7,7 @@ namespace Orleans.Transactions.Tests
     {
         public HashSet<long> Prepared { get; } = new HashSet<long>();
         public HashSet<long> Aborted { get; } = new HashSet<long>();
-        public HashSet<long> Commited { get; } = new HashSet<long>();
+        public HashSet<long> Committed { get; } = new HashSet<long>();
     }
 
     public interface ITransactionOrchestrationResultGrain : IGrainWithGuidKey

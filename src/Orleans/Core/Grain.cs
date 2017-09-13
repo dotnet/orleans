@@ -22,7 +22,7 @@ namespace Orleans
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
 
-        internal GrainReference GrainReference { get { return Data.GrainReference; } }
+        public GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; set; }
 

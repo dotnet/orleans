@@ -8,8 +8,11 @@ namespace Orleans.Transactions.Tests
         /// </summary>
         public const int MaxCoordinatedTransactions = 8;
 
+        // storage providers
+        public const string TransactionStore = "TransactionStore";
+
         // grain implementations
         public const string TransactionOrchestrationGrain = "Orleans.Transactions.Tests.TransactionOrchestrationGrain";
-
+        public const string SingleStateTransactionalGrain = "Orleans.Transactions.Tests.SingleStateTransactionalGrain";
     }
 }
