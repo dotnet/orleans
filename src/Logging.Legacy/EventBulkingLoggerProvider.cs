@@ -5,7 +5,7 @@ namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
     /// EventBulkingLoggerProvider, which has event bulking feature in. If you want to add event bulking feature on top of your logger provider,
-    /// you just need to use <see cref="ILoggerFactory.AddBulkLoggerDecorator"/>. 
+    /// you just need to use <see cref="ILoggingBuilder.AddBulkLoggerDecorator"/>. 
     /// Note: It need to be a typed class for <see cref="LoggerFilterRule"/> to work, such as per provider type filter
     /// </summary>
     public class EventBulkingLoggerProvider<TDecoratedLoggerProvider> : ILoggerProvider

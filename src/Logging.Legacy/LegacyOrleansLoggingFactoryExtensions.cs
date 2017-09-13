@@ -9,7 +9,7 @@ namespace Microsoft.Orleans.Logging.Legacy
     public static class LegacyOrleansLoggingFactoryExtensions
     {
         /// <summary>
-        /// Add <see cref="LegacyOrleansLoggerProvider"> with event bulking feature to LoggerFactory
+        /// Add <see cref="LegacyOrleansLoggerProvider"/> with event bulking feature to LoggerFactory
         /// </summary>
         /// <param name="builder">logger builder</param>
         /// <param name="logConsumers">log consumers which user want to write log events to</param>
@@ -29,7 +29,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         }
 
         /// <summary>
-        ///Add <see cref="LegacyOrleansLoggerProvider"> with event bulking feature to LoggerFactory
+        ///Add <see cref="LegacyOrleansLoggerProvider"/> with event bulking feature to LoggerFactory
         /// </summary>
         /// <param name="builder">logger builder</param>
         /// <param name="logConsumers">log consumers which configured to consume the logs</param>
@@ -55,8 +55,8 @@ namespace Microsoft.Orleans.Logging.Legacy
         }
 
         /// <summary>
-        /// Add event bulking feature onto <param name="provider"></param>, and add that new logger provider 
-        /// <see cref="EventBulkingLoggerProvider{TDecoratedLoggerProvider}"/> into <param name="builder"></param>.
+        /// Add event bulking feature onto <paramref name="provider"></paramref>, and add that new logger provider 
+        /// <see cref="EventBulkingLoggerProvider{TDecoratedLoggerProvider}"/> into <paramref name="builder"></paramref>.
         /// </summary>
         /// <param name="builder">logger builder</param>
         /// <param name="provider">logger provider</param>
