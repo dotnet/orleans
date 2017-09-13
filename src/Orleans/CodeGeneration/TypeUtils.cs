@@ -512,6 +512,26 @@ namespace Orleans.Runtime
             return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
         }
 
+        private static Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
+        {
+            try
+            {
+                CachedReflectionOnlyTypeResolver.Instance.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
+                return true;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return false;
+            }
+            catch (Exception)
+            {
+                // if other exceptions not related to platform ocurr, assume that ReflectionOnly is supported
+                return true;
+            }
+        });
+
+        public static bool CanUseReflectionOnly => canUseReflectionOnly.Value;
+
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
         {
             return CachedReflectionOnlyTypeResolver.Instance.ResolveType(assemblyQualifiedName);
@@ -519,7 +539,14 @@ namespace Orleans.Runtime
 
         public static Type ToReflectionOnlyType(Type type)
         {
-            return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+            if (CanUseReflectionOnly)
+            {
+                return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+            }
+            else
+            {
+                return type;
+            }
         }
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
