@@ -49,8 +49,8 @@ namespace Orleans.Runtime
         /// <param name="severity">The severity of the message being traced.</param>
         /// <param name="loggerType">The type of logger the message is being traced through.</param>
         /// <param name="caller">The name of the logger tracing the message.</param>
-        /// <param name="myIPEndPoint">The <see cref="IPEndPoint"/> of the Orleans client/server if known. May be null.</param>
         /// <param name="message">The message to log.</param>
+        /// <param name="myIPEndPoint">The <see cref="IPEndPoint"/> of the Orleans client/server if known. May be null.</param> 
         /// <param name="exception">The exception to log. May be null.</param>
         /// <param name="eventCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'. 
         /// In general, all log entries at severity=Error or greater should specify an explicit error code value.</param>
