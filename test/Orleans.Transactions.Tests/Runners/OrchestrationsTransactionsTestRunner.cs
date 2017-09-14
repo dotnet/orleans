@@ -119,7 +119,7 @@ namespace Orleans.Transactions.Tests
 
             Assert.Equal(perpareCount, results.Prepared.Count);
             Assert.Equal(abortCount, results.Aborted.Count);
-            Assert.Equal(commitCount, results.Commited.Count);
+            Assert.Equal(commitCount, results.Committed.Count);
         }
     }
 }

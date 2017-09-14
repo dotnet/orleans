@@ -15,6 +15,7 @@ namespace Orleans.Transactions
         OrleansTransactions = 1 << 17,
 
         Transactions_IdAllocationFailed = OrleansTransactions + 1,
+        Transactions_PrepareFailed      = Transactions_IdAllocationFailed+1,
     }
 
     internal static class LoggerExtensions

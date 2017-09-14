@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.Transactions.Tests.Grains
+namespace Orleans.Transactions.Tests
 {
     public class TransactionOrchestrationResultGrain : Grain, ITransactionOrchestrationResultGrain
     {
@@ -30,8 +30,8 @@ namespace Orleans.Transactions.Tests.Grains
 
         public Task RecordCommit(long transactionId)
         {
-            this.logger.Info($"Grain {this.GetPrimaryKey()} commited transaction {transactionId}.");
-            this.orchestrationResult.Commited.Add(transactionId);
+            this.logger.Info($"Grain {this.GetPrimaryKey()} committed transaction {transactionId}.");
+            this.orchestrationResult.Committed.Add(transactionId);
             return Task.CompletedTask;
         }
 

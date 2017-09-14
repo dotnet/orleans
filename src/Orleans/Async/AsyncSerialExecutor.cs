@@ -9,9 +9,9 @@ namespace Orleans
     /// A utility class that provides serial execution of async functions.
     /// In can be used inside reentrant grain code to execute some methods in a non-reentrant (serial) way.
     /// </summary>
-    public class AsyncSerialExecutor
+    public class AsyncSerialExecutor<TResult>
     {
-        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions = new ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>>();
+        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>> actions = new ConcurrentQueue<Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>>();
         private readonly InterlockedExchangeLock locker = new InterlockedExchangeLock();
 
         private class InterlockedExchangeLock
@@ -38,11 +38,11 @@ namespace Orleans
         /// </summary>
         /// <param name="func"></param>
         /// <returns></returns>
-        public Task AddNext(Func<Task> func)
+        public Task<TResult> AddNext(Func<Task<TResult>> func)
         {
-            var resolver = new TaskCompletionSource<bool>();
-            actions.Enqueue(new Tuple<TaskCompletionSource<bool>, Func<Task>>(resolver, func));
-            Task task = resolver.Task;
+            var resolver = new TaskCompletionSource<TResult>();
+            actions.Enqueue(new Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>(resolver, func));
+            Task<TResult> task = resolver.Task;
             ExecuteNext().Ignore();
             return task;
         }
@@ -61,13 +61,13 @@ namespace Orleans
 
                     while (!actions.IsEmpty)
                     {
-                        Tuple<TaskCompletionSource<bool>, Func<Task>> actionTuple;
+                        Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>> actionTuple;
                         if (actions.TryDequeue(out actionTuple))
                         {
                             try
                             {
-                                await actionTuple.Item2();
-                                actionTuple.Item1.TrySetResult(true);
+                                TResult result = await actionTuple.Item2();
+                                actionTuple.Item1.TrySetResult(result);
                             }
                             catch (Exception exc)
                             {
@@ -82,6 +82,21 @@ namespace Orleans
                         locker.ReleaseLock();
                 }
             }
+        }
+    }
+
+    public class AsyncSerialExecutor
+    {
+        private AsyncSerialExecutor<bool> executor = new AsyncSerialExecutor<bool>();
+
+        public Task AddNext(Func<Task> func)
+        {
+            return this.executor.AddNext(() => Wrap(func));
+        }
+        private async Task<bool> Wrap(Func<Task> func)
+        {
+            await func();
+            return true;
         }
     }
 }

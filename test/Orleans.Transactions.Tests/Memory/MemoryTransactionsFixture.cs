@@ -13,6 +13,7 @@ namespace Orleans.Transactions.Tests
         {
             var options = new TestClusterOptions();
             options.ClusterConfiguration.UseStartupType<Startup>();
+            options.ClusterConfiguration.AddMemoryStorageProvider(TransactionTestConstants.TransactionStore);
             return new TestCluster(options);
         }
 
@@ -22,6 +23,7 @@ namespace Orleans.Transactions.Tests
             {
                 services.UseInClusterTransactionManager(new TransactionsConfiguration());
                 services.UseInMemoryTransactionLog();
+                services.UseTransactionalState();
                 return services.BuildServiceProvider();
             }
         }

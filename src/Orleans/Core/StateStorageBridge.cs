@@ -7,7 +7,7 @@ using Orleans.Storage;
 
 namespace Orleans.Core
 {
-    internal class StateStorageBridge<TState> : IStorage<TState>
+    public class StateStorageBridge<TState> : IStorage<TState>
         where TState : new()
     {
         private readonly string name;
