@@ -9,6 +9,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
+using Orleans.Hosting;
 
 namespace UnitTests.General
 {
@@ -22,8 +23,24 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.UseStartupType<TestStartup>();
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
                 return new TestCluster(options);
+            }
+
+            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureServices(ConfigureServices);
+                }
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator)));
             }
         }
 
@@ -37,7 +54,7 @@ namespace UnitTests.General
         {
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var actual = await grain.GetStringValue();
-            Assert.Equal(TestStartup.HardcodedGrainActivator.HardcodedValue, actual);
+            Assert.Equal(HardcodedGrainActivator.HardcodedValue, actual);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -59,45 +76,35 @@ namespace UnitTests.General
             Assert.Equal(initialReleasedInstances + 1, finalReleasedInstances);
         }
 
-        public class TestStartup
+        private class HardcodedGrainActivator : DefaultGrainActivator, IGrainActivator
         {
-            public class HardcodedGrainActivator : DefaultGrainActivator, IGrainActivator
+            public const string HardcodedValue = "Hardcoded Test Value";
+            private int numberOfReleasedInstances;
+
+            public HardcodedGrainActivator(IServiceProvider service) : base(service)
             {
-                public const string HardcodedValue = "Hardcoded Test Value";
-                private int numberOfReleasedInstances;
-
-                public HardcodedGrainActivator(IServiceProvider service) : base(service)
-                {
-                }
-
-                public override object Create(IGrainActivationContext context)
-                {
-                    if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
-                    {
-                        return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(null), HardcodedValue, numberOfReleasedInstances);
-                    }
-
-                    return base.Create(context);
-                }
-
-                public override void Release(IGrainActivationContext context, object grain)
-                {
-                    if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
-                    {
-                        numberOfReleasedInstances++;
-                    }
-                    else
-                    {
-                        base.Release(context, grain);
-                    }
-                }
             }
 
-            public IServiceProvider ConfigureServices(IServiceCollection services)
+            public override object Create(IGrainActivationContext context)
             {
-                services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator)));
+                if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                {
+                    return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(null), HardcodedValue, numberOfReleasedInstances);
+                }
 
-                return services.BuildServiceProvider();
+                return base.Create(context);
+            }
+
+            public override void Release(IGrainActivationContext context, object grain)
+            {
+                if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                {
+                    numberOfReleasedInstances++;
+                }
+                else
+                {
+                    base.Release(context, grain);
+                }
             }
         }
     }

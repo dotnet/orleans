@@ -32,6 +32,7 @@ namespace ServiceBus.Tests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(siloCount);
+                options.UseSiloBuilderFactory<SiloBuilderFactory>();
                 ProviderSettings.EventHubPartitionCount = totalQueueCount;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);

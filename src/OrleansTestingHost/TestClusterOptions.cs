@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
+using Orleans.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -92,6 +93,7 @@ namespace Orleans.TestingHost
             this.BaseSiloPort = basePorts.Item1;
             this.BaseGatewayPort = basePorts.Item2;
             this.ExtendedFallbackOptions = extendedFallbackOptions;
+            this.SiloBuilderFactoryType = typeof(DefaultSiloBuilderFactory);
         }
 
         private static FallbackOptions BindExtendedOptions(IConfiguration extendedConfiguration)
@@ -143,6 +145,13 @@ namespace Orleans.TestingHost
             return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount, this.ExtendedFallbackOptions);
         }
 
+        internal Type SiloBuilderFactoryType { get; private set; }
+
+        public void UseSiloBuilderFactory<TSiloBuilderFactory>() where TSiloBuilderFactory : ISiloBuilderFactory, new()
+        {
+            this.SiloBuilderFactoryType = typeof(TSiloBuilderFactory);
+        }
+        
         /// <summary>Build a cluster configuration.</summary>
         /// <param name="baseSiloPort">Base port number to use for silos</param>
         /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>
