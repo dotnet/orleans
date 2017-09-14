@@ -1,6 +1,7 @@
 ﻿#define LOG_MEMORY_PERF_COUNTERS 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime
@@ -15,12 +16,14 @@ namespace Orleans.Runtime
         private readonly RuntimeStatisticsGroup runtimeStats;
 
         private AsyncTaskSafeTimer reportTimer;
-        private static readonly Logger logger = LogManager.GetLogger("ClientTableStatistics", LoggerType.Runtime);
-
-        internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime)
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
+        internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory)
         {
             this.mc = mc;
             this.metricsDataPublisher = metricsDataPublisher;
+            this.logger = loggerFactory.CreateLogger<ClientTableStatistics>();
+            this.loggerFactory = loggerFactory;
             runtimeStats = runtime;
             reportFrequency = TimeSpan.Zero;
             connectedGatewayCount = IntValueStatistic.Find(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT);
@@ -98,7 +101,7 @@ namespace Orleans.Runtime
                     {
                         reportTimer.Dispose();
                     }
-                    reportTimer = new AsyncTaskSafeTimer(this.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
+                    reportTimer = new AsyncTaskSafeTimer(this.lothis.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
                 }
             }
         }

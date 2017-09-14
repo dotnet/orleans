@@ -5,11 +5,13 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.SqlServer;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
@@ -36,8 +38,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
             this.environment = environment;
-            LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            logger = new LoggerWrapper<SqlStatisticsPublisherTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 

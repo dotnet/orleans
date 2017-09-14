@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -26,25 +27,25 @@ namespace Orleans.Runtime
         private int                 totalNumTicks;
         private Logger      logger;
 
-        internal SafeTimerBase(Func<object, Task> asynTaskCallback, object state)
+        internal SafeTimerBase(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state)
         {
-            Init(asynTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            Init(loggerFactory, asynTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        internal SafeTimerBase(Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
+        internal SafeTimerBase(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            Init(asynTaskCallback, null, state, dueTime, period);
+            Init(loggerFactory, asynTaskCallback, null, state, dueTime, period);
             Start(dueTime, period);
         }
 
-        internal SafeTimerBase(TimerCallback syncCallback, object state)
+        internal SafeTimerBase(ILoggerFactory loggerFactory, TimerCallback syncCallback, object state)
         {
-            Init(null, syncCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            Init(loggerFactory, null, syncCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        internal SafeTimerBase(TimerCallback syncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        internal SafeTimerBase(ILoggerFactory loggerFactory, TimerCallback syncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            Init(null, syncCallback, state, dueTime, period);
+            Init(loggerFactory, null, syncCallback, state, dueTime, period);
             Start(dueTime, period);
         }
 
@@ -60,7 +61,7 @@ namespace Orleans.Runtime
             timer.Change(due, Constants.INFINITE_TIMESPAN);
         }
 
-        private void Init(Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
+        private void Init(ILoggerFactory loggerFactory, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
         {
             if (synCallback == null && asynCallback == null) throw new ArgumentNullException("synCallback", "Cannot use null for both sync and asyncTask timer callbacks.");
             int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
@@ -72,8 +73,8 @@ namespace Orleans.Runtime
             timerFrequency = period;
             this.dueTime = due;
             totalNumTicks = 0;
-
-            logger = syncCallbackFunc != null ? syncLogger : asyncLogger;
+            var loggerName = syncCallbackFunc != null ? syncTimerName : asyncTimerName;
+            logger = new LoggerWrapper(loggerName, loggerFactory);
             if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);

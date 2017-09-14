@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -27,7 +28,7 @@ namespace Orleans.Runtime
         internal string Name { get; private set; }
         internal int ManagedThreadId { get { return t==null ? -1 : t.ManagedThreadId;  } } 
 
-        protected AsynchAgent(string nameSuffix)
+        protected AsynchAgent(string nameSuffix, ILoggerFactory loggerFactory)
         {
             Cts = new CancellationTokenSource();
             var thisType = GetType();
@@ -49,7 +50,7 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = LogManager.GetLogger(Name, LoggerType.Runtime);
+            Log = new LoggerWrapper(Name, loggerFactory);
 
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
@@ -62,8 +63,8 @@ namespace Orleans.Runtime
             t = new Thread(AgentThreadProc) { IsBackground = true, Name = this.Name };
         }
 
-        protected AsynchAgent()
-            : this(null)
+        protected AsynchAgent(ILoggerFactory loggerFactory)
+            : this(null, loggerFactory)
         {
         }
 

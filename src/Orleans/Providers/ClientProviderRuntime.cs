@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -18,12 +19,14 @@ namespace Orleans.Providers
         private InvokeInterceptor invokeInterceptor;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IRuntimeClient runtimeClient;
+        private readonly ILoggerFactory loggerFactory;
 
-        public ClientProviderRuntime(IInternalGrainFactory grainFactory, IServiceProvider serviceProvider) 
+        public ClientProviderRuntime(IInternalGrainFactory grainFactory, IServiceProvider serviceProvider, ILoggerFactory loggerFactory) 
         {
             this.grainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
+            this.loggerFactory = loggerFactory;
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
         }
@@ -74,7 +77,7 @@ namespace Orleans.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Provider);
+            return new LoggerWrapper(loggerName, this.loggerFactory);
         }
 
         public Guid ServiceId
@@ -120,7 +123,7 @@ namespace Orleans.Providers
 
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            return new AsyncTaskSafeTimer(asyncCallback, state, dueTime, period);
+            return new AsyncTaskSafeTimer(this.loggerFactory, asyncCallback, state, dueTime, period);
         }
 
         public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)

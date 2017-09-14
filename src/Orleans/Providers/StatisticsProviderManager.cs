@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -13,12 +14,13 @@ namespace Orleans.Providers
         private ProviderLoader<IProvider> statisticsProviderLoader;
         private readonly string providerKind;
         private readonly IProviderRuntime runtime;
-
-        public StatisticsProviderManager(IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        private readonly ILoggerFactory loggerFactory;
+        public StatisticsProviderManager(IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
             providerKind = ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME;
             this.runtime = runtime;
-            statisticsProviderLoader = new ProviderLoader<IProvider>(loadedProviderTypeLoaders);
+            this.loggerFactory = loggerFactory;
+            statisticsProviderLoader = new ProviderLoader<IProvider>(loadedProviderTypeLoaders, loggerFactory);
         }
 
         public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
@@ -101,7 +103,7 @@ namespace Orleans.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Provider);
+            return new LoggerWrapper(loggerName, this.loggerFactory);
         }
 
         public Guid ServiceId

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -16,14 +17,16 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private AsyncTaskSafeTimer reportTimer;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         public IStatisticsPublisher StatsTablePublisher;
 
-        internal LogStatistics(TimeSpan writeInterval, bool isSilo, SerializationManager serializationManager)
+        internal LogStatistics(TimeSpan writeInterval, bool isSilo, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             reportFrequency = writeInterval;
             this.serializationManager = serializationManager;
-            logger = LogManager.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics");
         }
 
         internal void Start()

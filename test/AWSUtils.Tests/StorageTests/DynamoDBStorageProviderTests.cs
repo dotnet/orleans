@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -27,8 +28,9 @@ namespace AWSUtils.Tests.StorageTests
             DefaultProviderRuntime = new StorageProviderManager(
                 fixture.GrainFactory,
                 fixture.Services,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services),
-                new LoadedProviderTypeLoaders());
+                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance),
+                new LoadedProviderTypeLoaders(NullLoggerFactory.Instance),
+                NullLoggerFactory.Instance);
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
 
             var properties = new Dictionary<string, string>();

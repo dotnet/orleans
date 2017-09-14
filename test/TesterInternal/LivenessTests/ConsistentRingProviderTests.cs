@@ -18,7 +18,6 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                if (!LogManager.IsInitialized) LogManager.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             }
         }

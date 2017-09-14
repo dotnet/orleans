@@ -65,7 +65,7 @@ namespace Orleans
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
-
+        private readonly ILoggerFactory loggerFactory;
         public SerializationManager SerializationManager { get; set; }
 
         public ActivationAddress CurrentActivationAddress
@@ -93,9 +93,10 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ILogger<OutsideRuntimeClient> logger)
+        public OutsideRuntimeClient(ILoggerFactory loggerFactory)
         {
-            this.logger = logger;
+            this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
             tryResendMessage = TryResendMessage;
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
@@ -177,7 +178,7 @@ namespace Orleans
                 this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
-                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver");
+                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory);
                 }
             }
             catch (Exception exc)
@@ -204,7 +205,7 @@ namespace Orleans
 
         private void LoadAdditionalAssemblies()
         {
-            var logger = LogManager.GetLogger("AssemblyLoader.Client", LoggerType.Runtime);
+            var logger = new LoggerWrapper("AssemblyLoader.Client", this.loggerFactory);
 
             var directories =
                 new Dictionary<string, SearchOption>

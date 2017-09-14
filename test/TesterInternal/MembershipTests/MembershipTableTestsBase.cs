@@ -9,6 +9,7 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
@@ -42,7 +43,7 @@ namespace UnitTests.MembershipTests
         {
             this.environment = environment;
             LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            logger = new LoggerWrapper<MembershipTableTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
             deploymentId = "test-" + Guid.NewGuid();
 
             logger.Info("DeploymentId={0}", deploymentId);

@@ -3,10 +3,12 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -22,10 +24,6 @@ namespace Tester.AzureUtils
     {
         public class Fixture
         {
-            public Fixture()
-            {
-                LogManager.Initialize(new NodeConfiguration());
-            }
         }
 
         private string deploymentId;
@@ -33,14 +31,15 @@ namespace Tester.AzureUtils
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ITestOutputHelper output;
 
         public SiloInstanceTableManagerTests(ITestOutputHelper output)
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            logger = LogManager.GetLogger("SiloInstanceTableManagerTests", LoggerType.Application);
+            logger = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration())
+                .CreateLogger<SiloInstanceTableManagerTests>();
 
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();

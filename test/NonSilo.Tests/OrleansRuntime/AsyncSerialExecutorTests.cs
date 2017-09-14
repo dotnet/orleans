@@ -2,23 +2,25 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
     public class AsyncSerialExecutorTests
     {
-        public Logger logger;
+        public ILogger logger;
         private SafeRandom random;
         public int operationsInProgress;
 
         public AsyncSerialExecutorTests()
         {
-            LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger("AsyncSerialExecutorTests", LoggerType.Application);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
+            logger = loggerFactory.CreateLogger<AsyncSerialExecutorTests>();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Async")]

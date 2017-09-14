@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -13,11 +14,11 @@ namespace Orleans.Messaging
         private readonly IServiceProvider serviceProvider;
         private readonly Logger logger;
 
-        public GatewayProviderFactory(ClientConfiguration cfg, IServiceProvider serviceProvider)
+        public GatewayProviderFactory(ClientConfiguration cfg, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         {
             this.cfg = cfg;
             this.serviceProvider = serviceProvider;
-            this.logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
+            this.logger = new LoggerWrapper(typeof(GatewayProviderFactory).Name, loggerFactory);
         }
 
         internal IGatewayListProvider CreateGatewayListProvider()

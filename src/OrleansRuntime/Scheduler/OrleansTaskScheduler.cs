@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
 
@@ -13,7 +14,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("OrleansTaskScheduler RunQueue={RunQueue.Length}")]
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
-        private readonly LoggerImpl logger = LogManager.GetLogger("Scheduler.OrleansTaskScheduler", LoggerType.Runtime);
+        private readonly Logger logger;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         
@@ -26,7 +27,7 @@ namespace Orleans.Runtime.Scheduler
         
         public int RunQueueLength { get { return RunQueue.Length; } }
 
-        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics)
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
         {
             return new OrleansTaskScheduler(
                 maxActiveThreads,
@@ -35,19 +36,21 @@ namespace Orleans.Runtime.Scheduler
                 TimeSpan.FromMilliseconds(100),
                 NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
                 LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
-                performanceMetrics);
+                performanceMetrics,
+                loggerFactory);
         }
 
-        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics)
+        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
                     config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
-                    performanceMetrics)
+                    performanceMetrics, loggerFactory)
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, ICorePerformanceMetrics performanceMetrics)
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
         {
+            this.logger = new LoggerWrapper("Scheduler.OrleansTaskScheduler", loggerFactory);
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
@@ -56,7 +59,7 @@ namespace Orleans.Runtime.Scheduler
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
-            Pool = new WorkerPool(this, performanceMetrics, maxActiveThreads, injectMoreWorkerThreads);
+            Pool = new WorkerPool(this, performanceMetrics, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
@@ -365,7 +368,7 @@ namespace Orleans.Runtime.Scheduler
 
             var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
             if (stats.Length > 0)
-                logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatistics, 
+                logger.Info(ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     RunQueue.Length, WorkItemGroupCount, stats);
         }
@@ -392,7 +395,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (var workgroup in workgroupDirectory.Values)
                 sb.AppendLine(workgroup.DumpStatus());
             
-            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatus, sb.ToString());
+            logger.Info(ErrorCode.SchedulerStatus, sb.ToString());
         }
     }
 }

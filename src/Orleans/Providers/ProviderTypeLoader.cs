@@ -4,6 +4,7 @@ using System.Reflection;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -12,11 +13,11 @@ namespace Orleans.Providers
     {
         internal ConcurrentBag<ProviderTypeLoader> Managers { get; private set; }
         private readonly Logger logger;
-        public LoadedProviderTypeLoaders()
+        public LoadedProviderTypeLoaders(ILoggerFactory loggerFactory)
         {
             this.Managers = new ConcurrentBag<ProviderTypeLoader>();
             AppDomain.CurrentDomain.AssemblyLoad += ProcessNewAssembly;
-            this.logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
+            this.logger = new LoggerWrapper("ProviderTypeLoader", loggerFactory);
         }
 
         private void ProcessNewAssembly(object sender, AssemblyLoadEventArgs args)
@@ -55,20 +56,21 @@ namespace Orleans.Providers
         private readonly HashSet<Type> alreadyProcessed;
         public bool IsActive { get; set; }
 
-        private readonly Logger logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
+        private readonly Logger logger;
 
 
-        public ProviderTypeLoader(Func<Type, bool> condition, Action<Type> action)
+        public ProviderTypeLoader(Func<Type, bool> condition, Action<Type> action, ILoggerFactory loggerFactory)
         {
             this.condition = condition;
             callback = action;
             alreadyProcessed = new HashSet<Type>();
+            this.logger = new LoggerWrapper(this.GetType().Name, loggerFactory);
             IsActive = true;
          }
 
-        public static void AddProviderTypeManager(Func<Type, bool> condition, Action<Type> action, LoadedProviderTypeLoaders loadedProviderTypeLoadersSingleton)
+        public static void AddProviderTypeManager(Func<Type, bool> condition, Action<Type> action, LoadedProviderTypeLoaders loadedProviderTypeLoadersSingleton, ILoggerFactory loggerFactory)
         {
-            var manager = new ProviderTypeLoader(condition, action);
+            var manager = new ProviderTypeLoader(condition, action, loggerFactory);
             lock (loadedProviderTypeLoadersSingleton.Managers)
             {
                 loadedProviderTypeLoadersSingleton.Managers.Add(manager);

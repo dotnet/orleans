@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.TestingHost.Utils
@@ -12,6 +17,43 @@ namespace Orleans.TestingHost.Utils
     /// <summary> Collection of test utilities </summary>
     public static class TestingUtils
     {
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="cofig.TraceFileName"/>
+        /// This is the replacement for <see cref="LogManager.Initialize(ITraceConfiguration config, bool configChange = false)"/>
+        /// TODO: this is just an temporary change before we remove ITraceConfiguration
+        /// </summary>
+        /// <param name="config">Trace configuration</param>
+        /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(ITraceConfiguration config)
+        {
+            return CreateDefaultLoggerFactory(config.TraceFileName, new LoggerFilterOptions());
+        }
+
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="cofig.TraceFileName"/>
+        /// This is the replacement for <see cref="LogManager.Initialize(ITraceConfiguration config, bool configChange = false)"/>
+        /// TODO: this is just an temporary change before we remove ITraceConfiguration
+        /// </summary>
+        /// <param name="config">Trace configuration</param>
+        /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(ITraceConfiguration config, LoggerFilterOptions filters)
+        {
+            return CreateDefaultLoggerFactory(config.TraceFileName, filters);
+        }
+
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="filePath/>
+        /// </summary>
+        /// <param name="filePath">the logger file path</param>
+        /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath, LoggerFilterOptions filters)
+        {
+            var output = File.Open(filePath, FileMode.Append, FileAccess.Write, FileShare.Write);
+            var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
+            factory.AddTraceSource(new SourceSwitch("Default"), new TextWriterTraceListener(output));
+            return factory;
+        }
+
         /// <summary> Run the predicate until it succeed or times out </summary>
         /// <param name="predicate">The predicate to run</param>
         /// <param name="timeout">The timeout value</param>

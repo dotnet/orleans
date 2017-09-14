@@ -151,7 +151,7 @@ namespace UnitTests
 
             Assert.Equal(baseLogFileName, fname);
 
-            LogManager.Initialize(n);
+            TestingUtils.CreateDefaultLoggerFactory(n);
 
             Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
             Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
@@ -179,7 +179,7 @@ namespace UnitTests
 
             Assert.Equal(baseLogFileName, fname);
 
-            LogManager.Initialize(n);
+            TestingUtils.CreateDefaultLoggerFactory(n);
 
             Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
             Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
@@ -247,7 +247,7 @@ namespace UnitTests
 
             Assert.Equal(logFileName, fname);
 
-            LogManager.Initialize(n);
+            TestingUtils.CreateDefaultLoggerFactory(n);
 
             Assert.True(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
 
@@ -356,7 +356,7 @@ namespace UnitTests
             var cfg = ClientConfiguration.LoadFromFile(filename);
             Assert.Equal(filename, cfg.SourceFile);
 
-            LogManager.Initialize(cfg);
+            TestingUtils.CreateDefaultLoggerFactory(cfg);
             Assert.Collection(LogManager.LogConsumers,
                 lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
                 lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
@@ -372,9 +372,8 @@ namespace UnitTests
             var cfg = new ClusterConfiguration();
             cfg.LoadFromFile(filename);
             Assert.Equal(filename, cfg.SourceFile);
-
-            LogManager.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
-
+            
+            TestingUtils.CreateDefaultLoggerFactory(cfg.CreateNodeConfigurationForSilo("Primary"));
             Assert.Collection(LogManager.LogConsumers,
                 lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
                 lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
@@ -909,9 +908,8 @@ namespace UnitTests
         {
             const string filename = "DevTestServerConfiguration.xml";
             Guid myGuid = Guid.Empty;
-
-            LogManager.Initialize(new NodeConfiguration());
-
+            
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
@@ -1066,9 +1064,8 @@ namespace UnitTests
         public void SiloConfig_Azure_SystemStore()
         {
             const string filename = "Config_NewAzure.xml";
-
-            LogManager.Initialize(new NodeConfiguration());
-
+            
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 
@@ -1088,9 +1085,8 @@ namespace UnitTests
         public void SiloConfig_OldAzure()
         {
             const string filename = "Config_OldAzure.xml";
-
-            LogManager.Initialize(new NodeConfiguration());
-
+            
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 

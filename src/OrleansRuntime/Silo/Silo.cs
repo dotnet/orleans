@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Hosting;
@@ -89,6 +90,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
 
+        private readonly ILoggerFactory loggerFactory;
         /// <summary>
         /// Gets the type of this 
         /// </summary>
@@ -175,8 +177,19 @@ namespace Orleans.Runtime
             }
 
             var localEndpoint = this.initializationParams.SiloAddress.Endpoint;
-            LogManager.MyIPEndPoint = localEndpoint;
-            logger = LogManager.GetLogger("Silo", LoggerType.Runtime);
+            // Configure DI using Startup type
+            if (services == null)
+            {
+                var serviceCollection = new ServiceCollection();
+                serviceCollection.AddSingleton<Silo>(this);
+                serviceCollection.AddSingleton(initializationParams);
+                DefaultSiloServices.AddDefaultServices(serviceCollection);
+                services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
+            }
+
+            this.Services = services;
+            this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
+            logger = new LoggerWrapper<Silo>(this.loggerFactory);
 
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC)
@@ -190,19 +203,12 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
                 name, config.ToString(name));
 
-            // Configure DI using Startup type
-            if (services == null)
-            {
                 var serviceCollection = new ServiceCollection();
                 serviceCollection.AddSingleton<Silo>(this);
                 serviceCollection.AddSingleton(initializationParams);
                 DefaultSiloServices.AddDefaultServices(serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-            }
-
-            this.Services = services;
-
             this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
@@ -263,9 +269,9 @@ namespace Orleans.Runtime
 
             // Now the incoming message agents
             var messageFactory = this.Services.GetRequiredService<MessageFactory>();
-            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
-            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
-            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory);
+            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
+            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
+            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
 

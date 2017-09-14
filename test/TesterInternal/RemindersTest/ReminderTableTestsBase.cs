@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -26,9 +27,7 @@ namespace UnitTests.RemindersTest
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture)
         {
             this.ClusterFixture = clusterFixture;
-            LogManager.Initialize(new NodeConfiguration());
-            
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            logger = new LoggerWrapper<MembershipTableTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
 

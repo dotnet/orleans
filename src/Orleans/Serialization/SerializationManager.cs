@@ -14,6 +14,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -71,7 +72,7 @@ namespace Orleans.Serialization
         private ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private readonly IExternalSerializer fallbackSerializer;
-        private LoggerImpl logger;
+        private Logger logger;
         private bool IsBuiltInSerializersRegistered;
         private readonly object registerBuiltInSerializerLockObj = new object();
         internal int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
@@ -130,7 +131,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
         
-        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ITraceConfiguration traceConfig)
+        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ITraceConfiguration traceConfig, ILoggerFactory loggerFactory)
         {
             var serializationProviders = config.SerializationProviders;
             var fallbackType = config.FallbackSerializationProvider;
@@ -138,6 +139,7 @@ namespace Orleans.Serialization
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
+            logger = new LoggerWrapper<SerializationManager>(loggerFactory);
             this.serviceProvider = serviceProvider;
             RegisterBuiltInSerializers();
             fallbackSerializer = GetFallbackSerializer(serviceProvider, fallbackType);
@@ -199,7 +201,6 @@ namespace Orleans.Serialization
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
-            logger = LogManager.GetLogger("SerializationManager", LoggerType.Runtime);
 
             // Built-in handlers: Tuples
             Register(typeof(Tuple<>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
@@ -2142,7 +2143,7 @@ namespace Orleans.Serialization
             }
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
-            logger.LogWithoutBulkingAndTruncating(Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+            logger.Verbose(ErrorCode.SerMgr_ArtifactReport, report);
         }
 
         /// <summary>

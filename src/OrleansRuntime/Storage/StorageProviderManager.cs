@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
@@ -13,12 +14,12 @@ namespace Orleans.Runtime.Storage
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
 
-        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime, LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
             this.providerRuntime = providerRuntime;
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
-            storageProviderLoader = new ProviderLoader<IStorageProvider>(loadedProviderTypeLoaders);
+            storageProviderLoader = new ProviderLoader<IStorageProvider>(loadedProviderTypeLoaders, loggerFactory);
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)

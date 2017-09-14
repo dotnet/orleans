@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
@@ -13,7 +14,8 @@ namespace Orleans.Runtime.Counters
         internal IMessageCenter MessageCenter { get; set; }
         internal ISiloMetricsDataPublisher MetricsDataPublisher { get; set; }
         internal NodeConfiguration NodeConfig { get; set; }
-        
+
+        private readonly ILoggerFactory loggerFactory;
         private TimeSpan reportFrequency;
         private bool overloadLatched;
         private bool overloadValue;
@@ -22,8 +24,9 @@ namespace Orleans.Runtime.Counters
         private static readonly Logger logger = LogManager.GetLogger("SiloPerformanceMetrics", LoggerType.Runtime);
         private float? cpuUsageLatch;
 
-        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, NodeConfiguration cfg = null)
+        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
         {
+            this.loggerFactory = loggerFactory;
             runtimeStats = runtime;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
@@ -156,7 +159,7 @@ namespace Orleans.Runtime.Counters
                         tableReportTimer.Dispose();
                     }
                     // Start a new fresh timer. 
-                    tableReportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency);
+                    tableReportTimer = new AsyncTaskSafeTimer(this.loggerFactory, Reporter, null, reportFrequency, reportFrequency);
                 }
             }
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.MultiClusterNetwork
@@ -29,10 +30,11 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
-
-        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory)
+        private readonly ILoggerFactory loggerFactory;
+        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
             : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress)
         {
+            this.loggerFactory = loggerFactory;
             this.channelFactory = channelFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
@@ -180,6 +182,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             timer = GrainTimer.FromTimerCallback(
                 this.RuntimeClient.Scheduler,
+                this.loggerFactory,
                 this.OnGossipTimerTick,
                 null,
                 this.backgroundGossipInterval,

@@ -1,5 +1,6 @@
 
 using System;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using Orleans.Transactions;
@@ -9,12 +10,12 @@ namespace Orleans.Runtime
     internal class MessageFactory
     {
         private readonly SerializationManager serializationManager;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
-        public MessageFactory(SerializationManager serializationManager)
+        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger)
         {
             this.serializationManager = serializationManager;
-            this.logger = LogManager.GetLogger(nameof(MessageFactory), LoggerType.Runtime);
+            this.logger = logger;
         }
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
@@ -106,7 +107,7 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
-            if (this.logger.IsVerbose) this.logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }
     }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -32,19 +33,21 @@ namespace Orleans.Runtime.Messaging
         private readonly object lockable;
         private readonly SerializationManager serializationManager;
 
-        private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
-        
+        private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
         
-        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, GlobalConfiguration globalConfig)
+        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, GlobalConfiguration globalConfig, ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
+            this.logger = new LoggerWrapper("Orleans.Messaging.Gateway", this.loggerFactory);
             this.serializationManager = serializationManager;
             acceptor = new GatewayAcceptor(msgCtr, this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
-            dropper = new GatewayClientCleanupAgent(this);
+            dropper = new GatewayClientCleanupAgent(this, loggerFactory);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
@@ -62,7 +65,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<GatewaySender>(() =>
                 {
-                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory, this.serializationManager);
+                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory, this.serializationManager, this.loggerFactory);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -282,7 +285,8 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Gateway gateway;
 
-            internal GatewayClientCleanupAgent(Gateway gateway)
+            internal GatewayClientCleanupAgent(Gateway gateway, ILoggerFactory loggerFactory)
+                :base(loggerFactory)
             {
                 this.gateway = gateway;
             }
@@ -358,9 +362,8 @@ namespace Orleans.Runtime.Messaging
             private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
             private readonly SerializationManager serializationManager;
-            
-            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager)
-                : base(name, gateway.MessagingConfiguration)
+            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+                : base(name, gateway.MessagingConfiguration, loggerFactory)
             {
                 this.gateway = gateway;
                 this.messageFactory = messageFactory;
@@ -478,9 +481,9 @@ namespace Orleans.Runtime.Messaging
                     data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
                     if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
                     {
-                        logger.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                        Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
                             headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
-                        if (logger.IsVerbose3) logger.Verbose3("Sending large message {0}", msg.ToLongString());
+                        if (Log.IsVerbose3) Log.Verbose3("Sending large message {0}", msg.ToLongString());
                     }
                 }
                 catch (Exception exc)

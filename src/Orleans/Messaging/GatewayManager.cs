@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -29,12 +30,12 @@ namespace Orleans.Messaging
         private readonly ClientConfiguration config;
         private bool gatewayRefreshCallInitiated;
 
-        public GatewayManager(ClientConfiguration cfg, IGatewayListProvider gatewayListProvider)
+        public GatewayManager(ClientConfiguration cfg, IGatewayListProvider gatewayListProvider, ILoggerFactory loggerFactory)
         {
             config = cfg;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
-            logger = LogManager.GetLogger("Messaging.GatewayManager", LoggerType.Runtime);
+            logger = new LoggerWrapper("Messaging.GatewayManager", loggerFactory);
             lockable = new object();
             gatewayRefreshCallInitiated = false;
 

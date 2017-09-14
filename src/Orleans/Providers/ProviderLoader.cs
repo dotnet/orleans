@@ -7,6 +7,7 @@ using System.Xml;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -34,11 +35,13 @@ namespace Orleans.Providers
     {
         private readonly Dictionary<string, TProvider> providers;
         private IDictionary<string, IProviderConfiguration> providerConfigs;
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly LoadedProviderTypeLoaders loadedProviderTypeLoaders;
-        public ProviderLoader(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public ProviderLoader(LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger("ProviderLoader/" + typeof(TProvider).Name, LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<ProviderLoader<TProvider>>();
+            this.loggerFactory = loggerFactory;
             providers = new Dictionary<string, TProvider>();
             this.loadedProviderTypeLoaders = loadedProviderTypeLoaders;
         }
@@ -53,7 +56,7 @@ namespace Orleans.Providers
             }
 
             // Load providers
-            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType, this.loadedProviderTypeLoaders);
+            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType, this.loadedProviderTypeLoaders, this.loggerFactory);
 
             ValidateProviders();
         }
@@ -87,7 +90,7 @@ namespace Orleans.Providers
                 ProviderConfiguration fullConfig = (ProviderConfiguration) providerConfig;
                 if (providers.TryGetValue(providerConfig.Name, out provider))
                 {
-                    logger.Verbose(ErrorCode.Provider_ProviderLoadedOk, 
+                    logger.Debug(ErrorCode.Provider_ProviderLoadedOk, 
                         "Provider of type {0} name {1} located ok.", 
                         fullConfig.Type, fullConfig.Name);
                     continue;

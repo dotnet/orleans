@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -119,7 +120,7 @@ namespace UnitTests.StreamingTests
         {
             return this.producer.ProducePeriodicSeries(timerCallback =>
                     {
-                        return new AsyncTaskSafeTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                        return new AsyncTaskSafeTimer(NullLoggerFactory.Instance, timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
                     }, count);
         }
 

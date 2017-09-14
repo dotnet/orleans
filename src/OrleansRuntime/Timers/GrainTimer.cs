@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
-        private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, ILoggerFactory loggerFactory, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
             scheduler.CheckSchedulingContextValidity(ctxt);
@@ -33,7 +34,7 @@ namespace Orleans.Runtime
 
             this.Name = name;
             this.asyncCallback = asyncCallback;
-            timer = new AsyncTaskSafeTimer( 
+            timer = new AsyncTaskSafeTimer( loggerFactory, 
                 stateObj => TimerTick(stateObj, ctxt),
                 state);
             this.dueTime = dueTime;
@@ -44,6 +45,7 @@ namespace Orleans.Runtime
 
         internal static GrainTimer FromTimerCallback(
             OrleansTaskScheduler scheduler,
+            ILoggerFactory loggerFactory,
             TimerCallback callback,
             object state,
             TimeSpan dueTime,
@@ -53,6 +55,7 @@ namespace Orleans.Runtime
             return new GrainTimer(
                 scheduler,
                 null,
+                loggerFactory, 
                 ob =>
                 {
                     if (callback != null)

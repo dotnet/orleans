@@ -6,6 +6,99 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
+    internal class LoggerWrapper<T> : Logger
+    {
+        private readonly LoggerWrapper logger;
+        public LoggerWrapper(ILoggerFactory loggerFactory)
+        {
+            logger = new LoggerWrapper(typeof(T).FullName, loggerFactory);
+        }
+
+        public override Severity SeverityLevel => this.logger.SeverityLevel;
+
+        public override string Name => this.logger.Name;
+
+        public override Logger GetLogger(string loggerName)
+        {
+            return this.logger.GetLogger(loggerName);
+        }
+
+        public override void Log(int errorCode, Severity sev, string format, object[] args, Exception exception)
+        {
+            this.logger.Log(errorCode, sev, format, args, exception);
+        }
+
+        //TODO: delete those APM methods after Julian's PR. 
+        public override void DecrementMetric(string name)
+        {
+            this.logger.DecrementMetric(name);
+        }
+
+        public override void DecrementMetric(string name, double value)
+        {
+            this.logger.DecrementMetric(name, value);
+        }
+
+        public override void IncrementMetric(string name)
+        {
+            this.logger.IncrementMetric(name);
+        }
+
+        public override void IncrementMetric(string name, double value)
+        {
+            this.logger.IncrementMetric(name, value);
+        }
+        public override void TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
+        {
+            this.logger.TrackDependency(name, commandName, startTime, duration, success);
+        }
+
+        public override void TrackEvent(string name, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            this.logger.TrackEvent(name, properties, metrics);
+        }
+
+        public override void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            this.logger.TrackException(exception, properties, metrics);
+        }
+
+        public override void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
+        {
+            this.logger.TrackMetric(name, value, properties);
+        }
+
+        public override void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
+        {
+           this.logger.TrackMetric(name, value, properties);
+        }
+
+        public override void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
+        {
+            this.logger.TrackRequest(name, startTime, duration, responseCode, success);
+        }
+
+        public override void TrackTrace(string message)
+        {
+            this.logger.TrackTrace(message);
+        }
+
+        public override void TrackTrace(string message, Severity severityLevel)
+        {
+            this.logger.TrackTrace(message, severityLevel);
+        }
+
+        public override void TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties)
+        {
+            this.logger.TrackTrace(message, severityLevel, properties);
+        }
+
+        public override void TrackTrace(string message, IDictionary<string, string> properties)
+        {
+            this.logger.TrackTrace(message, properties);
+        }
+    }
+
     //TODO: Mark it as [Obsolete] after all runtime has migrated
     internal class LoggerWrapper : Logger
     {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
@@ -37,10 +38,11 @@ namespace Orleans.Runtime.MembershipService
         public string SiloName { get { return membershipOracleData.SiloName; } }
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
-
-        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory)
+        private readonly ILoggerFactory loggerFactory;
+        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, siloDetails.SiloAddress)
         {
+            this.loggerFactory = loggerFactory;
             this.membershipTableFactory = membershipTableFactory;
             this.grainFactory = grainFactory;
             logger = LogManager.GetLogger("MembershipOracle");
@@ -151,6 +153,7 @@ namespace Orleans.Runtime.MembershipService
 
                     timerGetTableUpdates = GrainTimer.FromTimerCallback(
                         this.RuntimeClient.Scheduler,
+                        this.loggerFactory,
                         OnGetTableUpdateTimer,
                         null,
                         randomTableOffset,
@@ -164,6 +167,7 @@ namespace Orleans.Runtime.MembershipService
 
                     timerProbeOtherSilos = GrainTimer.FromTimerCallback(
                         this.RuntimeClient.Scheduler,
+                        this.loggerFactory,
                         OnProbeOtherSilosTimer,
                         null,
                         randomProbeOffset,
@@ -194,6 +198,7 @@ namespace Orleans.Runtime.MembershipService
 
             timerIAmAliveUpdateInTable = GrainTimer.FromTimerCallback(
                 this.RuntimeClient.Scheduler,
+                this.loggerFactory,
                 OnIAmAliveUpdateInTableTimer,
                 null,
                 TimeSpan.Zero,

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -11,13 +12,14 @@ namespace Orleans.Runtime
     {
         private readonly LRU<IPEndPoint, Socket> cache;
         private TimeSpan connectionTimeout;
-
+        private ILogger logger;
         private const int MAX_SOCKETS = 200;
 
-        internal SocketManager(IMessagingConfiguration config)
+        internal SocketManager(IMessagingConfiguration config, ILoggerFactory loggerFactory)
         {
             connectionTimeout = config.OpenConnectionTimeout;
             cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
+            this.logger = loggerFactory.CreateLogger<SocketManager>();
             cache.RaiseFlushEvent += FlushHandler;
         }
 
@@ -124,7 +126,7 @@ namespace Orleans.Runtime
         // We start an asynch receive, with this callback, off of every send socket.
         // Since we should never see data coming in on these sockets, having the receive complete means that
         // the socket is in an unknown state and we should close it and try again.
-        private static void ReceiveCallback(object sender, SocketAsyncEventArgs socketAsyncEventArgs)
+        private void ReceiveCallback(object sender, SocketAsyncEventArgs socketAsyncEventArgs)
         {
             var t = socketAsyncEventArgs.UserToken as Tuple<Socket, IPEndPoint, SocketManager>;
             try
@@ -133,7 +135,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                LogManager.GetLogger("SocketManager", LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
+                this.logger.Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
             }
             finally
             {

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
@@ -10,11 +11,10 @@ namespace Orleans.Runtime
         private readonly PluginManager<IBootstrapProvider> pluginManager;
         private readonly string configCategoryName;
 
-        public BootstrapProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public BootstrapProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
-            var logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
-            pluginManager = new PluginManager<IBootstrapProvider>(logger, loadedProviderTypeLoaders);
+            pluginManager = new PluginManager<IBootstrapProvider>(loggerFactory, loadedProviderTypeLoaders);
         }
 
         public IProvider GetProvider(string name)
@@ -48,12 +48,12 @@ namespace Orleans.Runtime
         private class PluginManager<T> : IProviderManager where T : class, IProvider
         {
             private readonly ProviderLoader<T> providerLoader;
-            private readonly Logger logger;
+            private readonly ILogger logger;
 
-            internal PluginManager(Logger logger, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+            internal PluginManager(ILoggerFactory loggerFactory, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
             {
-                this.logger = logger;
-                this.providerLoader = new ProviderLoader<T>(loadedProviderTypeLoaders);
+                this.logger = loggerFactory.CreateLogger<PluginManager<T>>();
+                this.providerLoader = new ProviderLoader<T>(loadedProviderTypeLoaders, loggerFactory);
             }
 
             public IProvider GetProvider(string name)
