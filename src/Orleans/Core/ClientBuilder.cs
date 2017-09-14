@@ -32,7 +32,7 @@ namespace Orleans
             // Configure default services and build the container.
             this.serviceProviderBuilder.ConfigureServices(
                 services =>
-            {
+                {
                     services.TryAddSingleton(this.clientConfiguration ?? ClientConfiguration.StandardLoad());
                     services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
                     services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
@@ -78,7 +78,8 @@ namespace Orleans
 
         private static void AddDefaultServices(IServiceCollection services)
         {
-            services.AddSingleton<ITelemetryClient>(sp => TelemetryManager.FromConfiguration(sp.GetRequiredService<ClientConfiguration>().TelemetryConfiguration, sp));
+            services.TryAddSingleton<TelemetryManager>();
+            services.TryAddFromExisting<ITelemetryClient, TelemetryManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();

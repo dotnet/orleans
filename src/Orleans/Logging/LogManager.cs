@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Orleans.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -143,39 +144,55 @@ namespace Orleans.Runtime
                 Trace.Listeners.Add(new DefaultTraceListener());
                 */
 
-                // TODO: need to re-connect this to the logging abstractions!!
-                //if (config.TraceToConsole)
-                //{
-                //    if (!TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
-                //    {
-                //        TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
-                //    }
-                //}
-                //if (!string.IsNullOrEmpty(config.TraceFileName))
-                //{
-                //    try
-                //    {
-                //        if (!TelemetryConsumers.OfType<FileTelemetryConsumer>().Any())
-                //        {
-                //            TelemetryConsumers.Add(new FileTelemetryConsumer(config.TraceFileName));
-                //        }
-                //    }
-                //    catch (Exception exc)
-                //    {
-                //        Trace.Listeners.Add(new DefaultTraceListener());
-                //        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", config.TraceFileName, exc);
-                //    }
-                //}
-
-                //if (Trace.Listeners.Count > 0)
-                //{
-                //    if (!TelemetryConsumers.OfType<TraceTelemetryConsumer>().Any())
-                //    {
-                //        TelemetryConsumers.Add(new TraceTelemetryConsumer());
-                //    }
-                //}
+                InitializeLegacyTraceTelemetryConsumersConfiguration(config, LogConsumers.OfType<TelemetryManager>().FirstOrDefault() ?? new TelemetryManager());
 
                 IsInitialized = true;
+            }
+        }
+
+        /// <summary>
+        /// Forward traces to the telemetry abstractions based on the legacy configuration.
+        /// This functionality will be opt-in in the future, as we will not connect our tracing to the telemetry client by default.
+        /// </summary>
+        /// <param name="traceConfiguration">The legacy trace configuration.</param>
+        private static void InitializeLegacyTraceTelemetryConsumersConfiguration(ITraceConfiguration traceConfiguration, TelemetryManager telemetryManager)
+        {
+            if (traceConfiguration == null) return;
+
+            var newConsumers = new List<ITelemetryConsumer>();
+            if (traceConfiguration.TraceToConsole && !telemetryManager.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
+            {
+                newConsumers.Add(new ConsoleTelemetryConsumer());
+            }
+
+            if (!string.IsNullOrEmpty(traceConfiguration.TraceFileName))
+            {
+                try
+                {
+                    if (!telemetryManager.TelemetryConsumers.OfType<FileTelemetryConsumer>().Any())
+                    {
+                        newConsumers.Add(new FileTelemetryConsumer(traceConfiguration.TraceFileName));
+                    }
+                }
+                catch (Exception exc)
+                {
+                    Trace.Listeners.Add(new DefaultTraceListener());
+                    Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", traceConfiguration.TraceFileName, exc);
+                }
+            }
+
+            if (Trace.Listeners.Count > 0)
+            {
+                if (!telemetryManager.TelemetryConsumers.OfType<TraceTelemetryConsumer>().Any())
+                {
+                    newConsumers.Add(new TraceTelemetryConsumer());
+                }
+            }
+
+            if (newConsumers.Count > 0)
+            {
+                telemetryManager.AddConsumers(newConsumers);
+                LogConsumers.Add(new TelemetryLogConsumer(telemetryManager));
             }
         }
 
@@ -187,7 +204,12 @@ namespace Orleans.Runtime
             lock (lockable)
             {
                 Close();
+                var consumers = LogConsumers;
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
+                foreach (var manager in consumers.OfType<TelemetryManager>())
+                {
+                    manager.Dispose();
+                }
 
                 loggerStoreInternCache?.StopAndClear();
 

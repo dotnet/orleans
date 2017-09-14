@@ -10,36 +10,50 @@ namespace Orleans.Runtime
     {
         internal const string ObsoleteMessageTelemetry = "This method might be removed in the future in favor of a non Orleans-owned abstraction for APMs.";
 
-        private List<ITelemetryConsumer> consumers;
-        private List<IMetricTelemetryConsumer> metricTelemetryConsumers;
-        private List<ITraceTelemetryConsumer> traceTelemetryConsumers;
+        private List<ITelemetryConsumer> consumers = new List<ITelemetryConsumer>();
+        private List<IMetricTelemetryConsumer> metricTelemetryConsumers = new List<IMetricTelemetryConsumer>();
+        private List<ITraceTelemetryConsumer> traceTelemetryConsumers = new List<ITraceTelemetryConsumer>();
 
-        public TelemetryManager(IEnumerable<ITelemetryConsumer> consumers)
+        public IEnumerable<ITelemetryConsumer> TelemetryConsumers => this.consumers;
+
+        public void AddConsumers(IEnumerable<ITelemetryConsumer> newConsumers)
         {
-            this.consumers = consumers.ToList();
-            this.metricTelemetryConsumers = consumers.OfType<IMetricTelemetryConsumer>().ToList();
-            this.traceTelemetryConsumers = consumers.OfType<ITraceTelemetryConsumer>().ToList();
+            this.consumers = new List<ITelemetryConsumer>(this.consumers.Union(newConsumers));
+            this.metricTelemetryConsumers = this.consumers.OfType<IMetricTelemetryConsumer>().ToList();
+            this.traceTelemetryConsumers = this.consumers.OfType<ITraceTelemetryConsumer>().ToList();
         }
 
-        internal static TelemetryManager FromConfiguration(TelemetryConfiguration configuration, IServiceProvider serviceProvider)
+        public void AddFromConfiguration(IServiceProvider serviceProvider, TelemetryConfiguration configuration)
         {
-            var consumers = new List<ITelemetryConsumer>(configuration.Consumers.Count);
-            foreach (var consumerConfig in configuration.Consumers)
+            if (serviceProvider == null) throw new ArgumentNullException(nameof(serviceProvider));
+
+            if (configuration?.Consumers?.Count > 0)
             {
-                ITelemetryConsumer consumer = null;
-                if ((consumerConfig.Properties?.Count ?? 0) == 0)
+                var newConsumers = new List<ITelemetryConsumer>(configuration.Consumers.Count);
+                foreach (var consumerConfig in configuration.Consumers)
                 {
-                    // first check whether it is registered in the container already
-                    consumer = (ITelemetryConsumer)serviceProvider.GetService(consumerConfig.ConsumerType);
+                    var consumer = GetTelemetryConsumer(serviceProvider, consumerConfig.ConsumerType, consumerConfig.Properties);
+                    newConsumers.Add(consumer);
                 }
-                if (consumer == null)
-                {
-                    consumer = (ITelemetryConsumer)ActivatorUtilities.CreateInstance(serviceProvider, consumerConfig.ConsumerType, consumerConfig.Properties?.Values?.ToArray() ?? new object[0]);
-                }
-                consumers.Add(consumer);
+
+                this.AddConsumers(newConsumers);
+            }
+        }
+
+        private static ITelemetryConsumer GetTelemetryConsumer(IServiceProvider serviceProvider, Type consumerType, IReadOnlyDictionary<string, object> activationProperies)
+        {
+            ITelemetryConsumer consumer = null;
+            if ((activationProperies?.Count ?? 0) == 0)
+            {
+                // first check whether it is registered in the container already
+                consumer = (ITelemetryConsumer) serviceProvider.GetService(consumerType);
+            }
+            if (consumer == null)
+            {
+                consumer = (ITelemetryConsumer) ActivatorUtilities.CreateInstance(serviceProvider, consumerType, activationProperies?.Values?.ToArray() ?? new object[0]);
             }
 
-            return new TelemetryManager(consumers);
+            return consumer;
         }
 
         public void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
