@@ -2,17 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Providers;
 using Orleans.LogConsistency;
-using Orleans.Storage;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.LogConsistency
 {
-    internal class LogConsistencyProviderManager : ILogConsistencyProviderManager, ILogConsistencyProviderRuntime
+    internal class LogConsistencyProviderManager : ILogConsistencyProviderManager, ILogConsistencyProviderRuntime, IKeyedServiceCollection<string, ILogConsistencyProvider>
     {
         private ProviderLoader<ILogConsistencyProvider> providerLoader;
         private IProviderRuntime runtime;
@@ -72,6 +68,11 @@ namespace Orleans.Runtime.LogConsistency
 #pragma warning restore 618
         }
 
+        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension
+        {
+            return runtime.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+        }
+
         public Logger GetLogger(string loggerName)
         {
             return LogManager.GetLogger(loggerName, LoggerType.Provider);
@@ -107,5 +108,22 @@ namespace Orleans.Runtime.LogConsistency
             return providerLoader.GetProvider(name, true);
         }
 
+        public ILogConsistencyProvider GetService(IServiceProvider services, string key)
+        {
+            ILogConsistencyProvider provider;
+            return TryGetProvider(key, out provider) ? provider : default(ILogConsistencyProvider);
+        }
+
+        public ILogConsistencyProvider GetDefaultProvider()
+        {
+            try
+            {
+                return providerLoader.GetDefaultProvider(Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME);
+            } catch(InvalidOperationException)
+            {
+                // default ILogConsistencyProvider are optional, will fallback to grain specific if not configured.
+                return default(ILogConsistencyProvider);
+            }
+        }
     }
 }

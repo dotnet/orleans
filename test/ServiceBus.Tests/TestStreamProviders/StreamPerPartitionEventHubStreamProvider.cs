@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Text;
-
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
-
 using Microsoft.ServiceBus.Messaging;
-
 #endif
-
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -39,7 +35,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             {
                 var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), null, null);
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
-                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger, 
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger,
                     new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate, null, null), null, null);
             }
         }
@@ -66,7 +62,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
                 StreamSequenceToken token =
-#if NETSTANDARD
+#if !BUILD_FLAVOR_LEGACY
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 #else
                 new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);

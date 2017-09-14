@@ -7,11 +7,11 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    public class LifecycleObservable<TStage> : ILifecycleObservable<TStage>, ILifecycleObserver
+    public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
         private readonly Logger logger;
-        private TStage highStage;
+        private int highStage;
 
         public LifecycleObservable(Logger logger)
         {
@@ -23,13 +23,13 @@ namespace Orleans
         {
             try
             {
-                foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
+                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
                     if (ct.IsCancellationRequested)
                     {
-                        throw new OperationCanceledException();
+                        throw new OrleansLifecycleCanceledException("Lifecycle start canceled by request");
                     }
                     this.highStage = observerGroup.Key;
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
@@ -39,13 +39,13 @@ namespace Orleans
             {
                 string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
                 this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
-                throw new OperationCanceledException(error, ex);
+                throw new OrleansLifecycleCanceledException(error, ex);
             }
         }
 
         public async Task OnStop(CancellationToken ct)
         {
-            foreach (IGrouping<TStage, OrderedObserver> observerGroup in this.subscribers.Values
+            foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key)
                 // skip all until we hit the highest started stage
@@ -56,7 +56,7 @@ namespace Orleans
                 {
                     if (ct.IsCancellationRequested)
                     {
-                        throw new OperationCanceledException();
+                        throw new OrleansLifecycleCanceledException("Lifecycle stop canceled by request");
                     }
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                 }
@@ -67,7 +67,7 @@ namespace Orleans
             }
         }
 
-        public IDisposable Subscribe(TStage stage, ILifecycleObserver observer)
+        public IDisposable Subscribe(int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
 
@@ -78,8 +78,7 @@ namespace Orleans
 
         private void Remove(object key)
         {
-            OrderedObserver o;
-            this.subscribers.TryRemove(key, out o);
+            this.subscribers.TryRemove(key, out OrderedObserver o);
         }
 
         private static async Task WrapExecution(CancellationToken ct, Func<CancellationToken, Task> action)
@@ -105,9 +104,9 @@ namespace Orleans
         private class OrderedObserver
         {
             public ILifecycleObserver Observer { get; }
-            public TStage Stage { get; }
+            public int Stage { get; }
 
-            public OrderedObserver(TStage stage, ILifecycleObserver observer)
+            public OrderedObserver(int stage, ILifecycleObserver observer)
             {
                 Stage = stage;
                 Observer = observer;

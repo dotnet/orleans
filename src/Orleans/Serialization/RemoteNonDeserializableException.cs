@@ -51,7 +51,6 @@ namespace Orleans.Serialization
             return builder.ToString();
         }
         
-#if !NETSTANDARD
         public RemoteNonDeserializableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -67,6 +66,5 @@ namespace Orleans.Serialization
 
             base.GetObjectData(info, context);
         }
-#endif
     }
 }

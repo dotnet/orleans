@@ -177,7 +177,7 @@ namespace Orleans.Runtime
             ActivationAddress addr,
             string genericArguments,
             PlacementStrategy placedUsing,
-            MultiClusterRegistrationStrategy registrationStrategy,
+            IMultiClusterRegistrationStrategy registrationStrategy,
             IActivationCollector collector,
             TimeSpan ageLimit,
             NodeConfiguration nodeConfiguration,
@@ -312,8 +312,6 @@ namespace Orleans.Runtime
             var contextFactory = sp.GetRequiredService<GrainActivationContextFactory>();
             contextFactory.Context = context;
         }
-
-        public IStorageProvider StorageProvider { get; set; }
 
         private Streams.StreamDirectory streamDirectory;
         internal Streams.StreamDirectory GetStreamDirectory()
@@ -454,7 +452,7 @@ namespace Orleans.Runtime
 
         public PlacementStrategy PlacedUsing { get; private set; }
 
-        public MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
+        public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }

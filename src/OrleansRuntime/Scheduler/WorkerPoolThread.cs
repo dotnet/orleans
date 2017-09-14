@@ -177,7 +177,6 @@ namespace Orleans.Runtime.Scheduler
 #endif
                                 todo.Execute();
                             }
-#if !NETSTANDARD
                             catch (ThreadAbortException ex)
                             {
                                 // The current turn was aborted (indicated by the exception state being set to true).
@@ -187,7 +186,6 @@ namespace Orleans.Runtime.Scheduler
                                 else
                                     Log.Error(ErrorCode.Runtime_Error_100029, "Caught thread abort exception, allowing it to propagate outwards", ex);
                             }
-#endif
                             catch (Exception ex)
                             {
                                 var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", todo);
@@ -233,7 +231,6 @@ namespace Orleans.Runtime.Scheduler
                             noWorkCount++;
                         }
                     }
-#if !NETSTANDARD
                     catch (ThreadAbortException tae)
                     {
                         // Can be reported from RunQueue.Get when Silo is being shutdown, so downgrade to verbose log
@@ -241,7 +238,6 @@ namespace Orleans.Runtime.Scheduler
                         Thread.ResetAbort();
                         break;
                     }
-#endif
                     catch (Exception ex)
                     {
                         Log.Error(ErrorCode.Runtime_Error_100031, "Exception bubbled up to worker thread", ex);

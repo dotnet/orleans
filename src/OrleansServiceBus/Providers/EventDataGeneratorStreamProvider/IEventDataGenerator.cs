@@ -1,4 +1,4 @@
-﻿#if NETSTANDARD
+﻿#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -59,7 +59,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// </summary>
         IStreamIdentity StreamId { get; }
         /// <summary>
-        /// 
+        ///
         /// </summary>
         bool ShouldProduce { set; }
     }

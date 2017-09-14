@@ -17,6 +17,7 @@ namespace Orleans.Serialization
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
+        public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly JsonSerializerSettings settings;
         private Logger logger;
 
@@ -42,10 +43,8 @@ namespace Orleans.Serialization
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
                 TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
 
-#if !NETSTANDARD_TODO
                 // Types such as GrainReference need context during deserialization, so provide that context now.
                 Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
-#endif
                 Formatting = Formatting.None
             };
 
@@ -83,6 +82,15 @@ namespace Orleans.Serialization
                 if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
                 {
                     settings.Formatting = Formatting.Indented;
+                }
+            }
+
+            if (config.Properties.ContainsKey(TypeNameHandlingProperty))
+            {
+                TypeNameHandling typeNameHandling;
+                if (Enum.TryParse<TypeNameHandling>(config.Properties[TypeNameHandlingProperty], out typeNameHandling))
+                {
+                    settings.TypeNameHandling = typeNameHandling;
                 }
             }
             return settings;
@@ -164,7 +172,7 @@ namespace Orleans.Serialization
 
 #region JsonConverters
 
-    internal class IPAddressConverter : JsonConverter
+    public class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -184,7 +192,7 @@ namespace Orleans.Serialization
         }
     }
 
-    internal class GrainIdConverter : JsonConverter
+    public class GrainIdConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -208,7 +216,7 @@ namespace Orleans.Serialization
         }
     }
 
-    internal class SiloAddressConverter : JsonConverter
+    public class SiloAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -232,7 +240,7 @@ namespace Orleans.Serialization
         }
     }
 
-    internal class UniqueKeyConverter : JsonConverter
+    public class UniqueKeyConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -256,7 +264,7 @@ namespace Orleans.Serialization
         }
     }
 
-    internal class IPEndPointConverter : JsonConverter
+    public class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -283,7 +291,7 @@ namespace Orleans.Serialization
         }
     }
 
-    internal class GrainReferenceConverter : JsonConverter
+    public class GrainReferenceConverter : JsonConverter
     {
         private static readonly Type AddressableType = typeof(IAddressable);
         private readonly IGrainFactory grainFactory;

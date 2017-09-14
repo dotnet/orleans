@@ -614,7 +614,7 @@ namespace Orleans.Runtime.Configuration
         {
             var sb = new StringBuilder();
             sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
-#if !NETSTANDARD_TODO
+#if BUILD_FLAVOR_LEGACY
             // TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());

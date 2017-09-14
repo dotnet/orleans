@@ -50,9 +50,8 @@ namespace Orleans.Runtime
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
             Log = LogManager.GetLogger(Name, LoggerType.Runtime);
-#if !NETSTANDARD
+
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-#endif
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -120,9 +119,8 @@ namespace Orleans.Runtime
                         State = ThreadState.Stopped;
                     }
                 }
-#if !NETSTANDARD
+
                 AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
-#endif
             }
             catch (Exception exc)
             {
@@ -132,13 +130,11 @@ namespace Orleans.Runtime
             Log.Verbose("Stopped agent");
         }
 
-#if !NETSTANDARD
         public void Abort(object stateInfo)
         {
             if(t!=null)
                 t.Abort(stateInfo);
         }
-#endif
 
         public void Join(TimeSpan timeout)
         {

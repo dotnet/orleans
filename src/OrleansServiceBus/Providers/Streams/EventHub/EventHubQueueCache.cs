@@ -1,6 +1,5 @@
-﻿
-using System;
-#if NETSTANDARD
+﻿using System;
+#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
 #else
 using Microsoft.ServiceBus.Messaging;
@@ -47,8 +46,8 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="evictionStrategy">Eviction stretagy manage purge related events</param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
-        protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, 
-            ICacheDataComparer<TCachedMessage> comparer, Logger logger, IEvictionStrategy<TCachedMessage> evictionStrategy, 
+        protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter,
+            ICacheDataComparer<TCachedMessage> comparer, Logger logger, IEvictionStrategy<TCachedMessage> evictionStrategy,
             ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             this.defaultMaxAddCount = defaultMaxAddCount;
@@ -83,7 +82,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="lastItemPurged"></param>
         /// <returns></returns>
         protected abstract string GetOffset(TCachedMessage lastItemPurged);
-        
+
         /// <summary>
         /// cachePressureContribution should be a double between 0-1, indicating how much danger the item is of being removed from the cache.
         ///   0 indicating  no danger,
@@ -185,7 +184,7 @@ namespace Orleans.ServiceBus.Providers
     /// Message cache that stores EventData as a CachedEventHubMessage in a pooled message cache
     /// </summary>
     public class EventHubQueueCache : EventHubQueueCache<CachedEventHubMessage>
-    {    
+    {
         private readonly Logger log;
 
         /// <summary>
@@ -198,9 +197,9 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="serializationManager"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger, 
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger,
             SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
-            : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), EventHubDataComparer.Instance, logger, 
+            : this(checkpointer, new EventHubDataAdapter(serializationManager, bufferPool), EventHubDataComparer.Instance, logger,
                   new EventHubCacheEvictionStrategy(logger, timePurge, cacheMonitor, cacheMonitorWriteInterval), cacheMonitor, cacheMonitorWriteInterval)
         {
         }
@@ -215,8 +214,8 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="evictionStrategy">eviction strategy for the cache</param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, 
-            ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy, 
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
+            ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy,
             ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
             : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, cacheMonitor, cacheMonitorWriteInterval)
         {
@@ -234,8 +233,8 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="evictionStrategy">eviction strategy for the cache</param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
-        public EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, 
-            ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy, 
+        public EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
+            ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy,
             ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
             : base(defaultMaxAddCount, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, cacheMonitor, cacheMonitorWriteInterval)
         {
@@ -292,7 +291,7 @@ namespace Orleans.ServiceBus.Providers
             IEventHubPartitionLocation location = (IEventHubPartitionLocation) token;
             double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
             long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
-            // pressure is the ratio of the distance from the front of the cache to the 
+            // pressure is the ratio of the distance from the front of the cache to the
             cachePressureContribution = distanceFromNewestMessage/cacheSize;
 
             return true;

@@ -40,11 +40,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2ELegacyActivityId()
         {
-#if !NETSTANDARD
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
-#else
-            return Task.FromResult(Guid.Empty);
-#endif
         }
 
 #endregion

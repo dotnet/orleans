@@ -14,6 +14,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.Storage;
 
 namespace UnitTests.Grains
 {
@@ -83,7 +84,7 @@ namespace UnitTests.Grains
 
         public Task<string> CheckProviderType()
         {
-            var storageProvider = ((ActivationData) Data).StorageProvider;
+            IStorageProvider storageProvider = this.GetStorageProvider(this.ServiceProvider);
             Assert.NotNull(storageProvider);
             return Task.FromResult(storageProvider.GetType().FullName);
         }

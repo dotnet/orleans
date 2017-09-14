@@ -14,12 +14,10 @@ namespace Orleans.Streams
         public DataNotAvailableException(string message) : base(message) { }
         public DataNotAvailableException(string message, Exception inner) : base(message, inner) { }
 
-#if !NETSTANDARD
         public DataNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 
     [Serializable]
@@ -29,11 +27,9 @@ namespace Orleans.Streams
         public CacheFullException(string message) : base(message) { }
         public CacheFullException(string message, Exception inner) : base(message, inner) { }
 
-#if !NETSTANDARD
         public CacheFullException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
-#endif
     }
 }

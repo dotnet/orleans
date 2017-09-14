@@ -1,18 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Streams;
+using System.Diagnostics;
 
 namespace Orleans
 {
     /// <summary>
     /// The abstract base class for all grain classes.
     /// </summary>
-    public abstract class Grain : IAddressable
+    public abstract class Grain : IAddressable, ILifecycleParticipant<IGrainLifecycle>
     {
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
@@ -20,7 +22,7 @@ namespace Orleans
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
 
-        internal GrainReference GrainReference { get { return Data.GrainReference; } }
+        public GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; set; }
 
@@ -262,17 +264,20 @@ namespace Orleans
                 throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
             }
         }
+
+        public virtual void Participate(IGrainLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
+        }
     }
 
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStatefulGrain where TGrainState : new()
+    public class Grain<TGrainState> : Grain where TGrainState : new()
     {
-        private readonly GrainState<TGrainState> grainState;
-
-        private IStorage storage;
+        private IStorage<TGrainState> storage;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
@@ -280,7 +285,6 @@ namespace Orleans
         /// </summary>
         protected Grain()
         {
-            grainState = new GrainState<TGrainState>();
         }
 
         /// <summary>
@@ -288,10 +292,9 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, IStorage<TGrainState> storage)
             : base(identity, runtime)
         {
-            grainState = new GrainState<TGrainState>(state);
             this.storage = storage;
         }
 
@@ -300,18 +303,8 @@ namespace Orleans
         /// </summary>
         protected TGrainState State
         {
-            get { return grainState.State; }
-            set { grainState.State = value; }
-        }
-        
-        void IStatefulGrain.SetStorage(IStorage storage)
-        {
-            this.storage = storage;
-        }
-
-        IGrainState IStatefulGrain.GrainState
-        {
-            get { return grainState; }
+            get { return this.storage.State; }
+            set { this.storage.State = value; }
         }
 
         /// <summary>Clear the current grain state data from backing store.</summary>
@@ -331,6 +324,34 @@ namespace Orleans
         protected virtual Task ReadStateAsync()
         {
             return storage.ReadStateAsync();
+        }
+
+        public override void Participate(IGrainLifecycle lifecycle)
+        {
+            base.Participate(lifecycle);
+            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+        }
+
+        private async Task OnSetupState(CancellationToken ct)
+        {
+            if (ct.IsCancellationRequested)
+                return;
+            IStorageProvider storageProvider = this.GetStorageProvider(this.ServiceProvider);
+            string grainTypeName = this.GetType().FullName;
+            this.storage = new StateStorageBridge<TGrainState>(grainTypeName, this.GrainReference, storageProvider);
+            Stopwatch sw = Stopwatch.StartNew();
+            try
+            {
+                await this.ReadStateAsync();
+                sw.Stop();
+                StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
+            }
+            catch (Exception)
+            {
+                sw.Stop();
+                StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
+                throw;
+            }
         }
     }
 }

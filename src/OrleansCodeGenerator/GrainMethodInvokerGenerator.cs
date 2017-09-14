@@ -58,9 +58,7 @@ namespace Orleans.CodeGenerator
                     .AddArgumentListArguments(
                         SF.AttributeArgument(grainTypeArgument),
                         SF.AttributeArgument(interfaceIdArgument)),
-#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
-#endif
             };
 
             var members = new List<MemberDeclarationSyntax>(GenerateGenericInvokerFields(grainType))

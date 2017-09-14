@@ -390,13 +390,12 @@ namespace Orleans.Runtime
         {
             var grainType = typeof(Grain);
             var grainChevronType = typeof(Grain<>);
-#if !NETSTANDARD
+
             if (type.Assembly.ReflectionOnly)
             {
                 grainType = ToReflectionOnlyType(grainType);
                 grainChevronType = ToReflectionOnlyType(grainChevronType);
             }
-#endif
 
             if (grainType == type || grainChevronType == type) return false;
 
@@ -494,12 +493,12 @@ namespace Orleans.Runtime
         public static bool IsGrainMethodInvokerType(Type type)
         {
             var generalType = typeof(IGrainMethodInvoker);
-#if !NETSTANDARD
+
             if (type.Assembly.ReflectionOnly)
             {
                 generalType = ToReflectionOnlyType(generalType);
             }
-#endif
+
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
 
@@ -512,7 +511,27 @@ namespace Orleans.Runtime
         {
             return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
         }
-#if !NETSTANDARD
+
+        private static Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
+        {
+            try
+            {
+                CachedReflectionOnlyTypeResolver.Instance.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
+                return true;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return false;
+            }
+            catch (Exception)
+            {
+                // if other exceptions not related to platform ocurr, assume that ReflectionOnly is supported
+                return true;
+            }
+        });
+
+        public static bool CanUseReflectionOnly => canUseReflectionOnly.Value;
+
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
         {
             return CachedReflectionOnlyTypeResolver.Instance.ResolveType(assemblyQualifiedName);
@@ -520,9 +539,16 @@ namespace Orleans.Runtime
 
         public static Type ToReflectionOnlyType(Type type)
         {
-            return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+            if (CanUseReflectionOnly)
+            {
+                return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
+            }
+            else
+            {
+                return type;
+            }
         }
-#endif
+
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
         {
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
@@ -587,7 +613,6 @@ namespace Orleans.Runtime
 
         public static bool TypeHasAttribute(Type type, Type attribType)
         {
-#if !NETSTANDARD
             if (type.Assembly.ReflectionOnly || attribType.Assembly.ReflectionOnly)
             {
                 type = ToReflectionOnlyType(type);
@@ -597,7 +622,6 @@ namespace Orleans.Runtime
                 return CustomAttributeData.GetCustomAttributes(type).Any(
                         attrib => attribType.IsAssignableFrom(attrib.AttributeType));
             }
-#endif
 
             return TypeHasAttribute(type.GetTypeInfo(), attribType);
         }
@@ -1028,44 +1052,12 @@ namespace Orleans.Runtime
         /// <returns>A constructor that matches the signature or <see langword="null"/>.</returns>
         public static ConstructorInfo GetConstructorThatMatches(Type type, Type[] constructorArguments)
         {
-#if NETSTANDARD
-            var candidates = type.GetTypeInfo().GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            foreach (ConstructorInfo candidate in candidates)
-            {
-                if (ConstructorMatches(candidate, constructorArguments))
-                {
-                    return candidate;
-                }
-            }
-
-            return null;
-#else
             var constructorInfo = type.GetConstructor(
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 null,
                 constructorArguments,
                 null);
             return constructorInfo;
-#endif
-        }
-
-        private static bool ConstructorMatches(ConstructorInfo candidate, Type[] constructorArguments)
-        {
-            ParameterInfo[] parameters = candidate.GetParameters();
-            if (parameters.Length == constructorArguments.Length)
-            {
-                for (int i = 0; i < constructorArguments.Length; i++)
-                {
-                    if (parameters[i].ParameterType != constructorArguments[i])
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            return false;
         }
 
         /// <summary>

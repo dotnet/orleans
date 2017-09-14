@@ -98,18 +98,11 @@ namespace Orleans.TestingHost.Utils
         {
             IFormatter formatter = new BinaryFormatter();
             MemoryStream stream = new MemoryStream(new byte[100000], true);
-#if !NETSTANDARD_TODO
             formatter.Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager));
-#endif
             formatter.Serialize(stream, input);
             stream.Position = 0;
             T output = (T)formatter.Deserialize(stream);
 
-#if NETSTANDARD_TODO
-                // On .NET Standard, currently we need to manually fixup grain references.
-                var outputAsGrainRef = output as Orleans.Runtime.GrainReference;
-                if (outputAsGrainRef != null) grainFactory.BindGrainReference(outputAsGrainRef);
-#endif
             return output;
         }
     }

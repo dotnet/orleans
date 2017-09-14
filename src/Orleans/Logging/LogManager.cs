@@ -426,9 +426,7 @@ namespace Orleans.Runtime
             const string dateFormat = "yyyy-MM-dd-HH-mm-ss-fffZ"; // Example: 2010-09-02-09-50-43-341Z
 
             var thisAssembly = Assembly.GetEntryAssembly()
-#if !NETSTANDARD
                 ?? Assembly.GetCallingAssembly()
-#endif
                 ?? typeof(LogManager)
                 .GetTypeInfo().Assembly;
 
@@ -456,11 +454,7 @@ namespace Orleans.Runtime
 
         private static IntPtr GetProcessHandle(Process process)
         {
-#if NETSTANDARD
-            return process.SafeHandle.DangerousGetHandle();
-#else
             return process.Handle;
-#endif
         }
 
         /// <summary>

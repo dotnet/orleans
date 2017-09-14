@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -279,11 +278,7 @@ namespace Orleans.Runtime
                 uint n;
                 if (HasKeyExt && KeyExt != null)
                 {
-                    var writer = new BinaryTokenStreamWriter();
-                    writer.Write(this);
-                    byte[] bytes = writer.ToByteArray();
-                    writer.ReleaseBuffers();
-                    n = JenkinsHash.ComputeHash(bytes);
+                    n = JenkinsHash.ComputeHash(this.ToByteArray());
                 }
                 else
                 {
@@ -295,6 +290,49 @@ namespace Orleans.Runtime
             }
             return uniformHashCache;
             // ReSharper restore NonReadonlyFieldInGetHashCode
+        }
+
+        internal byte[] ToByteArray()
+        {
+            byte[] bytes, extBytes = null;
+            var tmpArray = new ulong[1];
+            var offset = 0;
+            if (this.KeyExt != null)
+            {
+                extBytes = Encoding.UTF8.GetBytes(KeyExt);
+                // N0 + N1 + TypeCodeData + length(KeyExt in bytes) + KeyExt in bytes
+                bytes = new byte[sizeof(ulong) * 3 + sizeof(int) + extBytes.Length];
+            }
+            else
+            {
+                // N0 + N1 + TypeCodeData + length(-1)
+                bytes = new byte[sizeof(ulong) * 3 + sizeof(int)];
+            }
+            // Copy N0
+            tmpArray[0] = this.N0;
+            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
+            offset += sizeof(ulong);
+            // Copy N1
+            tmpArray[0] = this.N1;
+            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
+            offset += sizeof(ulong);
+            // Copy TypeCodeData
+            tmpArray[0] = this.TypeCodeData;
+            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
+            offset += sizeof(ulong);
+            // Copy KeyExt
+            if (extBytes != null)
+            {
+                Buffer.BlockCopy(new[] {extBytes.Length}, 0, bytes, offset, sizeof(int));
+                offset += sizeof(int);
+                Buffer.BlockCopy(extBytes, 0, bytes, offset, extBytes.Length);
+            }
+            else
+            {
+                Buffer.BlockCopy(new[] {-1}, 0, bytes, offset, sizeof(int));
+            }
+
+            return bytes;
         }
 
         private Guid ConvertToGuid()

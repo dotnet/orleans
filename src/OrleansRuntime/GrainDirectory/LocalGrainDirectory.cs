@@ -11,9 +11,7 @@ using Orleans.Runtime.MultiClusterNetwork;
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class LocalGrainDirectory :
-#if !NETSTANDARD
         MarshalByRefObject,
-#endif
         ILocalGrainDirectory, ISiloStatusListener
     {
         /// <summary>

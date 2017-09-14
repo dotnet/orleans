@@ -48,7 +48,7 @@ namespace Orleans.Runtime
                 StorageWriteLatency.AddSample(latency);
             }
         }
-        internal static void OnStorageActivate(IStorageProvider storage, string grainType, GrainReference grain, TimeSpan latency)
+        internal static void OnStorageActivate(string grainType, TimeSpan latency)
         {
             StorageActivateTotal.Increment();
             if (latency > TimeSpan.Zero)
@@ -64,7 +64,7 @@ namespace Orleans.Runtime
         {
             StorageWriteErrors.Increment();
         }
-        internal static void OnStorageActivateError(IStorageProvider storage, string grainType, GrainReference grain)
+        internal static void OnStorageActivateError(string grainType)
         {
             StorageActivateErrors.Increment();
         }

@@ -11,17 +11,9 @@
 
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <Compile Remove="CounterControlProgTests.cs" />
-    <Compile Remove="GeoClusterTests\*.cs" />
-    <Compile Remove="OrleansHostProgTests.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.ServiceModel" />
-    <Reference Include="System.Web.Extensions" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
+  <ItemGroup>
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.Web.Extensions" />

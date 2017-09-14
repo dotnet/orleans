@@ -124,9 +124,7 @@ namespace Tester
 
         public static void ClearActivityId()
         {
-#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = Guid.Empty;
-#endif
             RequestContext.ActivityId = Guid.Empty;
         }
     }

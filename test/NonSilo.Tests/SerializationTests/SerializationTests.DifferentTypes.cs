@@ -120,8 +120,6 @@ namespace UnitTests.Serialization
             }
         }
 
-#if !NETSTANDARD_TODO
-
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_RecursiveSerialization()
         {
@@ -133,8 +131,6 @@ namespace UnitTests.Serialization
 
             TestTypeA output2 = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
         }
-
-#endif
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_CultureInfo()

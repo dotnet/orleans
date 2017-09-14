@@ -19,8 +19,6 @@ namespace Orleans.Streams
         internal FaultedSubscriptionException(GuidId subscriptionId, StreamId streamId)
             : base(string.Format(ErrorStringFormat, subscriptionId.Guid, streamId)) { }
         public FaultedSubscriptionException(string message, Exception innerException) : base(message, innerException) { }
-#if !NETSTANDARD
         public FaultedSubscriptionException(SerializationInfo info, StreamingContext context) : base(info, context) { }
-#endif
     }
 }

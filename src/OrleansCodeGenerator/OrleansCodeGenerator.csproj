@@ -20,10 +20,6 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <PackageReference Include="System.Reflection" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />

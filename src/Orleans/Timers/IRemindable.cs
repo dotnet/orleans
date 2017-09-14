@@ -82,12 +82,10 @@ namespace Orleans
         {
             public ReminderException(string msg) : base(msg) { }
 
-#if !NETSTANDARD
             public ReminderException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {
             }
-#endif
         }
 
         #endregion

@@ -18,7 +18,6 @@ namespace UnitTests.OrleansRuntime
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
-#if !NETSTANDARD
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_DotNet()
         {
@@ -31,7 +30,6 @@ namespace UnitTests.OrleansRuntime
             Assert.Equal(original.NonExistentActivation, output.NonExistentActivation);
             Assert.Equal(original.IsStatelessWorker, output.IsStatelessWorker);
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_Orleans()

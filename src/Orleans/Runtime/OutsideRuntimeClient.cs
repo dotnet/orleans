@@ -205,7 +205,6 @@ namespace Orleans
 
         private void LoadAdditionalAssemblies()
         {
-#if !NETSTANDARD_TODO
             var logger = LogManager.GetLogger("AssemblyLoader.Client", LoggerType.Runtime);
 
             var directories =
@@ -230,7 +229,6 @@ namespace Orleans
 
             this.assemblyProcessor.Initialize();
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
-#endif
         }
 
         private void UnhandledException(ISchedulingContext context, Exception exception)
@@ -268,13 +266,16 @@ namespace Orleans
             Task.Run(
                 () =>
                 {
-                    try
+                    while (listenForMessages && !ct.IsCancellationRequested)
                     {
-                        RunClientMessagePump(ct);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                        try
+                        {
+                            RunClientMessagePump(ct);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                        }
                     }
                 },
                 ct).Ignore();
@@ -846,11 +847,7 @@ namespace Orleans
 
         private string PrintAppDomainDetails()
         {
-#if NETSTANDARD_TODO
-            return "N/A";
-#else
             return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
-#endif
         }
 
         private class LocalObjectData

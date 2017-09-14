@@ -1,11 +1,11 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Xunit;
+using Orleans.Runtime;
 
 namespace Tester
 {
@@ -113,7 +113,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task MultiStageObserverLifecycleTest()
         {
-            var lifecycle = new LifecycleObservable<TestStages>(null);
+            var lifecycle = new LifecycleObservable(null);
             var multiStageObserver = new MultiStageObserver();
             multiStageObserver.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -128,7 +128,7 @@ namespace Tester
         {
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
-            var lifecycle = new LifecycleObservable<TestStages>(null);
+            var lifecycle = new LifecycleObservable(null);
             foreach (KeyValuePair<TestStages, int> kvp in observerCountByStage)
             {
                 List<Observer> observers = Enumerable
@@ -136,13 +136,13 @@ namespace Tester
                     .Select(i => new Observer(failOnStart.HasValue && kvp.Key == failOnStart, failOnStop.HasValue && kvp.Key == failOnStop))
                     .ToList();
                 observersByStage[kvp.Key] = observers;
-                observers.ForEach(o => lifecycle.Subscribe(kvp.Key, o));
+                observers.ForEach(o => lifecycle.Subscribe((int)kvp.Key, o));
             }
 
             // run lifecycle
             if (failOnStart.HasValue)
             {
-                await Assert.ThrowsAsync<OperationCanceledException>(() => lifecycle.OnStart());
+                await Assert.ThrowsAsync<OrleansLifecycleCanceledException>(() => lifecycle.OnStart());
             }
             else
             {
@@ -198,7 +198,7 @@ namespace Tester
         /// <summary>
         /// Single component which takes action at multiple stages of the lifecycle (most common expected pattern)
         /// </summary>
-        private class MultiStageObserver : ILifecycleParticipant<TestStages>
+        private class MultiStageObserver : ILifecycleParticipant<ILifecycleObservable>
         {
             public Dictionary<TestStages,bool> Started { get; } = new Dictionary<TestStages, bool>(); 
             public Dictionary<TestStages, bool> Stopped { get; } = new Dictionary<TestStages, bool>();
@@ -216,14 +216,13 @@ namespace Tester
                 return Task.CompletedTask;
             }
 
-            public void Participate(ILifecycleObservable<TestStages> lifecycle)
+            public void Participate(ILifecycleObservable lifecycle)
             {
-                lifecycle.Subscribe(TestStages.Down, ct => OnStartStage(TestStages.Down), ct => OnStopStage(TestStages.Down));
-                lifecycle.Subscribe(TestStages.Initialize, ct => OnStartStage(TestStages.Initialize), ct => OnStopStage(TestStages.Initialize));
-                lifecycle.Subscribe(TestStages.Configure, ct => OnStartStage(TestStages.Configure), ct => OnStopStage(TestStages.Configure));
-                lifecycle.Subscribe(TestStages.Run, ct => OnStartStage(TestStages.Run), ct => OnStopStage(TestStages.Run));
+                lifecycle.Subscribe((int)TestStages.Down, ct => OnStartStage(TestStages.Down), ct => OnStopStage(TestStages.Down));
+                lifecycle.Subscribe((int)TestStages.Initialize, ct => OnStartStage(TestStages.Initialize), ct => OnStopStage(TestStages.Initialize));
+                lifecycle.Subscribe((int)TestStages.Configure, ct => OnStartStage(TestStages.Configure), ct => OnStopStage(TestStages.Configure));
+                lifecycle.Subscribe((int)TestStages.Run, ct => OnStartStage(TestStages.Run), ct => OnStopStage(TestStages.Run));
             }
         }
-
     }
 }

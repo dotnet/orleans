@@ -4,9 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-#if NETSTANDARD
-using System.Reflection;
-#endif
 using System.Runtime;
 using System.Text;
 using System.Threading;
@@ -33,6 +30,7 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 
@@ -341,6 +339,13 @@ namespace Orleans.Runtime
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
 
+            var transactionAgent = this.Services.GetRequiredService<ITransactionAgent>() as SystemTarget;
+            if (transactionAgent != null)
+            {
+                logger.Verbose("Creating {0} System Target", "TransactionAgent");
+                RegisterSystemTarget(transactionAgent);
+            }
+
             logger.Verbose("Finished creating System Targets for this silo.");
         }
 
@@ -466,8 +471,13 @@ namespace Orleans.Runtime
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
+
+            ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
+            ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
+            scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
+                        .WaitWithThrow(initTimeout);
+
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
@@ -478,7 +488,6 @@ namespace Orleans.Runtime
                 () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            catalog.SetLogConsistencyManager(logConsistencyProviderManager);
             if (logger.IsVerbose) { logger.Verbose("Log consistency provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
@@ -624,7 +633,6 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
-#if !NETSTANDARD_TODO
             if (LocalConfig.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
@@ -660,7 +668,6 @@ namespace Orleans.Runtime
             ServicePointManager.Expect100Continue = LocalConfig.Expect100Continue;
             ServicePointManager.DefaultConnectionLimit = LocalConfig.DefaultConnectionLimit;
             ServicePointManager.UseNagleAlgorithm = LocalConfig.UseNagleAlgorithm;
-#endif
         }
 
         /// <summary>

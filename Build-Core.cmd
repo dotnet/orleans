@@ -2,11 +2,43 @@
 setlocal
 
 SET CMDHOME=%~dp0.
-SET BUILD_FLAGS=/m:1 /v:m
+if "%BUILD_FLAGS%"=="" SET BUILD_FLAGS=/m:1 /v:m
 
 :: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
 :: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
 set Platform=
+
+for /f "tokens=*" %%i in ('where dotnet.exe') do set INSTALLED_DOTNET_EXE=%%i
+
+if not exist "%INSTALLED_DOTNET_EXE%" goto :install-dotnet
+
+echo Found dotnet.exe at: "%INSTALLED_DOTNET_EXE%"
+
+for /f "tokens=*" %%i in ('"%INSTALLED_DOTNET_EXE%" --version') do set INSTALLED_DOTNET_VERSION=%%i
+
+if [%INSTALLED_DOTNET_VERSION%]==[] (
+  echo Cannot determine version of installed .Net Core
+  goto :install-dotnet
+)
+
+echo .Net Core version found: %INSTALLED_DOTNET_VERSION%
+
+set /p REQUIRED_DOTNET_VERSION=< "%~dp0DotnetCLIVersion.txt"
+
+echo .Net Core version required: %REQUIRED_DOTNET_VERSION%
+
+if [%REQUIRED_DOTNET_VERSION%] neq [%INSTALLED_DOTNET_VERSION%] (
+  echo .Net Core version mismatch, installing.
+  goto :install-dotnet
+) else (
+  echo .Net Core version is matching, using the installed version.
+
+  set _dotnet="%INSTALLED_DOTNET_EXE%"
+
+  goto :dotnet-installed
+)
+
+:install-dotnet
 
 :: Restore the Tools directory
 call %~dp0init-tools.cmd
@@ -16,6 +48,8 @@ set _toolRuntime=%~dp0Tools
 set _dotnet=%_toolRuntime%\dotnetcli\dotnet.exe
 
 SET PATH=%_toolRuntime%\dotnetcli;%PATH%
+
+:dotnet-installed
 
 SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 

@@ -11,10 +11,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Orleans.CodeGeneration</RootNamespace>
     <AssemblyName>ClientGenerator</AssemblyName>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <TargetFramework>net462</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,24 +30,13 @@
     </ProjectReference>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj">
-      <PrivateAssets>all</PrivateAssets>
-    </ProjectReference>
-  </ItemGroup>
-
   <ItemGroup>
     <None Include="..\Orleans.SDK.targets">
       <Pack>true</Pack>
       <PackagePath>build\$(PackageId).targets</PackagePath>
       <Visible>false</Visible>
     </None>
-    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/Orleans.dll;$(OutDir)/OrleansCodeGenerator.dll;$(OutDir)/Microsoft.CodeAnalysis.dll;$(OutDir)/Microsoft.CodeAnalysis.CSharp.dll;$(OutDir)/System*.dll">
-      <Pack>true</Pack>
-      <PackagePath>tools\</PackagePath>
-      <Visible>false</Visible>
-    </None>
-    <None Include="$(OutDir)/Orleans.PlatformServices.dll" Condition=" '$(BuildFlavor)' == 'Current' ">
+    <None Include="$(OutDir)/ClientGenerator.exe.config;$(OutDir)/*.dll">
       <Pack>true</Pack>
       <PackagePath>tools\</PackagePath>
       <Visible>false</Visible>

@@ -65,7 +65,6 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
-#if !NETSTANDARD
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_LegacyActivityId_Simple()
         {
@@ -76,7 +75,6 @@ namespace UnitTests.General
             Guid result = await grain.E2ELegacyActivityId();
             Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
@@ -176,7 +174,6 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-#if !NETSTANDARD
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E()
         {
@@ -238,7 +235,6 @@ namespace UnitTests.General
             Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_None_E2E()
@@ -303,7 +299,6 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-#if !NETSTANDARD
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_DynamicChange_Client()
         {
@@ -382,7 +377,6 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_CountCallbacks()

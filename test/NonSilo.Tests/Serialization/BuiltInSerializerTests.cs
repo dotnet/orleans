@@ -58,9 +58,7 @@ namespace UnitTests.Serialization
         public static IEnumerable<object[]> FallbackSerializers = new[]
         {
             new object[] { SerializerToUse.Default },
-#if !NETSTANDARD_TODO
             new object[] { SerializerToUse.BinaryFormatterFallbackSerializer },
-#endif
             new object[] { SerializerToUse.IlBasedFallbackSerializer }
         };
 
@@ -81,11 +79,9 @@ namespace UnitTests.Serialization
                         case SerializerToUse.IlBasedFallbackSerializer:
                             fallback = typeof(ILBasedSerializer).GetTypeInfo();
                             break;
-#if !NETSTANDARD_TODO
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
                             fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
                             break;
-#endif
                         case SerializerToUse.NoFallback:
                             fallback = typeof(SupportsNothingSerializer).GetTypeInfo();
                             break;
@@ -120,6 +116,12 @@ namespace UnitTests.Serialization
         {
             var environment = InitializeSerializer(SerializerToUse.NoFallback);
             Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(int)),
+                $"Should be able to serialize internal type {nameof(Int32)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(List<int>)),
+                $"Should be able to serialize internal type {nameof(List<int>)}.");
+            Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(AddressesAndTag)),
                 $"Should be able to serialize internal type {nameof(AddressesAndTag)}.");
             Assert.True(
@@ -140,6 +142,9 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(EventHubSequenceTokenV2)),
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
+            Assert.True(
+                environment.SerializationManager.HasSerializer(typeof(ValueTuple<int, AddressAndTag>)),
+                $"Should be able to serialize internal type {nameof(ValueTuple<int, AddressAndTag>)}.");
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]
@@ -623,7 +628,6 @@ namespace UnitTests.Serialization
             }
         }
 
-#if !NETSTANDARD_TODO // On .NET Standard, the IL-based fallback serializer is used, so this is expected to fail (because serialization succeeds).
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.Default)]
         [InlineData(SerializerToUse.BinaryFormatterFallbackSerializer)]
@@ -640,12 +644,8 @@ namespace UnitTests.Serialization
                                     typeof(UnserializableException).OrleansTypeName() + ": " + Message;
             Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
         }
-#endif
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-#if NETSTANDARD_TODO // On .NET Standard, the IL-based fallback serializer is used, so this is expected to pass.
-        [InlineData(SerializerToUse.Default)]
-#endif
         [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
         public void Serialize_UnserializableException_IlFallback(SerializerToUse serializerToUse)
         {
@@ -828,7 +828,6 @@ namespace UnitTests.Serialization
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
-#if !NETSTANDARD_TODO
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
@@ -860,7 +859,6 @@ namespace UnitTests.Serialization
 
             Assert.Contains("is not marked as serializable", exc.Message);
         }
-#endif
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
@@ -971,9 +969,7 @@ namespace UnitTests.Serialization
             object deserialized;
             var formatter = new BinaryFormatter
             {
-#if !NETSTANDARD_TODO
                 Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager))
-#endif
             };
             using (var str = new MemoryStream())
             {
@@ -985,11 +981,6 @@ namespace UnitTests.Serialization
             {
                 deserialized = formatter.Deserialize(inStream);
             }
-#if NETSTANDARD_TODO
-                // On .NET Standard, currently we need to manually fixup grain references.
-                var grainRef = deserialized as GrainReference;
-                if (grainRef != null) grainFactory.BindGrainReference(grainRef);
-#endif
             return deserialized;
         }
 

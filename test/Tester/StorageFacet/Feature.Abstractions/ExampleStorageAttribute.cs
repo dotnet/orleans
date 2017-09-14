@@ -16,5 +16,4 @@ namespace Tester.StorageFacet.Abstractions
             this.StateName = stateName;
         }
     }
-
 }

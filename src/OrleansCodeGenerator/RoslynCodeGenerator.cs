@@ -294,11 +294,6 @@ namespace Orleans.CodeGenerator
         {
 #if ORLEANS_BOOTSTRAP
             throw new NotImplementedException();
-#elif NETSTANDARD
-            Assembly result;
-            result = Orleans.PlatformServices.PlatformAssemblyLoader.LoadFromBytes(asm.RawBytes);
-            Orleans.AppDomain.CurrentDomain.AddAssembly(result);
-            return result;
 #else
             return Assembly.Load(asm.RawBytes);
 #endif
