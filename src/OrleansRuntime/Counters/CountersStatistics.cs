@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Counters
         private static readonly Logger logger = LogManager.GetLogger("WindowsPerfCountersStatistics", LoggerType.Runtime);
 
         private const int ERROR_THRESHOLD = 10; // A totally arbitrary value!
-        private readonly IMetricsWriter metricsWriter;
+        private readonly ITelemetryClient telemetryClient;
         private SafeTimer timer;
         private bool shouldWritePerfCounters = true;
 
@@ -23,14 +23,14 @@ namespace Orleans.Runtime.Counters
         /// Initialize the counter publisher framework. Start the background stats writer thread.
         /// </summary>
         /// <param name="writeInterval">Frequency of writing to Windows perf counters</param>
-        /// <param name="metricsWriter">The metrics writer.</param>
-        public CountersStatistics(TimeSpan writeInterval, IMetricsWriter metricsWriter)
+        /// <param name="telemetryClient">The metrics writer.</param>
+        public CountersStatistics(TimeSpan writeInterval, ITelemetryClient telemetryClient)
         {
             if (writeInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(writeInterval), "Creating CounterStatsPublisher with negative or zero writeInterval");
-            if (metricsWriter == null) throw new ArgumentNullException(nameof(metricsWriter));
+            if (telemetryClient == null) throw new ArgumentNullException(nameof(telemetryClient));
             
             PerfCountersWriteInterval = writeInterval;
-            this.metricsWriter = metricsWriter;
+            this.telemetryClient = telemetryClient;
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Counters
             if (shouldWritePerfCounters)
             {
                 // Write counters to Windows perf counters
-                int numErrors = OrleansCounterManager.WriteCounters(this.metricsWriter);
+                int numErrors = OrleansCounterManager.WriteCounters(this.telemetryClient);
 
                 if (numErrors > 0)
                 {

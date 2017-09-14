@@ -30,7 +30,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         public CounterStorage Storage => CounterStorage.LogAndTable;
 
-        public void TrackMetric(IMetricsWriter metricsWriter)
+        public void TrackMetric(ITelemetryClient telemetryClient)
         {
         }
     }

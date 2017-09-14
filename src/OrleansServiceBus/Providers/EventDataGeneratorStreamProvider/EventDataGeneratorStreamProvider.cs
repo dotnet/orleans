@@ -137,7 +137,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionCount));
             }
 
-            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger, IMetricsWriter metricsWriter)
+            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger, ITelemetryClient telemetryClient)
             {
                 var generator = new EventHubPartitionDataGenerator(logger, this.serviceProvider.GetRequiredService<SerializationManager>(), this.ehGeneratorSettings);
                 var generatorReceiver = new EventHubPartitionGeneratorReceiver(generator);

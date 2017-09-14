@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseTelemetry(XmlElement root, MetricsTelemetryConfiguration metricsConfiguration)
+        internal static void ParseTelemetry(XmlElement root, TelemetryConfiguration metricsConfiguration)
         {
             foreach (var node in root.ChildNodes)
             {

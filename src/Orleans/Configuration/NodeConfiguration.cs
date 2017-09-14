@@ -211,7 +211,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
 
-        public MetricsTelemetryConfiguration MetricsConfiguration { get; } = new MetricsTelemetryConfiguration();
+        public TelemetryConfiguration TelemetryConfiguration { get; } = new TelemetryConfiguration();
 
         public Dictionary<string, SearchOption> AdditionalAssemblyDirectories { get; set; }
 
@@ -327,7 +327,7 @@ namespace Orleans.Runtime.Configuration
             StartupTypeName = other.StartupTypeName;
             AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>(other.AdditionalAssemblyDirectories);
             ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
-            MetricsConfiguration = other.MetricsConfiguration.Clone();
+            TelemetryConfiguration = other.TelemetryConfiguration.Clone();
         }
 
         public override string ToString()
@@ -490,7 +490,7 @@ namespace Orleans.Runtime.Configuration
                         }
                         break;
                     case "Telemetry":
-                        ConfigUtilities.ParseTelemetry(child, this.MetricsConfiguration);
+                        ConfigUtilities.ParseTelemetry(child, this.TelemetryConfiguration);
                         break;
                     case "AdditionalAssemblyDirectories":
                         ConfigUtilities.ParseAdditionalAssemblyDirectories(AdditionalAssemblyDirectories, child);

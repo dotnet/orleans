@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Configuration
 
             foreach (var nodeConfig in config.Overrides.Values.Union(new[] { config.Defaults }))
             {
-                nodeConfig.MetricsConfiguration.Add(typeName, assemblyName, null);
+                nodeConfig.TelemetryConfiguration.Add(typeName, assemblyName, null);
             }
         }
 
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Configuration
             string typeName = typeof(OrleansPerfCounterTelemetryConsumer).FullName;
             string assemblyName = typeof(OrleansPerfCounterTelemetryConsumer).Assembly.GetName().Name;
 
-            config.MetricsConfiguration.Add(typeName, assemblyName, null);
+            config.TelemetryConfiguration.Add(typeName, assemblyName, null);
         }
     }
 }

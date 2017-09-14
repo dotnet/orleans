@@ -39,8 +39,8 @@ namespace ServiceBus.Tests.TestStreamProviders
 
                 public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
                     SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimensions sharedDimensions,
-                    Func<EventHubCacheMonitorDimensions, Logger, IMetricsWriter, ICacheMonitor> cacheMonitorFactory = null,
-                    Func<EventHubBlockPoolMonitorDimensions, Logger, IMetricsWriter, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                    Func<EventHubCacheMonitorDimensions, Logger, ITelemetryClient, ICacheMonitor> cacheMonitorFactory = null,
+                    Func<EventHubBlockPoolMonitorDimensions, Logger, ITelemetryClient, IBlockPoolMonitor> blockPoolMonitorFactory = null)
                     : base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
                 {
                     this.caches = caches;
@@ -48,10 +48,10 @@ namespace ServiceBus.Tests.TestStreamProviders
                 private const int defaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
                     Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
-                    SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, IMetricsWriter metricsWriter)
+                    SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryClient telemetryClient)
                 {
                     var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
-                    var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, cacheLogger, metricsWriter);
+                    var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, cacheLogger, telemetryClient);
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                     var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge, cacheMonitor, providerSettings.StatisticMonitorWriteInterval),

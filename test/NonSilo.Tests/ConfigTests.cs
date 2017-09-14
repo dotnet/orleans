@@ -387,8 +387,8 @@ namespace UnitTests
             var cfg = ClientConfiguration.LoadFromFile(filename);
             Assert.Equal(filename, cfg.SourceFile);
 
-            Assert.Single(cfg.MetricsConfiguration.Consumers);
-            var consumer = cfg.MetricsConfiguration.Consumers.First();
+            Assert.Single(cfg.TelemetryConfiguration.Consumers);
+            var consumer = cfg.TelemetryConfiguration.Consumers.First();
             Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
             Assert.Collection(consumer.Properties, kv => 
             {
@@ -406,8 +406,8 @@ namespace UnitTests
             cfg.LoadFromFile(filename);
             Assert.Equal(filename, cfg.SourceFile);
 
-            Assert.Single(cfg.Defaults.MetricsConfiguration.Consumers);
-            var consumer = cfg.Defaults.MetricsConfiguration.Consumers.First();
+            Assert.Single(cfg.Defaults.TelemetryConfiguration.Consumers);
+            var consumer = cfg.Defaults.TelemetryConfiguration.Consumers.First();
             Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
             Assert.Collection(consumer.Properties, kv =>
             {
@@ -1146,6 +1146,14 @@ namespace UnitTests
 
     public class DummyMetricTelemetryConsumer : IMetricTelemetryConsumer
     {
+        public void Flush()
+        {
+        }
+
+        public void Close()
+        {
+        }
+
         public void DecrementMetric(string name)
         {
             throw new NotImplementedException();

@@ -3,10 +3,8 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    /// <summary>Represents an object used for publishing metrics</summary>
-    /// <remarks>In a future iteration, this will probably be replaced by an IMetric interface that already contains the name of the metric,
-    /// so callers will not need to specify it in every method call</remarks>
-    public interface IMetricsWriter
+    /// <summary>Represents an object used for producing telemetry</summary>
+    public interface ITelemetryClient
     {
         /// <summary>Send a metric value to the registered telemetry consumers.</summary>
         /// <param name="name">Metric name.</param>
@@ -37,5 +35,29 @@ namespace Orleans.Runtime
         /// <param name="name">Metric name.</param>
         /// <param name="value">The amount to decrement. The value should typically be positive.</param>
         void DecrementMetric(string name, double value);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackEvent(string name, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackTrace(string message);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackTrace(string message, Severity severityLevel);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties);
+
+        [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
+        void TrackTrace(string message, IDictionary<string, string> properties);
     }
 }

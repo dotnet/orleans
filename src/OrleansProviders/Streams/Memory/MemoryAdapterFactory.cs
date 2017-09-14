@@ -30,7 +30,7 @@ namespace Orleans.Providers
         private IStreamFailureHandler streamFailureHandler;
         private IServiceProvider serviceProvider;
         private MemoryAdapterConfig adapterConfig;
-        private IMetricsWriter metricsWriter;
+        private ITelemetryClient telemetryClient;
         private Logger logger;
         private String providerName;
         private IGrainFactory grainFactory;
@@ -61,19 +61,19 @@ namespace Orleans.Providers
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, IMetricsWriter, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ITelemetryClient, ICacheMonitor> CacheMonitorFactory;
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, IMetricsWriter, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, ITelemetryClient, IBlockPoolMonitor> BlockPoolMonitorFactory;
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, IMetricsWriter, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, ITelemetryClient, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
         /// <summary>
         /// Factory initialization.
@@ -89,13 +89,13 @@ namespace Orleans.Providers
             providerName = name;
             queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             adapterConfig = new MemoryAdapterConfig(providerName);
-            this.metricsWriter = svcProvider.GetService<IMetricsWriter>();
+            this.telemetryClient = svcProvider.GetService<ITelemetryClient>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions, metricsWriter) => new DefaultCacheMonitor(dimensions, metricsWriter);
+                this.CacheMonitorFactory = (dimensions, telemetryClient) => new DefaultCacheMonitor(dimensions, telemetryClient);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions, metricsWriter) => new DefaultBlockPoolMonitor(dimensions, metricsWriter);
+                this.BlockPoolMonitorFactory = (dimensions, telemetryClient) => new DefaultBlockPoolMonitor(dimensions, telemetryClient);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions, metricsWriter) => new DefaultQueueAdapterReceiverMonitor(dimensions, metricsWriter);
+                this.ReceiverMonitorFactory = (dimensions, telemetryClient) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryClient);
             purgePredicate = new TimePurgePredicate(adapterConfig.DataMinTimeInCache, adapterConfig.DataMaxAgeInCache);
             grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
             adapterConfig.PopulateFromProviderConfig(providerConfig);
@@ -112,7 +112,7 @@ namespace Orleans.Providers
                 // 1 meg block size pool
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.metricsWriter), oneMb);
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryClient), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
             }
         }
@@ -153,7 +153,7 @@ namespace Orleans.Providers
         {
             var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
             var receiverLogger = logger.GetSubLogger(typeof(MemoryAdapterReceiver<TSerializer>).Name);
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.metricsWriter);
+            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryClient);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
         }
@@ -194,7 +194,7 @@ namespace Orleans.Providers
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
             var logger = this.logger.GetSubLogger(typeof(MemoryPooledCache<TSerializer>).Name);
-            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.metricsWriter);
+            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryClient);
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
 

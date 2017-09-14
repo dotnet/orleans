@@ -168,6 +168,16 @@ namespace OrleansTelemetryConsumers.Counters
         /// <param name="name">metric name</param>
         /// <param name="value">metric value</param>
         public void DecrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Decrement, value);
+
+        /// <summary>
+        /// Write all pending metrics
+        /// </summary>
+        public void Flush() { }
+
+        /// <summary>
+        /// Close telemetry consumer
+        /// </summary>
+        public void Close() { }
         
         private bool Initialize()
         {

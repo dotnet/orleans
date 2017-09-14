@@ -137,7 +137,7 @@ namespace Orleans.Runtime.Configuration
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        public MetricsTelemetryConfiguration MetricsConfiguration { get; } = new MetricsTelemetryConfiguration();
+        public TelemetryConfiguration TelemetryConfiguration { get; } = new TelemetryConfiguration();
 
         public LimitManager LimitManager { get; private set; }
 
@@ -331,7 +331,7 @@ namespace Orleans.Runtime.Configuration
                             }
                             break;
                         case "Telemetry":
-                            ConfigUtilities.ParseTelemetry(child, this.MetricsConfiguration);
+                            ConfigUtilities.ParseTelemetry(child, this.TelemetryConfiguration);
                             break;
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))

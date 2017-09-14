@@ -6,7 +6,8 @@ using NRClient = NewRelic.Api.Agent.NewRelic;
 
 namespace Orleans.TelemetryConsumers.NewRelic
 {
-    public class NRTelemetryConsumer :  IMetricTelemetryConsumer
+    public class NRTelemetryConsumer : IEventTelemetryConsumer, IExceptionTelemetryConsumer,
+        IDependencyTelemetryConsumer, IMetricTelemetryConsumer, IRequestTelemetryConsumer
     {
         public NRTelemetryConsumer()
         {
@@ -34,6 +35,24 @@ namespace Orleans.TelemetryConsumers.NewRelic
             NRClient.RecordMetric(FormatMetricName(name), (float)value);
         }
 
+        public void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
+        {
+            NRClient.RecordResponseTimeMetric(FormatMetricName($"{dependencyName}/{commandName}"), (long)duration.TotalMilliseconds);
+        }
+
+        public void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            NRClient.RecordCustomEvent(eventName, metrics != null ? metrics.ToDictionary(e => e.Key, e => (object)e.Value) : null);
+            AddMetric(metrics);
+            AddProperties(properties);
+        }
+
+        public void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            AddMetric(metrics);
+            NRClient.NoticeError(exception, properties);
+        }
+
         public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
         {
             AddProperties(properties);
@@ -44,6 +63,11 @@ namespace Orleans.TelemetryConsumers.NewRelic
         {
             AddProperties(properties);
             NRClient.RecordMetric(FormatMetricName(name), (float)value);
+        }
+
+        public void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
+        {
+            NRClient.RecordMetric(FormatMetricName(name), (float)duration.TotalMilliseconds);
         }
 
         private static string FormatMetricName(string name)
@@ -73,6 +97,14 @@ namespace Orleans.TelemetryConsumers.NewRelic
                     NRClient.AddCustomParameter(p.Key, p.Value);
                 });
             }
+        }
+
+        public void Flush()
+        {
+        }
+
+        public void Close()
+        {
         }
     }
 }

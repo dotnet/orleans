@@ -11,6 +11,6 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Function used to create a IEventHubQueueCache
         /// </summary>
-        IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger, IMetricsWriter metricsWriter);
+        IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger, ITelemetryClient telemetryClient);
     }
 }

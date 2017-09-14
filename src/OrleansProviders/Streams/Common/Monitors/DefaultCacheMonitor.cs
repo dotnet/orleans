@@ -12,16 +12,16 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultCacheMonitor : ICacheMonitor
     {
-        protected readonly IMetricsWriter MetricsWriter;
+        protected readonly ITelemetryClient TelemetryClient;
         protected Dictionary<string, string> LogProperties;
 
-        public DefaultCacheMonitor(IMetricsWriter metricsWriter)
+        public DefaultCacheMonitor(ITelemetryClient telemetryClient)
         {
-            this.MetricsWriter = metricsWriter;
+            this.TelemetryClient = telemetryClient;
         }
 
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, IMetricsWriter metricsWriter)
-            :this(metricsWriter)
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions, ITelemetryClient telemetryClient)
+            :this(telemetryClient)
         {
             this.LogProperties = new Dictionary<string, string>
             {
@@ -33,53 +33,53 @@ namespace Orleans.Providers.Streams.Common
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)
         {
-            this.MetricsWriter.TrackMetric($"{pressureMonitorType}-UnderPressure", underPressure ? 1 : 0, this.LogProperties);
+            this.TelemetryClient.TrackMetric($"{pressureMonitorType}-UnderPressure", underPressure ? 1 : 0, this.LogProperties);
             if (cachePressureContributionCount.HasValue)
-                this.MetricsWriter.TrackMetric($"{pressureMonitorType}-PressureContributionCount", cachePressureContributionCount.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric($"{pressureMonitorType}-PressureContributionCount", cachePressureContributionCount.Value, this.LogProperties);
             if (currentPressure.HasValue)
-                this.MetricsWriter.TrackMetric($"{pressureMonitorType}-CurrentPressure", currentPressure.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric($"{pressureMonitorType}-CurrentPressure", currentPressure.Value, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void ReportCacheSize(long totalCacheSizeInByte)
         {
-            this.MetricsWriter.TrackMetric("TotalCacheSizeInByte", totalCacheSizeInByte, this.LogProperties);
+            this.TelemetryClient.TrackMetric("TotalCacheSizeInByte", totalCacheSizeInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
         {
             if (oldestMessageEnqueueTimeUtc.HasValue && newestMessageEnqueueTimeUtc.HasValue)
-                this.MetricsWriter.TrackMetric("OldestMessageRelativeAgeToNewestMessage", newestMessageEnqueueTimeUtc.Value - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric("OldestMessageRelativeAgeToNewestMessage", newestMessageEnqueueTimeUtc.Value - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
 
             if (oldestMessageDequeueTimeUtc.HasValue)
-                this.MetricsWriter.TrackMetric("OldestMessageDequeueTimeToNow", DateTime.UtcNow - oldestMessageDequeueTimeUtc.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric("OldestMessageDequeueTimeToNow", DateTime.UtcNow - oldestMessageDequeueTimeUtc.Value, this.LogProperties);
 
-            this.MetricsWriter.TrackMetric("TotalMessageCount", totalMessageCount, this.LogProperties);
+            this.TelemetryClient.TrackMetric("TotalMessageCount", totalMessageCount, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void TrackMemoryAllocated(int memoryInByte)
         {
-            this.MetricsWriter.TrackMetric("MemoryAllocatedInByte", memoryInByte, this.LogProperties);
+            this.TelemetryClient.TrackMetric("MemoryAllocatedInByte", memoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void TrackMemoryReleased(int memoryInByte)
         {
-            this.MetricsWriter.TrackMetric("MemoryReleasedInByte", memoryInByte, this.LogProperties);
+            this.TelemetryClient.TrackMetric("MemoryReleasedInByte", memoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void TrackMessagesAdded(long mesageAdded)
         {
-            this.MetricsWriter.TrackMetric("MessageAdded", mesageAdded, this.LogProperties);
+            this.TelemetryClient.TrackMetric("MessageAdded", mesageAdded, this.LogProperties);
         }
 
         /// <inheritdoc cref="ICacheMonitor"/>
         public void TrackMessagesPurged(long messagePurged)
         {
-            this.MetricsWriter.TrackMetric("MessagePurged", messagePurged, this.LogProperties);
+            this.TelemetryClient.TrackMetric("MessagePurged", messagePurged, this.LogProperties);
         }
     }
 }

@@ -19,9 +19,9 @@ namespace OrleansServiceBus.Providers.Streams.EventHub.StatisticMonitors
         /// Constructor
         /// </summary>
         /// <param name="dimensions"></param>
-        /// <param name="metricsWriter"></param>
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, IMetricsWriter metricsWriter)
-            :base(metricsWriter)
+        /// <param name="telemetryClient"></param>
+        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions, ITelemetryClient telemetryClient)
+            :base(telemetryClient)
         {
             this.LogProperties = new Dictionary<string, string>
             {

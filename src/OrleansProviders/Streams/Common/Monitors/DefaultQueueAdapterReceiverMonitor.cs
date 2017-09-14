@@ -12,16 +12,16 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultQueueAdapterReceiverMonitor : IQueueAdapterReceiverMonitor
     {
-        protected readonly IMetricsWriter MetricsWriter;
+        protected readonly ITelemetryClient TelemetryClient;
         protected Dictionary<string, string> LogProperties;
 
-        public DefaultQueueAdapterReceiverMonitor(IMetricsWriter metricsWriter)
+        public DefaultQueueAdapterReceiverMonitor(ITelemetryClient telemetryClient)
         {
-            this.MetricsWriter = metricsWriter;
+            this.TelemetryClient = telemetryClient;
         }
 
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, IMetricsWriter metricsWriter)
-            :this(metricsWriter)
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions, ITelemetryClient telemetryClient)
+            :this(telemetryClient)
         {
             this.LogProperties = new Dictionary<string, string>
             {
@@ -37,9 +37,9 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="exception"></param>
         public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
-            this.MetricsWriter.TrackMetric("InitializationFailure", success ? 0 : 1, this.LogProperties);
-            this.MetricsWriter.TrackMetric("InitializationCallTime", callTime, this.LogProperties);
-            this.MetricsWriter.TrackMetric("InitializationException", exception == null ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("InitializationFailure", success ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("InitializationCallTime", callTime, this.LogProperties);
+            this.TelemetryClient.TrackMetric("InitializationException", exception == null ? 0 : 1, this.LogProperties);
         }
 
         /// <summary>
@@ -50,9 +50,9 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="exception"></param>
         public void TrackRead(bool success, TimeSpan callTime, Exception exception)
         {
-            this.MetricsWriter.TrackMetric("ReadFailure", success ? 0 : 1, this.LogProperties);
-            this.MetricsWriter.TrackMetric("ReadCallTime", callTime, this.LogProperties);
-            this.MetricsWriter.TrackMetric("ReadException", exception == null ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ReadFailure", success ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ReadCallTime", callTime, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ReadException", exception == null ? 0 : 1, this.LogProperties);
         }
 
         /// <summary>
@@ -64,11 +64,11 @@ namespace Orleans.Providers.Streams.Common
         public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             var now = DateTime.UtcNow;
-            this.MetricsWriter.TrackMetric("MessagesRecieved", count, this.LogProperties);
+            this.TelemetryClient.TrackMetric("MessagesRecieved", count, this.LogProperties);
             if (oldestMessageEnqueueTimeUtc.HasValue)
-                this.MetricsWriter.TrackMetric("OldestMessageReadEnqueueTimeToNow", now - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric("OldestMessageReadEnqueueTimeToNow", now - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
             if (newestMessageEnqueueTimeUtc.HasValue)
-                this.MetricsWriter.TrackMetric("NewestMessageReadEnqueueTimeToNow", now - newestMessageEnqueueTimeUtc.Value, this.LogProperties);
+                this.TelemetryClient.TrackMetric("NewestMessageReadEnqueueTimeToNow", now - newestMessageEnqueueTimeUtc.Value, this.LogProperties);
         }
 
         /// <summary>
@@ -79,9 +79,9 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="exception"></param>
         public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
         {
-            this.MetricsWriter.TrackMetric("ShutdownFailure", success ? 0 : 1, this.LogProperties);
-            this.MetricsWriter.TrackMetric("ShutdownCallTime", callTime, this.LogProperties);
-            this.MetricsWriter.TrackMetric("ShutdownException", exception == null ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ShutdownFailure", success ? 0 : 1, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ShutdownCallTime", callTime, this.LogProperties);
+            this.TelemetryClient.TrackMetric("ShutdownException", exception == null ? 0 : 1, this.LogProperties);
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
-    public interface IMetricTelemetryConsumer
+    public interface IMetricTelemetryConsumer : ITelemetryConsumer
     {
         void TrackMetric(string name, double value, IDictionary<string, string> properties = null);
         void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null);

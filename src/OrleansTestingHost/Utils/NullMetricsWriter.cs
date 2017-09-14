@@ -5,37 +5,63 @@ using Orleans.Runtime;
 namespace Orleans.TestingHost.Utils
 {
     /// <summary>
-    /// Test metrics writer that does nothing with the metrics.
+    /// Test telemetry client that does nothing with the telemetry.
     /// </summary>
-    public class NullMetricsWriter : IMetricsWriter
+    public class NullTelemetryClient : ITelemetryClient
     {
-        /// <inheritdoc />
-        public void DecrementMetric(string name)
+        void ITelemetryClient.DecrementMetric(string name)
         {
         }
 
-        /// <inheritdoc />
-        public void DecrementMetric(string name, double value)
+        void ITelemetryClient.DecrementMetric(string name, double value)
         {
         }
 
-        /// <inheritdoc />
-        public void IncrementMetric(string name)
+        void ITelemetryClient.IncrementMetric(string name)
         {
         }
 
-        /// <inheritdoc />
-        public void IncrementMetric(string name, double value)
+        void ITelemetryClient.IncrementMetric(string name, double value)
         {
         }
 
-        /// <inheritdoc />
-        public void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
+        void ITelemetryClient.TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
         {
         }
 
-        /// <inheritdoc />
-        public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
+        void ITelemetryClient.TrackEvent(string name, IDictionary<string, string> properties, IDictionary<string, double> metrics)
+        {
+        }
+
+        void ITelemetryClient.TrackException(Exception exception, IDictionary<string, string> properties, IDictionary<string, double> metrics)
+        {
+        }
+
+        void ITelemetryClient.TrackMetric(string name, double value, IDictionary<string, string> properties)
+        {
+        }
+
+        void ITelemetryClient.TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties)
+        {
+        }
+
+        void ITelemetryClient.TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
+        {
+        }
+
+        void ITelemetryClient.TrackTrace(string message)
+        {
+        }
+
+        void ITelemetryClient.TrackTrace(string message, Severity severityLevel)
+        {
+        }
+
+        void ITelemetryClient.TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties)
+        {
+        }
+
+        void ITelemetryClient.TrackTrace(string message, IDictionary<string, string> properties)
         {
         }
     }
