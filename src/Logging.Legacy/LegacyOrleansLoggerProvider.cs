@@ -37,7 +37,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// Constructor
         /// </summary>
         /// <param name="consumers">Registered log consumers</param>
-        /// <param name="ipEndPoint">ip endpoint</param>
+        /// <param name="ipEndPoint">IP endpoint</param>
         public LegacyOrleansLoggerProvider(IEnumerable<ILogConsumer> consumers, IPEndPoint ipEndPoint)
         {
             this.LogConsumers = new ConcurrentBag<ILogConsumer>();

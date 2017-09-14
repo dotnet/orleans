@@ -10,7 +10,7 @@ using System.Net;
 namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
-    /// LegacyOrleansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer"/>,
+    /// LegacyOrleansLogger supports legacy Orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer"/>,
     /// <see cref="IFlushableLogConsumer"/>, <see cref="Severity"/>. 
     /// </summary>
     [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]

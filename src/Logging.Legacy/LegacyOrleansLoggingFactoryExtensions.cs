@@ -55,8 +55,8 @@ namespace Microsoft.Orleans.Logging.Legacy
         }
 
         /// <summary>
-        /// Add event bulking feature onto <paramref name="provider"></paramref>, and add that new logger provider 
-        /// <see cref="EventBulkingLoggerProvider{TDecoratedLoggerProvider}"/> into <paramref name="builder"></paramref>.
+        /// Add event bulking feature onto <paramref name="provider"/>, and add that new logger provider 
+        /// <see cref="EventBulkingLoggerProvider{TDecoratedLoggerProvider}"/> into <paramref name="builder"/>.
         /// </summary>
         /// <param name="builder">logger builder</param>
         /// <param name="provider">logger provider</param>
