@@ -10,8 +10,8 @@ using System.Net;
 namespace Microsoft.Orleans.Logging.Legacy
 {
     /// <summary>
-    /// LegacyOrleansLogger supports legacy orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer">,
-    /// <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
+    /// LegacyOrleansLogger supports legacy Orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer"/>,
+    /// <see cref="IFlushableLogConsumer"/>, <see cref="Severity"/>. 
     /// </summary>
     [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
     public class LegacyOrleansLogger : ILogger
@@ -58,7 +58,7 @@ namespace Microsoft.Orleans.Logging.Legacy
 
         /// <summary>
         /// Log a message. Current logger supports legacy event bulking feature. Message bulking feature will only log eventId code appearance count
-        /// if certain event appear more than <see cref="EventBulkingConfig.BulkEventLimit"/>> in <see cref="EventBulkingConfig.BulkEventInterval"/>
+        /// if certain event appear more than <see cref="EventBulkingOptions.BulkEventLimit"/>> in <see cref="EventBulkingOptions.BulkEventInterval"/>
         /// </summary>
         /// <typeparam name="TState"></typeparam>
         /// <param name="logLevel"></param>
