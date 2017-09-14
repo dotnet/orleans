@@ -97,13 +97,13 @@ namespace Orleans.TestingHost
         /// <summary>Starts the silo</summary>
         public void Start()
         {
-            this.silo.StartAsync().Wait();
+            this.silo.StartAsync().GetAwaiter().GetResult();
         }
 
         /// <summary>Gracefully shuts down the silo</summary>
         public void Shutdown()
         {
-            this.silo.StopAsync().Wait();
+            this.silo.StopAsync().GetAwaiter().GetResult();
         }
 
         private void InitializeTestHooksSystemTarget()
