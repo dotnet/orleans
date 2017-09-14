@@ -37,6 +37,7 @@ namespace Orleans.Transactions
         private TState value;
         private TransactionalResourceVersion version;
         private long stableVersion;
+        private bool validState;
 
         private long writeLowerBound;
 
@@ -144,30 +145,7 @@ namespace Orleans.Transactions
             {
                 // Note that the checks above will need to be done again
                 // after we aquire the lock because things could change in the meantime.
-                bool success= await this.storageExecutor.AddNext(async () =>
-                {
-                    if (!ValidateWrite(writeVersion))
-                    {
-                        return false;
-                    }
-
-                    if (!ValidateRead(transactionId, readVersion))
-                    {
-                        return false;
-                    }
-
-                    // check if we need to do a log write
-                    if (this.storage.State.Version.TransactionId >= transactionId && this.storage.State.WriteLowerBound >= wlb)
-                    {
-                        // Logs already persisted, nothing to do here
-                        return true;
-                    }
-
-                    await Persist(this.storage.State.StableVersion, wlb);
-
-                    return true;
-                });
-                return success;
+                return await this.storageExecutor.AddNext(() => GuardState(() => PersistPrepare(wlb, transactionId, writeVersion, readVersion)));
             }
             catch (Exception ex)
             {
@@ -198,38 +176,77 @@ namespace Orleans.Transactions
             // Learning that t is committed implies that all pending transactions before t also committed
             if (transactionId > this.stableVersion)
             {
-                bool success = await this.storageExecutor.AddNext(async () =>
-                {
-                    if (transactionId <= this.storage.State.StableVersion)
-                    {
-                        // Transaction commit already persisted.
-                        return true;
-                    }
-
-                    // Trim the logs to remove old versions. 
-                    // Note that we try to keep the highest version that is below or equal to the ReadOnlyTransactionId
-                    // so that we can use it to serve read only transactions.
-                    long highestKey = transactionId;
-                    foreach (var key in this.log.Keys)
-                    {
-                        if (key > this.transactionAgent.ReadOnlyTransactionId)
-                        {
-                            break;
-                        }
-
-                        highestKey = key;
-                    }
-
-                    if (this.log.Count != 0)
-                    {
-                        List<KeyValuePair<long, LogRecord<TState>>> records = this.log.TakeWhile(kvp => kvp.Key < highestKey).ToList();
-                        records.ForEach(kvp => this.log.Remove(kvp.Key));
-                    }
-
-                    await Persist(transactionId, this.writeLowerBound);
-                    return true;
-                });
+                bool success = await this.storageExecutor.AddNext(() => GuardState(() => PersistCommit(transactionId)));
             }
+        }
+
+        private async Task<bool> GuardState(Func<Task<bool>> action)
+        {
+            if (!this.validState)
+            {
+                await this.storage.ReadStateAsync();
+                DoRecovery();
+            }
+            this.validState = false;
+            bool results = await action();
+            this.validState = true;
+            return results;
+        }
+
+        private async Task<bool> PersistPrepare(long wlb, long transactionId, TransactionalResourceVersion? writeVersion, TransactionalResourceVersion? readVersion)
+        {
+            if (!ValidateWrite(writeVersion))
+            {
+                return false;
+            }
+
+            if (!ValidateRead(transactionId, readVersion))
+            {
+                return false;
+            }
+
+            // check if we need to do a log write
+            if (this.storage.State.Version.TransactionId >= transactionId && this.storage.State.WriteLowerBound >= wlb)
+            {
+                // Logs already persisted, nothing to do here
+                return true;
+            }
+
+            await Persist(this.storage.State.StableVersion, wlb);
+
+            return true;
+        }
+
+        private async Task<bool> PersistCommit(long transactionId)
+        {
+            if (transactionId <= this.storage.State.StableVersion)
+            {
+                // Transaction commit already persisted.
+                return true;
+            }
+
+            // Trim the logs to remove old versions. 
+            // Note that we try to keep the highest version that is below or equal to the ReadOnlyTransactionId
+            // so that we can use it to serve read only transactions.
+            long highestKey = transactionId;
+            foreach (var key in this.log.Keys)
+            {
+                if (key > this.transactionAgent.ReadOnlyTransactionId)
+                {
+                    break;
+                }
+
+                highestKey = key;
+            }
+
+            if (this.log.Count != 0)
+            {
+                List<KeyValuePair<long, LogRecord<TState>>> records = this.log.TakeWhile(kvp => kvp.Key < highestKey).ToList();
+                records.ForEach(kvp => this.log.Remove(kvp.Key));
+            }
+
+            await Persist(transactionId, this.writeLowerBound);
+            return true;
         }
         #endregion ITransactionalResource
 
@@ -375,34 +392,18 @@ namespace Orleans.Transactions
 
         private async Task Persist(long newStableVersion, long newWriteLowerBound)
         {
-            try
-            {
-                RecordInPersistedLog();
+            RecordInPersistedLog();
 
-                // update storage state
-                TransactionalStateRecord<TState> storageState = this.storage.State;
-                storageState.Value = this.value;
-                storageState.Version = this.version;
-                storageState.StableVersion = newStableVersion;
-                storageState.WriteLowerBound = newWriteLowerBound;
+            // update storage state
+            TransactionalStateRecord<TState> storageState = this.storage.State;
+            storageState.Value = this.value;
+            storageState.Version = this.version;
+            storageState.StableVersion = newStableVersion;
+            storageState.WriteLowerBound = newWriteLowerBound;
 
-                await this.storage.WriteStateAsync();
+            await this.storage.WriteStateAsync();
 
-                this.stableVersion = newStableVersion;
-            }
-            catch (Exception)
-            {
-                try
-                {
-                    await this.storage.ReadStateAsync();
-                    DoRecovery();
-                }
-                catch (Exception ex)
-                {
-                    throw new InconsistentStateException($"Transactional state {this.config.StateName} is in an inconsistent state.  Force reload.", ex);
-                }
-                throw;
-            }
+            this.stableVersion = newStableVersion;
         }
 
         private bool ValidateWrite(TransactionalResourceVersion? writeVersion)
@@ -471,6 +472,7 @@ namespace Orleans.Transactions
 
             // recover state
             DoRecovery();
+            this.validState = true;
         }
 
         private string StoredName()
