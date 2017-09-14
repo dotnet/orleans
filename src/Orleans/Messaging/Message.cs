@@ -66,11 +66,9 @@ namespace Orleans.Runtime
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
-        private static readonly Logger logger;
         
         static Message()
         {
-            logger = LogManager.GetLogger("Message", LoggerType.Runtime);
         }
 
         public enum Categories
@@ -431,16 +429,9 @@ namespace Orleans.Runtime
             {
                 return null;
             }
-            try
-            {
-                var stream = new BinaryTokenStreamReader(bytes);
-                return serializationManager.Deserialize(stream);
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
-                throw;
-            }
+
+            var stream = new BinaryTokenStreamReader(bytes);
+            return serializationManager.Deserialize(stream);
         }
 
         public Message()
@@ -722,7 +713,6 @@ namespace Orleans.Runtime
         internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
         {
             MessagingStatisticsGroup.OnMessageExpired(phase);
-            if (logger.IsVerbose2) logger.Verbose2("Dropping an expired message: {0}", this);
             ReleaseBodyAndHeaderBuffers();
         }
 

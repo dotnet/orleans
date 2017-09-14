@@ -697,7 +697,6 @@ namespace Orleans.Runtime.Configuration
 
         internal override void Load(XmlElement root)
         {
-            var logger = LogManager.GetLogger("OrleansConfiguration", LoggerType.Runtime);
             SeedNodes = new List<IPEndPoint>();
 
             XmlElement child;
@@ -789,11 +788,6 @@ namespace Orleans.Runtime.Configuration
 
                     case "Azure":
                     case "SystemStore":
-                        if (child.LocalName == "Azure")
-                        {
-                            // Log warning about deprecated <Azure> element, but then continue on to parse it for connection string info
-                            logger.Warn(ErrorCode.SiloConfigDeprecated, "The Azure element has been deprecated -- use SystemStore element instead.");
-                        }
 
                         if (child.HasAttribute("SystemStoreType"))
                         {
@@ -838,7 +832,6 @@ namespace Orleans.Runtime.Configuration
                             throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
                         if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
                         { 
-                            logger.Info("No ReminderTableAssembly specified with SystemStoreType set to Custom: ReminderService will be disabled");
                             SetReminderServiceType(ReminderServiceProviderType.Disabled);
                         }
 
@@ -972,7 +965,7 @@ namespace Orleans.Runtime.Configuration
                         break;
 
                     case "Application":
-                        Application.Load(child, logger);
+                        Application.Load(child);
                         break;
 
                     case "PlacementStrategy":
