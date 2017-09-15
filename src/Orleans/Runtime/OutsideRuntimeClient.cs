@@ -128,7 +128,6 @@ namespace Orleans
             this.config = services.GetRequiredService<ClientConfiguration>();
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            if (!LogManager.IsInitialized) LogManager.Initialize(config);
             services.GetService<TelemetryManager>()?.AddFromConfiguration(services, config.TelemetryConfiguration);
 
             StatisticsCollector.Initialize(config);
@@ -141,7 +140,8 @@ namespace Orleans
             try
             {
                 LoadAdditionalAssemblies();
-                
+                //init logger for UnobservedExceptionsHandlerClass
+                UnobservedExceptionsHandlerClass.InitLogger(this.ServiceProvider.GetRequiredService<ILoggerFactory>());
                 if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
                 {
                     logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
@@ -205,7 +205,7 @@ namespace Orleans
 
         private void LoadAdditionalAssemblies()
         {
-            var logger = new LoggerWrapper("AssemblyLoader.Client", this.loggerFactory);
+            var logger = new LoggerWrapper("Orleans.AssemblyLoader.Client", this.loggerFactory);
 
             var directories =
                 new Dictionary<string, SearchOption>
@@ -249,13 +249,12 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal()
         {
-            await this.gatewayListProvider.InitializeGatewayListProvider(config, this.loggerFactory)
+            await this.gatewayListProvider.InitializeGatewayListProvider(config)
                                .WithTimeout(initTimeout);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
             transport.Start();
-            LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
 
             listeningCts = new CancellationTokenSource();
@@ -639,7 +638,8 @@ namespace Orleans
                     context,
                     message,
                     unregisterCallback,
-                    config);
+                    config,
+                    this.loggerFactory);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }
@@ -787,12 +787,6 @@ namespace Orleans
             catch (Exception) { }
 
             Utils.SafeExecute(() => this.Dispose());
-
-            try
-            {
-                LogManager.UnInitialize();
-            }
-            catch (Exception) { }
         }
 
         public void SetResponseTimeout(TimeSpan timeout)
@@ -837,7 +831,6 @@ namespace Orleans
             {
                 logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload,
                     String.Format("Current AppDomain={0} is unloading.", PrintAppDomainDetails()));
-                LogManager.Flush();
             }
             catch (Exception)
             {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -31,7 +32,7 @@ namespace UnitTests.LivenessTests
         public void ConsistentRingProvider_Test1()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
-            ConsistentRingProvider ring = new ConsistentRingProvider(silo1);
+            ConsistentRingProvider ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance);
             output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddress.NewLocalAddress(1));
@@ -45,7 +46,7 @@ namespace UnitTests.LivenessTests
         public void ConsistentRingProvider_Test2()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, 30);
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30);
             //ring.logger.SetSeverityLevel(Severity.Warning);
             output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
@@ -66,7 +67,7 @@ namespace UnitTests.LivenessTests
 
             Random random = new Random();
             SiloAddress silo1 = SiloAddress.NewLocalAddress(random.Next(100000));
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, 50);
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50);
             //ring.logger.SetSeverityLevel(Severity.Warning);
             
             for (int i = 1; i <= NUM_SILOS - 1; i++)

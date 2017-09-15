@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -183,13 +184,14 @@ namespace Orleans.Runtime
             NodeConfiguration nodeConfiguration,
             TimeSpan maxWarningRequestProcessingTime,
 			TimeSpan maxRequestProcessingTime,
-            IRuntimeClient runtimeClient)
+            IRuntimeClient runtimeClient,
+            ILoggerFactory loggerFactory)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
-            logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
+            logger = new LoggerWrapper<ActivationData>(loggerFactory);
             this.lifecycle = new GrainLifecycle(logger);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;

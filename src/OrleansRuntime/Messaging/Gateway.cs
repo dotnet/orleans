@@ -42,9 +42,9 @@ namespace Orleans.Runtime.Messaging
             this.loggerFactory = loggerFactory;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
-            this.logger = new LoggerWrapper("Orleans.Messaging.Gateway", this.loggerFactory);
+            this.logger = new LoggerWrapper<Gateway>(this.loggerFactory);
             this.serializationManager = serializationManager;
-            acceptor = new GatewayAcceptor(msgCtr, this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig);
+            acceptor = new GatewayAcceptor(msgCtr, this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig, loggerFactory);
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this, loggerFactory);

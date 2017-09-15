@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime.Configuration;
 
 
@@ -12,7 +13,7 @@ namespace Orleans.Runtime.Host
     /// </summary>
     public static class AzureClient
     {
-        private static readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper();
+        private static readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper(AzureSilo.CreateDefaultLoggerFactory("AzureClient.log"));
 
         /// <summary>Number of retry attempts to make when searching for gateway silos to connect to.</summary>
         public static readonly int MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes

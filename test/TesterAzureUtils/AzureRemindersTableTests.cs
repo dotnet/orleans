@@ -1,8 +1,10 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Tester;
 using Tester.AzureUtils;
@@ -17,13 +19,18 @@ namespace UnitTests.RemindersTest
     [TestCategory("Reminders"), TestCategory("Azure")]
     public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
-        public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
         }
 
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("AzureTableDataManager", LogLevel.Trace);
+            filters.AddFilter("OrleansSiloInstanceManager", LogLevel.Trace);
+            filters.AddFilter("Storage", LogLevel.Trace);
+            return filters;
+        }
         public override void Dispose()
         {
             // Reset init timeout after tests
@@ -34,7 +41,7 @@ namespace UnitTests.RemindersTest
         protected override IReminderTable CreateRemindersTable()
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory);
         }
 
         protected override Task<string> GetConnectionString()

@@ -1,4 +1,5 @@
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.CodeGenerator
 {
@@ -35,13 +36,13 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Initializes members of the <see cref="SerializerGenerationManager"/> class.
         /// </summary>
-        internal SerializerGenerationManager(SerializationManager serializationManager)
+        internal SerializerGenerationManager(SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
             this.serializationManager = serializationManager;
             typesToProcess = new HashSet<Type>();
             processedTypes = new HashSet<Type>();
 
-            log = LogManager.GetLogger(typeof(SerializerGenerationManager).Name);
+            log = new LoggerWrapper<SerializerGenerationManager>(loggerFactory);
         }
 
         internal bool IsTypeRecorded(Type type)

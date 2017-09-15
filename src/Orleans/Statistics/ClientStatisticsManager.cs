@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             this.config = config;
             this.serviceProvider = serviceProvider;
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
-            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager);
+            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager, loggerFactory);
             logger = new LoggerWrapper<ClientStatisticsManager>(loggerFactory);
             this.loggerFactory = loggerFactory;
             MessagingStatisticsGroup.Init(false);

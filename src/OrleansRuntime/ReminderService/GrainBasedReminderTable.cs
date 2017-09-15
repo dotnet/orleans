@@ -17,9 +17,10 @@ namespace Orleans.Runtime.ReminderService
 
         public override Task OnActivateAsync()
         {
-            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(String.Format("GrainBasedReminderTable_{0}", Data.Address.ToString()));
+            var loggerFactory = this.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            logger = loggerFactory.CreateLogger(String.Format("{0}_{1}", typeof(GrainBasedReminderTable).FullName, Data.Address.ToString()));
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
-            remTable = new InMemoryRemindersTable();
+            remTable = new InMemoryRemindersTable(loggerFactory);
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
             return Task.CompletedTask;
         }

@@ -12,13 +12,18 @@ namespace Orleans.AzureUtils
     {
         private OrleansSiloInstanceManager siloInstanceManager;
         private ClientConfiguration config;
+        private readonly ILoggerFactory loggerFactory;
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory)
+        {
+            this.loggerFactory = loggerFactory;
+        }
 
         #region Implementation of IGatewayListProvider
 
         public async Task InitializeGatewayListProvider(ClientConfiguration conf)
         {
             config = conf;
-            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString, this.loggerFactory);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()

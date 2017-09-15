@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Protocol;
@@ -26,7 +27,7 @@ namespace Tester.AzureUtils
         {
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString);
+            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 

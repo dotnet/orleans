@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         public LocalReminderServiceFactory(IReminderTable reminderTable, ILoggerFactory loggerFactory)
         {
             this.reminderTable = reminderTable;
-            logger = loggerFactory.CreateLogger("ReminderFactory");
+            logger = loggerFactory.CreateLogger<LocalReminderServiceFactory>();
             this.loggerFactory = loggerFactory;
         }
 

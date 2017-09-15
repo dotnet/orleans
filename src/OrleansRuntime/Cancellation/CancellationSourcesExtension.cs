@@ -12,19 +12,19 @@ namespace Orleans.Runtime
     /// </summary>
     internal class CancellationSourcesExtension : ICancellationSourcesExtension
     {
-        private static readonly Lazy<Logger> _logger = new Lazy<Logger>(() =>
-            LogManager.GetLogger(nameof(CancellationSourcesExtension), LoggerType.Runtime));
+        private readonly ILogger _logger;
 
         private readonly Interner<Guid, GrainCancellationToken> _cancellationTokens;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
         private const int _defaultInternerCollectionSize = 31;
 
 
-        public CancellationSourcesExtension()
+        public CancellationSourcesExtension(ILoggerFactory loggerFactory)
         {
             _cancellationTokens = new Interner<Guid, GrainCancellationToken>(
                  _defaultInternerCollectionSize,
                  _cleanupFrequency);
+            _logger = loggerFactory.CreateLogger<CancellationSourcesExtension>();
         }
 
         public Task CancelRemoteToken(Guid tokenId)
@@ -32,7 +32,7 @@ namespace Orleans.Runtime
             GrainCancellationToken gct;
             if (!_cancellationTokens.TryFind(tokenId, out gct))
             {
-                _logger.Value.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {tokenId} was not found");
+                _logger.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {tokenId} was not found");
                 return Task.CompletedTask;
             }
 
@@ -45,11 +45,13 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="target"></param>
         /// <param name="request"></param>
-        /// <param name="logger"></param>
+        /// <param name="loggerFactory">logger factory configured in current cluster</param>
+        /// <param name="logger">caller's logger</param>
         /// <param name="siloRuntimeClient"></param>
         internal static void RegisterCancellationTokens(
             IAddressable target,
             InvokeMethodRequest request,
+            ILoggerFactory loggerFactory,
             ILogger logger,
             ISiloRuntimeClient siloRuntimeClient)
         {
@@ -62,7 +64,7 @@ namespace Orleans.Runtime
                 CancellationSourcesExtension cancellationExtension;
                 if (!siloRuntimeClient.TryGetExtensionHandler(out cancellationExtension))
                 {
-                    cancellationExtension = new CancellationSourcesExtension();
+                    cancellationExtension = new CancellationSourcesExtension(loggerFactory);
                     if (!siloRuntimeClient.TryAddExtension(cancellationExtension))
                     {
                         logger.Error(

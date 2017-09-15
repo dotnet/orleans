@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
+        private readonly Logger logger;
         private Task currentlyExecutingTickTask;
         private readonly OrleansTaskScheduler scheduler;
         private readonly IActivationData activationData;
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             scheduler.CheckSchedulingContextValidity(ctxt);
             this.scheduler = scheduler;
             this.activationData = activationData;
-
+            this.logger = new LoggerWrapper<GrainTimer>(loggerFactory);
             this.Name = name;
             this.asyncCallback = asyncCallback;
             timer = new AsyncTaskSafeTimer( loggerFactory, 
@@ -70,6 +70,7 @@ namespace Orleans.Runtime
 
         internal static IGrainTimer FromTaskCallback(
             OrleansTaskScheduler scheduler,
+            ILoggerFactory loggerFactory,
             Func<object, Task> asyncCallback,
             object state,
             TimeSpan dueTime,
@@ -77,7 +78,7 @@ namespace Orleans.Runtime
             string name = null,
             IActivationData activationData = null)
         {
-            return new GrainTimer(scheduler, activationData, asyncCallback, state, dueTime, period, name);
+            return new GrainTimer(scheduler, activationData, loggerFactory, asyncCallback, state, dueTime, period, name);
         }
 
         public void Start()

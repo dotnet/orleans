@@ -6,6 +6,7 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -26,7 +27,8 @@ namespace Tester.AzureUtils
 
         public AzureGossipTableTests()
         {
-            logger = LogManager.GetLogger("AzureGossipTableTests", LoggerType.Application);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
+            logger = new LoggerWrapper<AzureGossipTableTests>(loggerFactory);
         
             globalServiceId = Guid.NewGuid();
             deploymentId = "test-" + globalServiceId;
@@ -52,7 +54,7 @@ namespace Tester.AzureUtils
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
 
-            gossipTable = new AzureTableBasedGossipChannel();
+            gossipTable = new AzureTableBasedGossipChannel(loggerFactory);
             var done = gossipTable.Initialize(config.ServiceId, config.DataConnectionString);
             if (!done.Wait(timeout))
             {

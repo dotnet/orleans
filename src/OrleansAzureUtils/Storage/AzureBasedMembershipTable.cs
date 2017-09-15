@@ -14,11 +14,13 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class AzureBasedMembershipTable : IMembershipTable
     {
-        private ILogger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private OrleansSiloInstanceManager tableManager;
 
         public AzureBasedMembershipTable(ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
         }
 
@@ -28,7 +30,7 @@ namespace Orleans.Runtime.MembershipService
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                config.DeploymentId, config.DataConnectionString);
+                config.DeploymentId, config.DataConnectionString, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,

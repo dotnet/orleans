@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
@@ -23,7 +24,9 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory router,
             AdaptiveGrainDirectoryCache<TValue> cache,
             Func<List<ActivationAddress>, TValue> updateFunc,
-            IInternalGrainFactory grainFactory)
+            IInternalGrainFactory grainFactory,
+            ILoggerFactory loggerFactory)
+            :base(loggerFactory)
         {
             this.updateFunc = updateFunc;
             this.grainFactory = grainFactory;

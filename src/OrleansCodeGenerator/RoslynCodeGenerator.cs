@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator
@@ -31,8 +32,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly Logger Logger = LogManager.GetLogger("CodeGenerator");
-
+        private readonly Logger Logger;
         /// <summary>
         /// The serializer generation manager.
         /// </summary>
@@ -42,9 +42,11 @@ namespace Orleans.CodeGenerator
         /// Initializes a new instance of the <see cref="RoslynCodeGenerator"/> class.
         /// </summary>
         /// <param name="serializationManager">The serialization manager.</param>
-        public RoslynCodeGenerator(SerializationManager serializationManager)
+        /// <param name="loggerFactory">logger factory to use</param>
+        public RoslynCodeGenerator(SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
-            this.serializerGenerationManager = new SerializerGenerationManager(serializationManager);
+            this.serializerGenerationManager = new SerializerGenerationManager(serializationManager, loggerFactory);
+            this.Logger = new LoggerWrapper<RoslynCodeGenerator>(loggerFactory);
         }
 
         /// <summary>
@@ -275,9 +277,9 @@ namespace Orleans.CodeGenerator
         /// Whether or not to emit debug symbols for the generated assembly.
         /// </param>
         /// <returns>The compilation output.</returns>
-        private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax, bool emitDebugSymbols)
+        private CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax, bool emitDebugSymbols)
         {
-            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen", emitDebugSymbols: emitDebugSymbols);
+            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen", emitDebugSymbols: emitDebugSymbols, logger:this.Logger);
             var loadedAssembly = LoadAssembly(generated);
             return new CachedAssembly(generated)
             {
@@ -538,7 +540,7 @@ namespace Orleans.CodeGenerator
         /// Get types which have corresponding generated classes.
         /// </summary>
         /// <returns>Types which have corresponding generated classes marked.</returns>
-        private static HashSet<Type> GetTypesWithGeneratedSupportClasses()
+        private HashSet<Type> GetTypesWithGeneratedSupportClasses()
         {
             // Get assemblies which contain generated code.
             var all =

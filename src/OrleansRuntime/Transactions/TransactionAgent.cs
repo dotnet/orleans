@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 
@@ -22,22 +23,22 @@ namespace Orleans.Transactions
         private readonly HashSet<long> outstandingCommits;
 
         private readonly Logger logger;
-
+        private readonly ILoggerFactory loggerFactory;
         private IGrainTimer requestProcessor;
         private Task startTransactionsTask = Task.CompletedTask;
         private Task commitTransactionsTask = Task.CompletedTask;
 
         public long ReadOnlyTransactionId { get; private set; }
 
-        public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService)
-            : base(Constants.TransactionAgentSystemTargetId, siloDetails.SiloAddress)
+        public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService, ILoggerFactory loggerFactory)
+            : base(Constants.TransactionAgentSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
-            logger = LogManager.GetLogger("TransactionAgent");
+            logger = new LoggerWrapper<TransactionAgent>(loggerFactory);
             this.tmService = tmService;
             ReadOnlyTransactionId = 0;
             //abortSequenceNumber = 0;
             abortLowerBound = 0;
-
+            this.loggerFactory = loggerFactory;
 
             abortedTransactions = new ConcurrentDictionary<long, long>();
             transactionStartQueue = new ConcurrentQueue<Tuple<TimeSpan, TaskCompletionSource<long>>>();
@@ -334,7 +335,7 @@ namespace Orleans.Transactions
 
         public Task Start()
         {
-            requestProcessor = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, ProcessRequests, null, TimeSpan.FromMilliseconds(0), TimeSpan.FromMilliseconds(10), "TransactionAgent");
+            requestProcessor = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, this.loggerFactory, ProcessRequests, null, TimeSpan.FromMilliseconds(0), TimeSpan.FromMilliseconds(10), "TransactionAgent");
             requestProcessor.Start();
             return Task.CompletedTask;
         }

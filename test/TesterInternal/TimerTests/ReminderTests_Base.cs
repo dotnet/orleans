@@ -45,14 +45,13 @@ namespace UnitTests.TimerTests
             GrainFactory = fixture.GrainFactory;
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
             var filters = new LoggerFilterOptions();
 #if DEBUG
             filters.AddFilter("Storage", LogLevel.Trace);
             filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(cfg, filters));
+            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(cfg.TraceFileName, filters));
         }
 
         public IGrainFactory GrainFactory { get; }

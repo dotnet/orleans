@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Scheduler
                 t.Start();
             
             if (EnableWorkerThreadInjection)
-                longTurnTimer = new SafeTimer(obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                longTurnTimer = new SafeTimer(this.loggerFactory, obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
         internal void Stop()

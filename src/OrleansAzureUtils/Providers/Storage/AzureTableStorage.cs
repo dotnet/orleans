@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
@@ -58,6 +59,7 @@ namespace Orleans.Storage
         private static int counter;
         private readonly int id;
 
+        private ILoggerFactory loggerFactory;
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
         private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
@@ -113,14 +115,14 @@ namespace Orleans.Storage
 
             if (config.Properties.ContainsKey(UseJsonFormatPropertyName))
                 useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
-
+            this.loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
             this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableStorage Provider is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(dataConnectionString));
-            tableDataManager = new GrainStateTableDataManager(tableName, dataConnectionString, Log);
+            tableDataManager = new GrainStateTableDataManager(tableName, dataConnectionString, loggerFactory);
             return tableDataManager.InitTableAsync();
         }
 
@@ -471,11 +473,11 @@ namespace Orleans.Storage
             private readonly AzureTableDataManager<DynamicTableEntity> tableManager;
             private readonly Logger logger;
 
-            public GrainStateTableDataManager(string tableName, string storageConnectionString, Logger logger)
+            public GrainStateTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
             {
-                this.logger = logger;
+                this.logger = new LoggerWrapper<GrainStateTableDataManager>(loggerFactory);
                 TableName = tableName;
-                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString);
+                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString, loggerFactory);
             }
 
             public Task InitTableAsync()

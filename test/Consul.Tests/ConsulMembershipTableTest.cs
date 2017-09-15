@@ -3,6 +3,8 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
@@ -16,24 +18,30 @@ namespace Consul.Tests
     [TestCategory("Membership"), TestCategory("Consul")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
-        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        { 
+        }
+
+        private static LoggerFilterOptions CreateFilters()
         {
-            LogManager.AddTraceLevelOverride("ConsulBasedMembershipTable", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("ConsulBasedMembershipTable", Microsoft.Extensions.Logging.LogLevel.Trace);
+            filters.AddFilter("Storage", Microsoft.Extensions.Logging.LogLevel.Trace);
+            return filters;
         }
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
 
-            return new ConsulBasedMembershipTable();
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
 
-            return new ConsulBasedMembershipTable();
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>());
         }
 
         protected override async Task<string> GetConnectionString()

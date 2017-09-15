@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests
@@ -12,7 +13,7 @@ namespace UnitTests
     public class AssemblyLoaderTests 
     {
         const string ExpectedFileName = "OrleansProviders.dll";
-        private readonly Logger logger = LogManager.GetLogger("AssemblyLoaderTests", LoggerType.Application);
+        private readonly Logger logger = new LoggerWrapper<AssemblyLoaderTests>(TestingUtils.CreateDefaultLoggerFactory($"AssemblyLoaderTests.log"));
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()

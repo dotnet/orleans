@@ -9,18 +9,21 @@ namespace Orleans.Runtime.ReminderService
     internal class AzureBasedReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private ILogger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private RemindersTableManager remTableManager;
 
-        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILogger<AzureBasedReminderTable> logger)
+        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory)
         {
             this.grainReferenceConverter = grainReferenceConverter;
-            this.logger = logger;
+            this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
+            this.loggerFactory = loggerFactory;
+
         }
 
         public async Task Init(GlobalConfiguration config)
         {
-            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders);
+            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders, this.loggerFactory);
         }
 
         #region Utility methods

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 
 namespace OrleansAWSUtils.Streams
@@ -15,17 +16,17 @@ namespace OrleansAWSUtils.Streams
         protected readonly string DataConnectionString;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
-
+        private readonly ILoggerFactory loggerFactory;
         public string Name { get; private set; }
         public bool IsRewindable { get { return false; } }
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName)
+        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string deploymentId, string providerName)
         {
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
-
+            this.loggerFactory = loggerFactory;
             this.serializationManager = serializationManager;
             DataConnectionString = dataConnectionString;
             DeploymentId = deploymentId;
@@ -35,7 +36,7 @@ namespace OrleansAWSUtils.Streams
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.serializationManager, queueId, DataConnectionString, DeploymentId);
+            return SQSAdapterReceiver.Create(this.serializationManager, this.loggerFactory, queueId, DataConnectionString, DeploymentId);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -48,7 +49,7 @@ namespace OrleansAWSUtils.Streams
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new SQSStorage(queueId.ToString(), DataConnectionString, DeploymentId);
+                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, DeploymentId);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }

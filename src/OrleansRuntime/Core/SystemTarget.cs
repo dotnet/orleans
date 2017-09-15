@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         internal SchedulingContext SchedulingContext => schedulingContext;
         internal ActivationId ActivationId { get; set; }
         private ISiloRuntimeClient runtimeClient;
-
+        private readonly ILoggerFactory loggerFactory;
         internal ISiloRuntimeClient RuntimeClient
         {
             get
@@ -44,15 +45,16 @@ namespace Orleans.Runtime
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo) 
-            : this(grainId, silo, false)
+        internal SystemTarget(GrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory) 
+            : this(grainId, silo, false, loggerFactory)
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority)
+        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
         {
             this.grainId = grainId;
             Silo = silo;
+            this.loggerFactory = loggerFactory;
             ActivationId = ActivationId.GetSystemActivation(grainId, silo);
             schedulingContext = new SchedulingContext(this, lowPriority);
         }
@@ -96,7 +98,7 @@ namespace Orleans.Runtime
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
             name = name ?? ctxt.Name + "Timer";
 
-            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, asyncCallback, state, dueTime, period, name);
+            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler,this.loggerFactory, asyncCallback, state, dueTime, period, name);
             timer.Start();
             return timer;
         }

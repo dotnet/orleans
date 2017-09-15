@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private MultiClusterConfiguration injectedConfig;
         private readonly ILoggerFactory loggerFactory;
         public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
-            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress)
+            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             this.channelFactory = channelFactory;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
             var config = siloDetails.GlobalConfig;
-            logger = LogManager.GetLogger("MultiClusterOracle");
+            logger = new LoggerWrapper<MultiClusterOracle>(loggerFactory);
             localData = new MultiClusterOracleData(logger, grainFactory);
             clusterId = config.ClusterId;
             defaultMultiCluster = config.DefaultMultiCluster;

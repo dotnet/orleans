@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans;
 using Microsoft.Orleans.ServiceFabric.Models;
@@ -50,9 +51,9 @@ namespace Microsoft.Orleans.ServiceFabric
             ILocalSiloDetails localSiloDetails,
             GlobalConfiguration globalConfig,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
-            Factory<string, Logger> loggerFactory)
+            ILoggerFactory loggerFactory)
         {
-            this.log = loggerFactory("MembershipOracle");
+            this.log = new LoggerWrapper<FabricMembershipOracle>(loggerFactory);
             this.localSiloDetails = localSiloDetails;
             this.globalConfig = globalConfig;
             this.fabricServiceSiloResolver = fabricServiceSiloResolver;

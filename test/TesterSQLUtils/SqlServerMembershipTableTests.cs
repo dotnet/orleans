@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -16,19 +17,24 @@ namespace UnitTests.MembershipTests
     [TestCategory("Membership"), TestCategory("SqlServer")]
     public class SqlServerMembershipTableTests : MembershipTableTestsBase
     {
-        public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(typeof (SqlServerMembershipTableTests).Name, Severity.Verbose3);
         }
 
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(typeof(SqlServerMembershipTableTests).Name, LogLevel.Trace);
+            return filters;
+        }
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter);
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter);
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
         protected override string GetAdoInvariant()

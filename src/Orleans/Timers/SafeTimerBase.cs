@@ -11,11 +11,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal class SafeTimerBase : IDisposable
     {
-        private const string asyncTimerName = "asynTask.SafeTimerBase";
-        private const string syncTimerName = "sync.SafeTimerBase";
-
-        private static readonly Logger asyncLogger = LogManager.GetLogger(asyncTimerName, LoggerType.Runtime);
-        private static readonly Logger syncLogger = LogManager.GetLogger(syncTimerName, LoggerType.Runtime);
+        private const string asyncTimerName ="Orleans.Runtime.asynTask.SafeTimerBase";
+        private const string syncTimerName = "Orleans.Runtime.sync.SafeTimerBase";
 
         private Timer               timer;
         private Func<object, Task>  asynTaskCallback;

@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
             }
-            logger = LogManager.GetLogger("Messaging.OutboundMessageQueue");
+            logger = new LoggerWrapper<OutboundMessageQueue>(loggerFactory);
             stopped = false;
         }
 

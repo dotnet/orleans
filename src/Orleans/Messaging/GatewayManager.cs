@@ -25,6 +25,7 @@ namespace Orleans.Messaging
         private int roundRobinCounter;
         private readonly SafeRandom rand;
         private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly object lockable;
 
         private readonly ClientConfiguration config;
@@ -35,7 +36,8 @@ namespace Orleans.Messaging
             config = cfg;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
-            logger = new LoggerWrapper("Messaging.GatewayManager", loggerFactory);
+            logger = new LoggerWrapper<GatewayManager>(loggerFactory);
+            this.loggerFactory = loggerFactory;
             lockable = new object();
             gatewayRefreshCallInitiated = false;
 
@@ -65,7 +67,7 @@ namespace Orleans.Messaging
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
             {
-                gatewayRefreshTimer = new SafeTimer(RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
+                gatewayRefreshTimer = new SafeTimer(this.loggerFactory, RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
             }
         }
 

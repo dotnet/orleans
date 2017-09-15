@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
@@ -87,7 +90,7 @@ namespace UnitTests.Streaming.Reliability
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, _streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 

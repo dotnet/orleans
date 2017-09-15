@@ -17,15 +17,16 @@ namespace Tester.AzureUtils
     public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
     {
         private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
         private string queueName;
 
         public AzureQueueDataManagerTests()
         {
             ClientConfiguration config = new ClientConfiguration();
-            config.TraceFilePattern = null;
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName);
             logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
+            this.loggerFactory = loggerFactory;
         }
 
         public void Dispose()
@@ -37,7 +38,7 @@ namespace Tester.AzureUtils
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
+            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
             await manager.InitQueueAsync();
             return manager;
         }

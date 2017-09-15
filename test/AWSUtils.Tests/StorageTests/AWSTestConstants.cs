@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Runtime;
 using OrleansAWSUtils.Storage;
@@ -18,7 +19,7 @@ namespace AWSUtils.Tests.StorageTests
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage($"Service={Service}", LogManager.GetLogger("DynamoDB"));
+                    storage = new DynamoDBStorage($"Service={Service}", NullLoggerFactory.Instance);
                 }
                 catch (AmazonServiceException)
                 {

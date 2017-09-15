@@ -38,8 +38,9 @@ namespace Tester.AzureUtils
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            logger = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration())
-                .CreateLogger<SiloInstanceTableManagerTests>();
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+                
+            logger = loggerFactory.CreateLogger<SiloInstanceTableManagerTests>();
 
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
@@ -48,7 +49,7 @@ namespace Tester.AzureUtils
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
             logger.Info("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString)
+            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, loggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 

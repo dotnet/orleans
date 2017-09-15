@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.ConsistentRing
@@ -15,7 +16,7 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly int mySubRangeIndex;
         private IRingRange myRange;
 
-        internal EquallyDividedRangeRingProvider(IConsistentRingProvider provider, int mySubRangeIndex, int numSubRanges)
+        internal EquallyDividedRangeRingProvider(IConsistentRingProvider provider, ILoggerFactory loggerFactory, int mySubRangeIndex, int numSubRanges)
         {
             if (mySubRangeIndex < 0 || mySubRangeIndex >= numSubRanges)
                 throw new IndexOutOfRangeException("mySubRangeIndex is out of the range. mySubRangeIndex = " + mySubRangeIndex + " numSubRanges = " + numSubRanges);
@@ -25,7 +26,7 @@ namespace Orleans.Runtime.ConsistentRing
             this.mySubRangeIndex = mySubRangeIndex;
             grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
-            logger = LogManager.GetLogger(typeof(EquallyDividedRangeRingProvider).Name);
+            logger = new LoggerWrapper<EquallyDividedRangeRingProvider>(loggerFactory);
         }
 
         public IRingRange GetMyRange()

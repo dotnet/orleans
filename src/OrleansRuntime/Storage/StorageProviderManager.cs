@@ -13,13 +13,14 @@ namespace Orleans.Runtime.Storage
     {
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
-
+        private readonly ILoggerFactory loggerFactory;
         public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime providerRuntime, LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
             this.providerRuntime = providerRuntime;
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
             storageProviderLoader = new ProviderLoader<IStorageProvider>(loadedProviderTypeLoaders, loggerFactory);
+            this.loggerFactory = loggerFactory;
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
@@ -54,7 +55,7 @@ namespace Orleans.Runtime.Storage
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Provider);
+            return new LoggerWrapper(loggerName, loggerFactory);
         }
 
         public Guid ServiceId => providerRuntime.ServiceId;

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
@@ -8,8 +7,8 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Logging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.TestingHost.Utils
@@ -18,39 +17,45 @@ namespace Orleans.TestingHost.Utils
     public static class TestingUtils
     {
         /// <summary>
-        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="cofig.TraceFileName"/>
-        /// This is the replacement for <see cref="LogManager.Initialize(ITraceConfiguration config, bool configChange = false)"/>
-        /// TODO: this is just an temporary change before we remove ITraceConfiguration
+        /// Configure <paramref name="builder"/> with a ConsoleLoggerProvider and a TraceSourceLoggerProvider which logs to <paramref name="filePath"/>
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
         /// </summary>
-        /// <param name="config">Trace configuration</param>
-        /// <returns></returns>
-        public static ILoggerFactory CreateDefaultLoggerFactory(ITraceConfiguration config)
+        /// <param name="builder"></param>
+        /// <param name="filePath"></param>
+        public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
         {
-            return CreateDefaultLoggerFactory(config.TraceFileName, new LoggerFilterOptions());
+            if (ConsoleText.IsConsoleAvailable)
+                builder.AddConsole();
+            builder.AddFile(filePath);
         }
 
         /// <summary>
-        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="cofig.TraceFileName"/>
-        /// This is the replacement for <see cref="LogManager.Initialize(ITraceConfiguration config, bool configChange = false)"/>
-        /// TODO: this is just an temporary change before we remove ITraceConfiguration
-        /// </summary>
-        /// <param name="config">Trace configuration</param>
-        /// <returns></returns>
-        public static ILoggerFactory CreateDefaultLoggerFactory(ITraceConfiguration config, LoggerFilterOptions filters)
-        {
-            return CreateDefaultLoggerFactory(config.TraceFileName, filters);
-        }
-
-        /// <summary>
-        /// Create the default logger factory, which would create <see cref="ILogger"/>> that writes logs to <paramref name="filePath/>
+        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
         /// </summary>
         /// <param name="filePath">the logger file path</param>
         /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
+        {
+            return CreateDefaultLoggerFactory(filePath, new LoggerFilterOptions());
+        }
+
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
+        /// </summary>
+        /// <param name="filePath">the logger file path</param>
+        /// <param name="filters">log filters you want to configure your logging with</param>
+        /// <returns></returns>
         public static ILoggerFactory CreateDefaultLoggerFactory(string filePath, LoggerFilterOptions filters)
         {
-            var output = File.Open(filePath, FileMode.Append, FileAccess.Write, FileShare.Write);
             var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
-            factory.AddTraceSource(new SourceSwitch("Default"), new TextWriterTraceListener(output));
+            factory.AddProvider(new FileLoggerProvider(filePath));
+            if (ConsoleText.IsConsoleAvailable)
+                factory.AddConsole();
             return factory;
         }
 

@@ -162,8 +162,6 @@ namespace Orleans.Runtime
             var agent = obj as AsynchAgent;
             if (agent == null)
             {
-                var log = LogManager.GetLogger("RuntimeCore.AsynchAgent");
-                log.Error(ErrorCode.Runtime_Error_100022, "Agent thread started with incorrect parameter type");
                 return;
             }
 

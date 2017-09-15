@@ -3,6 +3,8 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using Orleans.Logging;
 using Orleans.Runtime.Configuration;
 
 
@@ -46,12 +48,6 @@ namespace Orleans.Runtime.Host
         /// <summary> Configuration data for this silo. </summary>
         public NodeConfiguration NodeConfig { get; private set; }
 
-        /// <summary> 
-        /// Silo Debug flag. 
-        /// If set to <c>true</c> then additional diagnostic info will be written during silo startup.
-        ///  </summary>
-        public bool Debug { get; set; }
-
         /// <summary>
         /// Whether the silo config has been loaded and initializing it's runtime config.
         /// </summary>
@@ -63,16 +59,11 @@ namespace Orleans.Runtime.Host
         /// <summary> Deployment Id (if any) for the cluster this silo is running in. </summary>
         public string DeploymentId { get; set; }
 
-        /// <summary>
-        /// Verbose flag. 
-        /// If set to <c>true</c> then additional status and diagnostics info will be written during silo startup.
-        /// </summary>
-        public int Verbose { get; set; }
-
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private Logger logger;
+        private static ILoggerFactory defaultLoggerFactory = CreateDefaultLoggerFactory();
+        private ILogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
@@ -85,8 +76,16 @@ namespace Orleans.Runtime.Host
         public SiloHost(string siloName)
         {
             Name = siloName;
+            this.logger = defaultLoggerFactory.CreateLogger<SiloHost>();
             Type = Silo.SiloType.Secondary; // Default
             IsStarted = false;
+        }
+
+        private static ILoggerFactory CreateDefaultLoggerFactory()
+        {
+            var factory = new LoggerFactory();
+            factory.AddProvider(new FileLoggerProvider("SiloHost.log"));
+            return factory;
         }
 
         /// <summary> Constructor </summary>
@@ -114,10 +113,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void InitializeOrleansSilo()
         {
-#if DEBUG
-            AssemblyLoaderUtils.EnableAssemblyLoadTracing();
-#endif
-
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
@@ -137,7 +132,6 @@ namespace Orleans.Runtime.Host
         public void UnInitializeOrleansSilo()
         {
             Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
-            Utils.SafeExecute(LogManager.UnInitialize);
         }
 
         /// <summary>
@@ -430,8 +424,6 @@ namespace Orleans.Runtime.Host
             {
                 if (logger != null) logger.Error(ErrorCode.Runtime_Error_100106, "Error writing log file " + startupLog, exc2);
             }
-
-            LogManager.Flush();
         }
 
         /// <summary>
@@ -466,10 +458,6 @@ namespace Orleans.Runtime.Host
         {
             Config = config;
 
-            if (Verbose > 0)
-                Config.Defaults.DefaultTraceLevel = (Severity.Verbose - 1 + Verbose);
-
-
             if (!String.IsNullOrEmpty(DeploymentId))
                 Config.Globals.DeploymentId = DeploymentId;
 
@@ -487,13 +475,6 @@ namespace Orleans.Runtime.Host
             }
 
             ConfigLoaded = true;
-            InitializeLogger(NodeConfig);
-        }
-
-        private void InitializeLogger(NodeConfiguration nodeCfg)
-        {
-            LogManager.Initialize(nodeCfg);
-            logger = LogManager.GetLogger("OrleansSiloHost", LoggerType.Runtime);
         }
 
         /// <summary>

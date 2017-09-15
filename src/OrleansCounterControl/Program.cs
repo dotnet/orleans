@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Counter.Control
@@ -8,7 +9,7 @@ namespace Orleans.Counter.Control
     {
         static int Main(string[] args)
         {
-            var prog = new CounterControl();
+            var prog = new CounterControl(CounterControl.InitDefaultLogging());
 
             // Program ident
             AssemblyName thisProgram = typeof(Program).GetTypeInfo().Assembly.GetName();

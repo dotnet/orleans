@@ -10,6 +10,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
@@ -34,7 +35,8 @@ namespace Tester
                     return new SiloBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices);
+                        .ConfigureServices(ConfigureServices)
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
                 }
 
             }

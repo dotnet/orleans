@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.LogConsistency;
@@ -15,12 +16,13 @@ namespace Orleans.Runtime
     internal class SiloAssemblyLoader
     {
         private readonly List<string> excludedGrains;
-        private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
+        private readonly Logger logger;
         private readonly Dictionary<string, SearchOption> directories;
         private readonly MultiClusterRegistrationStrategyManager registrationManager;
 
-        public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager)
+        public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager, ILoggerFactory loggerFactory)
         {
+            this.logger = new LoggerWrapper<SiloAssemblyLoader>(loggerFactory);
             IDictionary<string, SearchOption> additionalDirectories = nodeConfig.AdditionalAssemblyDirectories;
             this.registrationManager = registrationManager;
             this.excludedGrains = nodeConfig.ExcludedGrainTypes != null
@@ -146,7 +148,7 @@ namespace Orleans.Runtime
                 new GrainTypeData(grainType, this.registrationManager);
         }
 
-        private static void LogGrainTypesFound(LoggerImpl logger, Dictionary<string, GrainTypeData> grainTypeData)
+        private static void LogGrainTypesFound(Logger logger, Dictionary<string, GrainTypeData> grainTypeData)
         {
             var sb = new StringBuilder();
             sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));
@@ -184,7 +186,7 @@ namespace Orleans.Runtime
                 }
             }
             var report = sb.ToString();
-            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.Loader_GrainTypeFullList, report);
+            logger.Info(ErrorCode.Loader_GrainTypeFullList, report);
         }
     }
 }

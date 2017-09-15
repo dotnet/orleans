@@ -13,7 +13,7 @@ namespace Orleans.Runtime.LogConsistency
     {
         private ProviderLoader<ILogConsistencyProvider> providerLoader;
         private IProviderRuntime runtime;
-
+        private readonly ILoggerFactory loggerFactory;
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
 
@@ -22,6 +22,7 @@ namespace Orleans.Runtime.LogConsistency
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
             this.runtime = runtime;
+            this.loggerFactory = loggerFactory;
             providerLoader = new ProviderLoader<ILogConsistencyProvider>(loadedProviderTypeLoaders, loggerFactory);
         }
 
@@ -76,7 +77,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Provider);
+            return new LoggerWrapper(loggerName, this.loggerFactory);
         }
 
         public Guid ServiceId

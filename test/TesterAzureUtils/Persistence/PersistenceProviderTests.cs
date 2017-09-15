@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.Storage;
+using Orleans.TestingHost.Utils;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.StorageTests;
@@ -239,7 +240,7 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableStorageProvider(useJson, testName);
             var initialState = state.State;
 
-            var logger = LogManager.GetLogger("PersistenceProviderTests");
+            var logger = new LoggerWrapper<PersistenceProviderTests_Local>(TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log"));
             storage.InitLogger(logger);
 
             var entity = new DynamicTableEntity();

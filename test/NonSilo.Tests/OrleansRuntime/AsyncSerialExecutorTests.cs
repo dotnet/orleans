@@ -19,7 +19,7 @@ namespace UnitTests.OrleansRuntime
 
         public AsyncSerialExecutorTests()
         {
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             logger = loggerFactory.CreateLogger<AsyncSerialExecutorTests>();
         }
 

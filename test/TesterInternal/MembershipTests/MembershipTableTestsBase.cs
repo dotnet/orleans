@@ -13,7 +13,6 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
-using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace UnitTests.MembershipTests
@@ -38,13 +37,13 @@ namespace UnitTests.MembershipTests
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
         private readonly string deploymentId;
-
+        protected ILoggerFactory loggerFactory;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
 
-        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
+        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName, filters);
             logger = new LoggerWrapper<MembershipTableTestsBase>(loggerFactory);
 
             deploymentId = "test-" + Guid.NewGuid();
@@ -61,7 +60,7 @@ namespace UnitTests.MembershipTests
             };
 
             membershipTable = CreateMembershipTable(logger);
-            membershipTable.InitializeMembershipTable(globalConfiguration, true, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            membershipTable.InitializeMembershipTable(globalConfiguration, true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
             var clientConfiguration = new ClientConfiguration
             {
@@ -71,7 +70,7 @@ namespace UnitTests.MembershipTests
             };
 
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;

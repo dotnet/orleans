@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -10,14 +11,14 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly GrainDirectoryPartition partition;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainId id)
-            : base(id, r.MyAddress)
+        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainId id, ILoggerFactory loggerFactory)
+            : base(id, r.MyAddress, loggerFactory)
         {
             router = r;
             partition = r.DirectoryPartition;
-            logger = LogManager.GetLogger("Orleans.GrainDirectory.CacheValidator", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
         public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation, int hopCount)
@@ -35,7 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
 
-            if (logger.IsVerbose2) logger.Verbose2("RegisterMany Count={0}", addresses.Count);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RegisterMany Count={0}", addresses.Count);
 
 
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, singleActivation, 1)));
@@ -64,7 +65,7 @@ namespace Orleans.Runtime.GrainDirectory
         public Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList)
         {
             router.CacheValidationsReceived.Increment();
-            if (logger.IsVerbose2) logger.Verbose2("LookUpMany for {0} entries", grainAndETagList.Count);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("LookUpMany for {0} entries", grainAndETagList.Count);
 
             var result = new List<Tuple<GrainId, int, List<ActivationAddress>>>();
 

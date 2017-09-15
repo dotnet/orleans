@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         /// </summary>
         public TimeIntervalThreadCycleCounterBased(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger("Thread Cycle Counter");
+            this.logger = loggerFactory.CreateLogger<TimeIntervalThreadCycleCounterBased>();
             // System call returns what seems to be (from measurements) a value that is in cycles per 1/1024 of a second (close to millisecond)
             long cyclesPerMillisecond;
             NativeMethods.QueryPerformanceFrequency(out cyclesPerMillisecond);

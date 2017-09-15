@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Orleans.Runtime
 {
     using System;
@@ -52,9 +54,9 @@ namespace Orleans.Runtime
         /// <param name="codeGeneratorManager">
         /// The code generator.
         /// </param>
-        public AssemblyProcessor(TypeMetadataCache typeCache, SerializationManager serializationManager, CodeGeneratorManager codeGeneratorManager)
+        public AssemblyProcessor(TypeMetadataCache typeCache, SerializationManager serializationManager, CodeGeneratorManager codeGeneratorManager, ILoggerFactory loggerFactory)
         {
-            this.logger = LogManager.GetLogger("AssemblyProcessor");
+            this.logger = new LoggerWrapper<AssemblyProcessor>(loggerFactory);
             this.typeCache = typeCache;
             this.serializationManager = serializationManager;
             this.codeGeneratorManager = codeGeneratorManager;

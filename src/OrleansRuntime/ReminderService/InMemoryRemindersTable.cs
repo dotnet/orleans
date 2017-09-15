@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -18,11 +19,11 @@ namespace Orleans.Runtime.ReminderService
         // table version, as each read/insert/update should touch & depend on only one row at a time
         //internal TableVersion TableVersion;
 
-        [NonSerialized]
-        private readonly Logger logger = LogManager.GetLogger("InMemoryReminderTable", LoggerType.Runtime);
+        [NonSerialized] private readonly ILogger logger;
 
-        public InMemoryRemindersTable()
+        public InMemoryRemindersTable(ILoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<ILoggerFactory>();
             Reset();
         }
 
@@ -50,7 +51,7 @@ namespace Orleans.Runtime.ReminderService
             foreach (GrainReference k in keys)
                 list.AddRange(reminderTable[k].Values);
 
-            if (logger.IsVerbose3) logger.Verbose3("Selected {0} out of {1} reminders from memory for {2}. List is: {3}{4}", list.Count, reminderTable.Count, range.ToString(),
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Selected {0} out of {1} reminders from memory for {2}. List is: {3}{4}", list.Count, reminderTable.Count, range.ToString(),
                 Environment.NewLine, Utils.EnumerableToString(list, e => e.ToString()));
 
             return new ReminderTableData(list);
@@ -71,12 +72,12 @@ namespace Orleans.Runtime.ReminderService
                 reminders.TryGetValue(reminderName, out result);
             }
 
-            if (logger.IsVerbose3)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
                 if (result == null)
-                    logger.Verbose3("Reminder not found for grain {0} reminder {1} ", grainRef, reminderName);
+                    logger.Trace("Reminder not found for grain {0} reminder {1} ", grainRef, reminderName);
                 else
-                    logger.Verbose3("Read for grain {0} reminder {1} row {2}", grainRef, reminderName, result.ToString());
+                    logger.Trace("Read for grain {0} reminder {1} row {2}", grainRef, reminderName, result.ToString());
             }
             return result;
         }
@@ -96,7 +97,7 @@ namespace Orleans.Runtime.ReminderService
             d.TryGetValue(entry.ReminderName, out old); // tracing purposes only
             // add or over-write
             d[entry.ReminderName] = entry;
-            if (logger.IsVerbose3) logger.Verbose3("Upserted entry {0}, replaced {1}", entry, old);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Upserted entry {0}, replaced {1}", entry, old);
             return entry.ETag;
         }
 

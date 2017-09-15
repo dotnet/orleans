@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -79,7 +80,7 @@ namespace Orleans
             this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Constants.INFINITE_TIMESPAN : cleanupFreq;
             if (Constants.INFINITE_TIMESPAN != cacheCleanupInterval)
             {
-                cacheCleanupTimer = new SafeTimer(InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
+                cacheCleanupTimer = new SafeTimer(NullLoggerFactory.Instance, InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
 #if DEBUG_INTERNER
             StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=" + Environment.NewLine + "{1}", internCache.Count, PrintInternerContent()));

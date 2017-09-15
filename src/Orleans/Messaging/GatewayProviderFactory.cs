@@ -18,7 +18,7 @@ namespace Orleans.Messaging
         {
             this.cfg = cfg;
             this.serviceProvider = serviceProvider;
-            this.logger = new LoggerWrapper(typeof(GatewayProviderFactory).Name, loggerFactory);
+            this.logger = new LoggerWrapper<GatewayProviderFactory>(loggerFactory);
         }
 
         internal IGatewayListProvider CreateGatewayListProvider()

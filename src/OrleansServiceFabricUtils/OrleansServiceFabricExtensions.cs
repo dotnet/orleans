@@ -2,6 +2,7 @@
 using System.Fabric;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.ServiceFabric.Services.Runtime;
 using Orleans;
 using Orleans.Messaging;
@@ -35,7 +36,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     new FabricServiceSiloResolver(
                         service.Context.ServiceName,
                         sp.GetService<IFabricQueryManager>(),
-                        sp.GetService<Factory<string, Logger>>()));
+                        sp.GetService<ILoggerFactory>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
 
@@ -66,7 +67,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     new FabricServiceSiloResolver(
                         service.Context.ServiceName,
                         sp.GetService<IFabricQueryManager>(),
-                        sp.GetService<Factory<string, Logger>>()));
+                        sp.GetService<ILoggerFactory>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
 
             serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
@@ -111,7 +112,7 @@ namespace Microsoft.Orleans.ServiceFabric
                             new FabricServiceSiloResolver(
                                 serviceName,
                                 sp.GetService<IFabricQueryManager>(),
-                                sp.GetService<Factory<string, Logger>>()));
+                                sp.GetService<ILoggerFactory>()));
                     serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
                 });
 

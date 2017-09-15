@@ -119,7 +119,7 @@ namespace Orleans.Messaging
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
-            logger = new LoggerWrapper("Messaging.ProxiedMessageCenter", loggerFactory);
+            logger = new LoggerWrapper<ProxiedMessageCenter>(loggerFactory);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,

@@ -159,12 +159,6 @@ namespace Tests.GeoClusterTests
             Action<ClusterConfiguration> configcustomizer = (ClusterConfiguration c) =>
             {
                 c.Globals.DefaultMultiCluster = new List<string>(2) { clusterA, clusterB };
-
-                // logging  
-                foreach (var o in c.Overrides)
-                {
-                   o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.MultiClusterOracle", Severity.Verbose));
-                }
             };
       
             // create cluster A and clientA

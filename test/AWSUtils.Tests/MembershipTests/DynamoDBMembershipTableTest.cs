@@ -1,8 +1,10 @@
 ﻿using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using UnitTests;
@@ -17,11 +19,17 @@ namespace AWSUtils.Tests.MembershipTests
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")] 
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride("DynamoDBDataManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+        }
+
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("DynamoDBDataManager", LogLevel.Trace);
+            filters.AddFilter("OrleansSiloInstanceManager", LogLevel.Trace);
+            filters.AddFilter("Storage", LogLevel.Trace);
+            return filters;
         }
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
@@ -29,12 +37,12 @@ namespace AWSUtils.Tests.MembershipTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
-            return new DynamoDBMembershipTable();
+            return new DynamoDBMembershipTable(this.loggerFactory);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new DynamoDBGatewayListProvider();
+            return new DynamoDBGatewayListProvider(this.loggerFactory);
         }
 
         protected override Task<string> GetConnectionString()

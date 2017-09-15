@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using Xunit;
@@ -102,7 +103,7 @@ namespace UnitTests.General
             for (int i = 1; i <= n; i++)
             {
                 SiloAddress addr = SiloAddress.NewLocalAddress(i);
-                rings.Add(addr, new ConsistentRingProvider(addr));
+                rings.Add(addr, new ConsistentRingProvider(addr, NullLoggerFactory.Instance));
             }
             return rings;
         }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -15,13 +16,13 @@ namespace Orleans.Runtime
         private readonly StreamProviderManager streamProviderManager;
         private readonly IStreamProviderRuntime streamProviderRuntime;
         private readonly IDictionary<string, ProviderCategoryConfiguration> providerConfigurations;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor;
+        public StreamProviderManagerAgent(Silo silo, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
+            : base(Constants.StreamProviderManagerAgentSystemTargetId, silo.SiloAddress, loggerFactory)
 
-        public StreamProviderManagerAgent(Silo silo, IStreamProviderRuntime streamProviderRuntime)
-            : base(Constants.StreamProviderManagerAgentSystemTargetId, silo.SiloAddress)
         {
-            logger = LogManager.GetLogger("StreamProviderUpdateAgent", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<StreamProviderManagerAgent>();
             this.streamProviderManager = (StreamProviderManager)silo.StreamProviderManager;
             providerConfigurations = silo.GlobalConfig.ProviderConfigurations;
             this.streamProviderRuntime = streamProviderRuntime;
@@ -40,7 +41,7 @@ namespace Orleans.Runtime
             streamProviderConfigurations.TryGetValue(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, out categoryConfig);
             if (categoryConfig == null)
             {
-                if (logger.IsVerbose) { logger.Verbose("streamProviderConfigurations does not contain '" + ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME 
+                if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("streamProviderConfigurations does not contain '" + ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME 
                     + "' element. Nothing to update."); }
                 return;
             }
@@ -57,7 +58,7 @@ namespace Orleans.Runtime
                 if (!newProviderList.ContainsKey(providerName))
                 {
                     removeList.Add(providerName);
-                    if (logger.IsVerbose) { logger.Verbose("Removing stream provider '" + providerName + "' from silo"); }
+                    if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Removing stream provider '" + providerName + "' from silo"); }
                 }
             }
             foreach (var providerName in newProviderList.Keys)
@@ -65,7 +66,7 @@ namespace Orleans.Runtime
                 if (!existingProviders.Contains(providerName))
                 {
                     addList.Add(providerName);
-                    if (logger.IsVerbose) { logger.Verbose("Adding stream provider '" + providerName + "' to silo"); }
+                    if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Adding stream provider '" + providerName + "' to silo"); }
                 }
             }
             try
@@ -90,7 +91,8 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            if (logger.IsVerbose) { logger.Verbose("Stream providers updated successfully."); }
+            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Stream providers updated successfully."); }
+
             providerConfigurations[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME] = 
                 streamProviderConfigurations[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME];
         }

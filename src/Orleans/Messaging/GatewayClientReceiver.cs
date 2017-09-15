@@ -22,7 +22,7 @@ namespace Orleans.Messaging
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
-            buffer = new IncomingMessageBuffer(Log, serializationManager, true); 
+            buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, true); 
         }
 
         protected override void Run()

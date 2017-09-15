@@ -94,23 +94,10 @@ namespace Orleans.Runtime.Configuration
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
-        /// <inheritdoc />
-        public Severity DefaultTraceLevel { get; set; }
-
-        /// <inheritdoc />
-        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
-
-        /// <inheritdoc />
-        public bool TraceToConsole { get; set; }
-
-        /// <inheritdoc />
-        public int LargeMessageWarningThreshold { get; set; }
-
-        /// <inheritdoc />
+        /// <summary>
+        ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
+        /// </summary>
         public bool PropagateActivityId { get; set; }
-
-        /// <inheritdoc />
-        public int BulkMessageLimit { get; set; }
 
         /// <summary>
         /// </summary>
@@ -206,13 +193,8 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            DefaultTraceLevel = Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Severity>>();
-            TraceToConsole = ConsoleText.IsConsoleAvailable;
             TraceFilePattern = "{0}-{1}.log";
-            LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
-            BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
 
             GatewayListRefreshPeriod = DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;

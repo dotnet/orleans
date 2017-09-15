@@ -17,7 +17,7 @@ namespace Orleans.Providers
         {
             this.Managers = new ConcurrentBag<ProviderTypeLoader>();
             AppDomain.CurrentDomain.AssemblyLoad += ProcessNewAssembly;
-            this.logger = new LoggerWrapper("ProviderTypeLoader", loggerFactory);
+            this.logger = new LoggerWrapper<LoadedProviderTypeLoaders>(loggerFactory);
         }
 
         private void ProcessNewAssembly(object sender, AssemblyLoadEventArgs args)
@@ -64,7 +64,7 @@ namespace Orleans.Providers
             this.condition = condition;
             callback = action;
             alreadyProcessed = new HashSet<Type>();
-            this.logger = new LoggerWrapper(this.GetType().Name, loggerFactory);
+            this.logger = new LoggerWrapper<ProviderTypeLoader>(loggerFactory);
             IsActive = true;
          }
 

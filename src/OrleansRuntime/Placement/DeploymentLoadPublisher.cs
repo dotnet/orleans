@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
@@ -22,7 +23,7 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
-        private readonly Logger logger = LogManager.GetLogger("DeploymentLoadPublisher", LoggerType.Runtime);
+        private readonly ILogger logger;
         private IDisposable publishTimer;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
@@ -33,9 +34,11 @@ namespace Orleans.Runtime
             ISiloStatusOracle siloStatusOracle,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
-            OrleansTaskScheduler scheduler)
-            : base(Constants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress)
+            OrleansTaskScheduler scheduler,
+            ILoggerFactory loggerFactory)
+            : base(Constants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
             this.siloDetails = siloDetails;
             this.siloMetrics = siloMetrics;
             this.siloStatusOracle = siloStatusOracle;
@@ -66,7 +69,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if(logger.IsVerbose) logger.Verbose("PublishStatistics.");
+                if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("PublishStatistics.");
                 List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
                 var tasks = new List<Task>();
                 var myStats = new SiloRuntimeStatistics(this.siloMetrics, DateTime.UtcNow);
@@ -96,7 +99,7 @@ namespace Orleans.Runtime
 
         public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
-            if (logger.IsVerbose) logger.Verbose("UpdateRuntimeStatistics from {0}", siloAddress);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRuntimeStatistics from {0}", siloAddress);
             if (this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 return Task.CompletedTask;
 
@@ -112,7 +115,7 @@ namespace Orleans.Runtime
 
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
-            if (logger.IsVerbose) logger.Verbose("RefreshStatistics.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
             await this.scheduler.RunOrQueueTask( () =>
                 {
                     var tasks = new List<Task>();

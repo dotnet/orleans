@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.Configuration.Install" />
   </ItemGroup>
 

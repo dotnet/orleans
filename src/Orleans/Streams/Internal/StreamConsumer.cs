@@ -31,7 +31,7 @@ namespace Orleans.Streams
             if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
             if (pubSub == null) throw new ArgumentNullException("pubSub");
 
-            logger = loggerFactory.CreateLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream));
+            logger = loggerFactory.CreateLogger(string.Format("<{0}>-{1}", typeof(StreamConsumer<T>).FullName, stream));
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;

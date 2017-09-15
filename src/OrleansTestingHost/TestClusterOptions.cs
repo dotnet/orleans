@@ -22,8 +22,6 @@ namespace Orleans.TestingHost
         /// <summary>Extended options to be used as fallbacks in the case that explicit options are not provided by the user.</summary>
         public class FallbackOptions
         {
-            /// <summary>Gets or sets whether the cluster will output traces in the console by default</summary>
-            public bool? TraceToConsole { get; set; }
 
             /// <summary>Gets or sets the default subfolder the the logs</summary>
             public string LogsFolder { get; set; }
@@ -42,7 +40,6 @@ namespace Orleans.TestingHost
                 {
                     { nameof(DataConnectionString), "UseDevelopmentStorage=true" },
                     { nameof(LogsFolder), "logs" },
-                    { nameof(TraceToConsole), "true" },
                     { nameof(InitialSilosCount), "2" },
                 });
                 return builder;
@@ -162,10 +159,6 @@ namespace Orleans.TestingHost
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
             config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
-            if (extendedOptions.TraceToConsole.HasValue)
-            {
-                config.Defaults.TraceToConsole = extendedOptions.TraceToConsole.Value;
-            }
 
             var defaultLogsFolder = extendedOptions.LogsFolder;
             if (!string.IsNullOrWhiteSpace(defaultLogsFolder))
@@ -234,7 +227,6 @@ namespace Orleans.TestingHost
         {
             var config = new ClientConfiguration();
             config.TraceFilePattern = clusterConfig.Defaults.TraceFilePattern;
-            config.TraceToConsole = clusterConfig.Defaults.TraceToConsole;
             switch (clusterConfig.Globals.LivenessType)
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
@@ -268,15 +260,12 @@ namespace Orleans.TestingHost
 
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
             config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
-            config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
 
             // If a debugger is attached, override the timeout setting
             config.ResponseTimeout = Debugger.IsAttached
                 ? TimeSpan.FromMilliseconds(1000000)
                 : clusterConfig.Globals.ResponseTimeout;
-
-            config.LargeMessageWarningThreshold = clusterConfig.Defaults.LargeMessageWarningThreshold;
 
             config.AdjustForTestEnvironment(clusterConfig.Globals.DataConnectionString);
             return config;

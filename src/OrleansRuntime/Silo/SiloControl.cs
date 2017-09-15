@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Versions;
@@ -15,10 +16,11 @@ namespace Orleans.Runtime
 {
     internal class SiloControl : SystemTarget, ISiloControl
     {
-        private static readonly Logger logger = LogManager.GetLogger("SiloControl", LoggerType.Runtime);
+        private readonly ILogger logger;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly Factory<NodeConfiguration> localConfiguration;
         private readonly ClusterConfiguration clusterConfiguration;
+
         private readonly DeploymentLoadPublisher deploymentLoadPublisher;
         private readonly Catalog catalog;
         private readonly GrainTypeManager grainTypeManager;
@@ -41,12 +43,15 @@ namespace Orleans.Runtime
             ProviderManagerSystemTarget providerManagerSystemTarget,
             CachedVersionSelectorManager cachedVersionSelectorManager, 
             CompatibilityDirectorManager compatibilityDirectorManager,
-            VersionSelectorManager selectorManager)
-            : base(Constants.SiloControlId, localSiloDetails.SiloAddress)
+            VersionSelectorManager selectorManager,
+            ILoggerFactory loggerFactory)
+            : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
             this.localConfiguration = localConfiguration;
             this.clusterConfiguration = clusterConfiguration;
+
+            this.logger = loggerFactory.CreateLogger<SiloControl>();
             this.deploymentLoadPublisher = deploymentLoadPublisher;
             this.catalog = catalog;
             this.grainTypeManager = grainTypeManager;
@@ -66,35 +71,6 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public Task SetSystemLogLevel(int traceLevel)
-        {
-            var newTraceLevel = (Severity)traceLevel;
-            logger.Info("SetSystemLogLevel={0}", newTraceLevel);
-            LogManager.SetRuntimeLogLevel(newTraceLevel);
-            this.localConfiguration().DefaultTraceLevel = newTraceLevel;
-            return Task.CompletedTask;
-        }
-
-        public Task SetAppLogLevel(int traceLevel)
-        {
-            var newTraceLevel = (Severity)traceLevel;
-            logger.Info("SetAppLogLevel={0}", newTraceLevel);
-            LogManager.SetAppLogLevel(newTraceLevel);
-            return Task.CompletedTask;
-        }
-
-        public Task SetLogLevel(string logName, int traceLevel)
-        {
-            var newTraceLevel = (Severity)traceLevel;
-            logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
-            LoggerImpl log = LogManager.FindLogger(logName);
-            
-            if (log == null) throw new ArgumentException(string.Format("Logger {0} not found", logName));
-            
-            log.SetSeverityLevel(newTraceLevel);
-            return Task.CompletedTask;
-        }
-
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
@@ -111,13 +87,13 @@ namespace Orleans.Runtime
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsVerbose) logger.Verbose("ForceRuntimeStatisticsCollection");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ForceRuntimeStatisticsCollection");
             return this.deploymentLoadPublisher.RefreshStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsVerbose) logger.Verbose("GetRuntimeStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics");
             return Task.FromResult(new SiloRuntimeStatistics(this.siloMetrics, DateTime.UtcNow));
         }
 
@@ -129,7 +105,7 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
-            if (logger.IsVerbose) logger.Verbose("GetDetailedGrainStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetDetailedGrainStatistics");
             return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
         }
 

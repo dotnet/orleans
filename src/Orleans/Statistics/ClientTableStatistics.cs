@@ -101,7 +101,7 @@ namespace Orleans.Runtime
                     {
                         reportTimer.Dispose();
                     }
-                    reportTimer = new AsyncTaskSafeTimer(this.lothis.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
+                    reportTimer = new AsyncTaskSafeTimer(this.loggerFactory, this.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
                 }
             }
         }

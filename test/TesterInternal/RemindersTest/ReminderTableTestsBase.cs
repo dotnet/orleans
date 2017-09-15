@@ -7,12 +7,11 @@ using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
-using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.RemindersTest
 {
@@ -23,12 +22,12 @@ namespace UnitTests.RemindersTest
         private readonly ILogger logger;
 
         private readonly IReminderTable remindersTable;
-
+        protected ILoggerFactory loggerFactory;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
-        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture)
+        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration());
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName, filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid();
@@ -47,7 +46,7 @@ namespace UnitTests.RemindersTest
             };
 
             var rmndr = CreateRemindersTable();
-            rmndr.Init(globalConfiguration, loggerFactory).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            rmndr.Init(globalConfiguration).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
             remindersTable = rmndr;
         }
 

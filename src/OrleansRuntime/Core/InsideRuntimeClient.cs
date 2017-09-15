@@ -28,7 +28,7 @@ namespace Orleans.Runtime
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
-
+        private readonly ILoggerFactory loggerFactory;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly Func<Message, bool> tryResendMessage;
@@ -75,7 +75,8 @@ namespace Orleans.Runtime
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             this.siloInterceptors = new List<IGrainCallFilter>(registeredInterceptors);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
-            this.invokeExceptionLogger =loggerFactory.CreateLogger("Grain.InvokeException");
+            this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
+            this.loggerFactory = loggerFactory;
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -203,7 +204,8 @@ namespace Orleans.Runtime
                     context,
                     message,
                     unregisterCallback,
-                    Config.Globals);
+                    Config.Globals,
+                    this.loggerFactory);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }
@@ -325,7 +327,7 @@ namespace Orleans.Runtime
                     var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager);
                     if (request.Arguments != null)
                     {
-                        CancellationSourcesExtension.RegisterCancellationTokens(target, request, logger, this);
+                        CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this);
                     }
 
                     var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);

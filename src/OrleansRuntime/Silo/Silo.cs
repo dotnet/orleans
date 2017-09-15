@@ -159,14 +159,7 @@ namespace Orleans.Runtime
             AsynchAgent.IsStarting = true;
             
             var startTime = DateTime.UtcNow;
-            
-            if (!LogManager.IsInitialized)
-            {
-                LogManager.Initialize(LocalConfig);
-            }
-            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-
-            config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
+           services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             StatisticsCollector.Initialize(LocalConfig);
             
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
@@ -185,9 +178,12 @@ namespace Orleans.Runtime
                 serviceCollection.AddSingleton(initializationParams);
                 DefaultSiloServices.AddDefaultServices(serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
+                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
 
             this.Services = services;
+            //set PropagateActivityId flag from node cofnig
+            RequestContext.PropagateActivityId = this.initializationParams.NodeConfig.PropagateActivityId;
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = new LoggerWrapper<Silo>(this.loggerFactory);
 
@@ -203,17 +199,12 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
                 name, config.ToString(name));
 
-                var serviceCollection = new ServiceCollection();
-                serviceCollection.AddSingleton<Silo>(this);
-                serviceCollection.AddSingleton(initializationParams);
-                DefaultSiloServices.AddDefaultServices(serviceCollection);
-                services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
-                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
             BufferPool.InitGlobalBufferPool(GlobalConfig);
-
+            //init logger for UnobservedExceptionsHandlerClass
+            UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
             if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnobservedExceptionHandler))
             {
                 logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
@@ -302,11 +293,10 @@ namespace Orleans.Runtime
             RegisterSystemTarget(siloControl);
 
             logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
-            RegisterSystemTarget(
-                new StreamProviderManagerAgent(this, Services.GetRequiredService<IStreamProviderRuntime>()));
+            RegisterSystemTarget(new StreamProviderManagerAgent(this, Services.GetRequiredService<IStreamProviderRuntime>(), this.loggerFactory));
 
             logger.Verbose("Creating {0} System Target", "ProtocolGateway");
-            RegisterSystemTarget(new ProtocolGateway(this.SiloAddress));
+            RegisterSystemTarget(new ProtocolGateway(this.SiloAddress, this.loggerFactory));
 
             logger.Verbose("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
@@ -323,7 +313,8 @@ namespace Orleans.Runtime
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
             var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
             var versionDirectorManager = this.Services.GetRequiredService<CachedVersionSelectorManager>();
-            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager);
+            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager,
+                this.loggerFactory);
             this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
@@ -380,6 +371,7 @@ namespace Orleans.Runtime
 
             // SystemTarget for provider init calls
             providerManagerSystemTarget = Services.GetRequiredService<ProviderManagerSystemTarget>();
+
             RegisterSystemTarget(providerManagerSystemTarget);
         }
         
@@ -529,7 +521,7 @@ namespace Orleans.Runtime
                 if (this.logger.IsVerbose) { this.logger.Verbose("Silo deployment load publisher started successfully."); }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
-                this.platformWatchdog = new Watchdog(this.LocalConfig.StatisticsLogWriteInterval, this.healthCheckParticipants);
+                this.platformWatchdog = new Watchdog(this.LocalConfig.StatisticsLogWriteInterval, this.healthCheckParticipants, this.loggerFactory);
                 this.platformWatchdog.Start();
                 if (this.logger.IsVerbose) { this.logger.Verbose("Silo platform watchdog started successfully."); }
 
@@ -835,7 +827,6 @@ namespace Orleans.Runtime
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
             SafeExecute(() => this.assemblyProcessor?.Dispose());
             SafeExecute(() => (this.Services as IDisposable)?.Dispose());
-            SafeExecute(LogManager.Close);
 
             // Setting the event should be the last thing we do.
             // Do nothing after that!
@@ -851,24 +842,16 @@ namespace Orleans.Runtime
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            LogManager.Flush();
-
-            try
+            
+            lock (lockable)
             {
-                lock (lockable)
-                {
-                    if (!this.SystemStatus.Equals(SystemStatus.Running)) return;
+                if (!this.SystemStatus.Equals(SystemStatus.Running)) return;
                     
-                    this.SystemStatus = SystemStatus.Stopping;
-                }
+                this.SystemStatus = SystemStatus.Stopping;
+            }
                 
-                logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
-                FastKill();
-            }
-            finally
-            {
-                LogManager.Close();
-            }
+            logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
+            FastKill();
         }
 
         private void UnobservedExceptionHandler(ISchedulingContext context, Exception exception)
@@ -949,8 +932,8 @@ namespace Orleans.Runtime
     // A dummy system target to use for scheduling context for provider Init calls, to allow them to make grain calls
     internal class ProviderManagerSystemTarget : SystemTarget
     {
-        public ProviderManagerSystemTarget(ILocalSiloDetails localSiloDetails)
-            : base(Constants.ProviderManagerSystemTargetId, localSiloDetails.SiloAddress)
+        public ProviderManagerSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.ProviderManagerSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

@@ -19,7 +19,7 @@ namespace UnitTests
 
         public Async_TimingTests()
         {
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(ClientConfiguration.StandardLoad());
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(ClientConfiguration.StandardLoad().TraceFileName);
             logger = loggerFactory.CreateLogger<Async_TimingTests>();
             logger.Info("----------------------------- STARTING AC_TimingTests -------------------------------------");
         }

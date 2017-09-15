@@ -14,13 +14,11 @@ namespace Orleans.Runtime.MembershipService
         private readonly IServiceProvider serviceProvider;
         private readonly AsyncLock initializationLock = new AsyncLock();
         private readonly Logger logger;
-        private readonly ILoggerFactory loggerFactory;
         private IMembershipTable membershipTable;
 
         public MembershipTableFactory(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         {
             this.serviceProvider = serviceProvider;
-            this.loggerFactory = loggerFactory;
             logger = new LoggerWrapper<MembershipTableFactory>(loggerFactory);
         }
 
@@ -61,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
                             $"No membership table provider found for {nameof(globalConfig.LivenessType)}={globalConfig.LivenessType}");
                 }
                 
-                await result.InitializeMembershipTable(globalConfig, true, this.loggerFactory);
+                await result.InitializeMembershipTable(globalConfig, true);
                 membershipTable = result;
             }
 

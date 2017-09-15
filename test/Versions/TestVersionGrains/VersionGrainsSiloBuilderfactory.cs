@@ -5,6 +5,7 @@ using UnitTests.GrainInterfaces;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace TestVersionGrains
 {
@@ -15,7 +16,8 @@ namespace TestVersionGrains
             return new SiloBuilder()
                 .ConfigureSiloName(siloName)
                 .UseConfiguration(clusterConfiguration)
-                .ConfigureServices(ConfigureServices);
+                .ConfigureServices(ConfigureServices)
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
         }
 
         private void ConfigureServices(IServiceCollection services)

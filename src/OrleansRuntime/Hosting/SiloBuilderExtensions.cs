@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -92,6 +93,17 @@ namespace Orleans.Hosting
         {
             if (configureServiceProvider == null) throw new ArgumentNullException(nameof(configureServiceProvider));
             return builder.UseServiceProviderFactory(new DelegateServiceProviderFactory(configureServiceProvider));
+        }
+
+        /// <summary>
+        /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
+        /// </summary>
+        /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
+        /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
+        /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
+        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<ILoggingBuilder> configureLogging)
+        {
+            return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
         }
     }
 }

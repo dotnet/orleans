@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansTelemetryConsumers.Counters
 {
@@ -16,7 +17,7 @@ namespace OrleansTelemetryConsumers.Counters
         internal const string CATEGORY_DESCRIPTION = "Orleans Runtime Counters";
         private const string ExplainHowToCreateOrleansPerfCounters = "Run 'InstallUtil.exe OrleansTelemetryConsumers.Counters.dll' as Administrator to create perf counters for Orleans.";
 
-        private static readonly Logger logger = LogManager.GetLogger("OrleansPerfCounterManager", LoggerType.Runtime);
+        private readonly ILogger logger;
         private readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
         private bool isInstalling = false;
         private readonly object initializationLock = new object();
@@ -26,10 +27,11 @@ namespace OrleansTelemetryConsumers.Counters
         /// <summary>
         /// Default constructor
         /// </summary>
-        public OrleansPerfCounterTelemetryConsumer()
+        public OrleansPerfCounterTelemetryConsumer(ILoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<OrleansPerfCounterTelemetryConsumer>();
             this.isInitialized = new Lazy<bool>(this.Initialize, true);
-            if (!AreWindowsPerfCountersAvailable())
+            if (!AreWindowsPerfCountersAvailable(logger))
             {
                 logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
             }
@@ -41,7 +43,7 @@ namespace OrleansTelemetryConsumers.Counters
         /// Checks to see if windows perf counters as supported by OS.
         /// </summary>
         /// <returns></returns>
-        public static bool AreWindowsPerfCountersAvailable()
+        public static bool AreWindowsPerfCountersAvailable(ILogger logger)
         {
             try
             {
@@ -61,9 +63,9 @@ namespace OrleansTelemetryConsumers.Counters
             return false;
         }
 
-        private static PerformanceCounter CreatePerfCounter(string perfCounterName)
+        private static PerformanceCounter CreatePerfCounter(string perfCounterName, ILogger logger)
         {
-            logger.Verbose(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
+            logger.Debug(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
             return new PerformanceCounter(CATEGORY_NAME, perfCounterName, false);
         }
 
@@ -187,8 +189,7 @@ namespace OrleansTelemetryConsumers.Counters
                 var newPerfCounterData = new List<PerfCounterConfigData>(PerfCounterConfigData.StaticPerfCounters);
 
                 // TODO: get rid of this static access. Telemetry consumers now allow being injected with dependencies, so extract it as such
-                var grainTypes = LogManager.GrainTypes;
-                if (grainTypes != null)
+				var grainTypes = CrashUtils.GrainTypes;                if (grainTypes != null)
                 {
                     // (2) Then search for grain DLLs and pre-create activation counters for any grain types found
                     foreach (var grainType in grainTypes)
@@ -205,7 +206,7 @@ namespace OrleansTelemetryConsumers.Counters
                     foreach (var cd in newPerfCounterData)
                     {
                         var perfCounterName = GetPerfCounterName(cd);
-                        cd.PerfCounter = CreatePerfCounter(perfCounterName);
+                        cd.PerfCounter = CreatePerfCounter(perfCounterName, this.logger);
                     }
                 }
 
@@ -244,7 +245,7 @@ namespace OrleansTelemetryConsumers.Counters
             try
             {
 
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.PerfCounterWriting, "Writing perf counter {0}", perfCounterName);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PerfCounterWriting, "Writing perf counter {0}", perfCounterName);
 
                 switch (mode)
                 {

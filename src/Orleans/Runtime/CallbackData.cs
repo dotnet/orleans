@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions;
 
@@ -29,8 +30,8 @@ namespace Orleans.Runtime
         private TimeSpan timeout;
         private SafeTimer timer;
         private ITimeInterval timeSinceIssued;
-        private static readonly Logger logger = LogManager.GetLogger("CallbackData");
-
+        private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         public TransactionInfo TransactionInfo { get; set; }
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
@@ -41,13 +42,14 @@ namespace Orleans.Runtime
             TaskCompletionSource<object> ctx, 
             Message msg, 
             Action<Message> unregisterDelegate,
-            IMessagingConfiguration config)
+            IMessagingConfiguration config,
+            ILoggerFactory loggerFactory)
         {
             // We are never called without a callback func, but best to double check.
             if (callback == null) throw new ArgumentNullException(nameof(callback));
             // We are never called without a resend func, but best to double check.
             if (resendFunc == null) throw new ArgumentNullException(nameof(resendFunc));
-
+            this.logger = new LoggerWrapper<CallbackData>(loggerFactory);
             this.callback = callback;
             this.resendFunc = resendFunc;
             context = ctx;
@@ -55,7 +57,7 @@ namespace Orleans.Runtime
             unregister = unregisterDelegate;
             alreadyFired = false;
             this.config = config;
-
+            this.loggerFactory = loggerFactory;
             this.TransactionInfo = TransactionContext.GetTransactionInfo();
         }
 
@@ -82,7 +84,7 @@ namespace Orleans.Runtime
             }
             // Start time running
             DisposeTimer();
-            timer = new SafeTimer(TimeoutCallback, null, firstPeriod, repeatPeriod);
+            timer = new SafeTimer(this.loggerFactory, TimeoutCallback, null, firstPeriod, repeatPeriod);
 
         }
 

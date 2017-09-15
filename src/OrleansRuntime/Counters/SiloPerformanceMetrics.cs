@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Counters
         private bool overloadValue;
         private readonly RuntimeStatisticsGroup runtimeStats;
         private AsyncTaskSafeTimer tableReportTimer;
-        private static readonly Logger logger = LogManager.GetLogger("SiloPerformanceMetrics", LoggerType.Runtime);
+        private readonly ILogger logger;
         private float? cpuUsageLatch;
 
         internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
@@ -31,6 +31,7 @@ namespace Orleans.Runtime.Counters
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
             overloadValue = false;
+            this.logger = loggerFactory.CreateLogger<SiloPerformanceMetrics>();
             NodeConfig = cfg ?? new NodeConfiguration();
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => IsOverloaded.ToString());
         }

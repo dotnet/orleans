@@ -59,7 +59,6 @@ namespace Orleans.Storage
         /// <summary>
         /// Orleans Logger instance
         /// </summary>
-        [Obsolete]
         public Logger Log { get; private set; }
 
         private DynamoDBStorage storage;

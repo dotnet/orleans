@@ -1,7 +1,9 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.SqlUtils;
 using TestExtensions;
@@ -16,9 +18,14 @@ namespace UnitTests.RemindersTest
     [TestCategory("Reminders"), TestCategory("MySql")]
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
-        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(nameof(MySqlRemindersTableTests), Severity.Verbose3);
+        }
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(nameof(MySqlRemindersTableTests), LogLevel.Trace);
+            return filters;
         }
 
         protected override IReminderTable CreateRemindersTable()

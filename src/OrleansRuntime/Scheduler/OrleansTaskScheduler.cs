@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Scheduler
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
         private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         
@@ -50,7 +51,8 @@ namespace Orleans.Runtime.Scheduler
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
             TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
         {
-            this.logger = new LoggerWrapper("Scheduler.OrleansTaskScheduler", loggerFactory);
+            this.logger = new LoggerWrapper<OrleansTaskScheduler>(loggerFactory);
+            this.loggerFactory = loggerFactory;
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
@@ -180,7 +182,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                var todo = new TaskWorkItem(this, task, context);
+                var todo = new TaskWorkItem(this, task, context, this.loggerFactory);
                 RunQueue.Add(todo);
             }
             else
@@ -239,7 +241,7 @@ namespace Orleans.Runtime.Scheduler
         {
             if (context == null) return null;
 
-            var wg = new WorkItemGroup(this, context);
+            var wg = new WorkItemGroup(this, context, this.loggerFactory);
             workgroupDirectory.TryAdd(context, wg);
             return wg;
         }

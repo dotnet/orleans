@@ -5,6 +5,7 @@ using Orleans;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.Grains
 {
@@ -117,9 +118,9 @@ namespace UnitTests.Grains
         }
         public string GetInstanceValue() => this.instanceValue;
 
-        public InjectedService(Factory<string, Logger> loggerFactory)
+        public InjectedService(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory?.Invoke("InjectedService");
+            this.logger = new LoggerWrapper<InjectedService>(loggerFactory);
         }
 
         public void Dispose()
@@ -139,9 +140,9 @@ namespace UnitTests.Grains
         private readonly string instanceValue = Guid.NewGuid().ToString();
         private readonly Logger logger;
 
-        public InjectedScopedService(Factory<string, Logger> loggerFactory)
+        public InjectedScopedService(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory("InjectedScopedService");
+            this.logger = new LoggerWrapper<InjectedScopedService>(loggerFactory);
         }
 
         public void Dispose()

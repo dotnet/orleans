@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
@@ -24,7 +25,7 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, TestingUtils.CreateDefaultLoggerFactory(config.CreateNodeConfigurationForSilo(nameof(AzureSiloTests)).TraceFileName));
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.True(ok);
@@ -41,7 +42,8 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime,
+                TestingUtils.CreateDefaultLoggerFactory(config.GetOrCreateNodeConfigurationForSilo(nameof(AzureSiloTests)).TraceFileName));
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);
@@ -58,7 +60,8 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime,
+                TestingUtils.CreateDefaultLoggerFactory(config.GetOrCreateNodeConfigurationForSilo(nameof(AzureSiloTests)).TraceFileName));
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);

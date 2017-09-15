@@ -43,7 +43,6 @@ namespace UnitTests.SchedulerTests
             masterScheduler.Stop();
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
-            LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -685,7 +684,7 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddress.NewLocalAddress(23)
             };
-            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null));
+            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null, NullLoggerFactory.Instance));
             await grain.OnActivateAsync();
 
             Task wrapped = null;

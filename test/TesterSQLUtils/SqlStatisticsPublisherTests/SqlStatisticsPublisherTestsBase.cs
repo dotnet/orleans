@@ -32,13 +32,14 @@ namespace UnitTests.SqlStatisticsPublisherTests
         private const string testDatabaseName = "OrleansStatisticsTest";
         
         private readonly Logger logger;
-
+        private readonly ILoggerFactory loggerFactory;
         private readonly SqlStatisticsPublisher StatisticsPublisher;
         
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
             this.environment = environment;
-            logger = new LoggerWrapper<SqlStatisticsPublisherTestsBase>(TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration()));
+            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+            logger = new LoggerWrapper<SqlStatisticsPublisherTestsBase>(loggerFactory);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
@@ -76,8 +77,8 @@ namespace UnitTests.SqlStatisticsPublisherTests
                 DataConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>());
-            await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(TimeSpan.FromMinutes(1));
+            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            await mbr.InitializeMembershipTable(config, true).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddress.NewLocalAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));
         }

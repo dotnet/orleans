@@ -26,12 +26,12 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             reportFrequency = writeInterval;
             this.serializationManager = serializationManager;
-            logger = loggerFactory.CreateLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics");
+            logger = loggerFactory.CreateLogger("Orleans.Runtime" + (isSilo ? "SiloLogStatistics" : "ClientLogStatistics"));
         }
 
         internal void Start()
         {
-            reportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer.
+            reportTimer = new AsyncTaskSafeTimer(this.loggerFactory, Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer.
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -115,7 +115,7 @@ namespace Orleans.Runtime
             int newSize = logMsgBuilder.Length + Environment.NewLine.Length + counterData.Length;
             int newSizeWithPostfix = newSize + STATS_LOG_POSTFIX.Length + Environment.NewLine.Length;
 
-            if (newSizeWithPostfix >= LogManager.MAX_LOG_MESSAGE_SIZE)
+            if (newSizeWithPostfix >= LoggingUtils.MAX_LOG_MESSAGE_SIZE)
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);

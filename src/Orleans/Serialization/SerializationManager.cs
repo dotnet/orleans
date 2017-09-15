@@ -135,7 +135,7 @@ namespace Orleans.Serialization
         {
             var serializationProviders = config.SerializationProviders;
             var fallbackType = config.FallbackSerializationProvider;
-            this.LargeObjectSizeThreshold = traceConfig.LargeMessageWarningThreshold;
+            this.LargeObjectSizeThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 

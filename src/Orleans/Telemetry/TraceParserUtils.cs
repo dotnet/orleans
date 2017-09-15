@@ -115,9 +115,9 @@ namespace Orleans.Runtime
             }
             string exc = includeStackTrace ? LogFormatter.PrintException(exception) : LogFormatter.PrintExceptionWithoutStackTrace(exception);
             string msg = String.Format("[{0} {1,5}\t{2}\t{3}\t{4}\t{5}]\t{6}\t{7}",
-                LogManager.ShowDate ? LogFormatter.PrintDate(timestamp) : LogFormatter.PrintTime(timestamp),            //0
+                LogFormatter.PrintTime(timestamp),            //0
                 Thread.CurrentThread.ManagedThreadId,   //1
-                LogManager.SeverityTable[(int)severity],    //2
+                severity.ToString(),  //2
                 errorCode,                              //3
                 caller,                                 //4
                 ip,                                     //5

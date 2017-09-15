@@ -126,7 +126,7 @@ namespace Orleans.Runtime
         // We start an asynch receive, with this callback, off of every send socket.
         // Since we should never see data coming in on these sockets, having the receive complete means that
         // the socket is in an unknown state and we should close it and try again.
-        private void ReceiveCallback(object sender, SocketAsyncEventArgs socketAsyncEventArgs)
+        private static void ReceiveCallback(object sender, SocketAsyncEventArgs socketAsyncEventArgs)
         {
             var t = socketAsyncEventArgs.UserToken as Tuple<Socket, IPEndPoint, SocketManager>;
             try
@@ -135,7 +135,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
+                t?.Item3.logger.Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
             }
             finally
             {

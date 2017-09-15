@@ -37,6 +37,8 @@ namespace Orleans
         {
             this.Configuration = configuration;
             this.runtimeClient = runtimeClient;
+            //set PropagateActivityId flag from node cofnig
+            RequestContext.PropagateActivityId = configuration.PropagateActivityId;
             this.appLogger = new LoggerWrapper("Application", loggerFactory);
         }
 

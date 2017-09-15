@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -56,7 +58,7 @@ namespace Orleans.CodeGenerator
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols, Logger logger)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
@@ -68,7 +70,6 @@ namespace Orleans.CodeGenerator
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
                     .ToArray();
-            var logger = LogManager.GetLogger("CodeGenerator");
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
@@ -91,8 +92,7 @@ namespace Orleans.CodeGenerator
                 source = GenerateSourceCode(code);
 
                 // Compile the code and load the generated assembly.
-                logger.LogWithoutBulkingAndTruncating(
-                    Severity.Verbose3,
+                logger.Verbose3(
                     ErrorCode.CodeGenSourceGenerated,
                     "Generating assembly {0} with source:\n{1}",
                     assemblyName,
