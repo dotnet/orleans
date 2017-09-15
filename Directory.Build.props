@@ -8,7 +8,7 @@
   <PropertyGroup>
     <Authors>Microsoft</Authors>
     <Product>Microsoft Orleans</Product>
-    <Copyright>Copyright (c) Microsoft Corporation 2017</Copyright>
+    <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <PackageLicenseUrl>https://github.com/dotnet/Orleans#license</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
