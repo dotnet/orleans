@@ -64,5 +64,13 @@ namespace Orleans.TestingHost.Utils
         void ITelemetryClient.TrackTrace(string message, IDictionary<string, string> properties)
         {
         }
+
+        void ITelemetryClient.Flush()
+        {
+        }
+
+        void ITelemetryClient.Close()
+        {
+        }
     }
 }

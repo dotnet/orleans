@@ -204,12 +204,7 @@ namespace Orleans.Runtime
             lock (lockable)
             {
                 Close();
-                var consumers = LogConsumers;
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
-                foreach (var manager in consumers.OfType<TelemetryManager>())
-                {
-                    manager.Dispose();
-                }
 
                 loggerStoreInternCache?.StopAndClear();
 

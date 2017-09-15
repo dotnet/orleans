@@ -59,5 +59,8 @@ namespace Orleans.Runtime
 
         [Obsolete(TelemetryManager.ObsoleteMessageTelemetry)]
         void TrackTrace(string message, IDictionary<string, string> properties);
+
+        void Flush();
+        void Close();
     }
 }

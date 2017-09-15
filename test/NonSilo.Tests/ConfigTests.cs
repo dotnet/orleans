@@ -5,11 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using Orleans;
+using Orleans.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
-using Tester;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
@@ -357,8 +357,9 @@ namespace UnitTests
             Assert.Equal(filename, cfg.SourceFile);
 
             LogManager.Initialize(cfg);
-            Assert.Single(LogManager.LogConsumers);
-            Assert.Equal(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName); // Log consumer type #1
+            Assert.Collection(LogManager.LogConsumers,
+                lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
+                lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
@@ -374,13 +375,13 @@ namespace UnitTests
 
             LogManager.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
 
-            var actualLogConsumers = LogManager.LogConsumers.Select(x => x.GetType()).ToList();
-            Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
-            Assert.Single(actualLogConsumers);
+            Assert.Collection(LogManager.LogConsumers,
+                lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
+                lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
-        public void ClientConfig_Metrics()
+        public void ClientConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
 
@@ -398,7 +399,7 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
-        public void ServerConfig_Metrics()
+        public void ServerConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
 

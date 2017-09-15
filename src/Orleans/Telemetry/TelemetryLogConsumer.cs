@@ -7,7 +7,7 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// Forward trace log calls to the telemetry abstractions. This will be replaced by an ILoggerProvider in the future.
     /// </summary>
-    public class TelemetryLogConsumer : ILogConsumer
+    public class TelemetryLogConsumer : ILogConsumer, IFlushableLogConsumer, ICloseableLogConsumer
     {
         private readonly ITelemetryClient telemetryClient;
 
@@ -30,6 +30,16 @@ namespace Orleans.Extensions.Logging
             this.telemetryClient.TrackTrace(logMessage, severity);
 
 #pragma warning restore CS0618 // Type or member is obsolete
+        }
+
+        public void Close()
+        {
+            this.telemetryClient.Close();
+        }
+
+        public void Flush()
+        {
+            this.telemetryClient.Flush();
         }
     }
 }

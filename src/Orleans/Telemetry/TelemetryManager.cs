@@ -168,6 +168,62 @@ namespace Orleans.Runtime
             }
         }
 
+        public void Flush()
+        {
+            List<Exception> exceptions = null;
+            var all = this.consumers;
+            foreach (var tc in all)
+            {
+                try
+                {
+                    tc.Flush();
+                }
+                catch (Exception ex)
+                {
+                    (exceptions ?? (exceptions = new List<Exception>())).Add(ex);
+                }
+            }
+
+            if (exceptions?.Count > 0)
+            {
+                throw new AggregateException(exceptions);
+            }
+        }
+
+        public void Close()
+        {
+            List<Exception> exceptions = null;
+            var all = this.consumers;
+            this.consumers = new List<ITelemetryConsumer>();
+            this.metricTelemetryConsumers = new List<IMetricTelemetryConsumer>();
+            this.traceTelemetryConsumers = new List<ITraceTelemetryConsumer>();
+            foreach (var tc in all)
+            {
+                try
+                {
+                    tc.Close();
+                }
+                catch (Exception ex)
+                {
+                    (exceptions ?? (exceptions = new List<Exception>())).Add(ex);
+                }
+
+                try
+                {
+                    (tc as IDisposable)?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    (exceptions ?? (exceptions = new List<Exception>())).Add(ex);
+                }
+            }
+
+            if (exceptions?.Count > 0)
+            {
+                throw new AggregateException(exceptions);
+            }
+        }
+
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
@@ -177,28 +233,7 @@ namespace Orleans.Runtime
             {
                 if (disposing)
                 {
-                    var all = this.consumers;
-                    this.consumers = new List<ITelemetryConsumer>();
-                    this.metricTelemetryConsumers = new List<IMetricTelemetryConsumer>();
-                    this.traceTelemetryConsumers = new List<ITraceTelemetryConsumer>();
-                    foreach (var tc in all)
-                    {
-                        try
-                        {
-                            tc.Flush();
-                        }
-                        catch (Exception) { }
-                        try
-                        {
-                            tc.Close();
-                        }
-                        catch (Exception) { }
-                        try
-                        {
-                            (tc as IDisposable).Dispose();
-                        }
-                        catch (Exception) { }
-                    }
+                    this.Close();
                 }
 
                 disposedValue = true;
