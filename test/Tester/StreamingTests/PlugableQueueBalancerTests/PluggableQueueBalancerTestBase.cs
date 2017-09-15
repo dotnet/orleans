@@ -46,9 +46,9 @@ namespace Tester.StreamingTests
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {
-            public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
             {
-                return new SiloBuilder()
+                return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureServices(ConfigureServices)

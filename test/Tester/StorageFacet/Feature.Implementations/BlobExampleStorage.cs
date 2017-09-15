@@ -47,7 +47,7 @@ namespace Tester.StorageFacet.Implementations
 
     public static class BlobExampleStorageExtensions
     {
-        public static void UseBlobExampleStorage(this ISiloBuilder builder, string name)
+        public static void UseBlobExampleStorage(this ISiloHostBuilder builder, string name)
         {
             builder.ConfigureServices(services =>
             {

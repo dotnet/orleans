@@ -10,7 +10,7 @@ namespace Orleans.Transactions.Azure
         /// <summary>
         /// Configure cluster to use azure transaction log.
         /// </summary>
-        public static ISiloBuilder UseAzureTransactionLog(this ISiloBuilder builder, AzureTransactionLogConfiguration config)
+        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, AzureTransactionLogConfiguration config)
         {
             return builder.ConfigureServices(UseAzureTransactionLog)
                           .Configure<AzureTransactionLogConfiguration>((cfg) => cfg.Copy(config));

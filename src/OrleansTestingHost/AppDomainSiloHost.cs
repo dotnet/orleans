@@ -30,12 +30,12 @@ namespace Orleans.TestingHost
 
         /// <summary>Creates and initializes a silo in the current app domain.</summary>
         /// <param name="name">Name of this silo.</param>
-        /// <param name="siloBuilderFactoryType">Type of silo builder factory.</param>
+        /// <param name="siloBuilderFactoryType">Type of silo host builder factory.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
         public AppDomainSiloHost(string name, Type siloBuilderFactoryType, ClusterConfiguration config)
         {
             var builderFactory = (ISiloBuilderFactory)Activator.CreateInstance(siloBuilderFactoryType);
-            ISiloBuilder builder = builderFactory.CreateSiloBuilder(name, config);
+            ISiloHostBuilder builder = builderFactory.CreateSiloBuilder(name, config);
             builder.ConfigureServices((services) => services.AddSingleton<TestHooksSystemTarget>());
             this.silo = builder.Build();
             InitializeTestHooksSystemTarget();

@@ -9,7 +9,7 @@ namespace Orleans.Transactions.Development
         /// Configure cluster to use an in-memory transaction log.
         /// For development and test purposes only
         /// </summary>
-        public static ISiloBuilder UseInMemoryTransactionLog(this ISiloBuilder builder)
+        public static ISiloHostBuilder UseInMemoryTransactionLog(this ISiloHostBuilder builder)
         {
             return builder.ConfigureServices(UseInMemoryTransactionLog);
         }

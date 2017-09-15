@@ -8,7 +8,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Functionality for building <see cref="ISilo"/> instances.
     /// </summary>
-    public class SiloBuilder : ISiloBuilder
+    public class SiloHostBuilder : ISiloHostBuilder
     {
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
@@ -17,7 +17,7 @@ namespace Orleans.Hosting
         public ISilo Build()
         {
             if (this.built)
-                throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(SiloBuilder)} instance.");
+                throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(SiloHostBuilder)} instance.");
             this.built = true;
             
             // Configure the container, including the default silo name & services.
@@ -37,21 +37,21 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloBuilder ConfigureServices(Action<IServiceCollection> configureServices)
+        public ISiloHostBuilder ConfigureServices(Action<IServiceCollection> configureServices)
         {
             this.serviceProviderBuilder.ConfigureServices(configureServices);
             return this;
         }
 
         /// <inheritdoc />
-        public ISiloBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
+        public ISiloHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
         {
             this.serviceProviderBuilder.UseServiceProviderFactory(factory);
             return this;
         }
 
         /// <inheritdoc />
-        public ISiloBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
+        public ISiloHostBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
         {
             this.serviceProviderBuilder.ConfigureContainer(configureContainer);
             return this;
