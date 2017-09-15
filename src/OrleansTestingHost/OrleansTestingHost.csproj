@@ -8,7 +8,7 @@
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
     <AssemblyName>OrleansTestingHost</AssemblyName>
-    <RootNamespace>OrleansTestingHost</RootNamespace>
+    <RootNamespace>Orleans.TestingHost</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

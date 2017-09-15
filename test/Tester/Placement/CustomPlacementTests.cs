@@ -12,6 +12,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.Hosting;
 
 namespace Tester.CustomPlacementTests
 {
@@ -28,10 +29,26 @@ namespace Tester.CustomPlacementTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(nSilos);
-                options.ClusterConfiguration.UseStartupType<TestStartup>();
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
 				options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
 				options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
 				return new TestCluster(options);
+            }
+
+            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureServices(ConfigureServices);
+                }
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services.AddSingleton<IPlacementDirector<TestCustomPlacementStrategy>, TestPlacementStrategyFixedSiloDirector>();
             }
         }
 
@@ -112,16 +129,6 @@ namespace Tester.CustomPlacementTests
                 var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
                 Assert.Equal(siloAddresses[hash % silos.Length], tasks[i].Result);
             }
-        }
-    }
-
-    public class TestStartup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton<IPlacementDirector<TestCustomPlacementStrategy>, TestPlacementStrategyFixedSiloDirector>();
-
-            return services.BuildServiceProvider();
         }
     }
 }

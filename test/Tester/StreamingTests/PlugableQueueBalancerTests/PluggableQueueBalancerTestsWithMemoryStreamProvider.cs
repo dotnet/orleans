@@ -27,6 +27,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(siloCount);
+                options.UseSiloBuilderFactory<SiloBuilderFactory>();
                 ProviderSettings.TotalQueueCount = totalQueueCount;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);

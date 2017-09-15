@@ -94,6 +94,13 @@ namespace Orleans.TestingHost
         /// </summary>
         public SerializationManager SerializationManager { get; private set; }
 
+        internal Type siloBuilderFactoryType;
+
+        public void UseSiloBuilderFactory<TSiloBuilderFactory>() where TSiloBuilderFactory : ISiloBuilderFactory, new()
+        {
+            this.siloBuilderFactoryType = typeof(TSiloBuilderFactory);
+        }
+
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -108,6 +115,7 @@ namespace Orleans.TestingHost
         public TestCluster(TestClusterOptions options)
             : this(options.ClusterConfiguration, options.ClientConfiguration)
         {
+            this.siloBuilderFactoryType = options.SiloBuilderFactoryType;
         }
 
         /// <summary>
@@ -126,6 +134,7 @@ namespace Orleans.TestingHost
         {
             this.ClusterConfiguration = clusterConfiguration;
             this.ClientConfiguration = clientConfiguration;
+            this.UseSiloBuilderFactory<DefaultSiloBuilderFactory>();
         }
 
         /// <summary>
@@ -530,7 +539,7 @@ namespace Orleans.TestingHost
 
         private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            return AppDomainSiloHandle.Create(siloName, type, config, nodeConfiguration, this.additionalAssemblies);
+            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration, this.additionalAssemblies);
         }
 
         #endregion
