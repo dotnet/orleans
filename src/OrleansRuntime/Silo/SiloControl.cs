@@ -177,7 +177,7 @@ namespace Orleans.Runtime
                 try
                 {
                     var candidate = providerManager.GetProvider(providerName);
-                    if (candidate?.GetType()?.FullName?.Equals(providerTypeFullName) == true)
+                    if (string.Equals(providerTypeFullName, candidate?.GetType()?.FullName))
                     {
                         provider = candidate;
                         break;
