@@ -8,6 +8,8 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Tester
 {
@@ -18,11 +20,28 @@ namespace Tester
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.UseStartupType<GrainServiceStartup>();
+                options.UseSiloBuilderFactory<GrainSiloBuilderFactory>();
                 options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainService, Tester",
                     new Dictionary<string, string> { { "test-property", "xyz" } });
 
                 return new TestCluster(options);
+            }
+
+            private class GrainSiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureServices(ConfigureServices);
+                }
+
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services.AddSingleton<ICustomGrainServiceClient, CustomGrainServiceClient>();
             }
         }
 
@@ -65,16 +84,6 @@ namespace Tester
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var prop = await grain.CallHasInit();
             Assert.True(prop);
-        }
-    }
-
-
-    public class GrainServiceStartup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton<ICustomGrainServiceClient, CustomGrainServiceClient>();
-            return services.BuildServiceProvider();
         }
     }
 }

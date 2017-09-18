@@ -1,9 +1,8 @@
-﻿using System;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using TestExtensions;
+using Orleans.Hosting;
 using Orleans.Transactions.Development;
+using TestExtensions;
 
 namespace Orleans.Transactions.Tests
 {
@@ -12,19 +11,21 @@ namespace Orleans.Transactions.Tests
         protected override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions();
-            options.ClusterConfiguration.UseStartupType<Startup>();
             options.ClusterConfiguration.AddMemoryStorageProvider(TransactionTestConstants.TransactionStore);
+            options.UseSiloBuilderFactory<SiloBuilderFactory>();
             return new TestCluster(options);
         }
 
-        public class Startup
+        private class SiloBuilderFactory : ISiloBuilderFactory
         {
-            public IServiceProvider ConfigureServices(IServiceCollection services)
+            public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
             {
-                services.UseInClusterTransactionManager(new TransactionsConfiguration());
-                services.UseInMemoryTransactionLog();
-                services.UseTransactionalState();
-                return services.BuildServiceProvider();
+                return new SiloBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseInClusterTransactionManager(new TransactionsConfiguration())
+                    .UseInMemoryTransactionLog()
+                    .UseTransactionalState();
             }
         }
     }

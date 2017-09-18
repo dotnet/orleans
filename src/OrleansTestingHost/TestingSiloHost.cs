@@ -782,7 +782,7 @@ namespace Orleans.TestingHost
             AdjustForTest(config, options);
 
             WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, config.ToString(siloName));
-            return AppDomainSiloHandle.Create(siloName, type, config, nodeConfig, host.additionalAssemblies);
+            return AppDomainSiloHandle.Create(siloName, type, typeof(DefaultSiloBuilderFactory), config, nodeConfig, host.additionalAssemblies);
         }
 
         private void StopOrleansSilo(SiloHandle instance, bool stopGracefully)

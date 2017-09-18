@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\TestVersionGrains\Startup.cs" Link="Startup.cs" />
+    <Compile Include="..\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
   </ItemGroup>
 
   <ItemGroup>

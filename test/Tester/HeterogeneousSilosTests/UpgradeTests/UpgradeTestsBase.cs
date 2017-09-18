@@ -203,7 +203,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 siloType = Silo.SiloType.Primary;
                 // Setup configuration
                 this.options = new TestClusterOptions(SiloCount);
-                options.ClusterConfiguration.UseStartupType<TestVersionGrains.Startup>();
                 options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
                 options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
                 options.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
@@ -222,6 +221,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             var silo = AppDomainSiloHandle.Create(
                 siloName,
                 siloType,
+                typeof(TestVersionGrains.VersionGrainsSiloBuilderFactory),
                 options.ClusterConfiguration,
                 options.ClusterConfiguration.Overrides[siloName],
                 new Dictionary<string, GeneratedAssembly>(),

@@ -21,6 +21,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// <param name="message">The message to log.</param>
         /// <param name="exception">The exception to log. May be null.</param>
         /// <param name="errorCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'.</param>
+        /// <param name="includeStackTrace">determine include stack trace or not</param>
         /// <returns></returns>
         [Obsolete(ObsoleteMessageString)]
         public static string FormatLogMessageToLegacyStyle(

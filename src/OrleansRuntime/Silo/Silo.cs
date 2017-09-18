@@ -26,7 +26,6 @@ using Orleans.Runtime.Providers;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
-using Orleans.Runtime.TestHooks;
 using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
@@ -130,11 +129,6 @@ namespace Orleans.Runtime
             => ((IAsyncResult)this.siloTerminatedTask.Task).AsyncWaitHandle;
 
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
-
-        /// <summary>
-        /// Test hook connection for white-box testing of silo.
-        /// </summary>
-        internal TestHooksSystemTarget testHook;
 
         private SchedulingContext membershipOracleContext;
         private SchedulingContext multiClusterOracleContext;
@@ -347,12 +341,6 @@ namespace Orleans.Runtime
             }
 
             logger.Verbose("Finished creating System Targets for this silo.");
-        }
-
-        internal void InitializeTestHooksSystemTarget()
-        {
-            testHook = new TestHooksSystemTarget(this);
-            RegisterSystemTarget(testHook);
         }
 
         private void InjectDependencies()

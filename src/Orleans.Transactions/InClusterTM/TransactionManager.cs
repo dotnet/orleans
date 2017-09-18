@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Threading;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
@@ -43,13 +44,13 @@ namespace Orleans.Transactions
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
 
-        public TransactionManager(TransactionLog transactionLog, TransactionsConfiguration config, Factory<string, Logger> logFactory)
+        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, Factory<string, Logger> logFactory)
         {
             this.transactionLog = transactionLog;
-            this.config = config;
+            this.config = configOption.Value;
             this.Logger = logFactory(nameof(TransactionManager));
 
-            activeTransactionsTracker = new ActiveTransactionsTracker(config, this.transactionLog, logFactory);
+            activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, logFactory);
 
             transactionsTable = new ConcurrentDictionary<long, Transaction>(2, 1000000);
 

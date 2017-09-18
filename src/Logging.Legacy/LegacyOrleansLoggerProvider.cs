@@ -12,7 +12,7 @@ namespace Microsoft.Orleans.Logging.Legacy
     /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction
     /// OrleansLoggerProvider creates one ILogger implementation, which supports orleans legacy logging features, including <see cref="ILogConsumer"/>, 
-    /// <see cref="ICloseableLogConsumer">, <see cref="IFlushableLogConsumer">, <see cref="Severity">. 
+    /// <see cref="ICloseableLogConsumer"/>, <see cref="IFlushableLogConsumer"/>, <see cref="Severity"/>. 
     /// LegacyOrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
     [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
@@ -37,7 +37,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// Constructor
         /// </summary>
         /// <param name="consumers">Registered log consumers</param>
-        /// <param name="severityOverrides">per logger category Severity overides</param>
+        /// <param name="ipEndPoint">IP endpoint</param>
         public LegacyOrleansLoggerProvider(IEnumerable<ILogConsumer> consumers, IPEndPoint ipEndPoint)
         {
             this.LogConsumers = new ConcurrentBag<ILogConsumer>();

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.LeaseProviders;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -40,9 +41,32 @@ namespace Tester.AzureUtils.Lease
         {
             TestUtils.CheckForAzureStorage();
             var options = new TestClusterOptions(siloCount);
+            options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
             ProviderSettings.TotalQueueCount = totalQueueCount;
             AdjustClusterConfiguration(options.ClusterConfiguration);
             return new TestCluster(options);
+        }
+
+        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .ConfigureServices(ConfigureServices);
+            }
+        }
+
+        private static void ConfigureServices(IServiceCollection services)
+        {
+            var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
+            {
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
+                BlobContainerName = "test-container-leasebasedqueuebalancer"
+            };
+            services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
+            services.AddTransient<AzureBlobLeaseProvider>();
         }
 
         private static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -55,7 +79,6 @@ namespace Tester.AzureUtils.Lease
             // register stream provider
             config.Globals.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, settings);
             config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            config.UseStartupType<TestStartup>();
         }
 
         [SkippableFact]
@@ -106,21 +129,6 @@ namespace Tester.AzureUtils.Lease
                 return agentStarted.All(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo) >= expectedAgentCountMin && Convert.ToInt32(startedAgentInEachSilo) <= expectedAgentCountMax);
             }
             catch { return false; }
-
-        }
-        public class TestStartup
-        {
-            public IServiceProvider ConfigureServices(IServiceCollection services)
-            {
-                var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
-                {
-                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                    BlobContainerName = "test-container-leasebasedqueuebalancer"
-                };
-                services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<AzureBlobLeaseProvider>();
-                return services.BuildServiceProvider();
-            }
         }
     }
 }

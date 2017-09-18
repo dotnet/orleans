@@ -81,6 +81,13 @@ namespace Microsoft.Orleans.ServiceFabric
                 foreach (var partition in this.silos)
                 {
                     var partitionInfo = partition.Partition;
+                    if (oldRegistrations != null && oldRegistrations.ContainsKey(partitionInfo.Id))
+                    {
+                        updatedRegistrations[partitionInfo.Id] = oldRegistrations[partitionInfo.Id];
+                        oldRegistrations.Remove(partitionInfo.Id);
+                        if (this.log.IsVerbose) this.log.Verbose($"Partition change handler for partition {partition.Partition} already registered.");
+                        continue;
+                    }
                     var registrationId = updatedRegistrations[partitionInfo.Id] = this.queryManager.RegisterPartitionChangeHandler(
                         this.serviceName,
                         partitionInfo,
@@ -93,11 +100,8 @@ namespace Microsoft.Orleans.ServiceFabric
                 {
                     foreach (var registration in oldRegistrations)
                     {
-                        if (!updatedRegistrations.ContainsKey(registration.Key))
-                        {
-                            if (this.log.IsVerbose) this.log.Verbose($"Unregistering partition change handler 0x{registration.Value:X}");
-                            this.queryManager.UnregisterPartitionChangeHandler(registration.Value);
-                        }
+                        if (this.log.IsVerbose) this.log.Verbose($"Unregistering partition change handler 0x{registration.Value:X}");
+                        this.queryManager.UnregisterPartitionChangeHandler(registration.Value);
                     }
                 }
 

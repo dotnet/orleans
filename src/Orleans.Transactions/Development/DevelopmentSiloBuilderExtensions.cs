@@ -13,17 +13,12 @@ namespace Orleans.Transactions.Development
         /// <returns></returns>
         public static ISiloBuilder UseInMemoryTransactionLog(this ISiloBuilder builder)
         {
-            return builder.ConfigureServices(services => services.UseInMemoryTransactionLog());
+            return builder.ConfigureServices(UseInMemoryTransactionLog);
         }
 
-        /// TODO: Remove when we move to using silo builder for tests
-        #region pre-siloBuilder
-
-        public static void UseInMemoryTransactionLog(this IServiceCollection services)
+        private static void UseInMemoryTransactionLog(IServiceCollection services)
         {
             services.AddTransient<ITransactionLogStorage, InMemoryTransactionLogStorage>();
         }
-
-        #endregion pre-siloBuilder
     }
 }
