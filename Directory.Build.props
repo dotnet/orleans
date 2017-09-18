@@ -22,6 +22,7 @@
 
   <!-- Common compile parameters -->
   <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile Condition="'$(Configuration)'=='Release'">true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -33,19 +34,8 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
-  <!-- BuildFlavor can be Legacy (Orleans 1.x) or Current, default is Current if otherwise not specified -->
   <PropertyGroup>
-    <BuildFlavor Condition=" '$(BuildFlavor)' == '' ">Current</BuildFlavor>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <TargetFramework>netstandard2.0</TargetFramework>
-    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <DefineConstants>$(DefineConstants);BUILD_FLAVOR_LEGACY</DefineConstants>
-    <TargetFramework>net461</TargetFramework>
     <TestProjectTargetFramework>net461</TestProjectTargetFramework>
   </PropertyGroup>
 
@@ -53,97 +43,60 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
+    <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
+    <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
+    <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
-    <SystemCollectionsImmutableVersion>1.3.1</SystemCollectionsImmutableVersion>
+    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
 
     <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-	<MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
     <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>
     <MicrosoftExtensionsConfigurationVersion>2.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsDependencyInjection>2.0.0</MicrosoftExtensionsDependencyInjection>
+    <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsDependencyInjection>1.1.1</MicrosoftExtensionsDependencyInjection>
+    <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
 
-    <MicrosoftDataSQLiteVersion>1.1.0</MicrosoftDataSQLiteVersion>
+    <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
+    <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
+    <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
-    <MicrosoftServiceFabricServicesVersion>2.4.145</MicrosoftServiceFabricServicesVersion>
+    <MicrosoftServiceFabricServicesVersion>2.7.198</MicrosoftServiceFabricServicesVersion>
+    <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
     <FSharpCoreVersion>4.2.3</FSharpCoreVersion>
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
 
     <!-- 3rd party packages -->
-    <MySqlDataVersion>6.9.9</MySqlDataVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
-    <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
-    <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>1.10.0</NSubstituteVersion>
-    <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
-
-    <!-- Test related packages -->
-    <BenchmarkDotNetVersion>0.10.8</BenchmarkDotNetVersion>
-    <FluentAssertionsVersion>4.19.3</FluentAssertionsVersion>
-    <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
-    <xUnitVersion>2.3.0-beta4-build3742</xUnitVersion>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <!-- System packages -->
-    <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
-    <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
-    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-
-    <!-- Microsoft packages -->
-    <MicrosoftExtensionsDependencyInjection>2.0.0</MicrosoftExtensionsDependencyInjection>
-
-    <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
-    <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftServiceFabricServicesVersion>2.7.198</MicrosoftServiceFabricServicesVersion>
-    <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
-
-    <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>
     <BondCoreCSharpVersion>5.3.1</BondCoreCSharpVersion>
     <ConsulVersion>0.7.2.3</ConsulVersion>
+    <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
+    <MySqlDataVersion>6.9.9</MySqlDataVersion>
+    <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
+    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <NpgsqlVersion>3.1.9</NpgsqlVersion>
+    <NSubstituteVersion>1.10.0</NSubstituteVersion>
     <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>
-  </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <!-- System packages -->
-    <SystemReflectionMetadataVersion>1.4.2</SystemReflectionMetadataVersion>
-    <SystemValueTupleVersion>4.3.0</SystemValueTupleVersion>
-
-    <!-- Microsoft packages -->
-    <MicrosoftApplicationInsightsVersion>1.2.3</MicrosoftApplicationInsightsVersion>
-    <WindowsAzureServiceBusVersion>4.1.0</WindowsAzureServiceBusVersion>
-    <WindowsAzureStorageVersion>7.0.0</WindowsAzureStorageVersion>
-
-    <!-- 3rd party packages -->
-    <AWSSDKDynamoDBv2Version>3.1.5.2</AWSSDKDynamoDBv2Version>
-    <AWSSDKSQSVersion>3.1.0.9</AWSSDKSQSVersion>
-    <BondCoreCSharpVersion>4.0.1</BondCoreCSharpVersion>
-    <ConsulVersion>0.7.0.3</ConsulVersion>
-    <GoogleProtobufVersion>3.0.0</GoogleProtobufVersion>
-    <ZooKeeperNetExVersion>3.4.8.5</ZooKeeperNetExVersion>
+    <!-- Test related packages -->
+    <BenchmarkDotNetVersion>0.10.9</BenchmarkDotNetVersion>
+    <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
+    <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
+    <xUnitVersion>2.3.0-beta5-build3769</xUnitVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <PropertyGroup>
     <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.0</VersionPrefix>
-    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">preview3</VersionSuffix>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">1.6.0</VersionPrefix>
-    <VersionSuffix Condition=" '$(VersionSuffix)'=='' "></VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">preview4</VersionSuffix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -154,6 +107,6 @@
 
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>
-    <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(BuildFlavor)/$(Configuration)</PackageOutputPath>
+    <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(Configuration)</PackageOutputPath>
   </PropertyGroup>
 </Project>

@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Text;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -62,11 +58,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             {
                 IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
                 StreamSequenceToken token =
-#if !BUILD_FLAVOR_LEGACY
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
-#else
-                new EventHubSequenceTokenV2(queueMessage.Offset, queueMessage.SequenceNumber, 0);
-#endif
+
                 return new StreamPosition(stremIdentity, token);
             }
         }

@@ -1,8 +1,4 @@
-﻿#if !BUILD_FLAVOR_LEGACY
-using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
+﻿using Microsoft.Azure.EventHubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,19 +33,13 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     internal class EventHubReceiverProxy: IEventHubReceiver
     {
-#if !BUILD_FLAVOR_LEGACY
         private PartitionReceiver receiver;
+
         public EventHubReceiverProxy(PartitionReceiver receiver)
         {
             this.receiver = receiver;
         }
-#else
-        private EventHubReceiver receiver;
-        public EventHubReceiverProxy(EventHubReceiver receiver)
-        {
-            this.receiver = receiver;
-        }
-#endif
+
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             return this.receiver.ReceiveAsync(maxCount, waitTime);
@@ -59,6 +49,5 @@ namespace Orleans.ServiceBus.Providers
         {
             return this.receiver.CloseAsync();
         }
-
     }
 }

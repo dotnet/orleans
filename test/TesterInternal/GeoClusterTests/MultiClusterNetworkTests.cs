@@ -76,7 +76,7 @@ namespace Tests.GeoClusterTests
             Assert.Null(cur); //no configuration should be there yet
 
             var gateways = clientA.GetMultiClusterGateways();
-            Assert.Equal(1,  gateways.Count);  // "Expect 1 gateway"
+            Assert.Single(gateways);  // "Expect 1 gateway"
             Assert.Equal("A", gateways[0].ClusterId);
             Assert.Equal(siloA, gateways[0].SiloAddress.Endpoint);
             Assert.Equal(GatewayStatus.Active, gateways[0].Status);
@@ -129,7 +129,7 @@ namespace Tests.GeoClusterTests
             gateways = clientA.GetMultiClusterGateways();
             Assert.Equal(2,  gateways.Count);  // "Expect 2 gateways"
             var activegateways = gateways.Where(g => g.Status == GatewayStatus.Active).ToList();
-            Assert.Equal(1,  activegateways.Count);  // "Expect 1 active gateway"
+            Assert.Single(activegateways);  // "Expect 1 active gateway"
             Assert.Equal("A", activegateways[0].ClusterId);
         }
 

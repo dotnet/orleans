@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Orleans.LogConsistency
 {
     /// <summary>
-    /// A log view adaptor is the storage interface for <see cref="LogConsistentGrain"/>, whose state is defined as a log view. 
+    /// A log view adaptor is the storage interface for <see cref="LogConsistentGrain{T}"/>, whose state is defined as a log view. 
     ///<para>
     /// There is one adaptor per grain, which is installed by <see cref="ILogConsistencyProvider"/> when the grain is activated.
     ///</para>

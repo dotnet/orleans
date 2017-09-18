@@ -10,16 +10,9 @@
     <AssemblyName>OrleansServiceBus</AssemblyName>
     <RootNamespace>OrleansServiceBus</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <!--PackageReference Include="Microsoft.WindowsAzure.ConfigurationManager" Version="3.1.0" />-->
-    <!--<PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />-->
-    <PackageReference Include="WindowsAzure.ServiceBus" Version="$(WindowsAzureServiceBusVersion)" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="Microsoft.Azure.EventHubs" Version="$(MicrosoftAzureEventHubsVersion)" />
   </ItemGroup>
 

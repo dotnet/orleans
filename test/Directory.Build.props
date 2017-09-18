@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
 

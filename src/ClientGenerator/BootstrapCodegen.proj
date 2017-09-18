@@ -16,9 +16,6 @@
       GeneratePackageOnBuild=false;
     </MsBuildProperties>
   </PropertyGroup>
-<!--  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
-    <ExcludeCodegenConstants>$(ExcludeCodegenConstants);NETSTANDARD;NETSTANDARD_TODO</ExcludeCodegenConstants>
-  </PropertyGroup>-->
   <Target Name="Build">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
     <MSBuild
