@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseTelemetry(XmlElement root, TelemetryConfiguration metricsConfiguration)
+        internal static void ParseTelemetry(XmlElement root, TelemetryConfiguration telemetryConfiguration)
         {
             foreach (var node in root.ChildNodes)
             {
@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Configuration
                     var args = grandchild.Attributes.OfType<XmlAttribute>().Where(a => a.LocalName != "Type" && a.LocalName != "Assembly")
                         .Select(x => new KeyValuePair<string, object>(x.Name, x.Value)).ToArray();
 
-                    metricsConfiguration.Add(typeName, assemblyName, args);
+                    telemetryConfiguration.Add(typeName, assemblyName, args);
                 }
             }
         }
