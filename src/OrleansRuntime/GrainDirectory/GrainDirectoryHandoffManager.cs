@@ -277,37 +277,43 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal void AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy)
         {
-            if (logger.IsVerbose) logger.Verbose("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
-
-            if (!directoryPartitionsMap.ContainsKey(source))
+            lock (this)
             {
-                if (!isFullCopy)
+                if (logger.IsVerbose) logger.Verbose("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
+
+                if (!directoryPartitionsMap.ContainsKey(source))
                 {
-                    logger.Warn(ErrorCode.DirectoryUnexpectedDelta, 
-                        String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
-                            source, this.siloStatusOracle.GetApproximateSiloStatus(source),
-                            this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
+                    if (!isFullCopy)
+                    {
+                        logger.Warn(ErrorCode.DirectoryUnexpectedDelta,
+                            String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
+                                source, this.siloStatusOracle.GetApproximateSiloStatus(source),
+                                this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
+                    }
+
+                    directoryPartitionsMap[source] = this.createPartion();
                 }
 
-                directoryPartitionsMap[source] = this.createPartion();
-            }
+                if (isFullCopy)
+                {
+                    directoryPartitionsMap[source].Set(partition);
+                }
+                else
+                {
+                    directoryPartitionsMap[source].Update(partition);
+                }
 
-            if (isFullCopy)
-            {
-                directoryPartitionsMap[source].Set(partition);
+                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
             }
-            else
-            {
-                directoryPartitionsMap[source].Update(partition);
-            }
-
-            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
         }
 
         internal void RemoveHandoffPartition(SiloAddress source)
         {
-            if (logger.IsVerbose) logger.Verbose("Got request to unregister directory partition copy from " + source);
-            directoryPartitionsMap.Remove(source);
+            lock (this)
+            {
+                if (logger.IsVerbose) logger.Verbose("Got request to unregister directory partition copy from " + source);
+                directoryPartitionsMap.Remove(source);
+            }
         }
 
         private void ResetFollowers()
