@@ -152,7 +152,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Forward traces to the telemetry abstractions based on the legacy configuration.
-        /// This functionality will be opt-in in the future, as we will not connect our tracing to the telemetry client by default.
+        /// This functionality will be opt-in in the future, as we will not connect our tracing to the telemetry producer by default.
         /// </summary>
         /// <param name="traceConfiguration">The legacy trace configuration.</param>
         private static void InitializeLegacyTraceTelemetryConsumersConfiguration(ITraceConfiguration traceConfiguration, TelemetryManager telemetryManager)

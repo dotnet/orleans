@@ -117,7 +117,7 @@ namespace Orleans.Runtime
             return Name + "=" + GetCurrentValue();
         }
 
-        public void TrackMetric(ITelemetryClient telemetryClient)
+        public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
             // String values are not tracked.
         }

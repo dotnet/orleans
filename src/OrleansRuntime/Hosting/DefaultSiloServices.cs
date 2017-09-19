@@ -57,7 +57,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryClient, TelemetryManager>();
+            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
             // queue balancer contructing related
             services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();

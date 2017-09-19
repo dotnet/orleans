@@ -6,7 +6,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    public class TelemetryManager : ITelemetryClient, IDisposable
+    public class TelemetryManager : ITelemetryProducer, IDisposable
     {
         internal const string ObsoleteMessageTelemetry = "This method might be removed in the future in favor of a non Orleans-owned abstraction for APMs.";
 

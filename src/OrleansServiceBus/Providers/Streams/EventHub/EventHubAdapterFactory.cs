@@ -58,7 +58,7 @@ namespace Orleans.ServiceBus.Providers
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
-        private ITelemetryClient telemetryClient;
+        private ITelemetryProducer telemetryProducer;
 
         /// <summary>
         /// Gets the serialization manager.
@@ -85,7 +85,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Creates a message cache for an eventhub partition.
         /// </summary>
-        protected Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryClient, IEventHubQueueCache> CacheFactory { get; set; }
+        protected Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryProducer, IEventHubQueueCache> CacheFactory { get; set; }
 
         /// <summary>
         /// Creates a parition checkpointer.
@@ -106,13 +106,13 @@ namespace Orleans.ServiceBus.Providers
         /// Create a receiver monitor to report performance metrics.
         /// Factory funciton should return an IEventHubReceiverMonitor.
         /// </summary>
-        protected Func<EventHubReceiverMonitorDimensions, Logger, ITelemetryClient, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
+        protected Func<EventHubReceiverMonitorDimensions, Logger, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
         //for testing purpose, used in EventHubGeneratorStreamProvider
         /// <summary>
         /// Factory to create a IEventHubReceiver
         /// </summary>
-        protected Func<EventHubPartitionSettings, string, Logger, ITelemetryClient, Task<IEventHubReceiver>> EventHubReceiverFactory;
+        protected Func<EventHubPartitionSettings, string, Logger, ITelemetryProducer, Task<IEventHubReceiver>> EventHubReceiverFactory;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
         /// <summary>
@@ -137,7 +137,7 @@ namespace Orleans.ServiceBus.Providers
             adapterSettings = new EventHubStreamProviderSettings(providerName);
             adapterSettings.PopulateFromProviderConfig(providerConfig);
             hubSettings = adapterSettings.GetEventHubSettings(providerConfig, serviceProvider);
-            this.telemetryClient = serviceProvider.GetService<ITelemetryClient>();
+            this.telemetryProducer = serviceProvider.GetService<ITelemetryProducer>();
 
             InitEventHubClient();
             if (CheckpointerFactory == null)
@@ -164,7 +164,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (ReceiverMonitorFactory == null)
             {
-                ReceiverMonitorFactory = (dimensions, logger, telemetryClient) => new DefaultEventHubReceiverMonitor(dimensions, telemetryClient);
+                ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => new DefaultEventHubReceiverMonitor(dimensions, telemetryProducer);
             }
 
             logger = log.GetLogger($"EventHub.{hubSettings.Path}");
@@ -306,9 +306,9 @@ namespace Orleans.ServiceBus.Providers
             receiverMonitorDimensions.NodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
             receiverMonitorDimensions.GlobalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
 
-            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger, this.telemetryClient), 
+            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(receiverMonitorDimensions, recieverLogger, this.telemetryProducer), 
                 this.serviceProvider.GetRequiredService<Factory<NodeConfiguration>>(),
-                this.telemetryClient,
+                this.telemetryProducer,
                 this.EventHubReceiverFactory);
         }
 

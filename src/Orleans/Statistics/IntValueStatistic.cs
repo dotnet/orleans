@@ -121,9 +121,9 @@ namespace Orleans.Runtime
             return Name + "=" + GetValueString();
         }
 
-        public void TrackMetric(ITelemetryClient telemetryClient)
+        public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
-            telemetryClient.TrackMetric(currentName, GetCurrentValue());
+            telemetryProducer.TrackMetric(currentName, GetCurrentValue());
             // TODO: track delta, when we figure out how to calculate them accurately
         }
     }

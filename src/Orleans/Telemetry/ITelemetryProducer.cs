@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Orleans.Runtime
 {
     /// <summary>Represents an object used for producing telemetry</summary>
-    public interface ITelemetryClient
+    public interface ITelemetryProducer
     {
         /// <summary>Send a metric value to the registered telemetry consumers.</summary>
         /// <param name="name">Metric name.</param>

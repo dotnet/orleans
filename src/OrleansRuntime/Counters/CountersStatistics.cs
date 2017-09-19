@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Counters
         private static readonly Logger logger = LogManager.GetLogger("WindowsPerfCountersStatistics", LoggerType.Runtime);
 
         private const int ERROR_THRESHOLD = 10; // A totally arbitrary value!
-        private readonly ITelemetryClient telemetryClient;
+        private readonly ITelemetryProducer telemetryProducer;
         private SafeTimer timer;
         private bool shouldWritePerfCounters = true;
 
@@ -23,14 +23,14 @@ namespace Orleans.Runtime.Counters
         /// Initialize the counter publisher framework. Start the background stats writer thread.
         /// </summary>
         /// <param name="writeInterval">Frequency of writing to Windows perf counters</param>
-        /// <param name="telemetryClient">The metrics writer.</param>
-        public CountersStatistics(TimeSpan writeInterval, ITelemetryClient telemetryClient)
+        /// <param name="telemetryProducer">The metrics writer.</param>
+        public CountersStatistics(TimeSpan writeInterval, ITelemetryProducer telemetryProducer)
         {
             if (writeInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(writeInterval), "Creating CounterStatsPublisher with negative or zero writeInterval");
-            if (telemetryClient == null) throw new ArgumentNullException(nameof(telemetryClient));
+            if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
             
             PerfCountersWriteInterval = writeInterval;
-            this.telemetryClient = telemetryClient;
+            this.telemetryProducer = telemetryProducer;
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Counters
             if (shouldWritePerfCounters)
             {
                 // Write counters to Windows perf counters
-                int numErrors = OrleansCounterManager.WriteCounters(this.telemetryClient);
+                int numErrors = OrleansCounterManager.WriteCounters(this.telemetryProducer);
 
                 if (numErrors > 0)
                 {

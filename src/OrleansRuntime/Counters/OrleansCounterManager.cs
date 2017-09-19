@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Counters
     {
         private static readonly Logger logger = LogManager.GetLogger("OrleansCounterManager", LoggerType.Runtime);
 
-        public static int WriteCounters(ITelemetryClient telemetryClient)
+        public static int WriteCounters(ITelemetryProducer telemetryProducer)
         {
             if (logger.IsVerbose) logger.Verbose("Writing counters.");
 
@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Counters
                 {
                     if (logger.IsVerbose3) logger.Verbose3(ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
 
-                    counter.TrackMetric(telemetryClient);
+                    counter.TrackMetric(telemetryProducer);
                 }
                 catch (Exception ex)
                 {

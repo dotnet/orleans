@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         void ResetCurrent();
         string GetDisplayString();
         CounterStorage Storage { get; }
-        void TrackMetric(ITelemetryClient telemetryClient);
+        void TrackMetric(ITelemetryProducer telemetryProducer);
     }
 
     public static class Metric
@@ -329,9 +329,9 @@ namespace Orleans.Runtime
             }
         }
 
-        public void TrackMetric(ITelemetryClient telemetryClient)
+        public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
-            telemetryClient.TrackMetric(currentName, GetCurrentValue());
+            telemetryProducer.TrackMetric(currentName, GetCurrentValue());
             // TODO: track delta, when we figure out how to calculate them accurately
         }
     }

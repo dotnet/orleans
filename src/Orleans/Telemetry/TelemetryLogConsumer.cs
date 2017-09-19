@@ -9,11 +9,11 @@ namespace Orleans.Extensions.Logging
     /// </summary>
     public class TelemetryLogConsumer : ILogConsumer, IFlushableLogConsumer, ICloseableLogConsumer
     {
-        private readonly ITelemetryClient telemetryClient;
+        private readonly ITelemetryProducer telemetryProducer;
 
-        public TelemetryLogConsumer(ITelemetryClient telemetryClient)
+        public TelemetryLogConsumer(ITelemetryProducer telemetryProducer)
         {
-            this.telemetryClient = telemetryClient;
+            this.telemetryProducer = telemetryProducer;
         }
 
 
@@ -23,23 +23,23 @@ namespace Orleans.Extensions.Logging
 
             if (exception != null)
             {
-                this.telemetryClient.TrackException(exception);
+                this.telemetryProducer.TrackException(exception);
             }
 
             var logMessage = TraceParserUtils.FormatLogMessage(DateTime.UtcNow, severity, loggerType, caller, message, myIPEndPoint, exception, eventCode);
-            this.telemetryClient.TrackTrace(logMessage, severity);
+            this.telemetryProducer.TrackTrace(logMessage, severity);
 
 #pragma warning restore CS0618 // Type or member is obsolete
         }
 
         public void Close()
         {
-            this.telemetryClient.Close();
+            this.telemetryProducer.Close();
         }
 
         public void Flush()
         {
-            this.telemetryClient.Flush();
+            this.telemetryProducer.Flush();
         }
     }
 }
