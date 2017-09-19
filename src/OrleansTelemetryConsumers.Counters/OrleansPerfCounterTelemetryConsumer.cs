@@ -186,6 +186,7 @@ namespace OrleansTelemetryConsumers.Counters
                 // (1) Start with list of static counters
                 var newPerfCounterData = new List<PerfCounterConfigData>(PerfCounterConfigData.StaticPerfCounters);
 
+                // TODO: get rid of this static access. Telemetry consumers now allow being injected with dependencies, so extract it as such
                 var grainTypes = LogManager.GrainTypes;
                 if (grainTypes != null)
                 {

@@ -10,14 +10,11 @@ namespace Orleans.TelemetryConsumers.AI
     {
         private TelemetryClient _client;
 
-        public AITelemetryConsumer()
-        {
-            _client = new TelemetryClient();
-        }
-
         public AITelemetryConsumer(string instrumentationKey)
         {
-            _client = new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey });
+            _client = instrumentationKey != null
+                ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
+                : new TelemetryClient();
         }
 
         public void DecrementMetric(string name)

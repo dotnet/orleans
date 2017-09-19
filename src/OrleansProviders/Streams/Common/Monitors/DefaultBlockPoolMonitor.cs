@@ -12,16 +12,16 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
-        protected Logger Logger;
+        protected ITelemetryProducer TelemetryProducer;
         protected Dictionary<string, string> LogProperties;
 
-        public DefaultBlockPoolMonitor(Logger logger)
+        public DefaultBlockPoolMonitor(ITelemetryProducer telemetryProducer)
         {
-            this.Logger = logger;
+            this.TelemetryProducer = telemetryProducer;
         }
 
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, Logger logger)
-            :this(logger)
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions, ITelemetryProducer telemetryProducer)
+            :this(telemetryProducer)
         {
             this.LogProperties = new Dictionary<string, string>
             {
@@ -32,21 +32,21 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc cref="IBlockPoolMonitor"/>
         public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
-            this.Logger.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.LogProperties);
-            this.Logger.TrackMetric("AvailableMemoryInByte", availableMemoryInByte, this.LogProperties);
-            this.Logger.TrackMetric("ClaimedMemoryInByte", claimedMemoryInByte, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("AvailableMemoryInByte", availableMemoryInByte, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("ClaimedMemoryInByte", claimedMemoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="IBlockPoolMonitor"/>
         public void TrackMemoryReleased(long releasedMemoryInByte)
         {
-            this.Logger.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.LogProperties);
         }
 
         /// <inheritdoc cref="IBlockPoolMonitor"/>
         public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
-            this.Logger.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.LogProperties);
         }
     }
 }

@@ -128,6 +128,8 @@ namespace Orleans
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
+            services.GetService<TelemetryManager>()?.AddFromConfiguration(services, config.TelemetryConfiguration);
+
             StatisticsCollector.Initialize(config);
             this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();

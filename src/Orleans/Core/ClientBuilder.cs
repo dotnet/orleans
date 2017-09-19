@@ -78,6 +78,8 @@ namespace Orleans
 
         private static void AddDefaultServices(IServiceCollection services)
         {
+            services.TryAddSingleton<TelemetryManager>();
+            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();

@@ -661,10 +661,6 @@ namespace UnitTests.SchedulerTests
         {
             LogManager.UnInitialize();
             //LogManager.LogConsumers.Add(new LogWriterToConsole());
-            if (!LogManager.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
-            {
-                LogManager.TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
-            }
 
             var traceLevels = new[]
             {

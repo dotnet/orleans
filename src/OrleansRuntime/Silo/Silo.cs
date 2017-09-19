@@ -159,7 +159,10 @@ namespace Orleans.Runtime
             var startTime = DateTime.UtcNow;
             
             if (!LogManager.IsInitialized)
+            {
                 LogManager.Initialize(LocalConfig);
+            }
+            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
 
             config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
             StatisticsCollector.Initialize(LocalConfig);
@@ -195,6 +198,7 @@ namespace Orleans.Runtime
                 serviceCollection.AddSingleton(initializationParams);
                 DefaultSiloServices.AddDefaultServices(serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
+                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
 
             this.Services = services;
