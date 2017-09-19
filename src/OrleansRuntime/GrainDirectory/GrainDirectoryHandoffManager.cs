@@ -53,16 +53,16 @@ namespace Orleans.Runtime.GrainDirectory
             return null;
         }
 
-        private async Task HandoffMyPartitionUponStop(Dictionary<GrainId, IGrainInfo> batchUpdate, bool isFullCopy)
+        private async Task HandoffMyPartitionUponStop(Dictionary<GrainId, IGrainInfo> batchUpdate, List<SiloAddress> silosHoldingMyPartitionCopy, bool isFullCopy)
         {
-            if (batchUpdate.Count == 0 || silosHoldingMyPartition.Count == 0)
+            if (batchUpdate.Count == 0 || silosHoldingMyPartitionCopy.Count == 0)
             {
                 if (logger.IsVerbose) logger.Verbose((isFullCopy ? "FULL" : "DELTA") + " handoff finished with empty delta (nothing to send)");
                 return;
             }
 
             if (logger.IsVerbose) logger.Verbose("Sending {0} items to my {1}: (ring status is {2})", 
-                batchUpdate.Count, silosHoldingMyPartition.ToStrings(), localDirectory.RingStatusToString());
+                batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.RingStatusToString());
 
             var tasks = new List<Task>();
 
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.GrainDirectory
                     continue;
                 }
 
-                foreach (SiloAddress silo in silosHoldingMyPartition)
+                foreach (SiloAddress silo in silosHoldingMyPartitionCopy)
                 {
                     SiloAddress captureSilo = silo;
                     Dictionary<GrainId, IGrainInfo> captureChunk = chunk;
@@ -157,27 +157,31 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal void ProcessSiloStoppingEvent()
         {
-            lock (this)
-            {
-                ProcessSiloStoppingEvent_Impl();
-            }
+            ProcessSiloStoppingEvent_Impl();
         }
 
         private async void ProcessSiloStoppingEvent_Impl()
         {
             if (logger.IsVerbose) logger.Verbose("Processing silo stopping event");
 
-            // Select our nearest predecessor to receive our hand-off, since that's the silo that will wind up owning our partition (assuming
-            // that it doesn't also fail and that no other silo joins during the transition period).
-            if (silosHoldingMyPartition.Count == 0)
+            // As we're about to enter an async context further down, this is the latest opportunity to lock, modify and copy
+            // silosHoldingMyPartition for use inside of HandoffMyPartitionUponStop
+            List<SiloAddress> silosHoldingMyPartitionCopy;
+            lock (this)
             {
-                silosHoldingMyPartition.AddRange(localDirectory.FindPredecessors(localDirectory.MyAddress, 1));
+                // Select our nearest predecessor to receive our hand-off, since that's the silo that will wind up owning our partition (assuming
+                // that it doesn't also fail and that no other silo joins during the transition period).
+                if (silosHoldingMyPartition.Count == 0)
+                {
+                    silosHoldingMyPartition.AddRange(localDirectory.FindPredecessors(localDirectory.MyAddress, 1));
+                }
+                silosHoldingMyPartitionCopy = silosHoldingMyPartition.ToList();
             }
             // take a copy of the current directory partition
             Dictionary<GrainId, IGrainInfo> batchUpdate = localDirectory.DirectoryPartition.GetItems();
             try
             {
-                await HandoffMyPartitionUponStop(batchUpdate, true);
+                await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
                 localDirectory.MarkStopPreparationCompleted();
             }
             catch (Exception exc)
