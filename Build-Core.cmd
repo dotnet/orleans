@@ -107,7 +107,7 @@ goto :BuildFinished
 
 SET CURRENT_CONFIGURATION=Debug
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
+call %_dotnet% pack --no-build --no-restore %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION%;VersionDateSuffix=%DATE_SUFFIX% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
@@ -115,7 +115,7 @@ call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_C
 
 SET CURRENT_CONFIGURATION=Release
 
-call %_dotnet% pack --no-build %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
+call %_dotnet% pack --no-build --no-restore %BUILD_FLAGS% /bl:%LOGFILENAME_PREFIX%-%CURRENT_CONFIGURATION%-Pack.binlog /p:Configuration=%CURRENT_CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop                                    
 @echo PACKAGE ok for %CURRENT_CONFIGURATION% %SOLUTION%
 
