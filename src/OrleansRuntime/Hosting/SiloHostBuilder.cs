@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Functionality for building <see cref="ISilo"/> instances.
+    /// Functionality for building <see cref="ISiloHost"/> instances.
     /// </summary>
     public class SiloHostBuilder : ISiloHostBuilder
     {
@@ -14,7 +14,7 @@ namespace Orleans.Hosting
         private bool built;
 
         /// <inheritdoc />
-        public ISilo Build()
+        public ISiloHost Build()
         {
             if (this.built)
                 throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(SiloHostBuilder)} instance.");
@@ -33,7 +33,7 @@ namespace Orleans.Hosting
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider();
             
             // Construct and return the silo.
-            return serviceProvider.GetRequiredService<ISilo>();
+            return serviceProvider.GetRequiredService<ISiloHost>();
         }
 
         /// <inheritdoc />

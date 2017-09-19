@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Functionality for building <see cref="ISilo"/> instances.
+    /// Functionality for building <see cref="ISiloHost"/> instances.
     /// </summary>
     public interface ISiloHostBuilder
     {
@@ -13,7 +13,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <remarks>This method may only be called once per builder instance.</remarks>
         /// <returns>The newly created silo host.</returns>
-        ISilo Build();
+        ISiloHost Build();
 
         /// <summary>
         /// Adds a service configuration delegate to the configuration pipeline.

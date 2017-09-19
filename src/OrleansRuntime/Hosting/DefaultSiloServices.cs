@@ -44,7 +44,7 @@ namespace Orleans.Hosting
             services.AddOptions();
 
             // Register system services.
-            services.TryAddSingleton<ISilo, SiloWrapper>();
+            services.TryAddSingleton<ISiloHost, SiloWrapper>();
             services.TryAddFromExisting<ILocalSiloDetails, SiloInitializationParameters>();
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
