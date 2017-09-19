@@ -1,4 +1,8 @@
 using System.Runtime.CompilerServices;
+using Orleans;
+using Orleans.CodeGeneration;
+
+[assembly: KnownAssembly(typeof(IGrain))]
 
 [assembly: InternalsVisibleTo("ClientGenerator")]
 [assembly: InternalsVisibleTo("OrleansCounterControl")]
