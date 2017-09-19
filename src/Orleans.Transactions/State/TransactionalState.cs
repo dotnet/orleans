@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
-using System.Threading;
 
 namespace Orleans.Transactions
 {
@@ -149,6 +150,8 @@ namespace Orleans.Transactions
             }
             catch (Exception ex)
             {
+                // On error, queue up a recovery action.  Will do nothing if state recovers before this is processed
+                this.storageExecutor.AddNext(() => GuardState(() => Task.FromResult(true))).Ignore();
                 this.logger.Error(OrleansTransactionsErrorCode.Transactions_PrepareFailed, $"Prepare of transaction {transactionId} failed.", ex);
                 await ((ITransactionalResource)this).Abort(transactionId);
                 return false;
@@ -176,7 +179,15 @@ namespace Orleans.Transactions
             // Learning that t is committed implies that all pending transactions before t also committed
             if (transactionId > this.stableVersion)
             {
-                bool success = await this.storageExecutor.AddNext(() => GuardState(() => PersistCommit(transactionId)));
+                try
+                {
+                    bool success = await this.storageExecutor.AddNext(() => GuardState(() => PersistCommit(transactionId)));
+                } catch(Exception)
+                {
+                    // On error, queue up a recovery action.  Will do nothing if state recovers before this is processed
+                    this.storageExecutor.AddNext(() => GuardState(() => Task.FromResult(true))).Ignore();
+                    throw;
+                }
             }
         }
 
@@ -463,8 +474,8 @@ namespace Orleans.Transactions
 
             // wire up storage provider
             IStorageProvider storageProvider = string.IsNullOrWhiteSpace(this.config.StorageName)
-                ? this.runtime.ServiceProvider.GetRequiredService<IStorageProvider>()
-                : this.runtime.ServiceProvider.GetServiceByKey<string, IStorageProvider>(this.config.StorageName);
+                ? this.context.ActivationServices.GetRequiredService<IStorageProvider>()
+                : this.context.ActivationServices.GetServiceByKey<string, IStorageProvider>(this.config.StorageName);
             this.storage = new StateStorageBridge<TransactionalStateRecord<TState>>(StoredName(), this.context.GrainInstance.GrainReference, storageProvider);
 
             // load inital state

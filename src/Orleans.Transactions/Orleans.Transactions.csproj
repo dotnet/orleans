@@ -8,7 +8,7 @@
 
   <PropertyGroup>
     <AssemblyName>Microsoft.Orleans.Transactions</AssemblyName>
-    <RootNamespace>Microsoft.Orleans.Transactions</RootNamespace>
+    <RootNamespace>Orleans.Transactions</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
