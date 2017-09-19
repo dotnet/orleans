@@ -39,7 +39,7 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
-        internal static void AddDefaultServices(IServiceCollection services)
+        internal static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
         {
             services.AddOptions();
 

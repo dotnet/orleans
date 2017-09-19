@@ -178,7 +178,7 @@ namespace Orleans.Runtime
                 var serviceCollection = new ServiceCollection();
                 serviceCollection.AddSingleton<Silo>(this);
                 serviceCollection.AddSingleton(initializationParams);
-                DefaultSiloServices.AddDefaultServices(serviceCollection);
+                DefaultSiloServices.AddDefaultServices(null, serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }

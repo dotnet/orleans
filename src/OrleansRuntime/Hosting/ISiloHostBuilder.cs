@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -9,31 +11,49 @@ namespace Orleans.Hosting
     public interface ISiloHostBuilder
     {
         /// <summary>
-        /// Builds the silo.
+        /// A central location for sharing state between components during the host building process.
         /// </summary>
-        /// <remarks>This method may only be called once per builder instance.</remarks>
-        /// <returns>The newly created silo host.</returns>
+        IDictionary<object, object> Properties { get; }
+
+        /// <summary>
+        /// Run the given actions to initialize the host. This can only be called once.
+        /// </summary>
+        /// <returns>An initialized <see cref="ISiloHost"/></returns>
         ISiloHost Build();
 
         /// <summary>
-        /// Adds a service configuration delegate to the configuration pipeline.
+        /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
+        /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
+        /// subsequent operations, as well as in <see cref="ISiloHost.Services"/>.
         /// </summary>
-        /// <param name="configureServices">The service configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        ISiloHostBuilder ConfigureServices(Action<IServiceCollection> configureServices);
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
+        /// to construct the <see cref="IConfiguration"/> for the application.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        ISiloHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate);
 
         /// <summary>
-        /// Specifies how the <see cref="IServiceProvider"/> for this silo is configured. 
+        /// Adds services to the container. This can be called multiple times and the results will be additive.
         /// </summary>
-        /// <param name="factory">The service provider factory.</param>
-        /// <returns>The silo builder.</returns>
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IServiceCollection"/> that will be used
+        /// to construct the <see cref="IServiceProvider"/>.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        ISiloHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate);
+
+        /// <summary>
+        /// Overrides the factory used to create the service provider.
+        /// </summary>
+        /// <typeparam name="TContainerBuilder"></typeparam>
+        /// <param name="factory"></param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
         ISiloHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory);
 
         /// <summary>
-        /// Adds a container configuration delegate.
+        /// Enables configuring the instantiated dependency container. This can be called multiple times and
+        /// the results will be additive.
         /// </summary>
-        /// <typeparam name="TContainerBuilder">The container builder type.</typeparam>
-        /// <param name="configureContainer">The container builder configuration delegate.</param>
-        ISiloHostBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer);
+        /// <typeparam name="TContainerBuilder"></typeparam>
+        /// <param name="configureDelegate"></param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        ISiloHostBuilder ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate);
     }
 }

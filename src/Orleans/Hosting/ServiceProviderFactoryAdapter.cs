@@ -11,7 +11,7 @@ namespace Orleans.Hosting
     internal class ServiceProviderFactoryAdapter<TContainerBuilder> : IServiceProviderFactoryAdapter
     {
         private readonly IServiceProviderFactory<TContainerBuilder> serviceProviderFactory;
-        private readonly List<Action<TContainerBuilder>> configureContainerDelegates = new List<Action<TContainerBuilder>>();
+        private readonly List<Action<HostBuilderContext, TContainerBuilder>> configureContainerDelegates = new List<Action<HostBuilderContext, TContainerBuilder>>();
 
         public ServiceProviderFactoryAdapter(IServiceProviderFactory<TContainerBuilder> serviceProviderFactory)
         {
@@ -19,23 +19,23 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public IServiceProvider BuildServiceProvider(IServiceCollection services)
+        public IServiceProvider BuildServiceProvider(HostBuilderContext context, IServiceCollection services)
         {
             var builder = this.serviceProviderFactory.CreateBuilder(services);
 
             foreach (var configureContainer in this.configureContainerDelegates)
             {
-                configureContainer(builder);
+                configureContainer(context, builder);
             }
 
             return this.serviceProviderFactory.CreateServiceProvider(builder);
         }
 
         /// <inheritdoc />
-        public void ConfigureContainer<TBuilder>(Action<TBuilder> configureContainer)
+        public void ConfigureContainer<TBuilder>(Action<HostBuilderContext, TBuilder> configureContainer)
         {
             if (configureContainer == null) throw new ArgumentNullException(nameof(configureContainer));
-            var typedDelegate = configureContainer as Action<TContainerBuilder>;
+            var typedDelegate = configureContainer as Action<HostBuilderContext, TContainerBuilder>;
             if (typedDelegate == null)
             {
                 var msg = $"Type of configuration delegate requires builder of type {typeof(TBuilder)} which does not match previously configured container builder type {typeof(TContainerBuilder)}.";
