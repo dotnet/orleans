@@ -4,12 +4,7 @@
     <AssemblyName>TesterInternal</AssemblyName>
   </PropertyGroup>
 
-  <!-- REVIEW We've to decide about how we carry on OrleansHost and do we want to have tests or not for it. -->
   <ItemGroup>
-    <Compile Remove="OrleansHostProgTests.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <Compile Remove="CounterControlProgTests.cs" />
   </ItemGroup>
 

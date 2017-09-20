@@ -5,36 +5,44 @@ using Orleans.Runtime;
 
 namespace Orleans.TelemetryConsumers.AI
 {
-    public class AITelemetryConsumer : ITraceTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer, 
+    /// <summary>
+    /// Telemetry consumer class for ApplicationInsights.
+    /// </summary>
+    public class AITelemetryConsumer : ITraceTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer,
         IDependencyTelemetryConsumer, IMetricTelemetryConsumer, IRequestTelemetryConsumer
     {
-        private TelemetryClient _client;
+        private readonly TelemetryClient _client;
 
-        public AITelemetryConsumer()
-        {
-            _client = new TelemetryClient();
-        }
-
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="instrumentationKey">The instrumentation key for ApplicationInsights.</param>
         public AITelemetryConsumer(string instrumentationKey)
         {
-            _client = new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey });
+            _client = instrumentationKey != null
+                ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
+                : new TelemetryClient();
         }
 
+        /// <inheritdoc />
         public void DecrementMetric(string name)
         {
             _client.TrackMetric(name, -1, null);
         }
 
+        /// <inheritdoc />
         public void DecrementMetric(string name, double value)
         {
             _client.TrackMetric(name, value * -1, null);
         }
 
+        /// <inheritdoc />
         public void IncrementMetric(string name)
         {
             _client.TrackMetric(name, 1, null);
         }
 
+        /// <inheritdoc />
         public void IncrementMetric(string name, double value)
         {
             _client.TrackMetric(name, value, null);

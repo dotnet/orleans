@@ -1,9 +1,5 @@
-﻿#if !BUILD_FLAVOR_LEGACY
-using Microsoft.Azure.EventHubs;
+﻿using Microsoft.Azure.EventHubs;
 using static Microsoft.Azure.EventHubs.EventData;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,7 +43,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             EventDataMethodCache.Instance.SetEnqueuedTimeUtc(eventData, enqueueTime);
         }
-#if !BUILD_FLAVOR_LEGACY
+
         /// <summary>
         /// Setter for EventData.PartitionKey
         /// </summary>
@@ -57,9 +53,8 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             EventDataMethodCache.Instance.SetPartitionKey(eventData, partitionKey);
         }
-#endif
     }
-#if !BUILD_FLAVOR_LEGACY
+
     internal class EventDataMethodCache
     {
         public static EventDataMethodCache Instance = new EventDataMethodCache();
@@ -101,6 +96,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             SystemPropertiesCollectionMethodCache.Instance.SetPartitionKey(eventData.SystemProperties, partitionKey);
         }
     }
+
     internal class SystemPropertiesCollectionMethodCache
     {
         public static SystemPropertiesCollectionMethodCache Instance = new SystemPropertiesCollectionMethodCache();
@@ -145,38 +141,4 @@ namespace Orleans.ServiceBus.Providers.Testing
             return (SystemPropertiesCollection)this.zeroArgConstructorInfo.Invoke(null);
         }
     }
-#else
-    internal class EventDataMethodCache
-    {
-        public static EventDataMethodCache Instance = new EventDataMethodCache();
-        private Action<object, object> offSetPropertySetter;
-        private Action<object, object> sequenceNumberPropertySetter;
-        private Action<object, object> enqueueTimeUtcPropertySetter;
-
-        private EventDataMethodCache()
-        {
-            var ignore = new EventData(new byte[1]);
-            var offSetPropertyName = nameof(ignore.Offset);
-            var sequenceNumberPropertyName = nameof(ignore.SequenceNumber);
-            var enqueueTimeUtcPropertyName = nameof(ignore.EnqueuedTimeUtc);
-            this.offSetPropertySetter = typeof(EventData).GetProperty(offSetPropertyName).SetValue;
-            this.sequenceNumberPropertySetter = typeof(EventData).GetProperty(sequenceNumberPropertyName).SetValue;
-            this.enqueueTimeUtcPropertySetter = typeof(EventData).GetProperty(enqueueTimeUtcPropertyName).SetValue;
-        }
-
-        public void SetOffset(EventData eventData, string offSet)
-        {
-            this.offSetPropertySetter(eventData, offSet);
-        }
-
-        public void SetSequenceNumber(EventData eventData, long sequenceNumber)
-        {
-            this.sequenceNumberPropertySetter(eventData, sequenceNumber);
-        }
-        public void SetEnqueuedTimeUtc(EventData eventData, DateTime enqueueTime)
-        {
-            this.enqueueTimeUtcPropertySetter(eventData, enqueueTime);
-        }
-    }
-#endif
 }

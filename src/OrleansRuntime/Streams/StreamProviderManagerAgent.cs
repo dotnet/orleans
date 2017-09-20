@@ -13,19 +13,17 @@ namespace Orleans.Runtime
     internal class StreamProviderManagerAgent : SystemTarget, IStreamProviderManagerAgent
     {
         private readonly StreamProviderManager streamProviderManager;
-        private readonly List<IProvider> allSiloProviders;
         private readonly IStreamProviderRuntime streamProviderRuntime;
         private readonly IDictionary<string, ProviderCategoryConfiguration> providerConfigurations;
         private readonly Logger logger;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor;
 
-        public StreamProviderManagerAgent(Silo silo, List<IProvider> allSiloProviders, IStreamProviderRuntime streamProviderRuntime)
+        public StreamProviderManagerAgent(Silo silo, IStreamProviderRuntime streamProviderRuntime)
             : base(Constants.StreamProviderManagerAgentSystemTargetId, silo.SiloAddress)
         {
             logger = LogManager.GetLogger("StreamProviderUpdateAgent", LoggerType.Runtime);
             this.streamProviderManager = (StreamProviderManager)silo.StreamProviderManager;
             providerConfigurations = silo.GlobalConfig.ProviderConfigurations;
-            this.allSiloProviders = allSiloProviders;
             this.streamProviderRuntime = streamProviderRuntime;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
         }
@@ -91,12 +89,6 @@ namespace Orleans.Runtime
                 logger.Error(ErrorCode.Provider_ErrorFromInit, exc.Message, exc);
                 throw;
             }
-
-            IList<IProvider> providerList = siloStreamProviderManager.GetProviders();
-
-            // update allSiloProviders
-            allSiloProviders.Clear();
-            allSiloProviders.AddRange(providerList);
 
             if (logger.IsVerbose) { logger.Verbose("Stream providers updated successfully."); }
             providerConfigurations[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME] = 

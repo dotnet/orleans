@@ -11,7 +11,6 @@
     <AssemblyName>Microsoft.Orleans.ServiceFabric</AssemblyName>
     <RootNamespace>Microsoft.Orleans.ServiceFabric</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
-    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>

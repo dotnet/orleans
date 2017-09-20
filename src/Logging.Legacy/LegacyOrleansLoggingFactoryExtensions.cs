@@ -13,6 +13,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// </summary>
         /// <param name="builder">logger builder</param>
         /// <param name="logConsumers">log consumers which user want to write log events to</param>
+        /// <param name="ipEndPoint">IP endpoint this logger is associated with</param>
         /// <param name="eventBulkingOptions">config for event bulking feature</param>
         /// <returns></returns>
         [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
@@ -34,6 +35,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// <param name="builder">logger builder</param>
         /// <param name="logConsumers">log consumers which configured to consume the logs</param>
         /// <param name="severityOverrides">per category severity overrides</param>
+        /// <param name="ipEndPoint">IP endpoint this logger is associated with</param>
         /// <param name="eventBulkingOptions">config for event bulking feature</param>
         /// <returns></returns>
         [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]

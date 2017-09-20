@@ -1,8 +1,4 @@
-﻿#if !BUILD_FLAVOR_LEGACY
-using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
+﻿using Microsoft.Azure.EventHubs;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -137,7 +133,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionCount));
             }
 
-            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger)
+            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger, ITelemetryProducer telemetryProducer)
             {
                 var generator = new EventHubPartitionDataGenerator(logger, this.serviceProvider.GetRequiredService<SerializationManager>(), this.ehGeneratorSettings);
                 var generatorReceiver = new EventHubPartitionGeneratorReceiver(generator);

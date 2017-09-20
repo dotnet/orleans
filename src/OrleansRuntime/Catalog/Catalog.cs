@@ -1166,9 +1166,9 @@ namespace Orleans.Runtime
 
                 activationsFailedToActivate.Increment();
 
-                /// TODO: During lifecycle refactor discuss with team whether activation failure should have a well defined exception, or throw whatever
-                ///   exception caused activation to fail, with no indication that it occured durring activation
-                ///   rather than the grain call.
+                // TODO: During lifecycle refactor discuss with team whether activation failure should have a well defined exception, or throw whatever
+                //   exception caused activation to fail, with no indication that it occured durring activation
+                //   rather than the grain call.
                 OrleansLifecycleCanceledException canceledException = exc as OrleansLifecycleCanceledException;
                 if(canceledException?.InnerException != null)
                 {

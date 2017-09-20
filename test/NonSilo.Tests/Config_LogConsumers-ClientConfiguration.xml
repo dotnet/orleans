@@ -15,6 +15,9 @@
     <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
     <TraceLevelOverride LogPrefix="Tetris" TraceLevel="Info" />
   </Tracing>
+  <Telemetry>
+    <TelemetryConsumer Assembly="NonSilo.Tests" Type="UnitTests.DummyMetricTelemetryConsumer" connString="foo" />
+  </Telemetry>
   <Limits>
     <Limit Name="Limit1" SoftLimit="1" HardLimit="2" />
     <Limit Name="Limit2" SoftLimit="2" HardLimit="4" />

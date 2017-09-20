@@ -11,11 +11,7 @@
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Dynamic.Runtime" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>

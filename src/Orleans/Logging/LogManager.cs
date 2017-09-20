@@ -8,8 +8,8 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Orleans.Extensions.Logging;
 using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -51,11 +51,6 @@ namespace Orleans.Runtime
         /// The set of <see cref="ILogConsumer"/> references to write log events to. 
         /// </summary>
         public static ConcurrentBag<ILogConsumer> LogConsumers { get; private set; }
-
-        /// <summary>
-        /// The set of <see cref="ITelemetryConsumer"/> references to write telemetry events to. 
-        /// </summary>
-        public static ConcurrentBag<ITelemetryConsumer> TelemetryConsumers { get; private set; }
         
         /// <summary>
         /// Flag to suppress output of dates in log messages during unit test runs
@@ -92,7 +87,6 @@ namespace Orleans.Runtime
             defaultModificationCounter = 0;
             lockable = new object();
             LogConsumers = new ConcurrentBag<ILogConsumer>();
-            TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
             BulkMessageInterval = defaultBulkMessageInterval;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
         }
@@ -149,38 +143,57 @@ namespace Orleans.Runtime
                 // We need the default listener so that Debug.Assert and Debug.Fail work properly
                 Trace.Listeners.Add(new DefaultTraceListener());
                 */
-                if (config.TraceToConsole)
-                {
-                    if (!TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
-                    {
-                        TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
-                    }
-                }
-                if (!string.IsNullOrEmpty(config.TraceFileName))
-                {
-                    try
-                    {
-                        if (!TelemetryConsumers.OfType<FileTelemetryConsumer>().Any())
-                        {
-                            TelemetryConsumers.Add(new FileTelemetryConsumer(config.TraceFileName));
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        Trace.Listeners.Add(new DefaultTraceListener());
-                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", config.TraceFileName, exc);
-                    }
-                }
 
-                if (Trace.Listeners.Count > 0)
-                {
-                    if (!TelemetryConsumers.OfType<TraceTelemetryConsumer>().Any())
-                    {
-                        TelemetryConsumers.Add(new TraceTelemetryConsumer());
-                    }
-                }
+                InitializeLegacyTraceTelemetryConsumersConfiguration(config, LogConsumers.OfType<TelemetryManager>().FirstOrDefault() ?? new TelemetryManager());
 
                 IsInitialized = true;
+            }
+        }
+
+        /// <summary>
+        /// Forward traces to the telemetry abstractions based on the legacy configuration.
+        /// This functionality will be opt-in in the future, as we will not connect our tracing to the telemetry producer by default.
+        /// </summary>
+        /// <param name="traceConfiguration">The legacy trace configuration.</param>
+        /// <param name="telemetryManager">The <see cref="TelemetryManager" /> to use.</param>
+        private static void InitializeLegacyTraceTelemetryConsumersConfiguration(ITraceConfiguration traceConfiguration, TelemetryManager telemetryManager)
+        {
+            if (traceConfiguration == null) return;
+
+            var newConsumers = new List<ITelemetryConsumer>();
+            if (traceConfiguration.TraceToConsole && !telemetryManager.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
+            {
+                newConsumers.Add(new ConsoleTelemetryConsumer());
+            }
+
+            if (!string.IsNullOrEmpty(traceConfiguration.TraceFileName))
+            {
+                try
+                {
+                    if (!telemetryManager.TelemetryConsumers.OfType<FileTelemetryConsumer>().Any())
+                    {
+                        newConsumers.Add(new FileTelemetryConsumer(traceConfiguration.TraceFileName));
+                    }
+                }
+                catch (Exception exc)
+                {
+                    Trace.Listeners.Add(new DefaultTraceListener());
+                    Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", traceConfiguration.TraceFileName, exc);
+                }
+            }
+
+            if (Trace.Listeners.Count > 0)
+            {
+                if (!telemetryManager.TelemetryConsumers.OfType<TraceTelemetryConsumer>().Any())
+                {
+                    newConsumers.Add(new TraceTelemetryConsumer());
+                }
+            }
+
+            if (newConsumers.Count > 0)
+            {
+                telemetryManager.AddConsumers(newConsumers);
+                LogConsumers.Add(new TelemetryLogConsumer(telemetryManager));
             }
         }
 
@@ -193,7 +206,6 @@ namespace Orleans.Runtime
             {
                 Close();
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
-                TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
 
                 loggerStoreInternCache?.StopAndClear();
 
@@ -375,15 +387,6 @@ namespace Orleans.Runtime
                     }
                     catch (Exception) { }
                 }
-
-                foreach (var consumer in TelemetryConsumers)
-                {
-                    try
-                    {
-                        consumer.Flush();
-                    }
-                    catch (Exception) { }
-                }
             }
             catch (Exception) { }
         }
@@ -395,15 +398,6 @@ namespace Orleans.Runtime
             try
             {
                 foreach (ICloseableLogConsumer consumer in LogConsumers.OfType<ICloseableLogConsumer>())
-                {
-                    try
-                    {
-                        consumer.Close();
-                    }
-                    catch (Exception) { }
-                }
-
-                foreach (var consumer in TelemetryConsumers)
                 {
                     try
                     {

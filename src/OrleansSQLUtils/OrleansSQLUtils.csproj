@@ -16,7 +16,7 @@
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XmlSerializer" Version="$(SystemRuntimeVersion)" />

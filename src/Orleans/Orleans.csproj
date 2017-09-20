@@ -23,30 +23,14 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <Compile Remove="Statistics\RuntimeStatisticsGroup.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Compile Remove="Shims\RuntimeStatisticsGroup.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Reference Include="System.Management" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjection)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
-    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <PackageReference Include="System.ComponentModel.TypeConverter" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.FileVersionInfo" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.Process" Version="$(SystemRuntimeVersion)" />
@@ -56,6 +40,7 @@
     <PackageReference Include="System.Net.NetworkInformation" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
     <PackageReference Include="System.Reflection.TypeExtensions" Version="$(SystemReflectionTypeExtensionsVersion)" />
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
@@ -63,6 +48,7 @@
     <PackageReference Include="System.Security.Cryptography.Algorithms" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Threading.Thread" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Threading.ThreadPool" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
@@ -83,7 +69,7 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
     <PropertyGroup>
       <!-- Visual Studio or MsBuild .sln build -->
-      <BootstrapOutputPath>$(SourceRoot)/Bootstrap/$(BuildFlavor)/$(Configuration)/</BootstrapOutputPath>
+      <BootstrapOutputPath>$(SourceRoot)/Bootstrap/$(Configuration)/</BootstrapOutputPath>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN;ORLEANS_BOOTSTRAP</ExcludeCodeGen>
     </PropertyGroup>
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />

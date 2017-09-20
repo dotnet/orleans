@@ -16,7 +16,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainActivator">The activator used to used to create new grains</param>
         /// <param name="getGrainRuntime">The delegate used to get the grain runtime.</param>
-        /// <param name="protocolServicesFactory"></param>
         public GrainCreator(
             IGrainActivator grainActivator,
             Factory<IGrainRuntime> getGrainRuntime)

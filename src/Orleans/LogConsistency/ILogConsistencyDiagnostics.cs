@@ -27,7 +27,7 @@ namespace Orleans.LogConsistency
     }
 
     /// <summary>
-    /// A collection of statistics for grains using log-consistency. See <see cref="LogConsistentGrain"/>
+    /// A collection of statistics for grains using log-consistency. See <see cref="LogConsistentGrain{T}"/>
     /// </summary>
     public class LogConsistencyStatistics
     {

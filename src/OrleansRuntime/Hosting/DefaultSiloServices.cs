@@ -56,7 +56,9 @@ namespace Orleans.Hosting
                 });
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
-            
+            services.TryAddSingleton<TelemetryManager>();
+            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+
             // queue balancer contructing related
             services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
@@ -64,24 +66,31 @@ namespace Orleans.Hosting
             services.TryAddTransient<ConsistentRingQueueBalancer>();
             services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
+            services.TryAddSingleton<ProviderManagerSystemTarget>();
+
             services.TryAddSingleton<StatisticsProviderManager>();
+            services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
 
             // storage providers
             services.TryAddSingleton<StorageProviderManager>();
+            services.AddFromExisting<IProviderManager, StorageProviderManager>();
             services.TryAddFromExisting<IKeyedServiceCollection<string, IStorageProvider>, StorageProviderManager>(); // as named services
             services.TryAddSingleton<IStorageProvider>(sp => sp.GetRequiredService<StorageProviderManager>().GetDefaultProvider()); // default
 
             // log concistency providers
             services.TryAddSingleton<LogConsistencyProviderManager>();
+            services.AddFromExisting<IProviderManager, LogConsistencyProviderManager>();
             services.TryAddFromExisting<IKeyedServiceCollection<string, ILogConsistencyProvider>, LogConsistencyProviderManager>(); // as named services
             services.TryAddSingleton<ILogConsistencyProvider>(sp => sp.GetRequiredService<LogConsistencyProviderManager>().GetDefaultProvider()); // default
 
             services.TryAddSingleton<BootstrapProviderManager>();
+            services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
             services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
+            services.AddFromExisting<IProviderManager, IStreamProviderManager>();
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<OrleansTaskScheduler>();

@@ -4,11 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -38,17 +34,18 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionSettings settings;
-        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryProducer, IEventHubQueueCache> cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly Logger baseLogger;
         private readonly Logger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
+        private readonly ITelemetryProducer telemetryProducer;
 
         private IEventHubQueueCache cache;
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory;
+        private Func<EventHubPartitionSettings, string, Logger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
@@ -66,18 +63,20 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryProducer, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
             IQueueAdapterReceiverMonitor monitor,
             Factory<NodeConfiguration> getNodeConfig,
-            Func<EventHubPartitionSettings, string, Logger, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
+            ITelemetryProducer telemetryProducer,
+            Func<EventHubPartitionSettings, string, Logger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
             if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
             if (monitor == null) throw new ArgumentNullException(nameof(monitor));
+            if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
@@ -85,6 +84,7 @@ namespace Orleans.ServiceBus.Providers
             this.logger = baseLogger.GetSubLogger("receiver", "-");
             this.monitor = monitor;
             this.getNodeConfig = getNodeConfig;
+            this.telemetryProducer = telemetryProducer;
 
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
@@ -108,10 +108,10 @@ namespace Orleans.ServiceBus.Providers
             try
             {
                 checkpointer = await checkpointerFactory(settings.Partition);
-                cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
+                cache = cacheFactory(settings.Partition, checkpointer, baseLogger, this.telemetryProducer);
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
-                receiver = await this.eventHubReceiverFactory(settings, offset, logger);
+                receiver = await this.eventHubReceiverFactory(settings, offset, logger, this.telemetryProducer);
                 watch.Stop();
                 monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
@@ -171,13 +171,10 @@ namespace Orleans.ServiceBus.Providers
 
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
-#if !BUILD_FLAVOR_LEGACY
+
             DateTime oldestMessageEnqueueTime = messages[0].SystemProperties.EnqueuedTimeUtc;
             DateTime newestMessageEnqueueTime = messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
-#else
-            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTimeUtc;
-            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTimeUtc;
-#endif
+
             monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
             List<StreamPosition> messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
@@ -189,11 +186,7 @@ namespace Orleans.ServiceBus.Providers
             if (!checkpointer.CheckpointExists)
             {
                 checkpointer.Update(
-#if !BUILD_FLAVOR_LEGACY
                     messages[0].SystemProperties.Offset,
-#else
-                    messages[0].Offset,
-#endif
                     DateTime.UtcNow);
             }
             return batches;
@@ -270,24 +263,15 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)
+        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger, ITelemetryProducer telemetryProducer)
         {
             bool offsetInclusive = true;
-#if !BUILD_FLAVOR_LEGACY
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)
             {
                 EntityPath = partitionSettings.Hub.Path
             };
             EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
-#else
-            EventHubClient client = EventHubClient.CreateFromConnectionString(partitionSettings.Hub.ConnectionString, partitionSettings.Hub.Path);
 
-            EventHubConsumerGroup consumerGroup = client.GetConsumerGroup(partitionSettings.Hub.ConsumerGroup);
-            if (partitionSettings.Hub.PrefetchCount.HasValue)
-            {
-                consumerGroup.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
-            }
-#endif
             // if we have a starting offset or if we're not configured to start reading from utc now, read from offset
             if (!partitionSettings.Hub.StartFromNow ||
                 offset != EventHubConstants.StartOfStream)
@@ -297,26 +281,19 @@ namespace Orleans.ServiceBus.Providers
             else
             {
                 // to start reading from most recent data, we get the latest offset from the partition.
-#if !BUILD_FLAVOR_LEGACY
                 EventHubPartitionRuntimeInformation partitionInfo =
-#else
-                PartitionRuntimeInformation partitionInfo =
-#endif
                     await client.GetPartitionRuntimeInformationAsync(partitionSettings.Partition);
                 offset = partitionInfo.LastEnqueuedOffset;
                 offsetInclusive = false;
                 logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
             }
-#if !BUILD_FLAVOR_LEGACY
+
             PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
 
             if (partitionSettings.Hub.PrefetchCount.HasValue)
                 receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
 
             return new EventHubReceiverProxy(receiver);
-#else
-            return new EventHubReceiverProxy(await consumerGroup.CreateReceiverAsync(partitionSettings.Partition, offset, offsetInclusive));
-#endif
         }
 
 #region EventHubGeneratorStreamProvider related region

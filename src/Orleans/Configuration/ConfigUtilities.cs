@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseTelemetry(XmlElement root)
+        internal static void ParseTelemetry(XmlElement root, TelemetryConfiguration telemetryConfiguration)
         {
             foreach (var node in root.ChildNodes)
             {
@@ -60,40 +60,19 @@ namespace Orleans.Runtime.Configuration
                 }
                 else
                 {
-                    if (!grandchild.HasAttribute("Type"))
+                    string typeName = grandchild.Attributes["Type"]?.Value;
+                    string assemblyName = grandchild.Attributes["Assembly"]?.Value;
+
+                    if (string.IsNullOrWhiteSpace(typeName))
                         throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
 
-                    if (!grandchild.HasAttribute("Assembly"))
-                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+                    if (string.IsNullOrWhiteSpace(assemblyName))
+                        throw new FormatException("Missing 'Assembly' attribute on TelemetryConsumer element.");
 
-                    var className = grandchild.Attributes["Type"].Value;
-                    var assemblyName = new AssemblyName(grandchild.Attributes["Assembly"].Value);
+                    var args = grandchild.Attributes.OfType<XmlAttribute>().Where(a => a.LocalName != "Type" && a.LocalName != "Assembly")
+                        .Select(x => new KeyValuePair<string, object>(x.Name, x.Value)).ToArray();
 
-                    Assembly assembly = null;
-                    try
-                    {
-                        assembly = Assembly.Load(assemblyName);
-
-                        var pluginType = assembly.GetType(className);
-                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
-
-                        var args = grandchild.Attributes.Cast<XmlAttribute>().Where(a => a.LocalName != "Type" && a.LocalName != "Assembly").ToArray();
-
-                        var plugin = Activator.CreateInstance(pluginType, args);
-
-                        if (plugin is ITelemetryConsumer)
-                        {
-                            LogManager.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
-                        }
-                        else
-                        {
-                            throw new InvalidCastException("TelemetryConsumer class " + className + " must implement one of Orleans.Runtime.ITelemetryConsumer based interfaces");
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        throw new TypeLoadException("Cannot load TelemetryConsumer class " + className + " from assembly " + assembly + " - Error=" + exc);
-                    }
+                    telemetryConfiguration.Add(typeName, assemblyName, args);
                 }
             }
         }
@@ -614,11 +593,10 @@ namespace Orleans.Runtime.Configuration
         {
             var sb = new StringBuilder();
             sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
-#if BUILD_FLAVOR_LEGACY
-            // TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
-            sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile);
+#if BUILD_FLAVOR_LEGACY
+            sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile); 
 #endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",

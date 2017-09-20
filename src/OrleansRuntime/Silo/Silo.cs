@@ -88,7 +88,6 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
-        private readonly List<IProvider> allSiloProviders = new List<IProvider>();
 
         /// <summary>
         /// Gets the type of this 
@@ -109,10 +108,6 @@ namespace Orleans.Runtime
         internal IStreamProviderManager StreamProviderManager { get { return grainRuntime.StreamProviderManager; } }
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
-        internal IReadOnlyCollection<IProvider> AllSiloProviders 
-        {
-            get { return allSiloProviders.AsReadOnly();  }
-        }
         internal ICatalog Catalog => catalog;
 
         internal SystemStatus SystemStatus { get; set; }
@@ -164,7 +159,10 @@ namespace Orleans.Runtime
             var startTime = DateTime.UtcNow;
             
             if (!LogManager.IsInitialized)
+            {
                 LogManager.Initialize(LocalConfig);
+            }
+            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
 
             config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
             StatisticsCollector.Initialize(LocalConfig);
@@ -200,6 +198,7 @@ namespace Orleans.Runtime
                 serviceCollection.AddSingleton(initializationParams);
                 DefaultSiloServices.AddDefaultServices(serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
+                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
 
             this.Services = services;
@@ -298,7 +297,7 @@ namespace Orleans.Runtime
 
             logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
             RegisterSystemTarget(
-                new StreamProviderManagerAgent(this, allSiloProviders, Services.GetRequiredService<IStreamProviderRuntime>()));
+                new StreamProviderManagerAgent(this, Services.GetRequiredService<IStreamProviderRuntime>()));
 
             logger.Verbose("Creating {0} System Target", "ProtocolGateway");
             RegisterSystemTarget(new ProtocolGateway(this.SiloAddress));
@@ -374,7 +373,7 @@ namespace Orleans.Runtime
                 .WaitWithThrow(initTimeout);
 
             // SystemTarget for provider init calls
-            providerManagerSystemTarget = new ProviderManagerSystemTarget(this);
+            providerManagerSystemTarget = Services.GetRequiredService<ProviderManagerSystemTarget>();
             RegisterSystemTarget(providerManagerSystemTarget);
         }
         
@@ -438,7 +437,6 @@ namespace Orleans.Runtime
                 .WaitForResultWithThrow(initTimeout);
             if (statsProviderName != null)
                 LocalConfig.StatisticsProviderName = statsProviderName;
-            allSiloProviders.AddRange(statisticsProviderManager.GetProviders());
 
             // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
             siloStatistics.SetSiloStatsTableDataManager(this, LocalConfig).WaitWithThrow(initTimeout);
@@ -459,7 +457,6 @@ namespace Orleans.Runtime
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            allSiloProviders.AddRange(storageProviderManager.GetProviders());
 
             ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
             ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
@@ -485,7 +482,6 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
-            allSiloProviders.AddRange(siloStreamProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             // Load and init grain services before silo becomes active.
@@ -550,7 +546,6 @@ namespace Orleans.Runtime
                     this.providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(this.initTimeout);
                 this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
-                this.allSiloProviders.AddRange(this.BootstrapProviders);
 
                 if (this.logger.IsVerbose) { this.logger.Verbose("App bootstrap calls done successfully."); }
 
@@ -605,18 +600,6 @@ namespace Orleans.Runtime
                     this.logger.Verbose(String.Format("{0} Grain Service started successfully.", serviceConfig.Value.Name));
                 }
             }
-        }
-
-        /// <summary>
-        /// Load and initialize newly added stream providers. Remove providers that are not on the list that's being passed in.
-        /// </summary>
-        public async Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
-        {
-            IStreamProviderManagerAgent streamProviderUpdateAgent =
-                runtimeClient.InternalGrainFactory.GetSystemTarget<IStreamProviderManagerAgent>(Constants.StreamProviderManagerAgentSystemTargetId, this.SiloAddress);
-
-            await scheduler.QueueTask(() => streamProviderUpdateAgent.UpdateStreamProviders(streamProviderConfigurations), providerManagerSystemTarget.SchedulingContext)
-                    .WithTimeout(initTimeout);
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()
@@ -960,8 +943,8 @@ namespace Orleans.Runtime
     // A dummy system target to use for scheduling context for provider Init calls, to allow them to make grain calls
     internal class ProviderManagerSystemTarget : SystemTarget
     {
-        public ProviderManagerSystemTarget(Silo currentSilo)
-            : base(Constants.ProviderManagerSystemTargetId, currentSilo.SiloAddress)
+        public ProviderManagerSystemTarget(ILocalSiloDetails localSiloDetails)
+            : base(Constants.ProviderManagerSystemTargetId, localSiloDetails.SiloAddress)
         {
         }
     }

@@ -1,9 +1,4 @@
-﻿#if !BUILD_FLAVOR_LEGACY
-using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-using Orleans.Serialization;
-#endif
+﻿using Microsoft.Azure.EventHubs;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
