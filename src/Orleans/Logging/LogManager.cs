@@ -155,6 +155,7 @@ namespace Orleans.Runtime
         /// This functionality will be opt-in in the future, as we will not connect our tracing to the telemetry producer by default.
         /// </summary>
         /// <param name="traceConfiguration">The legacy trace configuration.</param>
+        /// <param name="telemetryManager">The <see cref="TelemetryManager" /> to use.</param>
         private static void InitializeLegacyTraceTelemetryConsumersConfiguration(ITraceConfiguration traceConfiguration, TelemetryManager telemetryManager)
         {
             if (traceConfiguration == null) return;

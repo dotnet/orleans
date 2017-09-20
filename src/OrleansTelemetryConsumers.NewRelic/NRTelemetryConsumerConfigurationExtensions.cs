@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Configuration
         /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
         /// </summary>
         /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
+        /// <param name="instrumentationKey">The instrumentation key for New Relic.</param>
         public static void AddPerfCountersTelemetryConsumer(this ClusterConfiguration config, string instrumentationKey)
         {
             string typeName = typeof(NRTelemetryConsumer).FullName;
@@ -24,6 +25,7 @@ namespace Orleans.Runtime.Configuration
         /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
         /// </summary>
         /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
+        /// <param name="instrumentationKey">The instrumentation key for New Relic.</param>
         public static void AddPerfCountersTelemetryConsumer(this ClientConfiguration config, string instrumentationKey)
         {
             string typeName = typeof(NRTelemetryConsumer).FullName;
