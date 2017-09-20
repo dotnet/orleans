@@ -29,7 +29,7 @@ namespace Microsoft.Orleans.Logging.Legacy
         /// </summary>
         /// <param name="categoryName">category name for current logger</param>
         /// <param name="logConsumers">log consumers which this logger will log messages to</param>
-        /// <param name="ipEndPoint">ipEndpoint this logger is associated with </param>
+        /// <param name="ipEndPoint">IP endpoint this logger is associated with</param>
         public LegacyOrleansLogger(string categoryName, IList<ILogConsumer> logConsumers, IPEndPoint ipEndPoint)
         {
             this.logConsumers = logConsumers;

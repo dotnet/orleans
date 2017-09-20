@@ -10,20 +10,11 @@
     <AssemblyName>OrleansAzureUtils</AssemblyName>
     <RootNamespace>OrleansAzureUtils</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <PackageReference Include="System.Net.Requests" Version="$(SystemRuntimeVersion)" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Web" />
+    <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
   </ItemGroup>
 
   <ItemGroup>

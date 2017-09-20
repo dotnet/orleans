@@ -14,12 +14,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Threading;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus;
-using Microsoft.ServiceBus.Messaging;
-#endif
 using ServiceBus.Tests.MonitorTests;
 
 namespace ServiceBus.Tests.TestStreamProviders

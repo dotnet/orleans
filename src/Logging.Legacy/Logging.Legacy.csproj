@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Logging.Legacy</PackageId>
     <Title>Microsoft Orleans Legacy Logging</Title>
-    <Summary>Microsoft Orleans Legacy Logging library supports legacy features, including ILogComsumer, Severity and message bulking features</Summary>
+    <Summary>Microsoft Orleans Legacy Logging library supports legacy features, including ILogConsumer, Severity and message bulking features</Summary>
     <Description>
       This package contains legacy types which is used
       for logging to facilitate migration from Orleans 1.x. 
@@ -15,7 +15,6 @@
   <PropertyGroup>
     <AssemblyName>Microsoft.Orleans.Logging.Legacy</AssemblyName>
     <RootNamespace>Microsoft.Orleans.Logging.Legacy</RootNamespace>
-    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>

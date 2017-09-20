@@ -11,10 +11,6 @@
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Legacy' ">
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
   </ItemGroup>

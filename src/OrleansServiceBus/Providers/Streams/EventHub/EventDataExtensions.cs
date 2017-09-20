@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
 using Orleans.Serialization;
 
 namespace Orleans.ServiceBus.Providers

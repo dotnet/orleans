@@ -9,7 +9,6 @@
   <PropertyGroup>
     <AssemblyName>OrleansAWSUtils</AssemblyName>
     <RootNamespace>OrleansAWSUtils</RootNamespace>
-    <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>

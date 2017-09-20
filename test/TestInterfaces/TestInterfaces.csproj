@@ -4,7 +4,7 @@
     <AssemblyName>TestInterfaces</AssemblyName>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
 </Project>

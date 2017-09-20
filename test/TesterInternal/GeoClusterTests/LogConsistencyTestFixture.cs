@@ -332,7 +332,7 @@ namespace Tests.GeoClusterTests
                  })
                );
                 var result = Client[0].GetReservationsGlobal(grainClass, x);
-                Assert.Equal(1, result.Length);
+                Assert.Single(result);
                 Assert.Equal(2, result[0]);
             });
 
@@ -387,7 +387,7 @@ namespace Tests.GeoClusterTests
                 {
                     var result = Client[0].SetAConditional(grainClass, x, Xyz);
                     Assert.Equal(0, result.Item1);
-                    Assert.Equal(true, result.Item2);
+                    Assert.True(result.Item2);
                     Assert.Equal(1, Client[0].GetConfirmedVersion(grainClass, x));
                 }
 
@@ -399,7 +399,7 @@ namespace Tests.GeoClusterTests
                     var result = Client[1].SetAConditional(grainClass, x, 444);
                     if (result.Item1 == 0) // was stale, thus failed
                     {
-                        Assert.Equal(false, result.Item2);
+                        Assert.False(result.Item2);
                         // must have updated as a result
                         Assert.Equal(1, Client[1].GetConfirmedVersion(grainClass, x));
                         // check stability
@@ -410,7 +410,7 @@ namespace Tests.GeoClusterTests
                     }
                     else // was up-to-date, thus succeeded
                     {
-                        Assert.Equal(true, result.Item2);
+                        Assert.True(result.Item2);
                         Assert.Equal(1, result.Item1);
                         // version is now 2
                         Assert.Equal(2, Client[1].GetConfirmedVersion(grainClass, x));

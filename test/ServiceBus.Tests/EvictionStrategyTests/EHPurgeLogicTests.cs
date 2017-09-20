@@ -9,11 +9,7 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus.Messaging;
-#endif
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
