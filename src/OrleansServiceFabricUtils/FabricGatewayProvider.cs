@@ -39,6 +39,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Initializes a new instance of the <see cref="FabricGatewayProvider"/> class.
         /// </summary>
         /// <param name="siloResolver">The silo resolver.</param>
+        /// <param name="logger">logger to use</param>
         public FabricGatewayProvider(IFabricServiceSiloResolver siloResolver, ILogger<FabricGatewayProvider> logger)
         {
             this.fabricServiceSiloResolver = siloResolver;

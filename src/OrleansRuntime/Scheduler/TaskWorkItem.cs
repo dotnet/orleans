@@ -18,6 +18,7 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="sched">Scheduler to execute this Task action. A value of null means use the Orleans system scheduler.</param>
         /// <param name="t">Task to be performed</param>
         /// <param name="context">Execution context</param>
+        /// <param name="loggerFactory">logger factory used to create loggers</param>
         internal TaskWorkItem(ITaskScheduler sched, Task t, ISchedulingContext context, ILoggerFactory loggerFactory)
         {
             scheduler = sched;

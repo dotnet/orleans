@@ -24,6 +24,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// Delivery failure handler that writes failures to azure table storage.
         /// </summary>
         /// <param name="serializationManager"></param>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="faultOnFailure"></param>
         /// <param name="deploymentId"></param>
         /// <param name="tableName"></param>

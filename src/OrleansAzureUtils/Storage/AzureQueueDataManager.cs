@@ -58,6 +58,7 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Constructor.
         /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">Name of the queue to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
@@ -84,6 +85,7 @@ namespace Orleans.AzureUtils
         /// <param name="deploymentId">The deployment id of the Azure service hosting this silo. It will be concatenated to the queueName.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
+        /// <param name="loggerFactory">logger factory used to create loggers</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string deploymentId, string storageConnectionString, TimeSpan? visibilityTimeout = null)
         {
             AzureStorageUtils.ValidateQueueName(queueName);

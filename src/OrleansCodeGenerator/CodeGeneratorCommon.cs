@@ -52,6 +52,7 @@ namespace Orleans.CodeGenerator
         /// <param name="emitDebugSymbols">
         /// Whether or not to emit debug symbols for the generated assembly.
         /// </param>
+        /// <param name="logger"> logger to use </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>

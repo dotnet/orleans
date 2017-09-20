@@ -53,7 +53,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitTableVersion">Will be ignored: Consul does not support the extended Membership Protocol TableVersion</param>
-        /// <param name="loggerFactory">The logger factory used by this instance to create logger</param>
         /// <returns></returns>
         /// <remarks>
         /// Consul Membership Provider does not support the extended Membership Protocol,

@@ -122,9 +122,9 @@ namespace Orleans
         /// <summary>
         /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
         /// </summary>
-        /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
+        /// <param name="builder">The <see cref="IClientBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
-        /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder ConfigureLogging(this IClientBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));

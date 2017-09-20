@@ -61,7 +61,6 @@ namespace Orleans.Runtime.Configuration
         /// Load this configuratin from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
-        /// <param name="logger"></param>
         public void Load(XmlElement xmlElement)
         {
             bool found = false;
@@ -303,7 +302,6 @@ namespace Orleans.Runtime.Configuration
         /// Load this configuration from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
-        /// <param name="logger"></param>
         public static GrainTypeConfiguration Load(XmlElement xmlElement)
         {
             string fullTypeName = null;

@@ -175,7 +175,7 @@ namespace Orleans.Streams
         /// <param name="serviceProvider"></param>
         /// <param name="siloStatusOracle"></param>
         /// <param name="deploymentConfig"></param>
-        /// <param name="loggerFac"></param>
+        /// <param name="loggerFactory"></param>
         public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
         {
             this.serviceProvider = serviceProvider;

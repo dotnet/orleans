@@ -41,6 +41,7 @@ namespace OrleansAWSUtils.Reminders
         /// Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
+        /// <param name="loggerFactory">logger factory to use</param>
         public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory)
         {
             this.grainReferenceConverter = grainReferenceConverter;
@@ -52,7 +53,6 @@ namespace OrleansAWSUtils.Reminders
         /// Initialize current instance with specific global configuration and logger
         /// </summary>
         /// <param name="config"> Global configuration to initialize with </param>
-        /// <param name="loggerFac"> Specific logger to use in current instance </param>
         /// <returns></returns>
         public Task Init(GlobalConfiguration config)
         {

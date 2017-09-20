@@ -15,6 +15,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Helper method for testing. Deletes all the queues used by the specifed stream provider.
         /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="providerName">The Azure Queue stream privider name.</param>
         /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
         /// <param name="storageConnectionString">The azure storage connection string.</param>
@@ -39,6 +40,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Helper method for testing. Clears all messages in all the queues used by the specifed stream provider.
         /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="providerName">The Azure Queue stream privider name.</param>
         /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
         /// <param name="storageConnectionString">The azure storage connection string.</param>

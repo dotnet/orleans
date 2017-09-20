@@ -35,6 +35,7 @@ namespace Orleans.Runtime
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
         /// <param name="threadName">Name used for logging the collected stastistics</param>
+        /// <param name="loggerFactory">LoggerFactory used to create loggers</param>
         public ThreadTrackingStatistic(string threadName, ILoggerFactory loggerFactory)
         {
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased(loggerFactory);

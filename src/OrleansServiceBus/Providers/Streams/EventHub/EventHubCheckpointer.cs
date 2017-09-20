@@ -30,6 +30,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="settings"></param>
         /// <param name="streamProviderName"></param>
         /// <param name="partition"></param>
+        /// <param name="loggerFactory"></param>
         /// <returns></returns>
         public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {

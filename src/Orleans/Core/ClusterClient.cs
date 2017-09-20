@@ -33,6 +33,7 @@ namespace Orleans
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="configuration">The client configuration.</param>
+        /// <param name="loggerFactory">Logger factory used to create loggers</param>
         public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration, ILoggerFactory loggerFactory)
         {
             this.Configuration = configuration;

@@ -110,6 +110,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Writes a log entry at the Trace logLevel
+        /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="format">A standard format string, suitable for String.Format.</param>
@@ -175,6 +176,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Writes a log entry at the Warning level
+        /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="format">A standard format string, suitable for String.Format.</param>
@@ -191,6 +193,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Writes a log entry at the Warning level
+        /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The warning message to log.</param>
@@ -207,6 +210,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Writes a log entry at the Error level
+        /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
         /// <param name="message">The error message to log.</param>

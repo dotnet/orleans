@@ -39,6 +39,7 @@ namespace OrleansAWSUtils.Storage
         /// <summary>
         /// Default Ctor
         /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
         /// <param name="connectionString">The connection string</param>
         /// <param name="deploymentId">The cluster deployment Id</param>
