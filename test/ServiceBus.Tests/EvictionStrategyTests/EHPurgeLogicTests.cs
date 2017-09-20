@@ -59,6 +59,146 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.telemetryProducer = new NullTelemetryProducer();
         }
 
+        //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
+#if BUILD_FLAVOR_LEGACY
+        [Fact, TestCategory("BVT")]
+        public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
+        {
+            InitForTesting();
+            var tasks = new List<Task>();
+            //add items into cache, make sure will allocate multiple buffers from the pool
+            int itemAddToCache = 100;
+            foreach(var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+
+            //set cachePressureMonitor to be underPressure
+            this.cachePressureInjectionMonitor.isUnderPressure = true;
+            //set purgePredicate to be ShouldPurge
+            this.purgePredicate.ShouldPurge = true;
+
+            //perform purge
+            IList<IBatchContainer> ignore;
+            this.receiver1.TryPurgeFromCache(out ignore);
+            this.receiver2.TryPurgeFromCache(out ignore);
+
+            //Assert
+            int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
+            Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
+        }
+
+        [Fact, TestCategory("BVT")]
+        public async Task EventhubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
+        {
+            InitForTesting();
+            var tasks = new List<Task>();
+            //add items into cache
+            int itemAddToCache = 100;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+
+            //set cachePressureMonitor to be underPressure
+            this.cachePressureInjectionMonitor.isUnderPressure = false;
+            //set purgePredicate to be ShouldPurge
+            this.purgePredicate.ShouldPurge = false;
+
+            //perform purge
+            IList<IBatchContainer> ignore;
+            this.receiver1.TryPurgeFromCache(out ignore);
+            this.receiver2.TryPurgeFromCache(out ignore);
+
+            //Assert
+            int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
+            Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
+        }
+
+        [Fact, TestCategory("BVT")]
+        public async Task EventhubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
+        {
+            InitForTesting();
+            var tasks = new List<Task>();
+            //add items into cache
+            int itemAddToCache = 100;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+
+            //set cachePressureMonitor to be underPressure
+            this.cachePressureInjectionMonitor.isUnderPressure = false;
+            //set purgePredicate to be ShouldPurge
+            this.purgePredicate.ShouldPurge = true;
+
+            //perform purge
+            IList<IBatchContainer> ignore;
+            this.receiver1.TryPurgeFromCache(out ignore);
+            this.receiver2.TryPurgeFromCache(out ignore);
+
+            //Assert
+            int expectedItemCountInCaches = 0;
+            //items got purged
+            Assert.Equal(expectedItemCountInCaches, GetItemCountInAllCache(this.cacheList));
+        }
+
+        [Fact, TestCategory("BVT")]
+        public async Task EventhubQueueCache_EvictionStrategy_Behavior()
+        {
+            InitForTesting();
+            var tasks = new List<Task>();
+            //add items into cache
+            int itemAddToCache = 100;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+
+            //set up condition so that purge will be performed
+            this.cachePressureInjectionMonitor.isUnderPressure = false;
+            this.purgePredicate.ShouldPurge = true;
+
+            //Each cache should each have buffers allocated
+            this.evictionStrategyList.ForEach(strategy => Assert.True(strategy.InUseBuffers.Count > 0));
+
+            //perform purge
+
+            //after purge, inUseBuffers should be purged and return to the pool, except for the current buffer
+            var expectedPurgedBuffers = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy =>
+            {
+                var purgedBufferList = strategy.InUseBuffers.ToArray<FixedSizeBuffer>();
+                //last one in purgedBufferList should be current buffer, which shouldn't be purged
+                for (int i = 0; i < purgedBufferList.Count() - 1; i++)
+                    expectedPurgedBuffers.Add(purgedBufferList[i]);
+            });
+
+            IList<IBatchContainer> ignore;
+            this.receiver1.TryPurgeFromCache(out ignore);
+            this.receiver2.TryPurgeFromCache(out ignore);
+
+            //Each cache should have all buffers purged, except for current buffer
+            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
+            var oldBuffersInCaches = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy => {
+                foreach (var inUseBuffer in strategy.InUseBuffers)
+                    oldBuffersInCaches.Add(inUseBuffer);
+                });
+            //add items into cache again
+            itemAddToCache = 100;
+            foreach (var cache in this.cacheList)
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+            await Task.WhenAll(tasks);
+            //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
+            var newBufferAllocated = new List<FixedSizeBuffer>();
+            this.evictionStrategyList.ForEach(strategy => {
+                foreach (var inUseBuffer in strategy.InUseBuffers)
+                    newBufferAllocated.Add(inUseBuffer);
+            });
+            //remove old buffer in cache, to get newly allocated buffers after purge
+            newBufferAllocated.RemoveAll(buffer => oldBuffersInCaches.Contains(buffer));
+            //purged buffer should return to the pool after purge, and used to allocate new buffer
+            expectedPurgedBuffers.ForEach(buffer => Assert.True(newBufferAllocated.Contains(buffer)));
+        }
+#endif
+
         private void InitForTesting()
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
