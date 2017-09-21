@@ -20,7 +20,7 @@ namespace Orleans.Providers
         private readonly IInternalGrainFactory grainFactory;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
-
+        private readonly ILogger timerLogger;
         public ClientProviderRuntime(IInternalGrainFactory grainFactory, IServiceProvider serviceProvider, ILoggerFactory loggerFactory) 
         {
             this.grainFactory = grainFactory;
@@ -29,6 +29,8 @@ namespace Orleans.Providers
             this.loggerFactory = loggerFactory;
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
+            //all async timer created through current class all share this logger for perf reasons
+            this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
         }
 
         public IGrainFactory GrainFactory => this.grainFactory;
@@ -123,7 +125,7 @@ namespace Orleans.Providers
 
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            return new AsyncTaskSafeTimer(this.loggerFactory, asyncCallback, state, dueTime, period);
+            return new AsyncTaskSafeTimer(this.timerLogger, asyncCallback, state, dueTime, period);
         }
 
         public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)

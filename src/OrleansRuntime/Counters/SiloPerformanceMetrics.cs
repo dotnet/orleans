@@ -160,7 +160,7 @@ namespace Orleans.Runtime.Counters
                         tableReportTimer.Dispose();
                     }
                     // Start a new fresh timer. 
-                    tableReportTimer = new AsyncTaskSafeTimer(this.loggerFactory, Reporter, null, reportFrequency, reportFrequency);
+                    tableReportTimer = new AsyncTaskSafeTimer(loggerFactory.CreateLogger<AsyncTaskSafeTimer>(), Reporter, null, reportFrequency, reportFrequency);
                 }
             }
         }

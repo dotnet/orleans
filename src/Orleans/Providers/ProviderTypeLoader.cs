@@ -13,11 +13,11 @@ namespace Orleans.Providers
     {
         internal ConcurrentBag<ProviderTypeLoader> Managers { get; private set; }
         private readonly Logger logger;
-        public LoadedProviderTypeLoaders(ILoggerFactory loggerFactory)
+        public LoadedProviderTypeLoaders(LoggerWrapper<LoadedProviderTypeLoaders> logger)
         {
             this.Managers = new ConcurrentBag<ProviderTypeLoader>();
             AppDomain.CurrentDomain.AssemblyLoad += ProcessNewAssembly;
-            this.logger = new LoggerWrapper<LoadedProviderTypeLoaders>(loggerFactory);
+            this.logger = logger;
         }
 
         private void ProcessNewAssembly(object sender, AssemblyLoadEventArgs args)

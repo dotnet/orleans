@@ -43,9 +43,9 @@ namespace Orleans.Runtime.Placement
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
-        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, ILoggerFactory loggerFactory)
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, LoggerWrapper<ActivationCountPlacementDirector> logger)
         {
-            logger = new LoggerWrapper<ActivationCountPlacementDirector>(loggerFactory);
+            this.logger = logger;
 
             SelectSilo = SelectSiloPowerOfK;
             if (globalConfig.ActivationCountBasedPlacementChooseOutOf <= 0)

@@ -15,11 +15,11 @@ namespace Orleans.Runtime.ReminderService
             GlobalConfiguration globalConfiguration,
             IGrainFactory grainFactory,
             IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory)
+            LoggerWrapper<ReminderTableFactory> logger)
         {
             this.globalConfiguration = globalConfiguration;
             this.grainFactory = grainFactory;
-            this.logger = new LoggerWrapper<ReminderTableFactory>(loggerFactory);
+            this.logger = logger;
             this.serviceProvider = serviceProvider;
         }
 

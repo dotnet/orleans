@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.SqlUtils;
@@ -58,7 +59,7 @@ namespace UnitTests.StorageTests.Relational
                 this.GrainFactory,
                 this.Services,
                 new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(NullLoggerFactory.Instance),
+                new LoadedProviderTypeLoaders(new LoggerWrapper<LoadedProviderTypeLoaders>(NullLoggerFactory.Instance)),
                 NullLoggerFactory.Instance);
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
         }

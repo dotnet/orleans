@@ -54,10 +54,10 @@ namespace Orleans.Runtime
         /// <param name="codeGeneratorManager">
         /// The code generator.
         /// </param>
-        /// <param name="loggerFactory"> the logger factory used to create loggers</param>
-        public AssemblyProcessor(TypeMetadataCache typeCache, SerializationManager serializationManager, CodeGeneratorManager codeGeneratorManager, ILoggerFactory loggerFactory)
+        /// <param name="logger"> the logger to use</param>
+        public AssemblyProcessor(TypeMetadataCache typeCache, SerializationManager serializationManager, CodeGeneratorManager codeGeneratorManager, LoggerWrapper<AssemblyProcessor> logger)
         {
-            this.logger = new LoggerWrapper<AssemblyProcessor>(loggerFactory);
+            this.logger = logger;
             this.typeCache = typeCache;
             this.serializationManager = serializationManager;
             this.codeGeneratorManager = codeGeneratorManager;

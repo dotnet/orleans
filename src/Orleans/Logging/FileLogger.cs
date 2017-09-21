@@ -44,7 +44,7 @@ namespace Orleans.Logging
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,
             Func<TState, Exception, string> formatter, string category)
         {
-            var logMessage = FormetMessage(DateTime.UtcNow, logLevel, category, formatter(state, exception), exception, eventId);
+            var logMessage = FormatMessage(DateTime.UtcNow, logLevel, category, formatter(state, exception), exception, eventId);
             lock (this.lockObj)
             {
                 if (this.logOutput == null) return;
@@ -59,7 +59,7 @@ namespace Orleans.Logging
             }
         }
 
-        private static string FormetMessage(
+        private static string FormatMessage(
             DateTime timestamp,
             LogLevel logLevel,
             string caller,

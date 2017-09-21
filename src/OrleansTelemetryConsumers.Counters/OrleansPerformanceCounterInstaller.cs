@@ -29,7 +29,7 @@ namespace OrleansTelemetryConsumers.Counters
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null};
             var loggerFactory = CreateDefaultLoggerFactory(cfg.TraceFileName);
-            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, loggerFactory);
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, new LoggerWrapper<SiloAssemblyLoader>(loggerFactory));
             CrashUtils.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
             consumer = new OrleansPerfCounterTelemetryConsumer(loggerFactory);
             this.logger = loggerFactory.CreateLogger<OrleansPerformanceCounterInstaller>();

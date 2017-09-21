@@ -67,7 +67,7 @@ namespace Orleans.Messaging
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
             {
-                gatewayRefreshTimer = new SafeTimer(this.loggerFactory, RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
+                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
             }
         }
 

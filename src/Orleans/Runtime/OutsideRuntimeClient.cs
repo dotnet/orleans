@@ -24,7 +24,8 @@ namespace Orleans
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private ILogger logger;
-
+        private Logger callBackDataLogger;
+        private ILogger timerLogger;
         private ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
@@ -102,6 +103,8 @@ namespace Orleans
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
+            this.callBackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
+            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -141,7 +144,7 @@ namespace Orleans
             {
                 LoadAdditionalAssemblies();
                 //init logger for UnobservedExceptionsHandlerClass
-                UnobservedExceptionsHandlerClass.InitLogger(this.ServiceProvider.GetRequiredService<ILoggerFactory>());
+                UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
                 if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
                 {
                     logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
@@ -639,7 +642,8 @@ namespace Orleans
                     message,
                     unregisterCallback,
                     config,
-                    this.loggerFactory);
+                    this.callBackDataLogger,
+                    this.timerLogger);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }

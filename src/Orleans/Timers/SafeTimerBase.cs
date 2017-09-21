@@ -22,27 +22,27 @@ namespace Orleans.Runtime
         private bool                timerStarted;
         private DateTime            previousTickTime;
         private int                 totalNumTicks;
-        private Logger      logger;
+        private ILogger      logger;
 
-        internal SafeTimerBase(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state)
+        internal SafeTimerBase(ILogger logger, Func<object, Task> asynTaskCallback, object state)
         {
-            Init(loggerFactory, asynTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            Init(logger, asynTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        internal SafeTimerBase(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
+        internal SafeTimerBase(ILogger logger, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            Init(loggerFactory, asynTaskCallback, null, state, dueTime, period);
+            Init(logger, asynTaskCallback, null, state, dueTime, period);
             Start(dueTime, period);
         }
 
-        internal SafeTimerBase(ILoggerFactory loggerFactory, TimerCallback syncCallback, object state)
+        internal SafeTimerBase(ILogger logger, TimerCallback syncCallback, object state)
         {
-            Init(loggerFactory, null, syncCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            Init(logger, null, syncCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        internal SafeTimerBase(ILoggerFactory loggerFactory, TimerCallback syncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        internal SafeTimerBase(ILogger logger, TimerCallback syncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            Init(loggerFactory, null, syncCallback, state, dueTime, period);
+            Init(logger, null, syncCallback, state, dueTime, period);
             Start(dueTime, period);
         }
 
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
             timer.Change(due, Constants.INFINITE_TIMESPAN);
         }
 
-        private void Init(ILoggerFactory loggerFactory, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
+        private void Init(ILogger logger, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
         {
             if (synCallback == null && asynCallback == null) throw new ArgumentNullException("synCallback", "Cannot use null for both sync and asyncTask timer callbacks.");
             int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
@@ -70,9 +70,8 @@ namespace Orleans.Runtime
             timerFrequency = period;
             this.dueTime = due;
             totalNumTicks = 0;
-            var loggerName = syncCallbackFunc != null ? syncTimerName : asyncTimerName;
-            logger = new LoggerWrapper(loggerName, loggerFactory);
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
+            this.logger = logger;
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
@@ -104,7 +103,7 @@ namespace Orleans.Runtime
                 {
                     var t = timer;
                     timer = null;
-                    if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
                     t.Dispose();
 
                 }
@@ -136,7 +135,7 @@ namespace Orleans.Runtime
         }
 
         public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
-                        TimeSpan dueTime, TimeSpan timerFrequency, Logger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
+                        TimeSpan dueTime, TimeSpan timerFrequency, ILogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
             TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;
             TimeSpan exceptedTimeToNexTick = totalNumTicks == 0 ? dueTime : timerFrequency;
@@ -184,7 +183,7 @@ namespace Orleans.Runtime
 
             timerFrequency = period;
 
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
 
             try
             {
@@ -218,9 +217,9 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
                 syncCallbackFunc(state);
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
@@ -249,9 +248,9 @@ namespace Orleans.Runtime
 
             try
             {
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
                 await asynTaskCallback(state);
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
@@ -274,20 +273,20 @@ namespace Orleans.Runtime
 
                 totalNumTicks++;
 
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
 
                 if (timerFrequency == Constants.INFINITE_TIMESPAN)
                 {
                     //timer.Change(Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
                     DisposeTimer();
 
-                    if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
                 }
                 else
                 {
                     timer.Change(timerFrequency, Constants.INFINITE_TIMESPAN);
 
-                    if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
                 }
             }
             catch (ObjectDisposedException ode)

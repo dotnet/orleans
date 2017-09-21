@@ -14,11 +14,12 @@ namespace Orleans.Messaging
         private readonly IServiceProvider serviceProvider;
         private readonly Logger logger;
 
-        public GatewayProviderFactory(ClientConfiguration cfg, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public GatewayProviderFactory(ClientConfiguration cfg, IServiceProvider serviceProvider,
+            LoggerWrapper<GatewayProviderFactory> logger)
         {
             this.cfg = cfg;
             this.serviceProvider = serviceProvider;
-            this.logger = new LoggerWrapper<GatewayProviderFactory>(loggerFactory);
+            this.logger = logger;
         }
 
         internal IGatewayListProvider CreateGatewayListProvider()

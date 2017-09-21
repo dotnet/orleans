@@ -42,10 +42,10 @@ namespace Orleans.CodeGeneration
 
         private readonly IServiceProvider serviceProvider;
 
-        public CodeGeneratorManager(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public CodeGeneratorManager(IServiceProvider serviceProvider, LoggerWrapper<CodeGeneratorManager> logger)
         {
             this.serviceProvider = serviceProvider;
-            this.Log = new LoggerWrapper<CodeGeneratorManager>(loggerFactory);
+            this.Log = logger;
         }
 
         /// <summary>

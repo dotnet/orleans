@@ -12,11 +12,11 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly IServiceProvider serviceProvider;
         private readonly Logger logger;
 
-        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider, LoggerWrapper<MultiClusterGossipChannelFactory> logger)
         {
             this.globalConfig = globalConfig;
             this.serviceProvider = serviceProvider;
-            logger = new LoggerWrapper<MultiClusterGossipChannelFactory>(loggerFactory);
+            this.logger = logger;
         }
 
         internal async Task<List<IGossipChannel>> CreateGossipChannels()

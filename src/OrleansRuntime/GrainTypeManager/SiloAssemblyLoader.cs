@@ -20,9 +20,9 @@ namespace Orleans.Runtime
         private readonly Dictionary<string, SearchOption> directories;
         private readonly MultiClusterRegistrationStrategyManager registrationManager;
 
-        public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager, ILoggerFactory loggerFactory)
+        public SiloAssemblyLoader(NodeConfiguration nodeConfig, MultiClusterRegistrationStrategyManager registrationManager, LoggerWrapper<SiloAssemblyLoader> logger)
         {
-            this.logger = new LoggerWrapper<SiloAssemblyLoader>(loggerFactory);
+            this.logger = logger;
             IDictionary<string, SearchOption> additionalDirectories = nodeConfig.AdditionalAssemblyDirectories;
             this.registrationManager = registrationManager;
             this.excludedGrains = nodeConfig.ExcludedGrainTypes != null

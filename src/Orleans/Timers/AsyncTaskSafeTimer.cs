@@ -8,14 +8,14 @@ namespace Orleans.Runtime
     {
         private readonly SafeTimerBase safeTimerBase;
 
-        public AsyncTaskSafeTimer(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state)
+        public AsyncTaskSafeTimer(ILogger logger, Func<object, Task> asynTaskCallback, object state)
         {
-            safeTimerBase = new SafeTimerBase(loggerFactory, asynTaskCallback, state);
+            safeTimerBase = new SafeTimerBase(logger, asynTaskCallback, state);
         }
 
-        public AsyncTaskSafeTimer(ILoggerFactory loggerFactory, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public AsyncTaskSafeTimer(ILogger logger, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            safeTimerBase = new SafeTimerBase(loggerFactory, asynTaskCallback, state, dueTime, period);
+            safeTimerBase = new SafeTimerBase(logger, asynTaskCallback, state, dueTime, period);
         }
 
         public void Start(TimeSpan dueTime, TimeSpan period)

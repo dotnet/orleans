@@ -37,7 +37,7 @@ namespace Tester.AzureUtils.Persistence
                 fixture.GrainFactory,
                 fixture.Services,
                 new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(NullLoggerFactory.Instance),
+                new LoadedProviderTypeLoaders(new LoggerWrapper<LoadedProviderTypeLoaders>(NullLoggerFactory.Instance)),
                 NullLoggerFactory.Instance);
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();

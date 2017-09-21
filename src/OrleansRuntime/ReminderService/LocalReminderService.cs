@@ -22,6 +22,7 @@ namespace Orleans.Runtime.ReminderService
         private IGrainTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private uint initialReadCallCount = 0;
+        private readonly ILogger timerLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
@@ -37,12 +38,13 @@ namespace Orleans.Runtime.ReminderService
             ILoggerFactory loggerFactory)
             : base(id, silo, null, loggerFactory)
         {
-            this.loggerFactory = loggerFactory;
+            this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
             this.config = config;
             this.initTimeout = initTimeout;
             localTableSequence = 0;
+            this.loggerFactory = loggerFactory;
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
@@ -224,7 +226,7 @@ namespace Orleans.Runtime.ReminderService
                 var random = new SafeRandom();
                 listRefreshTimer = GrainTimer.FromTaskCallback(
                     this.RuntimeClient.Scheduler,
-                    this.loggerFactory,
+                    this.timerLogger,
                     _ => DoInitialReadAndUpdateReminders(),
                     null,
                     random.NextTimeSpan(InitialReadRetryPeriod),
@@ -245,7 +247,7 @@ namespace Orleans.Runtime.ReminderService
             if (listRefreshTimer != null) listRefreshTimer.Dispose();
             listRefreshTimer = GrainTimer.FromTaskCallback(
                 this.RuntimeClient.Scheduler,
-                this.loggerFactory,
+                this.timerLogger,
                 _ => ReadAndUpdateReminders(),
                 null,
                 dueTime,
@@ -513,7 +515,7 @@ namespace Orleans.Runtime.ReminderService
             private readonly TimeSpan period;
             private GrainReference GrainRef {  get { return Identity.GrainRef; } }
             private string ReminderName { get { return Identity.ReminderName; } }
-            private readonly ILoggerFactory loggerFactory;
+            private readonly ILogger timerLogger;
             internal ReminderIdentity Identity { get; private set; }
             internal string ETag;
             internal IGrainTimer Timer;
@@ -524,17 +526,17 @@ namespace Orleans.Runtime.ReminderService
                 Identity = new ReminderIdentity(entry.GrainRef, entry.ReminderName);
                 firstTickTime = entry.StartAt;
                 period = entry.Period;
-                this.loggerFactory = loggerFactory;
                 remindable = entry.GrainRef.Cast<IRemindable>();
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
+                this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             }
 
             public void StartTimer(OrleansTaskScheduler scheduler, Func<object, Task> asyncCallback, Logger Logger)
             {
                 StopReminder(Logger); // just to make sure.
                 var dueTimeSpan = CalculateDueTime();
-                Timer = GrainTimer.FromTaskCallback(scheduler, this.loggerFactory, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
+                Timer = GrainTimer.FromTaskCallback(scheduler, this.timerLogger, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
                 if (Logger.IsVerbose) Logger.Verbose("Reminder {0}, Due time{1}", this, dueTimeSpan);
                 Timer.Start();
             }

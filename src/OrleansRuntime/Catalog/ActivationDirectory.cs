@@ -18,14 +18,14 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
-        public ActivationDirectory(ILoggerFactory loggerFactory)
+        public ActivationDirectory(ILogger<ActivationDirectory> logger)
         {
             activations = new ConcurrentDictionary<ActivationId, ActivationData>();
             systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();
             grainToActivationsMap = new ConcurrentDictionary<GrainId, List<ActivationData>>();
             grainCounts = new ConcurrentDictionary<string, CounterStatistic>();
             systemTargetCounts = new ConcurrentDictionary<string, CounterStatistic>();
-            this.logger = loggerFactory.CreateLogger<ActivationDirectory>();
+            this.logger = logger;
         }
 
         public int Count

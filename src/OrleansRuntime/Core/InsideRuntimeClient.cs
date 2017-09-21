@@ -27,6 +27,8 @@ namespace Orleans.Runtime
     internal class InsideRuntimeClient : ISiloRuntimeClient
     {
         private readonly ILogger logger;
+        private readonly Logger callbackDataLogger;
+        private readonly ILogger timerLogger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly List<IDisposable> disposables;
@@ -77,6 +79,8 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
+            this.callbackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
+            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -205,7 +209,8 @@ namespace Orleans.Runtime
                     message,
                     unregisterCallback,
                     Config.Globals,
-                    this.loggerFactory);
+                    this.callbackDataLogger,
+                    this.timerLogger);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }

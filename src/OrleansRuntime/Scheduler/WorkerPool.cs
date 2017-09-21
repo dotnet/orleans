@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly ICorePerformanceMetrics performanceMetrics;
         private readonly ILoggerFactory loggerFactory;
         internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
-
+        private readonly ILogger timerLogger;
         internal WorkerPool(OrleansTaskScheduler sched, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory, int maxActiveThreads, bool enableWorkerThreadInjection)
         {
             scheduler = sched;
@@ -52,6 +52,7 @@ namespace Orleans.Runtime.Scheduler
             running = false;
             runningThreadCount = 0;
             longTurnTimer = null;
+            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
         internal void Start()
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.Scheduler
                 t.Start();
             
             if (EnableWorkerThreadInjection)
-                longTurnTimer = new SafeTimer(this.loggerFactory, obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                longTurnTimer = new SafeTimer(this.timerLogger, obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
         internal void Stop()

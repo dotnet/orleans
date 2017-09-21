@@ -88,6 +88,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.AddLogging();
+            //temporary change until runtime moved away from Logger
+            services.TryAddSingleton(typeof(LoggerWrapper<>));
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();

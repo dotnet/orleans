@@ -17,13 +17,14 @@ namespace Orleans.Runtime
 
         private AsyncTaskSafeTimer reportTimer;
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger timerLogger;
         internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory)
         {
             this.mc = mc;
             this.metricsDataPublisher = metricsDataPublisher;
             this.logger = loggerFactory.CreateLogger<ClientTableStatistics>();
-            this.loggerFactory = loggerFactory;
+            //async timer created through current class all share this logger for perf reasons
+            this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
             runtimeStats = runtime;
             reportFrequency = TimeSpan.Zero;
             connectedGatewayCount = IntValueStatistic.Find(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT);
@@ -101,7 +102,7 @@ namespace Orleans.Runtime
                     {
                         reportTimer.Dispose();
                     }
-                    reportTimer = new AsyncTaskSafeTimer(this.loggerFactory, this.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
+                    reportTimer = new AsyncTaskSafeTimer(this.timerLogger, this.Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
                 }
             }
         }

@@ -16,10 +16,10 @@ namespace Orleans.Runtime.MembershipService
         private readonly Logger logger;
         private IMembershipTable membershipTable;
 
-        public MembershipTableFactory(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public MembershipTableFactory(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
         {
             this.serviceProvider = serviceProvider;
-            logger = new LoggerWrapper<MembershipTableFactory>(loggerFactory);
+            this.logger = logger;
         }
 
         internal async Task<IMembershipTable> GetMembershipTable()

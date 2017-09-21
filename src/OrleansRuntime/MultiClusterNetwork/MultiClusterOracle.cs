@@ -182,7 +182,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             timer = GrainTimer.FromTimerCallback(
                 this.RuntimeClient.Scheduler,
-                this.loggerFactory,
+                this.loggerFactory.CreateLogger<GrainTimer>(),
                 this.OnGossipTimerTick,
                 null,
                 this.backgroundGossipInterval,

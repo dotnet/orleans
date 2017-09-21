@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Counters
             logger.Info(ErrorCode.PerfCounterStarting, "Starting Windows perf counter stats collection with frequency={0}", PerfCountersWriteInterval);
 
             // Start the timer
-            timer = new SafeTimer(this.loggerFactory, TimerTick, null, PerfCountersWriteInterval, PerfCountersWriteInterval);
+            timer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), TimerTick, null, PerfCountersWriteInterval, PerfCountersWriteInterval);
         }
 
         /// <summary>

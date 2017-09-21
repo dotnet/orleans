@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
         private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
-
+        private readonly ILogger timerLogger;
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
 
         public string SiloName { get { return membershipOracleData.SiloName; } }
@@ -54,6 +54,7 @@ namespace Orleans.Runtime.MembershipService
             TimeSpan backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(orleansConfig.Globals.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
             EXP_BACKOFF_CONTENTION_MAX = backOffMax;
             EXP_BACKOFF_ERROR_MAX = backOffMax;
+            timerLogger = this.loggerFactory.CreateLogger<GrainTimer>();
         }
 
         #region ISiloStatusOracle Members
@@ -150,10 +151,9 @@ namespace Orleans.Runtime.MembershipService
                     var randomProbeOffset = random.NextTimeSpan(orleansConfig.Globals.ProbeTimeout);
                     if (timerGetTableUpdates != null)
                         timerGetTableUpdates.Dispose();
-
                     timerGetTableUpdates = GrainTimer.FromTimerCallback(
                         this.RuntimeClient.Scheduler,
-                        this.loggerFactory,
+                        timerLogger,
                         OnGetTableUpdateTimer,
                         null,
                         randomTableOffset,
@@ -167,7 +167,7 @@ namespace Orleans.Runtime.MembershipService
 
                     timerProbeOtherSilos = GrainTimer.FromTimerCallback(
                         this.RuntimeClient.Scheduler,
-                        this.loggerFactory,
+                        timerLogger,
                         OnProbeOtherSilosTimer,
                         null,
                         randomProbeOffset,
@@ -198,7 +198,7 @@ namespace Orleans.Runtime.MembershipService
 
             timerIAmAliveUpdateInTable = GrainTimer.FromTimerCallback(
                 this.RuntimeClient.Scheduler,
-                this.loggerFactory,
+                this.timerLogger,
                 OnIAmAliveUpdateInTableTimer,
                 null,
                 TimeSpan.Zero,

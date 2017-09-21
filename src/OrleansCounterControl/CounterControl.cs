@@ -33,7 +33,7 @@ namespace Orleans.Counter.Control
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
             
-            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, loggerFactory);
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, new LoggerWrapper<SiloAssemblyLoader>(loggerFactory));
             CrashUtils.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
             perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer(loggerFactory);
             this.logger = loggerFactory.CreateLogger<CounterControl>();

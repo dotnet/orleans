@@ -206,7 +206,7 @@ namespace Orleans.Runtime
 
             var t = GrainTimer.FromTaskCallback(
                 this.RuntimeClient.Scheduler,
-                this.loggerFactory,
+                this.loggerFactory.CreateLogger<GrainTimer>(),
                 OnTimer,
                 null,
                 TimeSpan.Zero,
