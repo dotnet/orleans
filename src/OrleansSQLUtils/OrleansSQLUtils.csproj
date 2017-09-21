@@ -23,17 +23,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="CreateOrleansTables_MySql.sql">
+    <None Include="CreateOrleansTables_MySQL.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
     </None>
-    <None Include="CreateOrleansTables_PostgreSql.sql">
+    <None Include="CreateOrleansTables_PostgreSQL.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
     </None>
-    <None Include="CreateOrleansTables_SqlServer.sql">
+    <None Include="CreateOrleansTables_SQLServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
