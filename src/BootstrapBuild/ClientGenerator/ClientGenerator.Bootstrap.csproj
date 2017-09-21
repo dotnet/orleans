@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -6,7 +6,7 @@
     <AssemblyName>ClientGenerator</AssemblyName>
     <RootNamespace>Microsoft.Orleans.CodeGenerator.MSBuild</RootNamespace>
     <SourceDir>$(SourceRoot)src/ClientGenerator/</SourceDir>
-    <PublishDir>$(SourceRoot)Bootstrap/$(BuildFlavor)/$(Configuration)/</PublishDir>
+    <PublishDir>$(SourceRoot)Bootstrap/$(Configuration)/</PublishDir>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <GenerateBindingRedirects>true</GenerateBindingRedirects>
   </PropertyGroup>
@@ -33,5 +33,9 @@
     <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.Bootstrap.csproj" />
     <ProjectReference Include="..\Orleans\Orleans.Bootstrap.csproj" />
   </ItemGroup>
+
+  <Target Name="PostBuildPublish" AfterTargets="Build">
+    <CallTarget Targets="Publish" />
+  </Target>
 
 </Project>

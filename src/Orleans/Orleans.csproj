@@ -51,16 +51,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\BootstrapBuild\ClientGenerator\ClientGenerator.Bootstrap.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+      <UndefineProperties>TargetFramework</UndefineProperties>
+      <!-- /Workaround -->
+    </ProjectReference>
   </ItemGroup>
-
-  <Target
-    Name="OrleansDllBootstrapUsingCodeGen"
-    BeforeTargets="GenerateOrleansCode" 
-    Inputs="@(Compile)"
-    Outputs="$(SourceRoot)Bootstrap/$(BuildFlavor)/$(Configuration)/ClientGenerator.exe">
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
-    <!-- Compile code generator -->
-    <MSBuild Projects="$(ProjectDir)..\BootstrapBuild\ClientGenerator\ClientGenerator.Bootstrap.csproj" Targets="Publish" Properties="OrleansCodeGenPrecompile=true" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="false" />
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator finished" Importance="high" />
-  </Target>
 </Project>
