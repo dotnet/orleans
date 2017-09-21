@@ -1,3 +1,5 @@
+using Orleans;
+using Orleans.CodeGeneration;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("ClientGenerator")]
@@ -28,3 +30,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
+
+[assembly: KnownAssembly(typeof(IGrain))]
