@@ -2,7 +2,7 @@
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to code generator -->
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-    <OrleansCodeGeneratorAssembly>$(SourceRoot)Bootstrap/$(Configuration)/ClientGenerator.exe</OrleansCodeGeneratorAssembly>
+    <OrleansCodeGeneratorAssembly>$(SourceRoot)Bootstrap/$(Configuration)/ClientGenerator.dll</OrleansCodeGeneratorAssembly>
   </PropertyGroup>
   <Import Project="$(SourceRoot)src/ClientGenerator/build/Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " />
   <!--End Orleans -->
