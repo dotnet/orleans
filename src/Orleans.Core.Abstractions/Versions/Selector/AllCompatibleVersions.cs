@@ -5,7 +5,7 @@ namespace Orleans.Versions.Selector
     [Serializable]
     public class AllCompatibleVersions : VersionSelectorStrategy
     {
-        internal static AllCompatibleVersions Singleton { get; } = new AllCompatibleVersions();
+        public static AllCompatibleVersions Singleton { get; } = new AllCompatibleVersions();
 
         private AllCompatibleVersions()
         { }
