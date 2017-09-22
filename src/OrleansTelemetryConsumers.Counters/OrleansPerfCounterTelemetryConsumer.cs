@@ -63,7 +63,7 @@ namespace OrleansTelemetryConsumers.Counters
             return false;
         }
 
-        private static PerformanceCounter CreatePerfCounter(string perfCounterName, ILogger logger)
+        private PerformanceCounter CreatePerfCounter(string perfCounterName)
         {
             logger.Debug(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
             return new PerformanceCounter(CATEGORY_NAME, perfCounterName, false);
@@ -206,7 +206,7 @@ namespace OrleansTelemetryConsumers.Counters
                     foreach (var cd in newPerfCounterData)
                     {
                         var perfCounterName = GetPerfCounterName(cd);
-                        cd.PerfCounter = CreatePerfCounter(perfCounterName, this.logger);
+                        cd.PerfCounter = CreatePerfCounter(perfCounterName);
                     }
                 }
 

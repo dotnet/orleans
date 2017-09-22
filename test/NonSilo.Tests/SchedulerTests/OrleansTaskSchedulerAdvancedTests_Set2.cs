@@ -41,6 +41,7 @@ namespace UnitTests.SchedulerTests
         public void Dispose()
         {
             masterScheduler.Stop();
+            this.loggerFactory.Dispose();
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
         }

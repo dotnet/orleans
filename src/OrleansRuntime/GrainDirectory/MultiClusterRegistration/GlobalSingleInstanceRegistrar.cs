@@ -34,14 +34,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public GlobalSingleInstanceRegistrar(
             LocalGrainDirectory localDirectory,
-            ILoggerFactory loggerFactory,
+            LoggerWrapper<GlobalSingleInstanceRegistrar> logger,
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
-            this.logger = new LoggerWrapper<GlobalSingleInstanceRegistrar>(loggerFactory);
+            this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;

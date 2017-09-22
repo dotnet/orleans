@@ -15,14 +15,6 @@ namespace UnitTests
 {
     public class Async_TimingTests
     {
-        private readonly ILogger logger;
-
-        public Async_TimingTests()
-        {
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(ClientConfiguration.StandardLoad().TraceFileName);
-            logger = loggerFactory.CreateLogger<Async_TimingTests>();
-            logger.Info("----------------------------- STARTING AC_TimingTests -------------------------------------");
-        }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_WithTimeout_Wait()

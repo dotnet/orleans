@@ -34,7 +34,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 var deploymentId = this.HostedCluster?.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.HostedCluster.ServiceProvider.GetService<ILoggerFactory>(), StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString)
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString)
                     .Wait();
             }
         }

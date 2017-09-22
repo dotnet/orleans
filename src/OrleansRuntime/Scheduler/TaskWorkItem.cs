@@ -18,13 +18,13 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="sched">Scheduler to execute this Task action. A value of null means use the Orleans system scheduler.</param>
         /// <param name="t">Task to be performed</param>
         /// <param name="context">Execution context</param>
-        /// <param name="loggerFactory">logger factory used to create loggers</param>
-        internal TaskWorkItem(ITaskScheduler sched, Task t, ISchedulingContext context, ILoggerFactory loggerFactory)
+        /// <param name="logger">logger to use</param>
+        internal TaskWorkItem(ITaskScheduler sched, Task t, ISchedulingContext context, ILogger logger)
         {
             scheduler = sched;
             task = t;
             SchedulingContext = context;
-            this.logger = loggerFactory.CreateLogger<TaskWorkItem>();
+            this.logger = logger;
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Created TaskWorkItem {0} for Id={1} State={2} with Status={3} Scheduler={4}",
                 Name, task.Id, (task.AsyncState == null) ? "null" : task.AsyncState.ToString(), task.Status, scheduler);

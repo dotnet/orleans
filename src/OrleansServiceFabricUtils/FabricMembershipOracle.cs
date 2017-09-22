@@ -26,7 +26,7 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly GlobalConfiguration globalConfig;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
-        private readonly Logger log;
+        private readonly ILogger log;
 
         // Cached collection of active silos.
         private volatile Dictionary<SiloAddress, SiloStatus> activeSilosCache;
@@ -46,14 +46,14 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <param name="localSiloDetails">The silo which this instance will provide membership information for.</param>
         /// <param name="globalConfig">The cluster configuration.</param>
         /// <param name="fabricServiceSiloResolver">The service resolver which this instance will use.</param>
-        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="logger">The logger.</param>
         public FabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
             GlobalConfiguration globalConfig,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
-            ILoggerFactory loggerFactory)
+            ILogger<FabricMembershipOracle> logger)
         {
-            this.log = new LoggerWrapper<FabricMembershipOracle>(loggerFactory);
+            this.log = logger;
             this.localSiloDetails = localSiloDetails;
             this.globalConfig = globalConfig;
             this.fabricServiceSiloResolver = fabricServiceSiloResolver;

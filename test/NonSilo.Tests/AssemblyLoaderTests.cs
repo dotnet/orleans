@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -10,10 +11,25 @@ using Xunit;
 
 namespace UnitTests
 {
-    public class AssemblyLoaderTests 
+    public class AssemblyLoaderTests :IDisposable
     {
         const string ExpectedFileName = "OrleansProviders.dll";
-        private readonly Logger logger = new LoggerWrapper<AssemblyLoaderTests>(TestingUtils.CreateDefaultLoggerFactory($"AssemblyLoaderTests.log"));
+
+        private readonly ILoggerFactory defaultLoggerFactory;
+
+        private readonly Logger logger;
+
+        public AssemblyLoaderTests()
+        {
+            this.defaultLoggerFactory =
+                TestingUtils.CreateDefaultLoggerFactory("AssemblyLoaderTests.log");
+            this.logger = new LoggerWrapper<AssemblyLoaderTests>(defaultLoggerFactory);
+        }
+
+        public void Dispose()
+        {
+            this.defaultLoggerFactory.Dispose();
+        }
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()

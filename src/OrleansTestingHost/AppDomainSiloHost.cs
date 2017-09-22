@@ -55,7 +55,6 @@ namespace Orleans.TestingHost
             /// <param name="cachedAssembly">The generated assembly.</param>
             public void AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly)
             {
-                //TODO: use NullLogger for now. 
                 CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly, NullLogger.Instance);
             }
         }

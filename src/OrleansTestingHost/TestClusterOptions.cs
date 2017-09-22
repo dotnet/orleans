@@ -261,7 +261,7 @@ namespace Orleans.TestingHost
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
             config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
-
+            config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             // If a debugger is attached, override the timeout setting
             config.ResponseTimeout = Debugger.IsAttached
                 ? TimeSpan.FromMilliseconds(1000000)

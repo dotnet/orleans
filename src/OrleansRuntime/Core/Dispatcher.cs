@@ -33,6 +33,7 @@ namespace Orleans.Runtime
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
         private readonly SafeRandom random;
+        private readonly ILogger invokeWorkItemLogger;
         private readonly ILoggerFactory loggerFactory;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
@@ -51,6 +52,7 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
+            this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
@@ -403,7 +405,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.loggerFactory), targetActivation.SchedulingContext);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
 

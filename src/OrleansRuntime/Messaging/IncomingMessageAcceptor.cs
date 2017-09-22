@@ -366,7 +366,8 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception ex)
             {
-                Log.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
+                var logger = ima?.Log ?? this.Log;
+                logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
                 RestartAcceptingSocket();
             }
         }

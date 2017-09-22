@@ -16,6 +16,7 @@ namespace Orleans.Runtime.Scheduler
     {
         private readonly Logger logger;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger taskWorkItemLogger;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         
@@ -60,6 +61,7 @@ namespace Orleans.Runtime.Scheduler
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
+            this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
             Pool = new WorkerPool(this, performanceMetrics, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
@@ -182,7 +184,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                var todo = new TaskWorkItem(this, task, context, this.loggerFactory);
+                var todo = new TaskWorkItem(this, task, context, this.taskWorkItemLogger);
                 RunQueue.Add(todo);
             }
             else

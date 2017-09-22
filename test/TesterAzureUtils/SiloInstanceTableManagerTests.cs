@@ -24,6 +24,8 @@ namespace Tester.AzureUtils
     {
         public class Fixture
         {
+            public ILoggerFactory LoggerFactory { get; set; } =
+                TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
         }
 
         private string deploymentId;
@@ -32,23 +34,22 @@ namespace Tester.AzureUtils
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
         private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly ITestOutputHelper output;
 
-        public SiloInstanceTableManagerTests(ITestOutputHelper output)
+        public SiloInstanceTableManagerTests(ITestOutputHelper output, ILoggerFactory loggerFactory)
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
-                
             logger = loggerFactory.CreateLogger<SiloInstanceTableManagerTests>();
-
+            this.loggerFactory = loggerFactory;
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddress.NewLocalAddress(generation);
 
-            logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
+            output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
 
-            logger.Info("Initializing SiloInstanceManager");
+            output.WriteLine("Initializing SiloInstanceManager");
             manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, loggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
@@ -67,6 +68,7 @@ namespace Tester.AzureUtils
                 logger.Info("TestCleanup -  Finished");
                 manager = null;
             }
+            this.loggerFactory.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional")]

@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {

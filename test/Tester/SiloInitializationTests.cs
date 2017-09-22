@@ -74,8 +74,7 @@ namespace Tester
 
         private static SiloHost CreateSiloHost(AppDomain appDomain, ClusterConfiguration clusterConfig)
         {
-            var siloName = nameof(SiloInitializationIsRetryableTest);
-            var args = new object[] {siloName , clusterConfig};
+            var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig};
 
             return (SiloHost)appDomain.CreateInstanceFromAndUnwrap(
                 "OrleansRuntime.dll",

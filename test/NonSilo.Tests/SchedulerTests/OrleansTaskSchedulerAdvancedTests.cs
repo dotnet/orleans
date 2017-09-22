@@ -46,7 +46,7 @@ namespace UnitTests.SchedulerTests
             {
                 orleansTaskScheduler.Stop();
             }
-
+            this.loggerFactory.Dispose();
             this.runtimeStatisticsGroup.Dispose();
             this.performanceMetrics.Dispose();
         }

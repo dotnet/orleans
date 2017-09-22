@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
-            Logger = new LoggerWrapper<GrainService>(loggerFactory);
+            Logger = new LoggerWrapper(typeName, loggerFactory);
 
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;

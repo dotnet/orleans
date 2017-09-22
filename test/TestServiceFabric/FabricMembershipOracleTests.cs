@@ -41,7 +41,7 @@ namespace TestServiceFabric
                 this.siloDetails,
                 globalConfig,
                 this.resolver,
-                NullLoggerFactory.Instance);
+                new NullLogger<FabricMembershipOracle>());
         }
 
         [Fact]

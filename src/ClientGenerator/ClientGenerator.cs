@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using Orleans.Logging;
+
 namespace Orleans.CodeGeneration
 {
     using System;
@@ -123,7 +126,9 @@ namespace Orleans.CodeGeneration
             }
 
             var config = new ClusterConfiguration();
-            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults));
+            var loggerFactory = new LoggerFactory();
+            loggerFactory.AddProvider(new FileLoggerProvider("ClientGenerator.log"));
+            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults, loggerFactory), loggerFactory);
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);

@@ -162,7 +162,7 @@ namespace Orleans.Runtime
             var agent = obj as AsynchAgent;
             if (agent == null)
             {
-                return;
+                throw new InvalidOperationException("Agent thread started with incorrect parameter type");
             }
 
             try

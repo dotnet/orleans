@@ -10,6 +10,7 @@ using Orleans.Hosting;
 using TestExtensions;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.TestingHost.Utils;
 
 namespace Tester.EventSourcingTests
@@ -52,7 +53,7 @@ namespace Tester.EventSourcingTests
             private void ConfigureLogging(ILoggingBuilder builder, string filePath)
             {
                 TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                builder.AddFilter("Storage.MemoryStorage", LogLevel.Debug);
+                builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
                 builder.AddFilter("LogViews", LogLevel.Debug);
             }
         }

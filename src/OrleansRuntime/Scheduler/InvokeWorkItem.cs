@@ -11,9 +11,9 @@ namespace Orleans.Runtime.Scheduler
         private readonly Message message;
         private readonly Dispatcher dispatcher;
 
-        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILoggerFactory loggerFactory)
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
         {
-            this.logger = loggerFactory.CreateLogger<InvokeWorkItem>();
+            this.logger = logger;
             if (activation?.GrainInstance == null)
             {
                 var str = string.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);

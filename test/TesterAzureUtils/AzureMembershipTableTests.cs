@@ -26,9 +26,9 @@ namespace Tester.AzureUtils
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter("AzureTableDataManager", LogLevel.Trace);
-            filters.AddFilter("OrleansSiloInstanceManager", LogLevel.Trace);
-            filters.AddFilter("Storage", LogLevel.Trace);
+            filters.AddFilter(typeof(AzureTableDataManager<>).FullName, LogLevel.Trace);
+            filters.AddFilter(typeof(OrleansSiloInstanceManager).FullName, LogLevel.Trace);
+            filters.AddFilter("Orleans.Storage", LogLevel.Trace);
             return filters;
         }
 

@@ -55,7 +55,8 @@ namespace Orleans.ServiceBus.Providers
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
         private ITelemetryProducer telemetryProducer;
-		private ILoggerFactory loggerFactory;        /// <summary>
+		private ILoggerFactory loggerFactory;        
+        /// <summary>
         /// Gets the serialization manager.
         /// </summary>
         public SerializationManager SerializationManager { get; private set; }

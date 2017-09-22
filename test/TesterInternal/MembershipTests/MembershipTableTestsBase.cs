@@ -85,6 +85,7 @@ namespace UnitTests.MembershipTests
             {
                 membershipTable.DeleteMembershipTableEntries(deploymentId).Wait();
             }
+            this.loggerFactory.Dispose();
         }
 
         protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);

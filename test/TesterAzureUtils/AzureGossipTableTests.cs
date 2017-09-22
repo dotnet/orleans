@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -12,7 +13,7 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureGossipTableTests : AzureStorageBasicTests 
+    public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
     {
         private readonly Logger logger;
 
@@ -24,10 +25,10 @@ namespace Tester.AzureUtils
         private SiloAddress siloAddress2;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
         private AzureTableBasedGossipChannel gossipTable; // This type is internal
-
+        private readonly ILoggerFactory loggerFactory;
         public AzureGossipTableTests()
         {
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
             logger = new LoggerWrapper<AzureGossipTableTests>(loggerFactory);
         
             globalServiceId = Guid.NewGuid();
@@ -60,6 +61,11 @@ namespace Tester.AzureUtils
             {
                 throw new TimeoutException("Could not create/read table.");
             }
+        }
+
+        public void Dispose()
+        {
+            this.loggerFactory.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]
