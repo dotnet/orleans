@@ -97,7 +97,7 @@
 <li>Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered to behave as if running on a reentrant grain with respect to other messages to that grain.</li>
 </ul>
 <h1 id="reminders">Reminders</h1>
-<h2 id="description">Description</h2>
+<h2 id="description-1">Description</h2>
 <p>Reminders are similar to timers with a few important differences:</p>
 <ul>
 <li>Reminders are persistent and will continue to trigger in all situations (including partial or full cluster restarts) unless explicitly cancelled.</li>
@@ -112,7 +112,7 @@
 &lt;SystemStore SystemStoreType=&quot;SqlServer&quot; /&gt;
 </code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
 <pre><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
-</code></pre><h2 id="usage">Usage</h2>
+</code></pre><h2 id="usage-1">Usage</h2>
 <p>A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
 <pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
 {

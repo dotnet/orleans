@@ -75,7 +75,7 @@
 <h1 id="my-first-orleans-application">My First Orleans Application</h1>
 
 <p>In this tutorial, we will walk through the steps to get the simplest possible Orleans application up and running, the all-too-familiar &quot;Hello World!&quot;.
-We&#39;re using VS 2013, but it works equally well with VS 2012 and VS 2015.</p>
+We&#39;re using VS 2017, but it works equally well with VS 2012, VS 2013 and VS 2015.</p>
 <p>Before we start, there are three Orleans concepts that you will run into in this tutorial: that of a grain, a communication interface, and a silo.</p>
 <h3 id="grains">Grains</h3>
 <p>Grains form the core of the Orleans programming model - they are distributed virtual actors.
@@ -99,30 +99,34 @@ Under &quot;Visual C#,&quot; you should see the following:</p>
 <p><img src="../Images/New%20DevTest%202.PNG" alt=""></p>
 <p>At this point go ahead and compile your project to download the packages.</p>
 <p>The project is just a console application populated with code that helps you host a silo in an environment that is &quot;developer friendly,&quot; i.e. where everything runs in a single process.</p>
-<p>The main code does three things: it creates a silo in a separate app domain, initializes the Orleans client runtime, and waits for user input before terminating:</p>
+<p>The main code does three things: it creates a silo, initializes the Orleans client runtime, and waits for user input before terminating:</p>
 <pre><code class="lang-csharp">static void Main(string[] args)
 {
-    // The Orleans silo environment is initialized in its own app domain in order to more
-    // closely emulate the distributed situation, when the client and the server cannot
-    // pass data via shared memory.
-    AppDomain hostDomain = AppDomain.CreateDomain(&quot;OrleansHost&quot;, null, new AppDomainSetup
-    {
-        AppDomainInitializer = InitSilo,
-        AppDomainInitializerArguments = args,
-    });
+    // First, configure and start a local silo
+    var siloConfig = ClusterConfiguration.LocalhostPrimarySilo();
+    var silo = new SiloHost(&quot;TestSilo&quot;, siloConfig);
+    silo.InitializeOrleansSilo();
+    silo.StartOrleansSilo();
 
-    // Orleans comes with a rich XML and programmatic configuration. Here we&#39;re just going to set up with basic programmatic config
-    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
-    GrainClient.Initialize(config);
+    Console.WriteLine(&quot;Silo started.&quot;);
 
-    // TODO: once the previous call returns, the silo is up and running.
-    //       This is the place your custom logic, for example calling client logic
-    //       or initializing an HTTP front end for accepting incoming requests.
+    // Then configure and connect a client.
+    var clientConfig = ClientConfiguration.LocalhostSilo();
+    var client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+    client.Connect().Wait();
 
-    Console.WriteLine(&quot;Orleans Silo is running.\nPress Enter to terminate...&quot;);
+    Console.WriteLine(&quot;Client connected.&quot;);
+
+    //
+    // This is the place for your test code.
+    //
+
+    Console.WriteLine(&quot;\nPress Enter to terminate...&quot;);
     Console.ReadLine();
 
-    hostDomain.DoCallBack(ShutdownSilo);
+    // Shut down
+    client.Close();
+    silo.ShutdownOrleansSilo();
 }
 </code></pre><h2 id="adding-some-grains">Adding Some Grains</h2>
 <p>At this point, we have everything we need except some actual Orleans-based code.
@@ -157,7 +161,7 @@ Just return the string as the contents of a Task:</p>
 </code></pre><p>OK, we&#39;re nearly done.
 All we need is a bit of client code, which we will return to <em>Program.cs</em> in order to add.
 In place of the comment following the call to <code>GrainClient.Initialize()</code>, add these two lines:</p>
-<pre><code class="lang-csharp">var friend = GrainClient.GrainFactory.GetGrain&lt;MyGrainInterfaces1.IGrain1&gt;(0);
+<pre><code class="lang-csharp">var friend = client.GetGrain&lt;MyGrainInterfaces1.IGrain1&gt;(0);
 Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello().Result);
 </code></pre><p>That&#39;s it!
 Hit F5, let the silo initialization code take its time.

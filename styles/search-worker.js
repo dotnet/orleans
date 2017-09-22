@@ -1,11 +1,12 @@
 (function () {
   importScripts('lunr.min.js');
 
-  var lunrIndex;
-
-  var stopWords = null;
-  var searchData = {};
-
+  var lunrIndex = lunr(function () {
+    this.pipeline.remove(lunr.stopWordFilter);
+    this.ref('href');
+    this.field('title', { boost: 50 });
+    this.field('keywords', { boost: 20 });
+  });
   lunr.tokenizer.seperator = /[\s\-\.]+/;
 
   var stopWordsRequest = new XMLHttpRequest();
@@ -14,11 +15,14 @@
     if (this.status != 200) {
       return;
     }
-    stopWords = JSON.parse(this.responseText);
-    buildIndex();
+    var stopWords = JSON.parse(this.responseText);
+    var docfxStopWordFilter = lunr.generateStopWordFilter(stopWords);
+    lunr.Pipeline.registerFunction(docfxStopWordFilter, 'docfxStopWordFilter');
+    lunrIndex.pipeline.add(docfxStopWordFilter);
   }
   stopWordsRequest.send();
 
+  var searchData = {};
   var searchDataRequest = new XMLHttpRequest();
 
   searchDataRequest.open('GET', '../index.json');
@@ -27,9 +31,11 @@
       return;
     }
     searchData = JSON.parse(this.responseText);
-
-    buildIndex();
-
+    for (var prop in searchData) {
+      if (searchData.hasOwnProperty(prop)) {
+        lunrIndex.add(searchData[prop]);
+      }
+    }
     postMessage({ e: 'index-ready' });
   }
   searchDataRequest.send();
@@ -43,38 +49,5 @@
       results.push({ 'href': item.href, 'title': item.title, 'keywords': item.keywords });
     });
     postMessage({ e: 'query-ready', q: q, d: results });
-  }
-
-  function buildIndex() {
-    if (stopWords !== null && !isEmpty(searchData)) {
-      lunrIndex = lunr(function () {
-        this.pipeline.remove(lunr.stopWordFilter);
-        this.ref('href');
-        this.field('title', { boost: 50 });
-        this.field('keywords', { boost: 20 });
-
-        for (var prop in searchData) {
-          if (searchData.hasOwnProperty(prop)) {
-            this.add(searchData[prop]);
-          }
-        }
-
-        var docfxStopWordFilter = lunr.generateStopWordFilter(stopWords);
-        lunr.Pipeline.registerFunction(docfxStopWordFilter, 'docfxStopWordFilter');
-        this.pipeline.add(docfxStopWordFilter);
-        this.searchPipeline.add(docfxStopWordFilter);
-      });
-    }
-  }
-
-  function isEmpty(obj) {
-    if(!obj) return true;
-
-    for (var prop in obj) {
-      if (obj.hasOwnProperty(prop))
-        return false;
-    }
-
-    return true;
   }
 })();

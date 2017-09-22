@@ -98,7 +98,7 @@ They will become idle, and eventually deactivated by the standard activation col
 Hence, the pool of activations will eventually shrink to match the load.</p>
 <p>The following example defines a Stateless Worker grain class <code>MyStatelessWorkerGrain</code> with the default maximum activation number limit. </p>
 <pre><code class="lang-csharp">[StatelessWorker]
-public class MyStatelessWorkerGrain : IMyStatelessWorkerGrain
+public class MyStatelessWorkerGrain : Grain, IMyStatelessWorkerGrain
 {
  ...
 }
