@@ -5,7 +5,7 @@ namespace Orleans.Versions.Compatibility
     [Serializable]
     public class StrictVersionCompatible : CompatibilityStrategy
     {
-        public static StrictVersionCompatible Singleton { get; } = new StrictVersionCompatible();
+        internal static StrictVersionCompatible Singleton { get; } = new StrictVersionCompatible();
 
         private StrictVersionCompatible()
         { }
