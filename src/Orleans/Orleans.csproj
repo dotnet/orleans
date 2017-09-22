@@ -17,6 +17,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>false</Pack>
     </Content>
+    <None Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
@@ -51,12 +55,27 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\BootstrapBuild\ClientGenerator\ClientGenerator.Bootstrap.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
-      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
-      <UndefineProperties>TargetFramework</UndefineProperties>
-      <!-- /Workaround -->
-    </ProjectReference>
   </ItemGroup>
+
+  <PropertyGroup>
+    <OrleansBootstrapSteps>
+      OrleansDllBootstrapUsingCodeGen
+    </OrleansBootstrapSteps>
+  </PropertyGroup>
+
+  <Target Name="OrleansBootstrap" BeforeTargets="AssignTargetPaths" DependsOnTargets="$(OrleansBootstrapSteps)" Condition="'$(Bootstrap)' != 'true'" />
+
+  <Target Name="OrleansDllBootstrapUsingCodeGen" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs" Condition="'$(Bootstrap)' != 'true'">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator start" Importance="high" />
+    <PropertyGroup>
+      <!-- Visual Studio or MsBuild .sln build -->
+      <BootstrapOutputPath>$(SourceRoot)/Bootstrap/$(Configuration)/</BootstrapOutputPath>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN;ORLEANS_BOOTSTRAP</ExcludeCodeGen>
+    </PropertyGroup>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
+    <!-- Compile code generator -->
+    <MSBuild Projects="$(ProjectDir)..\ClientGenerator\BootstrapCodegen.proj" Properties="BootstrapOutputPath=$(BootstrapOutputPath);Bootstrap=true" Targets="Build" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="true" />
+    <!-- Finally invoke code generator on the recently built Orleans.dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator finished" Importance="high" />
+  </Target>
 </Project>
