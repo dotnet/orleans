@@ -6,7 +6,7 @@ title: My First Orleans Application
 # My First Orleans Application
 
 In this tutorial, we will walk through the steps to get the simplest possible Orleans application up and running, the all-too-familiar "Hello World!".
-We're using VS 2013, but it works equally well with VS 2012 and VS 2015.
+We're using VS 2017, but it works equally well with VS 2012, VS 2013 and VS 2015.
 
 Before we start, there are three Orleans concepts that you will run into in this tutorial: that of a grain, a communication interface, and a silo.
 
@@ -43,33 +43,37 @@ At this point go ahead and compile your project to download the packages.
 
 The project is just a console application populated with code that helps you host a silo in an environment that is "developer friendly," i.e. where everything runs in a single process.
 
-The main code does three things: it creates a silo in a separate app domain, initializes the Orleans client runtime, and waits for user input before terminating:
+The main code does three things: it creates a silo, initializes the Orleans client runtime, and waits for user input before terminating:
 
 
 ``` csharp
 static void Main(string[] args)
 {
-    // The Orleans silo environment is initialized in its own app domain in order to more
-    // closely emulate the distributed situation, when the client and the server cannot
-    // pass data via shared memory.
-    AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
-    {
-        AppDomainInitializer = InitSilo,
-        AppDomainInitializerArguments = args,
-    });
+    // First, configure and start a local silo
+    var siloConfig = ClusterConfiguration.LocalhostPrimarySilo();
+    var silo = new SiloHost("TestSilo", siloConfig);
+    silo.InitializeOrleansSilo();
+    silo.StartOrleansSilo();
 
-    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
-    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
-    GrainClient.Initialize(config);
+    Console.WriteLine("Silo started.");
 
-    // TODO: once the previous call returns, the silo is up and running.
-    //       This is the place your custom logic, for example calling client logic
-    //       or initializing an HTTP front end for accepting incoming requests.
+    // Then configure and connect a client.
+    var clientConfig = ClientConfiguration.LocalhostSilo();
+    var client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+    client.Connect().Wait();
 
-    Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+    Console.WriteLine("Client connected.");
+
+    //
+    // This is the place for your test code.
+    //
+
+    Console.WriteLine("\nPress Enter to terminate...");
     Console.ReadLine();
 
-    hostDomain.DoCallBack(ShutdownSilo);
+    // Shut down
+    client.Close();
+    silo.ShutdownOrleansSilo();
 }
 ```
 
@@ -134,7 +138,7 @@ In place of the comment following the call to `GrainClient.Initialize()`, add th
 
 
 ``` csharp
-var friend = GrainClient.GrainFactory.GetGrain<MyGrainInterfaces1.IGrain1>(0);
+var friend = client.GetGrain<MyGrainInterfaces1.IGrain1>(0);
 Console.WriteLine("\n\n{0}\n\n", friend.SayHello().Result);
 ```
 
