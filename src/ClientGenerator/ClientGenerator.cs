@@ -1,149 +1,19 @@
+using System;
+using System.IO;
+using System.Reflection;
+using System.Text;
+
 namespace Orleans.CodeGeneration
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Reflection;
-    using Orleans.CodeGenerator;
-    using Orleans.Runtime;
-    using Orleans.Serialization;
-    using Orleans.Runtime.Configuration;
-
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.
     /// Generates state object classes for grain implementation classes.
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
-        [Serializable]
-        internal class CodeGenOptions
-        {
-            public FileInfo InputAssembly;
-
-            public List<string> ReferencedAssemblies = new List<string>();
-
-            public string OutputFileName;
-        }
-
-        [Serializable]
-        internal class GrainClientGeneratorFlags
-        {
-            internal static bool Verbose = false;
-
-            internal static bool FailOnPathNotFound = false;
-        }
-
-        private static readonly int[] suppressCompilerWarnings =
-        {
-            162, // CS0162 - Unreachable code detected.
-            219, // CS0219 - The variable 'V' is assigned but its value is never used.
-            414, // CS0414 - The private field 'F' is assigned but its value is never used.
-            649, // CS0649 - Field 'F' is never assigned to, and will always have its default value.
-            693, // CS0693 - Type parameter 'type parameter' has the same name as the type parameter from outer type 'T'
-            1591, // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
-            1998 // CS1998 - This async method lacks 'await' operators and will run synchronously
-        };
-
-        /// <summary>
-        /// Generates one GrainReference class for each Grain Type in the inputLib file 
-        /// and output code file under outputLib directory
-        /// </summary>
-        private static bool CreateGrainClientAssembly(CodeGenOptions options)
-        {
-            string generatedCode = null;
-            AppDomain appDomain = null;
-            try
-            {
-                var assembly = typeof (GrainClientGenerator).GetTypeInfo().Assembly;
-                // Create AppDomain.
-                var appDomainSetup = new AppDomainSetup
-                {
-                    ApplicationBase = Path.GetDirectoryName(assembly.Location),
-                    DisallowBindingRedirects = false,
-                    ConfigurationFile = AppDomain.CurrentDomain.SetupInformation.ConfigurationFile
-                };
-                appDomain = AppDomain.CreateDomain("Orleans-CodeGen Domain", null, appDomainSetup);
-
-                // Set up assembly resolver
-                var refResolver = new ReferenceResolver(options.ReferencedAssemblies);
-                appDomain.AssemblyResolve += refResolver.ResolveAssembly;
-
-                // Create an instance 
-                var generator =
-                    (GrainClientGenerator)
-                    appDomain.CreateInstanceAndUnwrap(
-                        assembly.FullName,
-                        typeof(GrainClientGenerator).FullName);
-
-                // Call a method 
-                generatedCode = generator.CreateGrainClient(options);
-            }
-            finally
-            {
-                if (appDomain != null) AppDomain.Unload(appDomain); // Unload the AppDomain
-            }
-
-            if (generatedCode != null)
-            {
-                using (var sourceWriter = new StreamWriter(options.OutputFileName))
-                {
-                    sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
-                    DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                    sourceWriter.WriteLine(generatedCode);
-                    RestoreWarnings(sourceWriter, suppressCompilerWarnings);
-                    sourceWriter.WriteLine("#endif");
-                }
-
-                ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", options.OutputFileName);
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Generate one GrainReference class for each Grain Type in the inputLib file 
-        /// and output a string with the code
-        /// </summary>
-        private string CreateGrainClient(CodeGenOptions options)
-        {
-            // Load input assembly 
-            // special case Orleans.dll because there is a circular dependency.
-            var assemblyName = AssemblyName.GetAssemblyName(options.InputAssembly.FullName);
-            var grainAssembly = (Path.GetFileName(options.InputAssembly.FullName) != "Orleans.dll")
-                                    ? Assembly.LoadFrom(options.InputAssembly.FullName)
-                                    : Assembly.Load(assemblyName);
-
-            // Create directory for output file if it does not exist
-            var outputFileDirectory = Path.GetDirectoryName(options.OutputFileName);
-
-            if (!String.IsNullOrEmpty(outputFileDirectory) && !Directory.Exists(outputFileDirectory))
-            {
-                Directory.CreateDirectory(outputFileDirectory);
-            }
-
-            var config = new ClusterConfiguration();
-            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults));
-
-            // Generate source
-            ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);
-
-            return codeGenerator.GenerateSourceForAssembly(grainAssembly);
-        }
-
-        private static void DisableWarnings(TextWriter sourceWriter, IEnumerable<int> warnings)
-        {
-            foreach (var warningNum in warnings) sourceWriter.WriteLine("#pragma warning disable {0}", warningNum);
-        }
-
-        private static void RestoreWarnings(TextWriter sourceWriter, IEnumerable<int> warnings)
-        {
-            foreach (var warningNum in warnings) sourceWriter.WriteLine("#pragma warning restore {0}", warningNum);
-        }
-
         public int RunMain(string[] args)
         {
-            ConsoleText.WriteStatus("Orleans-CodeGen - command-line = {0}", Environment.CommandLine);
+            Console.WriteLine("Orleans-CodeGen - command-line = {0}", Environment.CommandLine);
 
             if (args.Length < 1)
             {
@@ -163,14 +33,12 @@ namespace Orleans.CodeGeneration
                     string arg = args[0];
                     string argsFile = arg.Trim('"').Substring(1).Trim('"');
                     Console.WriteLine("Orleans-CodeGen - Reading code-gen params from file={0}", argsFile);
-                    AssertWellFormed(argsFile, true);
+                    AssertWellFormed(argsFile);
                     args = File.ReadAllLines(argsFile);
                 }
-                int i = 1;
                 foreach (string a in args)
                 {
                     string arg = a.Trim('"').Trim().Trim('"');
-                    if (GrainClientGeneratorFlags.Verbose) Console.WriteLine("Orleans-CodeGen - arg #{0}={1}", i++, arg);
                     if (string.IsNullOrEmpty(arg) || string.IsNullOrWhiteSpace(arg)) continue;
 
                     if (arg.StartsWith("/"))
@@ -182,7 +50,7 @@ namespace Orleans.CodeGeneration
                             string[] references = refstr.Split(';');
                             foreach (string rp in references)
                             {
-                                AssertWellFormed(rp, true);
+                                AssertWellFormed(rp);
                                 options.ReferencedAssemblies.Add(rp);
                             }
                         }
@@ -195,7 +63,7 @@ namespace Orleans.CodeGeneration
                         else if (arg.StartsWith("/out:"))
                         {
                             var outfile = arg.Substring(arg.IndexOf(':') + 1);
-                            AssertWellFormed(outfile, false);
+                            AssertWellFormed(outfile);
                             options.OutputFileName = outfile;
                         }
                     }
@@ -225,53 +93,36 @@ namespace Orleans.CodeGeneration
                 // STEP 3 : Dump useful info for debugging
                 Console.WriteLine($"Orleans-CodeGen - Options {Environment.NewLine}\tInputLib={options.InputAssembly.FullName}{Environment.NewLine}\tOutputFileName={options.OutputFileName}");
 
-                if (options.ReferencedAssemblies != null)
-                {
-                    Console.WriteLine("Orleans-CodeGen - Using referenced libraries:");
-                    foreach (string assembly in options.ReferencedAssemblies) Console.WriteLine("\t{0} => {1}", Path.GetFileName(assembly), assembly);
-                }
-
                 // STEP 5 : Finally call code generation
-                if (!CreateGrainClientAssembly(options)) return -1;
+                if (!new CodeGenerator(options, Console.WriteLine).GenerateCode()) return -1;
 
                 // DONE!
                 return 0;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("-- Code-gen FAILED -- \n{0}", LogFormatter.PrintException(ex));
+                Console.WriteLine("-- Code Generation FAILED -- \n{0}", LogFormatter.PrintException(ex));
                 return 3;
             }
         }
 
         private static void PrintUsage()
         {
-            Console.WriteLine("Usage: ClientGenerator.exe /in:<grain assembly filename> /out:<fileName for output file> /r:<reference assemblies>");
-            Console.WriteLine("       ClientGenerator.exe @<arguments fileName> - Arguments will be read and processed from this file.");
+            Console.WriteLine("Usage: /in:<grain assembly filename> /out:<fileName for output file> /r:<reference assemblies>");
+            Console.WriteLine("       @<arguments fileName> - Arguments will be read and processed from this file.");
             Console.WriteLine();
-            Console.WriteLine("Example: ClientGenerator.exe /in:MyGrain.dll /out:C:\\OrleansSample\\MyGrain\\obj\\Debug\\MyGrain.orleans.g.cs /r:Orleans.dll;..\\MyInterfaces\\bin\\Debug\\MyInterfaces.dll");
+            Console.WriteLine("Example: /in:MyGrain.dll /out:C:\\OrleansSample\\MyGrain\\obj\\Debug\\MyGrain.orleans.g.cs /r:Orleans.dll;..\\MyInterfaces\\bin\\Debug\\MyInterfaces.dll");
         }
 
-        private static void AssertWellFormed(string path, bool mustExist = false)
+        private static void AssertWellFormed(string path)
         {
             CheckPathNotStartWith(path, ":");
             CheckPathNotStartWith(path, "\"");
             CheckPathNotEndsWith(path, "\"");
             CheckPathNotEndsWith(path, "/");
             CheckPath(path, p => !string.IsNullOrWhiteSpace(p), "Empty path string");
-
-            bool exists = FileExists(path);
-
-            if (mustExist && GrainClientGeneratorFlags.FailOnPathNotFound) CheckPath(path, p => exists, "Path not exists");
         }
-
-        private static bool FileExists(string path)
-        {
-            bool exists = File.Exists(path) || Directory.Exists(path);
-            if (!exists) Console.WriteLine("MISSING: Path not exists: {0}", path);
-            return exists;
-        }
-
+        
         private static void CheckPathNotStartWith(string path, string str)
         {
             CheckPath(path, p => !p.StartsWith(str), string.Format("Cannot start with '{0}'", str));
@@ -294,60 +145,72 @@ namespace Orleans.CodeGeneration
             throw new ArgumentException("FAILED: " + errMsg);
         }
 
-
-        /// <summary>
-        /// Simple class that loads the reference assemblies upon the AppDomain.AssemblyResolve
-        /// </summary>
-        [Serializable]
-        internal class ReferenceResolver
+        private static class LogFormatter
         {
             /// <summary>
-            /// Dictionary : Assembly file name without extension -> full path
+            /// Utility function to convert an exception into printable format, including expanding and formatting any nested sub-expressions.
             /// </summary>
-            private Dictionary<string, string> referenceAssemblyPaths = new Dictionary<string, string>();
-
-            /// <summary>
-            /// Needs to be public so can be serialized accross the the app domain.
-            /// </summary>
-            public Dictionary<string, string> ReferenceAssemblyPaths
+            /// <param name="exception">The exception to be printed.</param>
+            /// <returns>Formatted string representation of the exception, including expanding and formatting any nested sub-expressions.</returns>
+            public static string PrintException(Exception exception)
             {
-                get
-                {
-                    return referenceAssemblyPaths;
-                }
-                set
-                {
-                    referenceAssemblyPaths = value;
-                }
+                return exception == null ? String.Empty : PrintException_Helper(exception, 0, true);
             }
 
-            /// <summary>
-            /// Inits the resolver
-            /// </summary>
-            /// <param name="referencedAssemblies">Full paths of referenced assemblies</param>
-            public ReferenceResolver(IEnumerable<string> referencedAssemblies)
+            private static string PrintException_Helper(Exception exception, int level, bool includeStackTrace)
             {
-                if (null == referencedAssemblies) return;
+                if (exception == null) return String.Empty;
+                var sb = new StringBuilder();
+                sb.Append(PrintOneException(exception, level, includeStackTrace));
+                if (exception is ReflectionTypeLoadException loadException)
+                {
+                    var loaderExceptions = loadException.LoaderExceptions;
+                    if (loaderExceptions == null || loaderExceptions.Length == 0)
+                    {
+                        sb.Append("No LoaderExceptions found");
+                    }
+                    else
+                    {
+                        foreach (Exception inner in loaderExceptions)
+                        {
+                            // call recursively on all loader exceptions. Same level for all.
+                            sb.Append(PrintException_Helper(inner, level + 1, includeStackTrace));
+                        }
+                    }
+                }
+                else if (exception is AggregateException)
+                {
+                    var innerExceptions = ((AggregateException)exception).InnerExceptions;
+                    if (innerExceptions == null) return sb.ToString();
 
-                foreach (var assemblyPath in referencedAssemblies) referenceAssemblyPaths[Path.GetFileNameWithoutExtension(assemblyPath)] = assemblyPath;
+                    foreach (Exception inner in innerExceptions)
+                    {
+                        // call recursively on all inner exceptions. Same level for all.
+                        sb.Append(PrintException_Helper(inner, level + 1, includeStackTrace));
+                    }
+                }
+                else if (exception.InnerException != null)
+                {
+                    // call recursively on a single inner exception.
+                    sb.Append(PrintException_Helper(exception.InnerException, level + 1, includeStackTrace));
+                }
+                return sb.ToString();
             }
 
-            /// <summary>
-            /// Handles System.AppDomain.AssemblyResolve event of an System.AppDomain
-            /// </summary>
-            /// <param name="sender">The source of the event.</param>
-            /// <param name="args">The event data.</param>
-            /// <returns>The assembly that resolves the type, assembly, or resource; 
-            /// or null if theassembly cannot be resolved.
-            /// </returns>
-            public Assembly ResolveAssembly(object sender, ResolveEventArgs args)
+            private static string PrintOneException(Exception exception, int level, bool includeStackTrace)
             {
-                Assembly assembly = null;
-                string path;
-                var asmName = new AssemblyName(args.Name);
-                if (referenceAssemblyPaths.TryGetValue(asmName.Name, out path)) assembly = Assembly.LoadFrom(path);
-                else ConsoleText.WriteStatus("Could not resolve {0}:", asmName.Name);
-                return assembly;
+                if (exception == null) return String.Empty;
+                string stack = String.Empty;
+                if (includeStackTrace && exception.StackTrace != null)
+                    stack = String.Format(Environment.NewLine + exception.StackTrace);
+
+                string message = exception.Message;
+
+                return string.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
+                                     level,
+                                     exception.GetType(),
+                                     message,
+                                     stack);
             }
         }
     }
