@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Transactions.Azure</PackageId>
+    <Title>Microsoft Orleans Transactions on Azure</Title>
+    <Description>Azure Transaction library of Microsoft Orleans used on the server.</Description>
+    <PackageTags>$(PackageTags) Azure Transactions</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Microsoft.Orleans.Transactions.Azure</AssemblyName>
+    <RootNamespace>Orleans.Transactions.Azure</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+  </ItemGroup>
+
+</Project>
