@@ -38,6 +38,7 @@ namespace Orleans.Transactions
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
+            services.TryAddTransient<INamedTransactionalStateStorageFactory, NamedTransactionalStateStorageFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
         }
     }

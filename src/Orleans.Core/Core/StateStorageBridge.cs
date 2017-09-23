@@ -21,6 +21,11 @@ namespace Orleans.Core
             set { grainState.State = value; }
         }
 
+        public string Etag
+        {
+            get { return grainState.ETag; }
+        }
+
         public StateStorageBridge(string name, GrainReference grainRef, IStorageProvider store)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));

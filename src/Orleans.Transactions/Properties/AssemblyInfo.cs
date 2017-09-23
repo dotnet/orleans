@@ -7,3 +7,5 @@ using Orleans.Transactions;
 [assembly: GenerateSerializer(typeof(TransactionsConfiguration))]
 [assembly: GenerateSerializer(typeof(LogRecord<>))]
 [assembly: GenerateSerializer(typeof(TransactionalStateRecord<>))]
+[assembly: GenerateSerializer(typeof(PendingTransactionState<>))]
+[assembly: GenerateSerializer(typeof(TransactionalStorageLoadResponse<>))]
