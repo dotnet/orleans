@@ -127,7 +127,7 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(ActivationInfo)),
                 $"Should be able to serialize internal type {nameof(ActivationInfo)}.");
-            var grainReferenceType = typeof(IGrain).Assembly.GetType(
+            var grainReferenceType = typeof(RuntimeVersion).Assembly.GetType(
                 "Orleans.OrleansCodeGenRemindableReference",
                 throwOnError: true);
             Assert.True(

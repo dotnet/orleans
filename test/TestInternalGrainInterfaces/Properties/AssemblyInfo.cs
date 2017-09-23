@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.FSharp.Core;
 using Orleans.CodeGeneration;
+using UnitTests.FSharpTypes;
 
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("TesterInternal")]
@@ -12,3 +13,5 @@ using Orleans.CodeGeneration;
 
 // generate Orleans serializers for types in FSharp.core.dll
 [assembly: KnownAssembly(typeof(FSharpOption<>))]
+
+[assembly: KnownAssembly(typeof(SingleCaseDU))]

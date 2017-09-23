@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The assembly name of the core Orleans assembly.
         /// </summary>
-        private static readonly AssemblyName OrleansCoreAssembly = typeof(IGrain).GetTypeInfo().Assembly.GetName();
+        private static readonly AssemblyName OrleansCoreAssembly = typeof(RuntimeVersion).GetTypeInfo().Assembly.GetName();
 
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 

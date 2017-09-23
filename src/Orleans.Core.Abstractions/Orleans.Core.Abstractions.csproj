@@ -11,5 +11,9 @@
     <RootNamespace>Orleans</RootNamespace>
     <TargetFramework>netstandard1.3</TargetFramework>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
   
 </Project>
