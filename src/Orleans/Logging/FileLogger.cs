@@ -71,7 +71,7 @@ namespace Orleans.Logging
                 message = "!!!!!!!!!! " + message;
 
             string exc = LogFormatter.PrintException(exception);
-            string msg = String.Format("[{0} {1}\t{2}\t{3}\t{4}\t{5}]\t{6}",
+            string msg = String.Format("[{0} {1}\t{2}\t{3}\t{4}]\t{5}\t{6}",
                 LogFormatter.PrintDate(timestamp),           //0
                 Thread.CurrentThread.ManagedThreadId,   //1
                 logLevel.ToString(),    //2

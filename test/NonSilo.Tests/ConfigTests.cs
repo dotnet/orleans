@@ -186,6 +186,24 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        public void ClientConfig_TelemetryConsumers()
+        {
+            string filename = "Config_LogConsumers-ClientConfiguration.xml";
+
+            var cfg = ClientConfiguration.LoadFromFile(filename);
+            Assert.Equal(filename, cfg.SourceFile);
+
+            Assert.Single(cfg.TelemetryConfiguration.Consumers);
+            var consumer = cfg.TelemetryConfiguration.Consumers.First();
+            Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
+            Assert.Collection(consumer.Properties, kv =>
+            {
+                Assert.Equal("connString", kv.Key);
+                Assert.Equal("foo", kv.Value);
+            });
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ServerConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";

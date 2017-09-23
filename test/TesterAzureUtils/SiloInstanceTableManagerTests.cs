@@ -33,16 +33,12 @@ namespace Tester.AzureUtils
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
-        private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ITestOutputHelper output;
 
-        public SiloInstanceTableManagerTests(ITestOutputHelper output, ILoggerFactory loggerFactory)
+        public SiloInstanceTableManagerTests(ITestOutputHelper output, Fixture fixture)
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            logger = loggerFactory.CreateLogger<SiloInstanceTableManagerTests>();
-            this.loggerFactory = loggerFactory;
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddress.NewLocalAddress(generation);
@@ -50,7 +46,7 @@ namespace Tester.AzureUtils
             output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, loggerFactory)
+            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, fixture.LoggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 
@@ -61,14 +57,13 @@ namespace Tester.AzureUtils
             {
                 TimeSpan timeout = SiloInstanceTableTestConstants.Timeout;
 
-                logger.Info("TestCleanup Timeout={0}", timeout);
+                output.WriteLine("TestCleanup Timeout={0}", timeout);
 
                 manager.DeleteTableEntries(deploymentId).WaitWithThrow(timeout);
 
-                logger.Info("TestCleanup -  Finished");
+                output.WriteLine("TestCleanup -  Finished");
                 manager = null;
             }
-            this.loggerFactory.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -106,7 +101,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Register_CheckData()
         {
             const string testName = "SiloInstanceTable_Register_CheckData";
-            logger.Info("Start {0}", testName);
+            output.WriteLine("Start {0}", testName);
 
             RegisterSiloInstance();
 
@@ -120,7 +115,7 @@ namespace Tester.AzureUtils
             Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_CREATED, siloEntry.Status);
 
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
-            logger.Info("End {0}", testName);
+            output.WriteLine("End {0}", testName);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -231,7 +226,7 @@ namespace Tester.AzureUtils
                 StartTime = LogFormatter.PrintDate(DateTime.UtcNow),
             };
 
-            logger.Info("MyEntry={0}", myEntry);
+            output.WriteLine("MyEntry={0}", myEntry);
 
             manager.RegisterSiloInstance(myEntry);
         }
@@ -241,11 +236,11 @@ namespace Tester.AzureUtils
             string partitionKey = deploymentId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
 
-            logger.Info("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);
+            output.WriteLine("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);
 
             Tuple<SiloInstanceTableEntry, string> data = await manager.ReadSingleTableEntryAsync(partitionKey, rowKey);
 
-            logger.Info("FindSiloEntry returning Data={0}", data);
+            output.WriteLine("FindSiloEntry returning Data={0}", data);
             return data;
         }
 
