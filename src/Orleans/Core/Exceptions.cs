@@ -7,29 +7,6 @@ using Orleans.Core;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// An exception class used by the Orleans runtime for reporting errors.
-    /// </summary>
-    /// <remarks>
-    /// This is also the base class for any more specific exceptions 
-    /// raised by the Orleans runtime.
-    /// </remarks>
-    [Serializable]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1058:TypesShouldNotExtendCertainBaseTypes")]
-    public class OrleansException : Exception
-    {
-        public OrleansException() : base("Unexpected error.") { }
-
-        public OrleansException(string message) : base(message) { }
-
-        public OrleansException(string message, Exception innerException) : base(message, innerException) { }
-
-        protected OrleansException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
     /// Signifies that a gateway silo is currently in overloaded / load shedding state 
     /// and is unable to currently accept this message being sent.
     /// </summary>
