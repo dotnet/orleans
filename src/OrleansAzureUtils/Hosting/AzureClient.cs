@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime.Configuration;
 
@@ -19,6 +20,9 @@ namespace Orleans.Runtime.Host
         public static readonly int MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
         /// <summary>Amount of time to pause before each retry attempt.</summary>
         public static readonly TimeSpan StartupRetryPause = AzureConstants.STARTUP_TIME_PAUSE; // 5 seconds
+
+        /// <summary> delegate to configure logging, default to none logger configured </summary>
+        public static Action<ILoggingBuilder> ConfigureLoggingDelegate { get; set; } = builder => { };
 
         /// <summary>
         /// Whether the Orleans Azure client runtime has already been initialized
@@ -176,6 +180,8 @@ namespace Orleans.Runtime.Host
             {
                 try
                 {
+                    //parse through ConfigureLoggingDelegate to GrainClient
+                    GrainClient.ConfigureLoggingDelegate = ConfigureLoggingDelegate;
                     // Initialize will throw if cannot find Gateways
                     GrainClient.Initialize(config);
                     initSucceeded = true;

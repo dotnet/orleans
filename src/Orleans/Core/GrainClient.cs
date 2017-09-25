@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -45,12 +46,13 @@ namespace Orleans
         private static IInternalClusterClient client;
 
         private static readonly object initLock = new Object();
-        
         public static IClusterClient Instance => client;
 
         //TODO: prevent client code from using this from inside a Grain or provider
         public static IGrainFactory GrainFactory => GetGrainFactory();
 
+        /// <summary>delegate to configure logging, default to none logger configured</summary>
+        public static Action<ILoggingBuilder> ConfigureLoggingDelegate { get; set; } = builder => { };
         private static IGrainFactory GetGrainFactory()
         {
             if (!IsInitialized)
@@ -72,7 +74,8 @@ namespace Orleans
                 Console.WriteLine("Error loading standard client configuration file.");
                 throw new ArgumentException("Error loading standard client configuration file");
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -109,7 +112,9 @@ namespace Orleans
                 Console.WriteLine("Error loading client configuration file {0}:", configFile.FullName);
                 throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder()
+                .UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -125,7 +130,8 @@ namespace Orleans
                 Console.WriteLine("Initialize was called with null ClientConfiguration object.");
                 throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate).Build();
             InternalInitialize(orleansClient);
         }
 
@@ -157,7 +163,8 @@ namespace Orleans
                 config.Gateways.Add(gatewayAddress);
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate).Build();
             InternalInitialize(orleansClient);
         }
 
