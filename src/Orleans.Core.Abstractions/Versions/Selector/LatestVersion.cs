@@ -5,7 +5,7 @@ namespace Orleans.Versions.Selector
     [Serializable]
     public class LatestVersion : VersionSelectorStrategy
     {
-        internal static LatestVersion Singleton { get; } = new LatestVersion();
+        public static LatestVersion Singleton { get; } = new LatestVersion();
 
         private LatestVersion()
         { }

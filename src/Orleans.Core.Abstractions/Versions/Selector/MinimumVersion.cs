@@ -5,7 +5,7 @@ namespace Orleans.Versions.Selector
     [Serializable]
     public class MinimumVersion : VersionSelectorStrategy
     {
-        internal static MinimumVersion Singleton { get; } = new MinimumVersion();
+        public static MinimumVersion Singleton { get; } = new MinimumVersion();
 
         private MinimumVersion()
         { }

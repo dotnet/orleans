@@ -5,7 +5,7 @@ namespace Orleans.Versions.Compatibility
     [Serializable]
     public class BackwardCompatible : CompatibilityStrategy
     {
-        internal static BackwardCompatible Singleton { get; } = new BackwardCompatible();
+        public static BackwardCompatible Singleton { get; } = new BackwardCompatible();
 
         private BackwardCompatible()
         { }
