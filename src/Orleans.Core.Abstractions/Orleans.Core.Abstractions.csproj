@@ -9,7 +9,7 @@
   <PropertyGroup>
     <AssemblyName>Microsoft.Orleans.Core.Abstractions</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
-    <TargetFramework>netstandard1.3</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
