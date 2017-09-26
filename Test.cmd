@@ -1,7 +1,7 @@
 @if not defined _echo @echo off
 setlocal
 
-SET CONFIGURATION=Release
+if not defined BuildConfiguration SET BuildConfiguration=Debug
 
 SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
@@ -10,11 +10,11 @@ set CMDHOME=%CMDHOME:~0,-1%
 pushd "%CMDHOME%"
 @cd
 
-SET TestResultDir=%CMDHOME%\Binaries\%CONFIGURATION%\TestResults
+SET TestResultDir=%CMDHOME%\Binaries\%BuildConfiguration%\TestResults
 
 if not exist %TestResultDir% md %TestResultDir%
 
-SET _Directory=bin\%CONFIGURATION%\net461\win10-x64
+SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
 
 rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
 if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1
