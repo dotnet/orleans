@@ -6,7 +6,7 @@ namespace Orleans.Runtime
     public  class HashBasedPlacement : PlacementStrategy
     {
 
-        internal static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();
+        public static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();
 
 
         public HashBasedPlacement()

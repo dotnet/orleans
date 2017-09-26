@@ -3,9 +3,9 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class PreferLocalPlacement : PlacementStrategy
+    public class PreferLocalPlacement : PlacementStrategy
     {
-        internal static PreferLocalPlacement Singleton { get; } = new PreferLocalPlacement();
+        public static PreferLocalPlacement Singleton { get; } = new PreferLocalPlacement();
         
         private PreferLocalPlacement()
         { }

@@ -3,13 +3,13 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class StatelessWorkerPlacement : PlacementStrategy
+    public class StatelessWorkerPlacement : PlacementStrategy
     {
-        private static readonly int defaultMaxStatelessWorkers = Environment.ProcessorCount;
+        public static readonly int defaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         public int MaxLocal { get; private set; }
-        
-        internal StatelessWorkerPlacement(int maxLocal = -1)
+
+        public StatelessWorkerPlacement(int maxLocal = -1)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute, 
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
