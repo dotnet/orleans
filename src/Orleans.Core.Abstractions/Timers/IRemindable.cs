@@ -55,7 +55,7 @@ namespace Orleans
             /// </summary>
             public DateTime CurrentTickTime { get; private set; }
 
-            internal static TickStatus NewStruct(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
+            public static TickStatus NewStruct(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
             {
                 return
                     new TickStatus
