@@ -15,6 +15,8 @@ namespace UnitTests.MembershipTests
     [TestCategory("Membership"), TestCategory("ZooKeeper")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
+
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
             : base(fixture, environment, CreateFilters())
         {
@@ -29,13 +31,13 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger,
+            return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(ORLEANS_ZOOKEEPER_UTILS_DLL, logger,
                 this.Services);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(ORLEANS_ZOOKEEPER_UTILS_DLL,
                 logger, this.Services);
         }
 
