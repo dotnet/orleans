@@ -9,13 +9,18 @@ namespace Tester.AzureUtils.Lease
     public class AzureBlobLeaseProviderTests : GoldenPathLeaseProviderTestRunner
     {
         public AzureBlobLeaseProviderTests(ITestOutputHelper output)
-            :base(new AzureBlobLeaseProvider(new AzureBlobLeaseProviderConfig()
+            :base(CreateLeaseProvider(), output)
+        {
+        }
+
+        private static ILeaseProvider CreateLeaseProvider()
+        {
+            TestUtils.CheckForAzureStorage();
+            return new AzureBlobLeaseProvider(new AzureBlobLeaseProviderConfig()
             {
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                 BlobContainerName = "test-blob-container-name"
-            }), output)
-        {
-            TestUtils.CheckForAzureStorage();
+            });
         }
     }
 }
