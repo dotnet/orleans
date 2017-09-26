@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
@@ -11,6 +12,8 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Tester.AzureUtils;
 
 namespace UnitTests.HaloTests.Streaming
@@ -49,7 +52,7 @@ namespace UnitTests.HaloTests.Streaming
                 base.Dispose();
                 if (deploymentId != null)
                 {
-                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
                 }
             }
         }
@@ -62,12 +65,13 @@ namespace UnitTests.HaloTests.Streaming
 
         private Guid _streamId;
         private string _streamProvider;
-
+        private readonly ILoggerFactory loggerFactory;
         public HaloStreamSubscribeTests(Fixture fixture)
         {
             this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
             fixture.EnsurePreconditionsMet();
+            this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>();
         }
 
         public void Dispose()
@@ -75,7 +79,7 @@ namespace UnitTests.HaloTests.Streaming
             var deploymentId = this.HostedCluster?.DeploymentId;
             if (deploymentId != null && _streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(this.loggerFactory, _streamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 

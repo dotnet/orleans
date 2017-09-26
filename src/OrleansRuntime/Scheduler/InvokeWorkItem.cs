@@ -1,17 +1,19 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
     internal class InvokeWorkItem : WorkItemBase
     {
-        private static readonly Logger logger = LogManager.GetLogger("InvokeWorkItem", LoggerType.Runtime);
+        private readonly ILogger logger;
         private readonly ActivationData activation;
         private readonly Message message;
         private readonly Dispatcher dispatcher;
 
-        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher)
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
         {
+            this.logger = logger;
             if (activation?.GrainInstance == null)
             {
                 var str = string.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);

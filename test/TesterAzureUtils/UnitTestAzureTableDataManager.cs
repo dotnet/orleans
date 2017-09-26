@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
@@ -49,8 +50,8 @@ namespace Tester.AzureUtils
     {
         protected const string INSTANCE_TABLE_NAME = "UnitTestAzureData";
 
-        public UnitTestAzureTableDataManager(string storageConnectionString)
-            : base(INSTANCE_TABLE_NAME, storageConnectionString)
+        public UnitTestAzureTableDataManager(string storageConnectionString, ILoggerFactory loggerFactory)
+            : base(INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory)
         {
             InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
         }

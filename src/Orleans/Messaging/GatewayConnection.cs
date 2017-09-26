@@ -1,6 +1,7 @@
 using System;
 using System.Net.Sockets;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging
@@ -34,13 +35,13 @@ namespace Orleans.Messaging
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory)
-            : base("GatewayClientSender_" + address, mc.MessagingConfiguration, mc.SerializationManager)
+        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ILoggerFactory loggerFactory)
+            : base("GatewayClientSender_" + address, mc.MessagingConfiguration, mc.SerializationManager, loggerFactory)
         {
             this.messageFactory = messageFactory;
             Address = address;
             MsgCenter = mc;
-            receiver = new GatewayClientReceiver(this, mc.SerializationManager);
+            receiver = new GatewayClientReceiver(this, mc.SerializationManager, loggerFactory);
             lastConnect = new DateTime();
             IsLive = true;
         }

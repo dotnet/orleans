@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.ConsistentRing
@@ -30,9 +31,9 @@ namespace Orleans.Runtime.ConsistentRing
 
         
 
-        public ConsistentRingProvider(SiloAddress siloAddr)
+        public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
         {
-            log = LogManager.GetLogger(typeof(ConsistentRingProvider).Name);
+            log = new LoggerWrapper<ConsistentRingProvider>(loggerFactory);
             membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();

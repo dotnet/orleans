@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -80,6 +82,9 @@ namespace Orleans
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+			services.AddLogging();
+            //temporary change until runtime moved away from Logger
+            services.TryAddSingleton(typeof(LoggerWrapper<>));
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();
@@ -97,7 +102,6 @@ namespace Orleans
                 sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
             services.TryAddSingleton<StreamProviderManager>();
             services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();

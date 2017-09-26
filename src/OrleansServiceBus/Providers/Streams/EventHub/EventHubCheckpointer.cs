@@ -1,6 +1,7 @@
 ﻿
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Streams;
 
@@ -29,15 +30,16 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="settings"></param>
         /// <param name="streamProviderName"></param>
         /// <param name="partition"></param>
+        /// <param name="loggerFactory"></param>
         /// <returns></returns>
-        public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
-            var checkpointer = new EventHubCheckpointer(settings, streamProviderName, partition);
+            var checkpointer = new EventHubCheckpointer(settings, streamProviderName, partition, loggerFactory);
             await checkpointer.Initialize();
             return checkpointer;
         }
 
-        private EventHubCheckpointer(ICheckpointerSettings settings, string streamProviderName, string partition)
+        private EventHubCheckpointer(ICheckpointerSettings settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             if (settings == null)
             {
@@ -52,7 +54,7 @@ namespace Orleans.ServiceBus.Providers
                 throw new ArgumentNullException(nameof(partition));
             }
             persistInterval = settings.PersistInterval;
-            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.TableName, settings.DataConnectionString);
+            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.TableName, settings.DataConnectionString, loggerFactory);
             entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, settings.CheckpointNamespace, partition);
         }
 

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Providers;
@@ -17,7 +18,7 @@ namespace Orleans.Runtime
         private IDictionary<string, GrainTypeData> grainTypes;
         private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
-        private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
+        private readonly Logger logger;
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
@@ -35,10 +36,11 @@ namespace Orleans.Runtime
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
         
-        public GrainTypeManager(ILocalSiloDetails siloDetails, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager)
+        public GrainTypeManager(ILocalSiloDetails siloDetails, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager
+            , LoggerWrapper<GrainTypeManager> logger)
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
-
+            this.logger = logger;
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
             this.serializationManager = serializationManager;
@@ -177,7 +179,7 @@ namespace Orleans.Runtime
         private void InitializeGrainClassData(SiloAssemblyLoader loader)
         {
             grainTypes = loader.GetGrainClassTypes();
-            LogManager.GrainTypes = this.grainTypes.Keys.ToList();
+            CrashUtils.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
         private void InitializeInvokerMap(SiloAssemblyLoader loader)

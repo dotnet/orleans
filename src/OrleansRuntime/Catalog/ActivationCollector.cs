@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -19,9 +20,9 @@ namespace Orleans.Runtime
         private readonly object nextTicketLock;
         private DateTime nextTicket;
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
-        public ActivationCollector(ClusterConfiguration config)
+        public ActivationCollector(ClusterConfiguration config, ILoggerFactory loggerFactory)
         {
             if (TimeSpan.Zero == config.Globals.CollectionQuantum)
             {
@@ -33,7 +34,7 @@ namespace Orleans.Runtime
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = LogManager.GetLogger("ActivationCollector", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<ActivationCollector>();
         }
 
         public TimeSpan Quantum { get { return quantum; } }

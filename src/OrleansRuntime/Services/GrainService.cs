@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -40,16 +41,16 @@ namespace Orleans.Runtime
         protected IGrainServiceConfiguration Config { get; private set; }
 
         /// <summary>Only to make Reflection happy</summary>
-        protected GrainService() : base(null, null)
+        protected GrainService() : base(null, null, null)
         {
             throw new Exception("This should not be constructed by client code.");
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true)
+        protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
-            Logger = LogManager.GetLogger(typeName);
+            Logger = new LoggerWrapper(typeName, loggerFactory);
 
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;
@@ -78,9 +79,8 @@ namespace Orleans.Runtime
         /// <summary>Invoked when service is being started</summary>
         public virtual Task Start()
         {
-            Logger.Info(ErrorCode.RS_ServiceStarting, "Starting {0} grain service on: {1} x{2,8:X8}, with range {3}", this.typeName, Silo, Silo.GetConsistentHashCode(), RingRange);
             RingRange = ring.GetMyRange();
-
+            Logger.Info(ErrorCode.RS_ServiceStarting, "Starting {0} grain service on: {1} x{2,8:X8}, with range {3}", this.typeName, Silo, Silo.GetConsistentHashCode(), RingRange);
             StartInBackground().Ignore();
 
             return Task.CompletedTask;

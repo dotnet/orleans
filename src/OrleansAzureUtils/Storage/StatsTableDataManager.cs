@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 
@@ -59,16 +60,17 @@ namespace Orleans.AzureUtils
 
 
         private AzureTableDataManager<StatsTableData> tableManager;
-        private readonly Logger logger;
-
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatsTableDataManager"/> class.
         /// </summary>
-        public StatsTableDataManager()
+        public StatsTableDataManager(ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
+            this.loggerFactory = loggerFactory;
+            this.logger = this.loggerFactory.CreateLogger<StatsTableDataManager>();
         }
 
         async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
@@ -84,7 +86,7 @@ namespace Orleans.AzureUtils
             }
             counter = 0;
             var tableName = isSilo ? "OrleansSiloStatistics" : "OrleansClientStatistics";
-            tableManager = new AzureTableDataManager<StatsTableData>(tableName, storageConnectionString, logger);
+            tableManager = new AzureTableDataManager<StatsTableData>(tableName, storageConnectionString, this.loggerFactory);
             await tableManager.InitTableAsync().WithTimeout(initTimeout);
         }
 
@@ -108,7 +110,7 @@ namespace Orleans.AzureUtils
 
                 StatsTableData statsTableEntry = PopulateStatsTableDataEntry(count);
                 if (statsTableEntry == null) continue; // Skip blank entries
-                if (logger.IsVerbose2) logger.Verbose2("Preparing to bulk insert {1} stats table entry: {0}", statsTableEntry, isSilo ? "silo" : "");
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Preparing to bulk insert {1} stats table entry: {0}", statsTableEntry, isSilo ? "silo" : "");
                 data.Add(statsTableEntry);
             }
             if (data.Count > 0)

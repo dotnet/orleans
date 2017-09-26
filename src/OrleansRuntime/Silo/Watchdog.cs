@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime
@@ -17,9 +18,10 @@ namespace Orleans.Runtime
         private readonly CounterStatistic watchdogChecks;
         private CounterStatistic watchdogFailedChecks;
 
-        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables)
+        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILoggerFactory loggerFactory)
+            :base(loggerFactory)
         {
-            logger = LogManager.GetLogger("Watchdog");
+            logger = new LoggerWrapper<Watchdog>(loggerFactory);
             healthCheckPeriod = watchdogPeriod;
             participants = watchables;
             watchdogChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_HEALTH_CHECKS);

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
@@ -116,6 +117,17 @@ namespace Orleans
         {
             builder.UseServiceProviderFactory(new DelegateServiceProviderFactory(factory));
             return builder;
+        }
+
+        /// <summary>
+        /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
+        /// </summary>
+        /// <param name="builder">The <see cref="IClientBuilder" /> to configure.</param>
+        /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder ConfigureLogging(this IClientBuilder builder, Action<ILoggingBuilder> configureLogging)
+        {
+            return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
         }
     }
 }

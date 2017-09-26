@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -27,7 +29,7 @@ namespace Orleans.Runtime.Management
         private readonly MembershipTableFactory membershipTableFactory;
         private readonly GrainTypeManager grainTypeManager;
         private readonly IVersionStore versionStore;
-        private Logger logger;
+        private ILogger logger;
 
         public ManagementGrain(
             GlobalConfiguration globalConfig,
@@ -49,7 +51,7 @@ namespace Orleans.Runtime.Management
 
         public override Task OnActivateAsync()
         {
-            logger = LogManager.GetLogger("ManagementGrain", LoggerType.Runtime);
+            logger = this.ServiceProvider.GetRequiredService<ILogger<ManagementGrain>>();
             return Task.CompletedTask;
         }
 
@@ -88,39 +90,6 @@ namespace Orleans.Runtime.Management
                 .ToArray();
         }
 
-        public Task SetSystemLogLevel(SiloAddress[] siloAddresses, int traceLevel)
-        {
-            var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("SetSystemTraceLevel={1} {0}", Utils.EnumerableToString(silos), traceLevel);
-
-            List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).SetSystemLogLevel(traceLevel));
-
-            return Task.WhenAll(actionPromises);
-        }
-
-        public Task SetAppLogLevel(SiloAddress[] siloAddresses, int traceLevel)
-        {
-            var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("SetAppTraceLevel={1} {0}", Utils.EnumerableToString(silos), traceLevel);
-
-            List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).SetAppLogLevel(traceLevel));
-
-            return Task.WhenAll(actionPromises);
-        }
-
-        public Task SetLogLevel(SiloAddress[] siloAddresses, string logName, int traceLevel)
-        {
-            var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("SetLogLevel[{1}]={2} {0}", Utils.EnumerableToString(silos), logName, traceLevel);
-
-            List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).SetLogLevel(logName, traceLevel));
-
-            return Task.WhenAll(actionPromises);
-        }
-
         public Task ForceGarbageCollection(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
@@ -157,7 +126,7 @@ namespace Orleans.Runtime.Management
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            if (logger.IsVerbose) logger.Verbose("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
             foreach (SiloAddress siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
@@ -348,8 +317,9 @@ namespace Orleans.Runtime.Management
         {
             var silos = await GetHosts(true);
 
-            if(logger.IsVerbose) {
-                logger.Verbose("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+            if(logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.Debug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
             }
 
             var actionPromises = new List<Task<object>>();

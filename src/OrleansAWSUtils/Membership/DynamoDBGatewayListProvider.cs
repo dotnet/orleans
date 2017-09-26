@@ -1,5 +1,6 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using OrleansAWSUtils.Storage;
@@ -18,15 +19,20 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan gatewayListRefreshPeriod;
         private string deploymentId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
+        private readonly ILoggerFactory loggerFactory;
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory)
+        {
+            this.loggerFactory = loggerFactory;
+        }
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider(ClientConfiguration conf, Logger logger)
+        public Task InitializeGatewayListProvider(ClientConfiguration conf)
         {
             gatewayListRefreshPeriod = conf.GatewayListRefreshPeriod;
             deploymentId = conf.DeploymentId;
 
-            storage = new DynamoDBStorage(conf.DataConnectionString, logger);
+            storage = new DynamoDBStorage(conf.DataConnectionString, loggerFactory);
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
                 {

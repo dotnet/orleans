@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -55,7 +56,6 @@ namespace Orleans
     internal class Interner<K, T> : IDisposable where T : class
     {
         private static readonly string internCacheName = "Interner-" + typeof(T).Name;
-        private readonly Logger logger;
         private readonly TimeSpan cacheCleanupInterval;
         private readonly SafeTimer cacheCleanupTimer;
 
@@ -75,15 +75,12 @@ namespace Orleans
             if (initialSize <= 0) initialSize = InternerConstants.SIZE_MEDIUM;
             int concurrencyLevel = Environment.ProcessorCount * 4; // Default from ConcurrentDictionary class in .NET 4.0
 
-            logger = LogManager.GetLogger(internCacheName, LoggerType.Runtime);
-
             this.internCache = new ConcurrentDictionary<K, WeakReference<T>>(concurrencyLevel, initialSize);
 
             this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Constants.INFINITE_TIMESPAN : cleanupFreq;
             if (Constants.INFINITE_TIMESPAN != cacheCleanupInterval)
             {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100298, "Starting {0} cache cleanup timer with frequency {1}", internCacheName, cacheCleanupInterval);
-                cacheCleanupTimer = new SafeTimer(InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
+                cacheCleanupTimer = new SafeTimer(NullLogger.Instance, InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
 #if DEBUG_INTERNER
             StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=" + Environment.NewLine + "{1}", internCache.Count, PrintInternerContent()));
@@ -171,40 +168,14 @@ namespace Orleans
 
         private void InternCacheCleanupTimerCallback(object state)
         {
-            Stopwatch clock = null;
-            long numEntries = 0;
-            var removalResultsLoggingNeeded = logger.IsVerbose || logger.IsVerbose2;
-            if (removalResultsLoggingNeeded)
-            {
-                clock = new Stopwatch();
-                clock.Start();
-                numEntries = internCache.Count;
-            }
-
             foreach (var e in internCache)
             {
                 T ignored;
                 if (e.Value == null || e.Value.TryGetTarget(out ignored) == false)
                 {
                     WeakReference<T> weak;
-                    bool ok = internCache.TryRemove(e.Key, out weak);
-                    if (!ok)
-                    {
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100295, "Could not remove old {0} entry: {1} ", internCacheName, e.Key);
-                    }
+                    internCache.TryRemove(e.Key, out weak);
                 }
-            }
-
-            if (!removalResultsLoggingNeeded) return;
-
-            var numRemoved = numEntries - internCache.Count;
-            if (numRemoved > 0)
-            {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
-            }
-            else
-            {
-                if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
             }
         }
 

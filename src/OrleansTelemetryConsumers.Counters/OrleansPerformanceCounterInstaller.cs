@@ -4,7 +4,10 @@ using System.ComponentModel;
 using System.Configuration.Install;
 using System.Diagnostics;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using Orleans.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace OrleansTelemetryConsumers.Counters
@@ -16,7 +19,7 @@ namespace OrleansTelemetryConsumers.Counters
     public class OrleansPerformanceCounterInstaller : Installer
     {
         private readonly OrleansPerfCounterTelemetryConsumer consumer;
-
+        private readonly ILogger logger;
         /// <summary>
         /// Constructors -- Registers Orleans system performance counters, 
         /// plus any grain-specific activation counters that can be detected when this installer is run.
@@ -24,11 +27,21 @@ namespace OrleansTelemetryConsumers.Counters
         public OrleansPerformanceCounterInstaller()
         {
             Trace.Listeners.Clear();
-            var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
-            LogManager.Initialize(cfg);
-            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null);
-            LogManager.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
-            consumer = new OrleansPerfCounterTelemetryConsumer();
+            var cfg = new NodeConfiguration { TraceFilePattern = null};
+            var loggerFactory = CreateDefaultLoggerFactory(cfg.TraceFileName);
+            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, new LoggerWrapper<SiloAssemblyLoader>(loggerFactory));
+            CrashUtils.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
+            consumer = new OrleansPerfCounterTelemetryConsumer(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<OrleansPerformanceCounterInstaller>();
+        }
+
+        private static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
+        {
+            var factory = new LoggerFactory();
+            factory.AddProvider(new FileLoggerProvider(filePath));
+            if (ConsoleText.IsConsoleAvailable)
+                factory.AddConsole();
+            return factory;
         }
 
         /// <summary>
@@ -38,7 +51,7 @@ namespace OrleansTelemetryConsumers.Counters
         public override void Install(IDictionary stateSaver)
         {
             consumer.InstallCounters();
-            if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
+            if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable(this.logger))
                 Context.LogMessage("Orleans counters registered successfully");
             else
                 Context.LogMessage("Orleans counters are NOT registered");
@@ -52,7 +65,7 @@ namespace OrleansTelemetryConsumers.Counters
         /// <param name="savedState">An <see cref="T:System.Collections.IDictionary" /> that contains the state of the computer after the installation was complete. </param>
         public override void Uninstall(IDictionary savedState)
         {
-            if (!OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
+            if (!OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable(this.logger))
             {
                 Context.LogMessage("Orleans counters are already unregistered");
             }

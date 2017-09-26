@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -14,16 +16,17 @@ namespace Tester.AzureUtils
     [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
     public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
         private string queueName;
 
         public AzureQueueDataManagerTests()
         {
             ClientConfiguration config = new ClientConfiguration();
-            config.TraceFilePattern = null;
-            LogManager.Initialize(config);
-            logger = LogManager.GetLogger("AzureQueueDataManagerTests", LoggerType.Application);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName);
+            logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
+            this.loggerFactory = loggerFactory;
         }
 
         public void Dispose()
@@ -35,7 +38,7 @@ namespace Tester.AzureUtils
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
+            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
             await manager.InitQueueAsync();
             return manager;
         }

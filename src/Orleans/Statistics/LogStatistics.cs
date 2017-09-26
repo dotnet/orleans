@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -16,19 +17,21 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private AsyncTaskSafeTimer reportTimer;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         public IStatisticsPublisher StatsTablePublisher;
 
-        internal LogStatistics(TimeSpan writeInterval, bool isSilo, SerializationManager serializationManager)
+        internal LogStatistics(TimeSpan writeInterval, bool isSilo, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             reportFrequency = writeInterval;
             this.serializationManager = serializationManager;
-            logger = LogManager.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger("Orleans.Runtime" + (isSilo ? "SiloLogStatistics" : "ClientLogStatistics"));
         }
 
         internal void Start()
         {
-            reportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer.
+            reportTimer = new AsyncTaskSafeTimer(loggerFactory.CreateLogger<AsyncTaskSafeTimer>(), Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer.
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -112,7 +115,7 @@ namespace Orleans.Runtime
             int newSize = logMsgBuilder.Length + Environment.NewLine.Length + counterData.Length;
             int newSizeWithPostfix = newSize + STATS_LOG_POSTFIX.Length + Environment.NewLine.Length;
 
-            if (newSizeWithPostfix >= LogManager.MAX_LOG_MESSAGE_SIZE)
+            if (newSizeWithPostfix >= LoggingUtils.MAX_LOG_MESSAGE_SIZE)
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);

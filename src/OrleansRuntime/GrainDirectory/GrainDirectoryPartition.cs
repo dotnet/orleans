@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 
@@ -213,6 +214,7 @@ namespace Orleans.Runtime.GrainDirectory
         private Dictionary<GrainId, IGrainInfo> partitionData;
         private readonly object lockable;
         private readonly Logger log;
+        private readonly ILoggerFactory loggerFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly GlobalConfiguration globalConfig;
         private readonly IInternalGrainFactory grainFactory;
@@ -225,14 +227,15 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, GlobalConfiguration globalConfig, IInternalGrainFactory grainFactory)
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, GlobalConfiguration globalConfig, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
-            log = LogManager.GetLogger("DirectoryPartition");
+            log = new LoggerWrapper<GrainDirectoryPartition>(loggerFactory);
             this.siloStatusOracle = siloStatusOracle;
             this.globalConfig = globalConfig;
             this.grainFactory = grainFactory;
+            this.loggerFactory = loggerFactory;
         }
 
         private bool IsValidSilo(SiloAddress silo)
@@ -528,7 +531,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
-            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.globalConfig, this.grainFactory);
+            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.globalConfig, this.grainFactory, this.loggerFactory);
 
             if (modifyOrigin)
             {

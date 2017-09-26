@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -7,14 +8,14 @@ namespace Orleans.Runtime
     {
         private readonly SafeTimerBase safeTimerBase;
 
-        public AsyncTaskSafeTimer(Func<object, Task> asynTaskCallback, object state)
+        public AsyncTaskSafeTimer(ILogger logger, Func<object, Task> asynTaskCallback, object state)
         {
-            safeTimerBase = new SafeTimerBase(asynTaskCallback, state);
+            safeTimerBase = new SafeTimerBase(logger, asynTaskCallback, state);
         }
 
-        public AsyncTaskSafeTimer(Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public AsyncTaskSafeTimer(ILogger logger, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            safeTimerBase = new SafeTimerBase(asynTaskCallback, state, dueTime, period);
+            safeTimerBase = new SafeTimerBase(logger, asynTaskCallback, state, dueTime, period);
         }
 
         public void Start(TimeSpan dueTime, TimeSpan period)

@@ -1,37 +1,61 @@
 using System;
 using Orleans.Runtime;
 using Xunit.Abstractions;
-
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions.Internal;
 namespace TestServiceFabric
 {
-    public class TestOutputLogger : Logger {
-
-        public Severity Severity { get; set; }
-
-        public override Severity SeverityLevel => this.Severity;
+    public class TestOutputLogger : ILogger
+    {
 
         public string LoggerName { get; set; }
 
-        public override string Name => this.LoggerName;
-
-        public TestOutputLogger(ITestOutputHelper output, string name = null, Severity severity = Severity.Info)
+        public string Name => this.LoggerName;
+        private LogLevel logLevel;
+        public TestOutputLogger(ITestOutputHelper output, string name = null, LogLevel level = LogLevel.Information)
         {
             this.Output = output;
             this.LoggerName = name ?? nameof(TestOutputLogger);
-            this.Severity = severity;
+            this.logLevel = level;
+        }
+
+        public IDisposable BeginScope<TState>(TState state)
+        {
+            return NullScope.Instance;
         }
 
         public ITestOutputHelper Output { get; set; }
 
-        public override Logger GetLogger(string loggerName)
+        public bool IsEnabled(LogLevel logLevel)
         {
-            return new TestOutputLogger(this.Output, loggerName, this.Severity);
+            return logLevel > this.logLevel;
         }
 
-        public override void Log(int errorCode, Severity sev, string format, object[] args, Exception exception)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,
+            Func<TState, Exception, string> formatter)
         {
-            var errCodeMsg = errorCode == 0 ? string.Empty : $"(0x{errorCode: 8X})";
-            this.Output.WriteLine($"{sev} {errCodeMsg} [{this.Name}] {string.Format(format, args)}");
+            this.Output.WriteLine($"{logLevel} {eventId} [{this.Name}] {formatter(state, exception)}");
+        }
+
+    }
+
+    public class TestOutputLoggerProvider : ILoggerProvider
+    {
+        private ITestOutputHelper output;
+        public TestOutputLoggerProvider(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new TestOutputLogger(this.output, categoryName);
+        }
+
+        public void Dispose()
+        {
+            output = null;
         }
     }
+
 }

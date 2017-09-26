@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -42,7 +43,7 @@ namespace Tester
 
     public class CustomGrainService : GrainService, ICustomGrainService
     {
-        public CustomGrainService(IGrainIdentity id, Silo silo, IGrainServiceConfiguration config) : base(id, silo, config)
+        public CustomGrainService(IGrainIdentity id, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base(id, silo, config, loggerFactory)
         {
             
         }

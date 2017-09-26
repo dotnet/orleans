@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 
@@ -18,16 +19,22 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private static int sequenceNumber;
 
         public string Name { get; private set; }
+        private readonly ILoggerFactory loggerFactory;
+
+        public AzureTableBasedGossipChannel(ILoggerFactory loggerFactory)
+        {
+            Name = "AzureTableBasedGossipChannel-" + ++sequenceNumber;
+            logger = new LoggerWrapper<AzureTableBasedGossipChannel>(loggerFactory);
+            this.loggerFactory = loggerFactory;
+        }
 
         public async Task Initialize(Guid serviceid, string connectionstring)
         {
-            Name = "AzureTableBasedGossipChannel-" + ++sequenceNumber;
-            logger = LogManager.GetLogger(Name, LoggerType.Runtime);
 
             logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}, SeverityLevel={2}",
                 serviceid, ConfigUtilities.RedactConnectionStringInfo(connectionstring), logger.SeverityLevel);
 
-            tableManager = await GossipTableInstanceManager.GetManager(serviceid, connectionstring, logger);
+            tableManager = await GossipTableInstanceManager.GetManager(serviceid, connectionstring, this.loggerFactory);
         }
 
         // used by unit tests

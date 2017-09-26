@@ -8,6 +8,7 @@ using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -55,7 +56,7 @@ namespace AWSUtils.Tests.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StreamConnectionString).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StreamConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         [SkippableFact, TestCategory("AWS")]

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -53,7 +54,7 @@ namespace Orleans.Providers.Streams.Common
         private IStreamSubscriptionManager streamSubscriptionManager;
         private IProviderConfiguration providerConfig;
         public string Name { get; private set; }
-
+        private ILoggerFactory loggerFactory;
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
@@ -69,6 +70,7 @@ namespace Orleans.Providers.Streams.Common
             adapterFactory = new TAdapterFactory();
             adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
             queueAdapter = await adapterFactory.CreateAdapter();
+            this.loggerFactory = providerUtilitiesManager.ServiceProvider.GetRequiredService<ILoggerFactory>();
             myConfig = new PersistentStreamProviderConfig(config);
             this.providerConfig = config;
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
@@ -155,7 +157,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(myConfig.PubSubType), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(myConfig.PubSubType), this.loggerFactory, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)

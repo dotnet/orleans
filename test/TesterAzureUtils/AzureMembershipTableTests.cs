@@ -1,8 +1,10 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using UnitTests;
@@ -17,22 +19,28 @@ namespace Tester.AzureUtils
     [TestCategory("Membership"), TestCategory("Azure")]
     public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTests>
     {
-        public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public AzureMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+        }
+
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(typeof(AzureTableDataManager<>).FullName, LogLevel.Trace);
+            filters.AddFilter(typeof(OrleansSiloInstanceManager).FullName, LogLevel.Trace);
+            filters.AddFilter("Orleans.Storage", LogLevel.Trace);
+            return filters;
         }
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBasedMembershipTable();
+            return new AzureBasedMembershipTable(loggerFactory);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new AzureGatewayListProvider();
+            return new AzureGatewayListProvider(loggerFactory);
         }
 
         protected override Task<string> GetConnectionString()

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
@@ -32,7 +33,8 @@ namespace Orleans.Runtime
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
         private readonly SafeRandom random;
-
+        private readonly ILogger invokeWorkItemLogger;
+        private readonly ILoggerFactory loggerFactory;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
@@ -42,18 +44,21 @@ namespace Orleans.Runtime
             ILocalGrainDirectory localGrainDirectory,
             MessageFactory messagefactory,
             SerializationManager serializationManager,
-            CompatibilityDirectorManager compatibilityDirectorManager)
+            CompatibilityDirectorManager compatibilityDirectorManager,
+            ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
+            this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.messagefactory = messagefactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
-            logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
+            logger = new LoggerWrapper<Dispatcher>(loggerFactory);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
             errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;
@@ -400,7 +405,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this), targetActivation.SchedulingContext);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
 

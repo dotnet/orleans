@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -24,17 +25,19 @@ namespace Orleans.Messaging
         private int roundRobinCounter;
         private readonly SafeRandom rand;
         private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly object lockable;
 
         private readonly ClientConfiguration config;
         private bool gatewayRefreshCallInitiated;
 
-        public GatewayManager(ClientConfiguration cfg, IGatewayListProvider gatewayListProvider)
+        public GatewayManager(ClientConfiguration cfg, IGatewayListProvider gatewayListProvider, ILoggerFactory loggerFactory)
         {
             config = cfg;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
-            logger = LogManager.GetLogger("Messaging.GatewayManager", LoggerType.Runtime);
+            logger = new LoggerWrapper<GatewayManager>(loggerFactory);
+            this.loggerFactory = loggerFactory;
             lockable = new object();
             gatewayRefreshCallInitiated = false;
 
@@ -64,7 +67,7 @@ namespace Orleans.Messaging
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
             {
-                gatewayRefreshTimer = new SafeTimer(RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
+                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
             }
         }
 

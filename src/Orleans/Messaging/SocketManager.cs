@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -11,13 +12,14 @@ namespace Orleans.Runtime
     {
         private readonly LRU<IPEndPoint, Socket> cache;
         private TimeSpan connectionTimeout;
-
+        private ILogger logger;
         private const int MAX_SOCKETS = 200;
 
-        internal SocketManager(IMessagingConfiguration config)
+        internal SocketManager(IMessagingConfiguration config, ILoggerFactory loggerFactory)
         {
             connectionTimeout = config.OpenConnectionTimeout;
             cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
+            this.logger = loggerFactory.CreateLogger<SocketManager>();
             cache.RaiseFlushEvent += FlushHandler;
         }
 
@@ -133,7 +135,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                LogManager.GetLogger("SocketManager", LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
+                t?.Item3.logger.Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
             }
             finally
             {

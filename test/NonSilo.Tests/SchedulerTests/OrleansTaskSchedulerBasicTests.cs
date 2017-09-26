@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
@@ -12,6 +14,7 @@ using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans;
+using Orleans.TestingHost.Utils;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -46,16 +49,16 @@ namespace UnitTests.SchedulerTests
         private readonly SiloPerformanceMetrics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
-
+        private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)
         {
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup();
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup);
-            InitSchedulerLogging();
+            loggerFactory = InitSchedulerLogging();
+            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
             this.rootContext = new UnitTestSchedulingContext();
-            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
+            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics, loggerFactory);
         }
         
         public void Dispose()
@@ -64,8 +67,6 @@ namespace UnitTests.SchedulerTests
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
             this.scheduler.Stop();
-            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
-            //LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("AsynchronyPrimitives")]
@@ -657,23 +658,18 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        internal static void InitSchedulerLogging()
+        internal static ILoggerFactory InitSchedulerLogging()
         {
-            LogManager.UnInitialize();
-            //LogManager.LogConsumers.Add(new LogWriterToConsole());
-
-            var traceLevels = new[]
-            {
-                Tuple.Create("Scheduler", Severity.Verbose3),
-                Tuple.Create("Scheduler.WorkerPoolThread", Severity.Verbose2),
-            };
-            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>(traceLevels));
-
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("Scheduler", LogLevel.Trace);
+            filters.AddFilter("Scheduler.WorkerPoolThread", LogLevel.Trace);
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();
             NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName, filters);
             StatisticsCollector.Initialize(config);
-            SchedulerStatisticsGroup.Init();
+            SchedulerStatisticsGroup.Init(loggerFactory);
+            return loggerFactory;
         }
     }
 }

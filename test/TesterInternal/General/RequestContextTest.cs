@@ -29,10 +29,8 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(initialSilosCount: 1);
-
                 options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
                 options.ClientConfiguration.PropagateActivityId = true;
-
                 return new TestCluster(options);
             }
         }

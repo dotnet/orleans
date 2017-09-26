@@ -3,13 +3,14 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime
 {
     internal class ActivationDirectory : IEnumerable<KeyValuePair<ActivationId, ActivationData>>
     {
-        private static readonly LoggerImpl logger = LogManager.GetLogger("ActivationDirectory", LoggerType.Runtime);
+        private readonly ILogger logger;
 
         private readonly ConcurrentDictionary<ActivationId, ActivationData> activations;                // Activation data (app grains) only.
         private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets;                // SystemTarget only.
@@ -17,13 +18,14 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
-        public ActivationDirectory()
+        public ActivationDirectory(ILogger<ActivationDirectory> logger)
         {
             activations = new ConcurrentDictionary<ActivationId, ActivationData>();
             systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();
             grainToActivationsMap = new ConcurrentDictionary<GrainId, List<ActivationData>>();
             grainCounts = new ConcurrentDictionary<string, CounterStatistic>();
             systemTargetCounts = new ConcurrentDictionary<string, CounterStatistic>();
+            this.logger = logger;
         }
 
         public int Count
@@ -50,13 +52,13 @@ namespace Orleans.Runtime
 
         internal void IncrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsVerbose2) logger.Verbose2("Increment Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Increment Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
         internal void DecrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsVerbose2) logger.Verbose2("Decrement Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.DecrementBy(1);
         }
@@ -167,12 +169,12 @@ namespace Orleans.Runtime
 
         public void PrintActivationDirectory()
         {
-            if (logger.IsInfo)
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 string stats = Utils.EnumerableToString(activations.Values.OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
                 {
-                    logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.Catalog_ActivationDirectory_Statistics, String.Format("ActivationDirectory.PrintActivationDirectory(): Size = {0}, Directory:" + Environment.NewLine + "{1}",
+                    logger.Info(ErrorCode.Catalog_ActivationDirectory_Statistics, String.Format("ActivationDirectory.PrintActivationDirectory(): Size = {0}, Directory:" + Environment.NewLine + "{1}",
                         activations.Count, stats));
                 }
             }

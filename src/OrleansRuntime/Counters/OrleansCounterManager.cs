@@ -1,16 +1,15 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Counters
 {
     internal static class OrleansCounterManager
     {
-        private static readonly Logger logger = LogManager.GetLogger("OrleansCounterManager", LoggerType.Runtime);
-
-        public static int WriteCounters(ITelemetryProducer telemetryProducer)
+        public static int WriteCounters(ITelemetryProducer telemetryProducer, ILogger logger)
         {
-            if (logger.IsVerbose) logger.Verbose("Writing counters.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Writing counters.");
 
             int numWriteErrors = 0;
 
@@ -25,7 +24,7 @@ namespace Orleans.Runtime.Counters
             {
                 try
                 {
-                    if (logger.IsVerbose3) logger.Verbose3(ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
 
                     counter.TrackMetric(telemetryProducer);
                 }

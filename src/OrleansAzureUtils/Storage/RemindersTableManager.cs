@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 
@@ -82,9 +83,9 @@ namespace Orleans.Runtime.ReminderService
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public static async Task<RemindersTableManager> GetManager(Guid serviceId, string deploymentId, string storageConnectionString)
+        public static async Task<RemindersTableManager> GetManager(Guid serviceId, string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            var singleton = new RemindersTableManager(serviceId, deploymentId, storageConnectionString);
+            var singleton = new RemindersTableManager(serviceId, deploymentId, storageConnectionString, loggerFactory);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and deploymentId {1}.", serviceId, deploymentId);
@@ -106,8 +107,8 @@ namespace Orleans.Runtime.ReminderService
             return singleton;
         }
 
-        private RemindersTableManager(Guid serviceId, string deploymentId, string storageConnectionString)
-            : base(REMINDERS_TABLE_NAME, storageConnectionString)
+        private RemindersTableManager(Guid serviceId, string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
+            : base(REMINDERS_TABLE_NAME, storageConnectionString, loggerFactory)
         {
             DeploymentId = deploymentId;
             ServiceId = serviceId;

@@ -114,14 +114,6 @@ namespace UnitTests.GeoClusterTests
                 c.AddAzureTableStorageProvider("PubSubStore", deleteOnClear:true, useJsonFormat:false, connectionString: TestDefaultConfiguration.DataConnectionString);
                 c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
-                // logging  
-                foreach (var o in c.Overrides)
-                {
-                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Catalog", Severity.Verbose));
-                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Dispatcher", Severity.Verbose2));
-                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Orleans.GrainDirectory.LocalGrainDirectory", Severity.Verbose2));
-                }
-
                 config_customizer?.Invoke(c);
             };
             // configuration for clients

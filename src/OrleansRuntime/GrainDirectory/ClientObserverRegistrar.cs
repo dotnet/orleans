@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -28,14 +29,15 @@ namespace Orleans.Runtime
             ILocalSiloDetails siloDetails,
             ILocalGrainDirectory dir,
             OrleansTaskScheduler scheduler,
-            ClusterConfiguration config)
-            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress)
+            ClusterConfiguration config,
+            ILoggerFactory loggerFactory)
+            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
         {
             grainDirectory = dir;
             myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
             orleansConfig = config;
-            logger = LogManager.GetLogger(typeof(ClientObserverRegistrar).Name);
+            logger = new LoggerWrapper<ClientObserverRegistrar>(loggerFactory);
         }
 
         internal void SetGateway(Gateway gateway)

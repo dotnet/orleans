@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MultiClusterNetwork
@@ -11,11 +12,11 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly IServiceProvider serviceProvider;
         private readonly Logger logger;
 
-        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider)
+        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider, LoggerWrapper<MultiClusterGossipChannelFactory> logger)
         {
             this.globalConfig = globalConfig;
             this.serviceProvider = serviceProvider;
-            logger = LogManager.GetLogger("MultiClusterGossipChannelFactory", LoggerType.Runtime);
+            this.logger = logger;
         }
 
         internal async Task<List<IGossipChannel>> CreateGossipChannels()

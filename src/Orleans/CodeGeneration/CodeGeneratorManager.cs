@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.CodeGeneration
 {
@@ -21,7 +22,7 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// The log.
         /// </summary>
-        private static readonly Logger Log = LogManager.GetLogger("CodeGenerator");
+        private readonly Logger Log;
 
         /// <summary>
         /// Empty generated assemblies.
@@ -41,9 +42,10 @@ namespace Orleans.CodeGeneration
 
         private readonly IServiceProvider serviceProvider;
 
-        public CodeGeneratorManager(IServiceProvider serviceProvider)
+        public CodeGeneratorManager(IServiceProvider serviceProvider, LoggerWrapper<CodeGeneratorManager> logger)
         {
             this.serviceProvider = serviceProvider;
+            this.Log = logger;
         }
 
         /// <summary>
@@ -95,10 +97,9 @@ namespace Orleans.CodeGeneration
         /// <param name="targetAssemblyName">
         /// The name of the assembly the provided <paramref name="generatedAssembly"/> targets.
         /// </param>
-        /// <param name="generatedAssembly">
-        /// The generated assembly.
-        /// </param>
-        public static void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly)
+        /// <param name="generatedAssembly"> The generated assembly. </param>
+        ///  <param name="logger">The logger</param>
+        public static void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly, ILogger logger)
         {
             if (codeGeneratorCacheInstance != null)
             {
@@ -106,7 +107,7 @@ namespace Orleans.CodeGeneration
             }
             else
             {
-                Log.Warn(
+                logger.Warn(
                     ErrorCode.CodeGenDllMissing,
                     "CodeGenerationManager.AddCachedAssembly called but no code generator has been loaded.");
             }

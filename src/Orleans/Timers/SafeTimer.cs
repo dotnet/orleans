@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -16,16 +17,16 @@ namespace Orleans.Runtime
         private readonly SafeTimerBase safeTimerBase;
         private readonly TimerCallback callbackFunc;
 
-        public SafeTimer(TimerCallback callback, object state)
+        public SafeTimer(ILogger logger, TimerCallback callback, object state)
         {
             callbackFunc = callback;
-            safeTimerBase = new SafeTimerBase(callbackFunc, state);
+            safeTimerBase = new SafeTimerBase(logger, callbackFunc, state);
         }
 
-        public SafeTimer(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
+        public SafeTimer(ILogger logger, TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
         {
             callbackFunc = callback;
-            safeTimerBase = new SafeTimerBase(callbackFunc, state, dueTime, period);
+            safeTimerBase = new SafeTimerBase(logger, callbackFunc, state, dueTime, period);
         }
 
         public void Start(TimeSpan dueTime, TimeSpan period)

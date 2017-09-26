@@ -5,6 +5,7 @@ using System.Fabric;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Microsoft.Orleans.ServiceFabric.Models;
 using Microsoft.Orleans.ServiceFabric.Utilities;
@@ -37,11 +38,11 @@ namespace Microsoft.Orleans.ServiceFabric
         public FabricServiceSiloResolver(
             Uri serviceName,
             IFabricQueryManager queryManager,
-            Factory<string, Logger> loggerFactory)
+            ILoggerFactory loggerFactory)
         {
             this.serviceName = serviceName;
             this.queryManager = queryManager;
-            this.log = loggerFactory(nameof(FabricServiceSiloResolver));
+            this.log = new LoggerWrapper<FabricServiceSiloResolver>(loggerFactory);
             this.partitionChangeHandler = this.OnPartitionChange;
         }
         

@@ -16,11 +16,6 @@ namespace Orleans.Runtime
         IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
-        /// Provides client application code with access to an Orleans logger.
-        /// </summary>
-        Logger AppLogger { get; }
-
-        /// <summary>
         /// A unique identifier for the current client.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>

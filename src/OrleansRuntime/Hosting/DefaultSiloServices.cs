@@ -16,7 +16,6 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -33,6 +32,8 @@ using Orleans.Runtime.Storage;
 using Orleans.Transactions;
 using Orleans.LogConsistency;
 using Orleans.Storage;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Utilities;
 
 namespace Orleans.Hosting
 {
@@ -86,6 +87,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<BootstrapProviderManager>();
             services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
+            services.AddLogging();
+            //temporary change until runtime moved away from Logger
+            services.TryAddSingleton(typeof(LoggerWrapper<>));
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
@@ -137,7 +141,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<Factory<string, Logger>>(LogManager.GetLogger);
             services.TryAddSingleton<CodeGeneratorManager>();
 
             services.TryAddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
@@ -185,12 +188,13 @@ namespace Orleans.Hosting
                 {
                     var globalConfig = sp.GetRequiredService<GlobalConfiguration>();
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
+                    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
                     if (globalConfig.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, globalConfig.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, globalConfig.NumVirtualBucketsConsistentRing);
                     }
 
-                    return new ConsistentRingProvider(siloDetails.SiloAddress);
+                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
                 });
             
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 using SQSMessage = Amazon.SQS.Model.Message;
 
@@ -19,30 +20,30 @@ namespace OrleansAWSUtils.Streams
         private SQSStorage queue;
         private long lastReadMessage;
         private Task outstandingTask;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly SerializationManager serializationManager;
 
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, QueueId queueId, string dataConnectionString, string deploymentId)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string deploymentId)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
 
-            var queue = new SQSStorage(queueId.ToString(), dataConnectionString, deploymentId);
-            return new SQSAdapterReceiver(serializationManager, queueId, queue);
+            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, deploymentId);
+            return new SQSAdapterReceiver(serializationManager, loggerFactory, queueId, queue);
         }
 
-        private SQSAdapterReceiver(SerializationManager serializationManager, QueueId queueId, SQSStorage queue)
+        private SQSAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (queue == null) throw new ArgumentNullException("queue");
 
             Id = queueId;
             this.queue = queue;
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
+            logger = loggerFactory.CreateLogger<SQSAdapterReceiver>();
             this.serializationManager = serializationManager;
         }
 

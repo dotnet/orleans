@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
 
 using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -15,10 +16,10 @@ namespace Orleans.Runtime.MembershipService
         private readonly Logger logger;
         private IMembershipTable membershipTable;
 
-        public MembershipTableFactory(IServiceProvider serviceProvider)
+        public MembershipTableFactory(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
         {
             this.serviceProvider = serviceProvider;
-            logger = LogManager.GetLogger(nameof(MembershipTableFactory), LoggerType.Runtime);
+            this.logger = logger;
         }
 
         internal async Task<IMembershipTable> GetMembershipTable()
@@ -58,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
                             $"No membership table provider found for {nameof(globalConfig.LivenessType)}={globalConfig.LivenessType}");
                 }
                 
-                await result.InitializeMembershipTable(globalConfig, true, this.logger.GetLogger(result.GetType().Name));
+                await result.InitializeMembershipTable(globalConfig, true);
                 membershipTable = result;
             }
 

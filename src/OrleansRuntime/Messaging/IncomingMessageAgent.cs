@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
@@ -13,8 +14,8 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly Message.Categories category;
 
-        internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher, MessageFactory messageFactory) :
-            base(cat.ToString())
+        internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher, MessageFactory messageFactory, ILoggerFactory loggerFactory) :
+            base(cat.ToString(), loggerFactory)
         {
             category = cat;
             messageCenter = mc;

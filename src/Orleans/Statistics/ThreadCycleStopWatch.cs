@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -13,7 +14,7 @@ namespace Orleans.Runtime
     internal class TimeIntervalThreadCycleCounterBased : ITimeInterval
     {
         private readonly double cyclesPerSecond;
-
+        private readonly ILogger logger;
         private IntPtr handle;
         private ulong startCycles;
         private ulong stopCycles;
@@ -31,8 +32,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Create thread CPU timing object. You may call this from a thread outside the one you wish to measure.
         /// </summary>
-        public TimeIntervalThreadCycleCounterBased()
+        public TimeIntervalThreadCycleCounterBased(ILoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<TimeIntervalThreadCycleCounterBased>();
             // System call returns what seems to be (from measurements) a value that is in cycles per 1/1024 of a second (close to millisecond)
             long cyclesPerMillisecond;
             NativeMethods.QueryPerformanceFrequency(out cyclesPerMillisecond);
@@ -84,9 +86,8 @@ namespace Orleans.Runtime
             }
             else
             {
-                var log = LogManager.GetLogger("Thread Cycle Counter", LoggerType.Runtime);
-                if (log.IsVerbose2)
-                    log.Verbose2(0,
+                if (logger.IsEnabled(LogLevel.Trace))
+                    logger.Trace(0,
                         String.Format("Invalid cycle counts startCycles = {0}, stopCycles = {1}", startCycles,
                             stopCycles));
 

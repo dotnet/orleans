@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
@@ -27,9 +28,10 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Factory<GrainDirectoryPartition> createPartion)
+            Factory<GrainDirectoryPartition> createPartion,
+            ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger(this.GetType().FullName);
+            logger = new LoggerWrapper<GrainDirectoryHandoffManager>(loggerFactory);
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;

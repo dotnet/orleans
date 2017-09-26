@@ -1,4 +1,7 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -16,7 +19,6 @@ namespace Tester.AzureUtils.Streaming
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
         private readonly SingleStreamTestRunner runner;
-
         public override TestCluster CreateTestCluster()
         {
             TestUtils.CheckForAzureStorage();
@@ -45,7 +47,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         ////------------------------ One to One ----------------------//

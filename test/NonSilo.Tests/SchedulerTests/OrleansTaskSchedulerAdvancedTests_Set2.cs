@@ -2,6 +2,8 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -25,23 +27,23 @@ namespace UnitTests.SchedulerTests
         private readonly UnitTestSchedulingContext context;
         private readonly SiloPerformanceMetrics performanceMetrics;
         private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
-
+        private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
             this.output = output;
-            OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
+            loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             context = new UnitTestSchedulingContext();
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup();
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup);
-            masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
+            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
+            masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics, loggerFactory);
         }
         
         public void Dispose()
         {
             masterScheduler.Stop();
+            this.loggerFactory.Dispose();
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
-            LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -661,7 +663,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics, loggerFactory);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             await Run_ActivationSched_Test1(scheduler, false);
@@ -670,7 +672,7 @@ namespace UnitTests.SchedulerTests
         public async Task OrleansSched_Test1_Bounce()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics, loggerFactory);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             await Run_ActivationSched_Test1(scheduler, true);
@@ -683,7 +685,7 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddress.NewLocalAddress(23)
             };
-            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null));
+            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null, NullLoggerFactory.Instance));
             await grain.OnActivateAsync();
 
             Task wrapped = null;

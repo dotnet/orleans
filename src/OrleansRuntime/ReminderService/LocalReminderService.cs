@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -20,7 +22,8 @@ namespace Orleans.Runtime.ReminderService
         private IGrainTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private uint initialReadCallCount = 0;
-
+        private readonly ILogger timerLogger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
         private readonly GlobalConfiguration config;
@@ -31,14 +34,17 @@ namespace Orleans.Runtime.ReminderService
             GrainId id,
             IReminderTable reminderTable,
             GlobalConfiguration config,
-            TimeSpan initTimeout)
-            : base(id, silo, null)
+            TimeSpan initTimeout,
+            ILoggerFactory loggerFactory)
+            : base(id, silo, null, loggerFactory)
         {
+            this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
             this.config = config;
             this.initTimeout = initTimeout;
             localTableSequence = 0;
+            this.loggerFactory = loggerFactory;
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
@@ -54,7 +60,7 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init(config, Logger).WithTimeout(initTimeout);
+            await reminderTable.Init(config).WithTimeout(initTimeout);
 
             await base.Start();
         }
@@ -220,6 +226,7 @@ namespace Orleans.Runtime.ReminderService
                 var random = new SafeRandom();
                 listRefreshTimer = GrainTimer.FromTaskCallback(
                     this.RuntimeClient.Scheduler,
+                    this.timerLogger,
                     _ => DoInitialReadAndUpdateReminders(),
                     null,
                     random.NextTimeSpan(InitialReadRetryPeriod),
@@ -240,6 +247,7 @@ namespace Orleans.Runtime.ReminderService
             if (listRefreshTimer != null) listRefreshTimer.Dispose();
             listRefreshTimer = GrainTimer.FromTaskCallback(
                 this.RuntimeClient.Scheduler,
+                this.timerLogger,
                 _ => ReadAndUpdateReminders(),
                 null,
                 dueTime,
@@ -401,7 +409,7 @@ namespace Orleans.Runtime.ReminderService
                 localReminders.Remove(prevReminder.Identity);
             }
 
-            var newReminder = new LocalReminderData(entry);
+            var newReminder = new LocalReminderData(entry, this.loggerFactory);
             localTableSequence++;
             newReminder.LocalSequenceNumber = localTableSequence;
             localReminders.Add(newReminder.Identity, newReminder);
@@ -507,13 +515,13 @@ namespace Orleans.Runtime.ReminderService
             private readonly TimeSpan period;
             private GrainReference GrainRef {  get { return Identity.GrainRef; } }
             private string ReminderName { get { return Identity.ReminderName; } }
-
+            private readonly ILogger timerLogger;
             internal ReminderIdentity Identity { get; private set; }
             internal string ETag;
             internal IGrainTimer Timer;
             internal long LocalSequenceNumber; // locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
 
-            internal LocalReminderData(ReminderEntry entry)
+            internal LocalReminderData(ReminderEntry entry, ILoggerFactory loggerFactory)
             {
                 Identity = new ReminderIdentity(entry.GrainRef, entry.ReminderName);
                 firstTickTime = entry.StartAt;
@@ -521,13 +529,14 @@ namespace Orleans.Runtime.ReminderService
                 remindable = entry.GrainRef.Cast<IRemindable>();
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
+                this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             }
 
             public void StartTimer(OrleansTaskScheduler scheduler, Func<object, Task> asyncCallback, Logger Logger)
             {
                 StopReminder(Logger); // just to make sure.
                 var dueTimeSpan = CalculateDueTime();
-                Timer = GrainTimer.FromTaskCallback(scheduler, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
+                Timer = GrainTimer.FromTaskCallback(scheduler, this.timerLogger, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
                 if (Logger.IsVerbose) Logger.Verbose("Reminder {0}, Due time{1}", this, dueTimeSpan);
                 Timer.Start();
             }
