@@ -79,85 +79,6 @@ namespace Orleans.Runtime.Configuration
 
         internal static void ParseTracing(ITraceConfiguration config, XmlElement root, string nodeName)
         {
-            if (root.HasAttribute("DefaultTraceLevel"))
-            {
-                config.DefaultTraceLevel = ParseSeverity(root.GetAttribute("DefaultTraceLevel"),
-                    "Invalid trace level DefaultTraceLevel attribute value on Tracing element for " + nodeName);
-            }
-            if (root.HasAttribute("TraceToConsole"))
-            {
-                config.TraceToConsole = ParseBool(root.GetAttribute("TraceToConsole"),
-                    "Invalid boolean value for TraceToConsole attribute on Tracing element for " + nodeName);
-            }
-            if (root.HasAttribute("TraceToFile"))
-            {
-                config.TraceFilePattern = root.GetAttribute("TraceToFile");
-            }
-            if (root.HasAttribute("LargeMessageWarningThreshold"))
-            {
-                config.LargeMessageWarningThreshold = ParseInt(root.GetAttribute("LargeMessageWarningThreshold"),
-                    "Invalid boolean value for LargeMessageWarningThresholdattribute on Tracing element for " + nodeName);
-            }
-            if (root.HasAttribute("PropagateActivityId"))
-            {
-                config.PropagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),
-                    "Invalid boolean value for PropagateActivityId attribute on Tracing element for " + nodeName);
-            }
-            if (root.HasAttribute("BulkMessageLimit"))
-            {
-                config.BulkMessageLimit = ParseInt(root.GetAttribute("BulkMessageLimit"),
-                    "Invalid int value for BulkMessageLimit attribute on Tracing element for " + nodeName);
-            }
-
-            foreach (XmlNode node in root.ChildNodes)
-            {
-                var grandchild = node as XmlElement;
-                if (grandchild == null) continue;
-
-                if (grandchild.LocalName.Equals("TraceLevelOverride") && grandchild.HasAttribute("TraceLevel") && grandchild.HasAttribute("LogPrefix"))
-                {
-                    config.TraceLevelOverrides.Add(new Tuple<string, Severity>(grandchild.GetAttribute("LogPrefix"),
-                        ParseSeverity(grandchild.GetAttribute("TraceLevel"),
-                            "Invalid trace level TraceLevel attribute value on TraceLevelOverride element for " + nodeName + " prefix " +
-                            grandchild.GetAttribute("LogPrefix"))));
-                }
-                else if (grandchild.LocalName.Equals("LogConsumer"))
-                {
-                    var className = grandchild.InnerText;
-                    Assembly assembly = null;
-                    try
-                    {
-                        int pos = className.IndexOf(',');
-                        if (pos > 0)
-                        {
-                            var assemblyName = className.Substring(pos + 1).Trim();
-                            className = className.Substring(0, pos).Trim();
-                            assembly = Assembly.Load(new AssemblyName(assemblyName));
-                        }
-                        else
-                        {
-                            assembly = typeof(ConfigUtilities).GetTypeInfo().Assembly;
-                        }
-                        var pluginType = assembly.GetType(className);
-                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
-                        var plugin = Activator.CreateInstance(pluginType);
-
-                        if (plugin is ILogConsumer)
-                        {
-                            LogManager.LogConsumers.Add(plugin as ILogConsumer);
-                        }
-                        else
-                        {
-                            throw new InvalidCastException("LogConsumer class " + className + " must implement Orleans.ILogConsumer interface");
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        throw new TypeLoadException("Cannot load LogConsumer class " + className + " from assembly " + assembly + " - Error=" + exc);
-                    }
-                }
-            }
-
             SetTraceFileName(config, nodeName, DateTime.UtcNow);
         }
 
@@ -463,24 +384,7 @@ namespace Orleans.Runtime.Configuration
         {
             var sb = new StringBuilder();
             sb.Append("   Tracing: ").AppendLine();
-            sb.Append("     Default Trace Level: ").Append(config.DefaultTraceLevel).AppendLine();
-            if (config.TraceLevelOverrides.Count > 0)
-            {
-                sb.Append("     TraceLevelOverrides:").AppendLine();
-                foreach (var over in config.TraceLevelOverrides)
-                {
-                    sb.Append("         ").Append(over.Item1).Append(" ==> ").Append(over.Item2.ToString()).AppendLine();
-                }
-            }
-            else
-            {
-                sb.Append("     TraceLevelOverrides: None").AppendLine();
-            }
-            sb.Append("     Trace to Console: ").Append(config.TraceToConsole).AppendLine();
             sb.Append("     Trace File Name: ").Append(string.IsNullOrWhiteSpace(config.TraceFileName) ? "" : Path.GetFullPath(config.TraceFileName)).AppendLine();
-            sb.Append("     LargeMessageWarningThreshold: ").Append(config.LargeMessageWarningThreshold).AppendLine();
-            sb.Append("     PropagateActivityId: ").Append(config.PropagateActivityId).AppendLine();
-            sb.Append("     BulkMessageLimit: ").Append(config.BulkMessageLimit).AppendLine();
             return sb.ToString();
         }
 

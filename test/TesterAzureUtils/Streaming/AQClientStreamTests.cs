@@ -1,6 +1,9 @@
 ﻿
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -20,7 +23,6 @@ namespace Tester.AzureUtils.Streaming
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
-
         public AQClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -42,7 +44,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, deploymentId,
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AQStreamProviderName, deploymentId,
                 TestDefaultConfiguration.DataConnectionString).Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
@@ -59,7 +61,7 @@ namespace Tester.AzureUtils.Streaming
         {
             logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName, NullLoggerFactory.Instance));
         }
     }
 }

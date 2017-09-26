@@ -1,5 +1,7 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -7,6 +9,7 @@ using Tester.StreamingTests;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -14,7 +17,6 @@ namespace Tester.AzureUtils.Streaming
     public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_AQ.Fixture>, IDisposable
     {
         private readonly string deploymentId;
-
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -32,7 +34,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 var deploymentId = this.HostedCluster?.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString)
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString)
                     .Wait();
             }
         }
@@ -46,7 +48,7 @@ namespace Tester.AzureUtils.Streaming
 
         public virtual void Dispose()
         {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance, 
                     streamProviderName,
                     this.deploymentId,
                     TestDefaultConfiguration.DataConnectionString).Wait();

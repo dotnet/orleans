@@ -12,6 +12,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Tester.ClientConnectionTests
 {
@@ -28,7 +29,7 @@ namespace Tester.ClientConnectionTests
             Gateways = new List<Uri>();
         }
 
-        public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
+        public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
         {
             return Task.CompletedTask;
         }

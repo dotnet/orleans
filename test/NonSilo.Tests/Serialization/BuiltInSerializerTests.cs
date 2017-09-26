@@ -108,7 +108,6 @@ namespace UnitTests.Serialization
             this.output = output;
             this.defaultFixture = fixture;
             this.serializerFixture = serializerFixture;
-            LogManager.Initialize(new NodeConfiguration());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("CodeGen")]

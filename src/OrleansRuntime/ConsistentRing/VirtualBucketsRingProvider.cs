@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.ConsistentRing
 {
@@ -25,14 +26,14 @@ namespace Orleans.Runtime.ConsistentRing
         private bool running;
         private IRingRange myRange;
 
-        internal VirtualBucketsRingProvider(SiloAddress siloAddress, int numVirtualBuckets)
+        internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets)
         {
             numBucketsPerSilo = numVirtualBuckets;
 
             if (numBucketsPerSilo <= 0 )
                 throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + numBucketsPerSilo);
 
-            logger = LogManager.GetLogger(typeof(VirtualBucketsRingProvider).Name);
+            logger = new LoggerWrapper<VirtualBucketsRingProvider>(loggerFactory);
                         
             statusListeners = new List<IRingRangeListener>();
             bucketsMap = new SortedDictionary<uint, SiloAddress>();

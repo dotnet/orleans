@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,6 +16,7 @@ namespace UnitTests.MessageCenterTests
             private readonly ITestOutputHelper output;
 
             public TestAgent(ITestOutputHelper output)
+                :base(NullLoggerFactory.Instance)
             {
                 this.output = output;
             }

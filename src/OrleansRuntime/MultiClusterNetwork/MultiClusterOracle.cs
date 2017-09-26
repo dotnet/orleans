@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.MultiClusterNetwork
@@ -29,17 +30,18 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
-
-        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory)
-            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress)
+        private readonly ILoggerFactory loggerFactory;
+        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             this.channelFactory = channelFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
             if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
             var config = siloDetails.GlobalConfig;
-            logger = LogManager.GetLogger("MultiClusterOracle");
+            logger = new LoggerWrapper<MultiClusterOracle>(loggerFactory);
             localData = new MultiClusterOracleData(logger, grainFactory);
             clusterId = config.ClusterId;
             defaultMultiCluster = config.DefaultMultiCluster;
@@ -180,6 +182,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             timer = GrainTimer.FromTimerCallback(
                 this.RuntimeClient.Scheduler,
+                this.loggerFactory.CreateLogger<GrainTimer>(),
                 this.OnGossipTimerTick,
                 null,
                 this.backgroundGossipInterval,

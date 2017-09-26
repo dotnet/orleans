@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -17,9 +18,7 @@ namespace Orleans.Runtime.Scheduler
             Running = 2,
             Shutdown = 3
         }
-
-        private static readonly Logger appLogger = LogManager.GetLogger("Scheduler.WorkItemGroup", LoggerType.Runtime);
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly OrleansTaskScheduler masterScheduler;
         private WorkGroupStatus state;
         private readonly Object lockable;
@@ -128,7 +127,7 @@ namespace Orleans.Runtime.Scheduler
         //private static readonly int MaxWaitingThreads = 500;
 
 
-        internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext)
+        internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext, ILoggerFactory loggerFactory)
         {
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
@@ -139,8 +138,8 @@ namespace Orleans.Runtime.Scheduler
             totalItemsProcessed = 0;
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
-            TaskRunner = new ActivationTaskScheduler(this);
-            log = IsSystemPriority ? LogManager.GetLogger("Scheduler." + Name + ".WorkItemGroup", LoggerType.Runtime) : appLogger;
+            TaskRunner = new ActivationTaskScheduler(this, loggerFactory);
+            log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
             {
@@ -177,7 +176,7 @@ namespace Orleans.Runtime.Scheduler
             lock (lockable)
             {
 #if DEBUG
-                if (log.IsVerbose2) log.Verbose2("EnqueueWorkItem {0} into {1} when TaskScheduler.Current={2}", task, SchedulingContext, TaskScheduler.Current);
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("EnqueueWorkItem {0} into {1} when TaskScheduler.Current={2}", task, SchedulingContext, TaskScheduler.Current);
 #endif
 
                 if (state == WorkGroupStatus.Shutdown)
@@ -210,7 +209,7 @@ namespace Orleans.Runtime.Scheduler
 
                 state = WorkGroupStatus.Runnable;
 #if DEBUG
-                if (log.IsVerbose3) log.Verbose3("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
 #endif
                 masterScheduler.RunQueue.Add(this);
             }
@@ -301,7 +300,7 @@ namespace Orleans.Runtime.Scheduler
                                 log.Warn(ErrorCode.SchedulerSkipWorkStopping, "Thread {0} is exiting work loop due to Shutdown state {1} while still having {2} work items in the queue.", 
                                     thread.ToString(), this.ToString(), WorkItemCount);
                             else
-                                if(log.IsVerbose) log.Verbose("Thread {0} is exiting work loop due to Shutdown state {1}. Has {2} work items in the queue.",
+                                if(log.IsEnabled(LogLevel.Debug)) log.Debug("Thread {0} is exiting work loop due to Shutdown state {1}. Has {2} work items in the queue.",
                                     thread.ToString(), this.ToString(), WorkItemCount);
                             
                             break;
@@ -332,7 +331,7 @@ namespace Orleans.Runtime.Scheduler
 #endif
 
 #if DEBUG
-                    if (log.IsVerbose2) log.Verbose2("About to execute task {0} in SchedulingContext={1}", task, SchedulingContext);
+                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("About to execute task {0} in SchedulingContext={1}", task, SchedulingContext);
 #endif
                     var taskStart = stopwatch.Elapsed;
 

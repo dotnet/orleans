@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 
@@ -70,14 +71,14 @@ namespace Orleans.AzureUtils
         private string myHostName;
         private readonly SiloMetricsData metricsDataObject = new SiloMetricsData();
         private AzureTableDataManager<SiloMetricsData> storage;
-        private readonly Logger logger;
-
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public SiloMetricsTableDataManager()
+        public SiloMetricsTableDataManager(ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
-            
+            this.loggerFactory = loggerFactory;
+            logger = loggerFactory.CreateLogger<SiloMetricsTableDataManager>();
         }
 
         public async Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
@@ -87,7 +88,7 @@ namespace Orleans.AzureUtils
             this.siloName = siloName;
             this.gateway = gateway;
             myHostName = hostName;
-            storage = new AzureTableDataManager<SiloMetricsData>( INSTANCE_TABLE_NAME, storageConnectionString, logger);
+            storage = new AzureTableDataManager<SiloMetricsData>( INSTANCE_TABLE_NAME, storageConnectionString, this.loggerFactory);
             await storage.InitTableAsync().WithTimeout(initTimeout);
         }
 
@@ -96,7 +97,7 @@ namespace Orleans.AzureUtils
         public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
             var siloMetricsTableEntry = PopulateSiloMetricsDataTableEntry(metricsData);
-            if (logger.IsVerbose) logger.Verbose("Updating silo metrics table entry: {0}", siloMetricsTableEntry);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Updating silo metrics table entry: {0}", siloMetricsTableEntry);
             return storage.UpsertTableEntryAsync(siloMetricsTableEntry);
         }
 

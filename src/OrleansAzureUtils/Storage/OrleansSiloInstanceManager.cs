@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 
@@ -124,23 +125,23 @@ namespace Orleans.AzureUtils
         private readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public string DeploymentId { get; private set; }
 
-        private OrleansSiloInstanceManager(string deploymentId, string storageConnectionString)
+        private OrleansSiloInstanceManager(string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
             DeploymentId = deploymentId;
-            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                INSTANCE_TABLE_NAME, storageConnectionString, logger);
+                INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory);
         }
 
-        public static async Task<OrleansSiloInstanceManager> GetManager(string deploymentId, string storageConnectionString)
+        public static async Task<OrleansSiloInstanceManager> GetManager(string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            var instance = new OrleansSiloInstanceManager(deploymentId, storageConnectionString);
+            var instance = new OrleansSiloInstanceManager(deploymentId, storageConnectionString, loggerFactory);
             try
             {
                 await instance.storage.InitTableAsync()
@@ -223,7 +224,7 @@ namespace Orleans.AzureUtils
 
         private async Task<IEnumerable<SiloInstanceTableEntry>> FindAllGatewaySilos()
         {
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
 
             try
@@ -374,7 +375,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsVerbose2) logger.Verbose2("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
@@ -400,7 +401,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsVerbose2) logger.Verbose2("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
                 
                 throw;
@@ -428,7 +429,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsVerbose2) logger.Verbose2("UpdateSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("UpdateSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
                 
                 throw;

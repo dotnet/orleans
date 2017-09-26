@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
@@ -9,8 +11,19 @@ using Xunit;
 
 namespace Tester.AzureUtils.Deployment
 {
-    public class AzureSiloTests
+    public class AzureSiloTests : IDisposable
     {
+        private ILoggerFactory loggerFactory;
+        public AzureSiloTests()
+        {
+            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory("AzureSiloTests.log");
+        }
+
+        public void Dispose()
+        {
+            this.loggerFactory.Dispose();
+        }
+
         [SkippableFact, TestCategory("Functional")]
         public async Task ValidateConfiguration_Startup()
         {
@@ -24,7 +37,7 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.True(ok);
@@ -41,7 +54,7 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);
@@ -58,7 +71,7 @@ namespace Tester.AzureUtils.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);

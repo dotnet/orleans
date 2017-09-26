@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Microsoft.Orleans.ServiceFabric.Utilities
 {
     using global::Orleans.Runtime.Configuration;

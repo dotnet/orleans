@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -61,12 +62,14 @@ namespace Orleans.AzureUtils
         private string myHostName;
 
         private AzureTableDataManager<ClientMetricsData> storage;
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public ClientMetricsTableDataManager()
+        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<ClientMetricsTableDataManager>();
+            this.loggerFactory = loggerFactory;
         }
 
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
@@ -76,7 +79,7 @@ namespace Orleans.AzureUtils
             this.address = address;
             myHostName = config.DNSHostName;
             storage = new AzureTableDataManager<ClientMetricsData>(
-                INSTANCE_TABLE_NAME, config.DataConnectionString, logger);
+                INSTANCE_TABLE_NAME, config.DataConnectionString, this.loggerFactory);
 
             await storage.InitTableAsync().WithTimeout(initTimeout);
         }
@@ -87,7 +90,7 @@ namespace Orleans.AzureUtils
         {
             var clientMetricsTableEntry = PopulateClientMetricsDataTableEntry(metricsData);
 
-            if (logger.IsVerbose) logger.Verbose("Updating client metrics table entry: {0}", clientMetricsTableEntry);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Updating client metrics table entry: {0}", clientMetricsTableEntry);
 
             return storage.UpsertTableEntryAsync(clientMetricsTableEntry);
         }

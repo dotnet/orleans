@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.ReminderService
@@ -8,14 +9,17 @@ namespace Orleans.Runtime.ReminderService
         private readonly GlobalConfiguration globalConfiguration;
         private readonly IGrainFactory grainFactory;
         private readonly IServiceProvider serviceProvider;
+        private readonly Logger logger;
 
         public ReminderTableFactory(
             GlobalConfiguration globalConfiguration,
             IGrainFactory grainFactory,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            LoggerWrapper<ReminderTableFactory> logger)
         {
             this.globalConfiguration = globalConfiguration;
             this.grainFactory = grainFactory;
+            this.logger = logger;
             this.serviceProvider = serviceProvider;
         }
 
@@ -23,7 +27,6 @@ namespace Orleans.Runtime.ReminderService
         {
             var config = this.globalConfiguration;
             var serviceType = config.ReminderServiceType;
-            var logger = LogManager.GetLogger("ReminderTable");
 
             switch (serviceType)
             {

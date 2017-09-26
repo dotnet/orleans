@@ -2,9 +2,11 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 #pragma warning disable 618
@@ -13,14 +15,6 @@ namespace UnitTests
 {
     public class Async_TimingTests
     {
-        private readonly Logger logger;
-
-        public Async_TimingTests()
-        {
-            LogManager.Initialize(ClientConfiguration.StandardLoad());
-            logger = LogManager.GetLogger("AC_TimingTests", LoggerType.Application);
-            logger.Info("----------------------------- STARTING AC_TimingTests -------------------------------------");
-        }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_WithTimeout_Wait()

@@ -45,4 +45,8 @@
       <Visible>false</Visible>
     </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
+  </ItemGroup>
 </Project>

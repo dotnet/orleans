@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -11,7 +12,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
     internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
     {
-        private static readonly Logger logger = LogManager.GetLogger("Scheduler.ActivationTaskScheduler", LoggerType.Runtime);
+        private readonly ILogger logger;
 
         private static long idCounter;
         private readonly long myId;
@@ -20,14 +21,15 @@ namespace Orleans.Runtime.Scheduler
         private readonly CounterStatistic turnsExecutedStatistic;
 #endif
 
-        internal ActivationTaskScheduler(WorkItemGroup workGroup)
+        internal ActivationTaskScheduler(WorkItemGroup workGroup, ILoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
             myId = Interlocked.Increment(ref idCounter);
             workerGroup = workGroup;
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsVerbose) logger.Verbose("Created {0} with SchedulingContext={1}", this, workerGroup.SchedulingContext);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with SchedulingContext={1}", this, workerGroup.SchedulingContext);
         }
 
         #region TaskScheduler methods
@@ -64,7 +66,7 @@ namespace Orleans.Runtime.Scheduler
         protected override void QueueTask(Task task)
         {
 #if DEBUG
-            if (logger.IsVerbose2) logger.Verbose2(myId + " QueueTask Task Id={0}", task.Id);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " QueueTask Task Id={0}", task.Id);
 #endif
             workerGroup.EnqueueTask(task);
         }
@@ -86,9 +88,9 @@ namespace Orleans.Runtime.Scheduler
             canExecuteInline = canExecuteInline2;
 
 #if DEBUG
-            if (logger.IsVerbose2)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Verbose2(myId + " --> TryExecuteTaskInline Task Id={0} Status={1} PreviouslyQueued={2} CanExecute={3} Queued={4}",
+                logger.Trace(myId + " --> TryExecuteTaskInline Task Id={0} Status={1} PreviouslyQueued={2} CanExecute={3} Queued={4}",
                     task.Id, task.Status, taskWasPreviouslyQueued, canExecuteInline, workerGroup.ExternalWorkItemCount);
             }
 #endif
@@ -102,7 +104,7 @@ namespace Orleans.Runtime.Scheduler
             if (!canExecuteInline)
             {
 #if DEBUG
-                if (logger.IsVerbose2) logger.Verbose2(myId + " <-X TryExecuteTaskInline Task Id={0} Status={1} Execute=No", task.Id, task.Status);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-X TryExecuteTaskInline Task Id={0} Status={1} Execute=No", task.Id, task.Status);
 #endif
                 return false;
             }
@@ -111,7 +113,7 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            if (logger.IsVerbose3) logger.Verbose3(myId + " TryExecuteTaskInline Task Id={0} Thread={1} Execute=Yes", task.Id, Thread.CurrentThread.ManagedThreadId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " TryExecuteTaskInline Task Id={0} Thread={1} Execute=Yes", task.Id, Thread.CurrentThread.ManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
@@ -121,7 +123,7 @@ namespace Orleans.Runtime.Scheduler
                     task.Id, task.Status);
             }
 #if DEBUG
-            if (logger.IsVerbose2) logger.Verbose2(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " <-- TryExecuteTaskInline Task Id={0} Thread={1} Execute=Done Ok={2}", task.Id, Thread.CurrentThread.ManagedThreadId, done);
 #endif
             return done;
         }

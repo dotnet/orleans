@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
@@ -11,6 +13,9 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
+using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace Tests.GeoClusterTests
 {
@@ -158,6 +163,25 @@ namespace Tests.GeoClusterTests
         }
 
 
+        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .ConfigureLogging(builder => ConfigureLogging(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
+
+            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
+            {
+                    TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
+                    builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
+                    builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
+                    builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+            }
+        }
+
         public void NewCluster(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
         {
             TestCluster testCluster;
@@ -174,7 +198,7 @@ namespace Tests.GeoClusterTests
                 };
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
                 customizer?.Invoke(options.ClusterConfiguration);
                 testCluster = new TestCluster(options.ClusterConfiguration, null);
                 testCluster.Deploy();

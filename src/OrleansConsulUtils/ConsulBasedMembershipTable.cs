@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Consul;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Host
 {
@@ -16,7 +17,7 @@ namespace Orleans.Runtime.Host
         //Consul does not support the extended Membership Protocol and will always return the same table version information
         private readonly TableVersion _tableVersion = new TableVersion(0, "0");
 
-        private Logger _logger;
+        private ILogger _logger;
         private ConsulClient _consulClient = null;
         private String _deploymentId;
         private String _connectionString;
@@ -33,11 +34,16 @@ namespace Orleans.Runtime.Host
             get { return true; }
         }
 
-        public Task InitializeGatewayListProvider(ClientConfiguration config, Logger logger)
+        public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger)
+        {
+            this._logger = logger;
+        }
+
+        public Task InitializeGatewayListProvider(ClientConfiguration config)
         {
             _maxStaleness = config.GatewayListRefreshPeriod;
 
-            Init(config.DeploymentId, config.DataConnectionString, logger);
+            Init(config.DeploymentId, config.DataConnectionString);
 
             return Task.CompletedTask;
         }
@@ -47,22 +53,20 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitTableVersion">Will be ignored: Consul does not support the extended Membership Protocol TableVersion</param>
-        /// <param name="logger">The logger to be used by this instance</param>
         /// <returns></returns>
         /// <remarks>
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialise
         /// </remarks>
-        public Task InitializeMembershipTable(GlobalConfiguration config, Boolean tryInitTableVersion, Logger logger)
+        public Task InitializeMembershipTable(GlobalConfiguration config, Boolean tryInitTableVersion)
         {
-            Init(config.DeploymentId, config.DataConnectionString, logger);
+            Init(config.DeploymentId, config.DataConnectionString);
 
             return Task.CompletedTask;
         }
 
-        private void Init(String deploymentId, String dataConnectionString, Logger logger)
+        private void Init(String deploymentId, String dataConnectionString)
         {
-            _logger = logger;
             _deploymentId = deploymentId;
             _connectionString = dataConnectionString;
 
@@ -82,7 +86,7 @@ namespace Orleans.Runtime.Host
             var deploymentKVAddresses = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(_deploymentId));
             if (deploymentKVAddresses.Response == null)
             {
-                _logger.Verbose("Could not find any silo registrations for deployment {0}.", _deploymentId);
+                _logger.Debug("Could not find any silo registrations for deployment {0}.", _deploymentId);
                 return new MembershipTableData(_tableVersion);
             }
 
@@ -109,7 +113,7 @@ namespace Orleans.Runtime.Host
                 var tryUpdate = await _consulClient.KV.CAS(insertKV);
                 if (!tryUpdate.Response)
                 {
-                    _logger.Verbose("ConsulMembershipProvider failed to insert the row because a registration already exists for silo {0}.", entry.SiloAddress);
+                    _logger.Debug("ConsulMembershipProvider failed to insert the row because a registration already exists for silo {0}.", entry.SiloAddress);
                     return false;
                 }
 
@@ -134,7 +138,7 @@ namespace Orleans.Runtime.Host
                 var tryUpdate = await _consulClient.KV.CAS(updateKV);
                 if (!tryUpdate.Response)
                 {
-                    _logger.Verbose("ConsulMembershipProvider failed the CAS check when updating the registration for silo {0}.", entry.SiloAddress);
+                    _logger.Debug("ConsulMembershipProvider failed the CAS check when updating the registration for silo {0}.", entry.SiloAddress);
                     return false;
                 }
 

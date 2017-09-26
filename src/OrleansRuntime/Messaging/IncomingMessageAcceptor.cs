@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
@@ -24,7 +25,7 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
         private readonly SerializationManager serializationManager;
-
+        private readonly ILoggerFactory loggerFactory;
         public Action<Message> SniffIncomingMessage
         {
             set
@@ -41,8 +42,12 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager)
+        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager,
+            ILoggerFactory loggerFactory)
+            :base(loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
+            Log = new LoggerWrapper<IncomingMessageAcceptor>(loggerFactory);
             MessageCenter = msgCtr;
             listenAddress = here;
             this.MessageFactory = messageFactory;
@@ -305,9 +310,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (ima == null)
                 {
-                    var logger = LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
-
-                    logger.Warn(ErrorCode.Messaging_IMA_AcceptCallbackUnexpectedState,
+                    Log.Warn(ErrorCode.Messaging_IMA_AcceptCallbackUnexpectedState,
                         "AcceptCallback invoked with an unexpected async state of type {0}",
                         e.UserToken?.GetType().ToString() ?? "null");
                     return;
@@ -363,7 +366,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception ex)
             {
-                var logger = ima != null ? ima.Log : LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
+                var logger = ima?.Log ?? this.Log;
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
                 RestartAcceptingSocket();
             }
@@ -413,7 +416,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -616,11 +619,11 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager)
+            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
             {
                 this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;
-                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime), serializationManager);
+                _buffer = new IncomingMessageBuffer(loggerFactory, serializationManager);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)

@@ -7,6 +7,7 @@ using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -26,7 +27,7 @@ namespace AWSUtils.Tests.Liveness
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage($"Service=http://localhost:8000", null);
+                    storage = new DynamoDBStorage($"Service=http://localhost:8000", NullLoggerFactory.Instance);
                 }
                 catch (AmazonServiceException)
                 {

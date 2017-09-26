@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -26,7 +27,7 @@ namespace UnitTests.Streaming
         {
             this.client = client;
             this.streamProviderName = streamProvider;
-            this.logger = LogManager.GetLogger("MultipleStreamsTestRunner", LoggerType.Application);
+            this.logger = new LoggerWrapper<MultipleStreamsTestRunner>(TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log"));
             this.testNumber = testNum;
             this.runFullTest = fullTest;
         }

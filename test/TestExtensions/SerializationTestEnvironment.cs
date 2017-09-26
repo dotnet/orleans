@@ -35,7 +35,6 @@ namespace TestExtensions
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
                 config.Gateways.Add(new IPEndPoint(0, 0));
             }
-            config.TraceToConsole = false;
         }
 
         internal OutsideRuntimeClient RuntimeClient { get; set; }

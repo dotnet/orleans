@@ -47,10 +47,6 @@ namespace Orleans.TestingHost
                 config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomStorage.LogConsistencyProvider", "CustomStoragePrimaryCluster", props);
             }
 
-            // logging  
-            foreach (var o in config.Overrides)
-                o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("LogViews", Severity.Verbose2));
-
         }
     }
 }

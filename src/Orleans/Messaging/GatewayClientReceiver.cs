@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -16,12 +17,12 @@ namespace Orleans.Messaging
         private readonly IncomingMessageBuffer buffer;
         private Socket socket;
 
-        internal GatewayClientReceiver(GatewayConnection gateway, SerializationManager serializationManager)
-            : base(gateway.Address.ToString())
+        internal GatewayClientReceiver(GatewayConnection gateway, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            : base(gateway.Address.ToString(), loggerFactory)
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
-            buffer = new IncomingMessageBuffer(Log, serializationManager, true); 
+            buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, true); 
         }
 
         protected override void Run()

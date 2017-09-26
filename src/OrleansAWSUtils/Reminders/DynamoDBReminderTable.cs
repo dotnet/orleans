@@ -7,6 +7,7 @@ using Orleans.Runtime.Configuration;
 using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansAWSUtils.Reminders
 {
@@ -30,7 +31,8 @@ namespace OrleansAWSUtils.Reminders
         private SafeRandom random = new SafeRandom();
 
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansReminders";
-        private Logger logger;
+        private ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
         private string deploymentId;
         private Guid serviceId;
@@ -39,25 +41,25 @@ namespace OrleansAWSUtils.Reminders
         /// Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
-        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        /// <param name="loggerFactory">logger factory to use</param>
+        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory)
         {
             this.grainReferenceConverter = grainReferenceConverter;
+            this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
+            this.loggerFactory = loggerFactory;
         }
 
         /// <summary>
         /// Initialize current instance with specific global configuration and logger
         /// </summary>
         /// <param name="config"> Global configuration to initialize with </param>
-        /// <param name="logger"> Specific logger to use in current instance </param>
         /// <returns></returns>
-        public Task Init(GlobalConfiguration config, Logger logger)
+        public Task Init(GlobalConfiguration config)
         {
             deploymentId = config.DeploymentId;
             serviceId = config.ServiceId;
 
-            this.logger = logger;
-
-            storage = new DynamoDBStorage(config.DataConnectionStringForReminders, logger);
+            storage = new DynamoDBStorage(config.DataConnectionStringForReminders, loggerFactory);
             logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var secondaryIndex = new GlobalSecondaryIndex
@@ -291,7 +293,7 @@ namespace OrleansAWSUtils.Reminders
 
             try
             {
-                if (logger.IsVerbose) logger.Verbose("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
 
                 await storage.PutEntryAsync(TABLE_NAME_DEFAULT_VALUE, fields);
                 

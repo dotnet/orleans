@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.LogConsistency;
@@ -12,16 +13,17 @@ namespace Orleans.Runtime.LogConsistency
     {
         private ProviderLoader<ILogConsistencyProvider> providerLoader;
         private IProviderRuntime runtime;
-
+        private readonly ILoggerFactory loggerFactory;
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime runtime, LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
             this.runtime = runtime;
-            providerLoader = new ProviderLoader<ILogConsistencyProvider>(loadedProviderTypeLoaders);
+            this.loggerFactory = loggerFactory;
+            providerLoader = new ProviderLoader<ILogConsistencyProvider>(loadedProviderTypeLoaders, loggerFactory);
         }
 
         internal Task LoadLogConsistencyProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
@@ -75,7 +77,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Provider);
+            return new LoggerWrapper(loggerName, this.loggerFactory);
         }
 
         public Guid ServiceId

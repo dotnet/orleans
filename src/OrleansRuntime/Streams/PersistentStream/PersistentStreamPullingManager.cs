@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -21,8 +22,8 @@ namespace Orleans.Streams
         private readonly PersistentStreamProviderConfig config;
         private readonly IProviderConfiguration providerConfig;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
-        private readonly LoggerImpl logger;
-
+        private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
         private int latestRingNotificationSequenceNumber;
         private int latestCommandNumber;
         private IQueueAdapter queueAdapter;
@@ -41,8 +42,9 @@ namespace Orleans.Streams
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             PersistentStreamProviderConfig config,
-            IProviderConfiguration providerConfig)
-            : base(id, runtime.ExecutingSiloAddress)
+            IProviderConfiguration providerConfig,
+            ILoggerFactory loggerFactory)
+            : base(id, runtime.ExecutingSiloAddress, loggerFactory)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -74,9 +76,9 @@ namespace Orleans.Streams
             this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
-            logger = LogManager.GetLogger(GetType().Name + "-" + streamProviderName, LoggerType.Provider);
+            logger = new LoggerWrapper($"{GetType().FullName}-{streamProviderName}", loggerFactory);
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
-
+            this.loggerFactory = loggerFactory;
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
         }
 
@@ -218,7 +220,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId, config);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, config);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
@@ -401,7 +403,7 @@ namespace Orleans.Streams
 
         private void Log(ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogWithoutBulkingAndTruncating(Severity.Info, logCode, format, args);
+            logger.Info(logCode, format, args);
         }
     }
 }

@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Logging;
+using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace Orleans.TestingHost.Utils
@@ -12,6 +16,49 @@ namespace Orleans.TestingHost.Utils
     /// <summary> Collection of test utilities </summary>
     public static class TestingUtils
     {
+        /// <summary>
+        /// Configure <paramref name="builder"/> with a ConsoleLoggerProvider and a TraceSourceLoggerProvider which logs to <paramref name="filePath"/>
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="filePath"></param>
+        public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
+        {
+            if (ConsoleText.IsConsoleAvailable)
+                builder.AddConsole();
+            builder.AddFile(filePath);
+        }
+
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
+        /// </summary>
+        /// <param name="filePath">the logger file path</param>
+        /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
+        {
+            return CreateDefaultLoggerFactory(filePath, new LoggerFilterOptions());
+        }
+
+        /// <summary>
+        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
+        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// by default;
+        /// </summary>
+        /// <param name="filePath">the logger file path</param>
+        /// <param name="filters">log filters you want to configure your logging with</param>
+        /// <returns></returns>
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath, LoggerFilterOptions filters)
+        {
+            var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
+            factory.AddProvider(new FileLoggerProvider(filePath));
+            if (ConsoleText.IsConsoleAvailable)
+                factory.AddConsole();
+            return factory;
+        }
+
         /// <summary> Run the predicate until it succeed or times out </summary>
         /// <param name="predicate">The predicate to run</param>
         /// <param name="timeout">The timeout value</param>

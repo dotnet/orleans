@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -23,12 +24,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// Delivery failure handler that writes failures to azure table storage.
         /// </summary>
         /// <param name="serializationManager"></param>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="faultOnFailure"></param>
         /// <param name="deploymentId"></param>
         /// <param name="tableName"></param>
         /// <param name="storageConnectionString"></param>
         /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, bool faultOnFailure, string deploymentId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
+        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string deploymentId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
         {
             if (string.IsNullOrEmpty(deploymentId))
             {
@@ -46,7 +48,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             this.deploymentId = deploymentId;
             ShouldFaultSubsriptionOnError = faultOnFailure;
             this.createEntity = createEntity ?? DefaultCreateEntity;
-            dataManager = new AzureTableDataManager<TEntity>(tableName, storageConnectionString);
+            dataManager = new AzureTableDataManager<TEntity>(tableName, storageConnectionString, loggerFactory);
         }
 
         /// <summary>

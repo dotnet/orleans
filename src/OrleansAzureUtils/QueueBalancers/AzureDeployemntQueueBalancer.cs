@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streams.Azure
 {
@@ -13,8 +14,9 @@ namespace Orleans.Streams.Azure
     {
         public DynamicAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider)
-            : base(siloStatusOracle, new ServiceRuntimeWrapper(), false)
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory)
+            : base(siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory), false)
         { }
     }
 
@@ -22,8 +24,9 @@ namespace Orleans.Streams.Azure
     {
         public StaticAzureDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider)
-            : base(siloStatusOracle, new ServiceRuntimeWrapper(), true)
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory)
+            : base(siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory), true)
         { }
     }
 
@@ -35,9 +38,9 @@ namespace Orleans.Streams.Azure
     public class AzureDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
     {
         public AzureDeploymentLeaseBasedBalancer(ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider, Factory<string, Logger> loggerFac)
-            : base(serviceProvider, siloStatusOracle, new ServiceRuntimeWrapper(),
-                  loggerFac)
+            IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+            : base(serviceProvider, siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory),
+                  loggerFactory)
         { }
     }
 }

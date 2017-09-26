@@ -7,23 +7,30 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.Logging;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Runtime.MembershipService
 {
     internal class AzureBasedMembershipTable : IMembershipTable
     {
-        private Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private OrleansSiloInstanceManager tableManager;
 
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger log)
+        public AzureBasedMembershipTable(ILoggerFactory loggerFactory)
         {
-            logger = log;
+            this.loggerFactory = loggerFactory;
+            logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
+        }
+
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
+        {
             AzureTableDefaultPolicies.MaxBusyRetries = config.MaxStorageBusyRetries;
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                config.DeploymentId, config.DataConnectionString);
+                config.DeploymentId, config.DataConnectionString, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
@@ -47,7 +54,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -64,7 +71,7 @@ namespace Orleans.Runtime.MembershipService
              {
                 var entries = await tableManager.FindAllSiloEntries();   
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data; 
             }
@@ -80,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
@@ -104,7 +111,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
@@ -126,7 +133,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("Merge entry = {0}", entry.ToFullString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry, tableManager.DeploymentId);
                 await tableManager.MergeTableEntryAsync(siloEntry);
             }

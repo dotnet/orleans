@@ -4,6 +4,7 @@ using Orleans.Concurrency;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -12,11 +13,11 @@ namespace Orleans.Runtime.MembershipService
     internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;
-        private Logger logger;
+        private ILogger logger;
 
         public override Task OnActivateAsync()
         {
-            logger = LogManager.GetLogger("GrainBasedMembershipTable", LoggerType.Runtime);
+            logger = this.ServiceProvider.GetRequiredService<ILogger<GrainBasedMembershipTable>>();
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
             table = new InMemoryMembershipTable(this.ServiceProvider.GetRequiredService<SerializationManager>());
             return Task.CompletedTask;
@@ -28,7 +29,7 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger traceLogger)
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
         {
             logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
             return Task.CompletedTask;
@@ -54,7 +55,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsVerbose) logger.Verbose("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
                 logger.Info(ErrorCode.MembershipGrainBasedTable2, 
@@ -66,7 +67,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsVerbose) logger.Verbose("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
             bool result = table.Update(entry, etag, tableVersion);
             if (result == false)
                 logger.Info(ErrorCode.MembershipGrainBasedTable3,
@@ -78,7 +79,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsVerbose) logger.Verbose("UpdateIAmAlive entry = {0}", entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateIAmAlive entry = {0}", entry.ToFullString());
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }

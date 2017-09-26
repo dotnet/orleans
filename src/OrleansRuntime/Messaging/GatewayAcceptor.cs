@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 using Orleans.Runtime.Configuration;
@@ -19,8 +20,9 @@ namespace Orleans.Runtime.Messaging
             IPEndPoint gatewayAddress,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            GlobalConfiguration globalConfig)
-            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager)
+            GlobalConfiguration globalConfig,
+            ILoggerFactory loggerFactory)
+            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, loggerFactory)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);

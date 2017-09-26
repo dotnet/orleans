@@ -13,6 +13,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
 
 namespace Tester.CustomPlacementTests
 {
@@ -42,7 +43,8 @@ namespace Tester.CustomPlacementTests
                     return new SiloBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices);
+                        .ConfigureServices(ConfigureServices)
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
                 }
             }
 

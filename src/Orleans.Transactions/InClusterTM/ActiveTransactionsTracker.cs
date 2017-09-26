@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Transactions
@@ -20,11 +21,11 @@ namespace Orleans.Transactions
         private long maxAllocatedTransactionId;
         private volatile bool disposed;
 
-        public ActiveTransactionsTracker(IOptions<TransactionsConfiguration> configOption, TransactionLog transactionLog, Factory<string, Logger> logFactory)
+        public ActiveTransactionsTracker(IOptions<TransactionsConfiguration> configOption, TransactionLog transactionLog, ILoggerFactory loggerFactory)
         {
             this.config = configOption.Value;
             this.transactionLog = transactionLog;
-            this.logger = logFactory(nameof(ActiveTransactionsTracker));
+            this.logger = new LoggerWrapper<ActiveTransactionsTracker>(loggerFactory);
             lockObj = new object();
 
             allocationEvent = new AutoResetEvent(true);

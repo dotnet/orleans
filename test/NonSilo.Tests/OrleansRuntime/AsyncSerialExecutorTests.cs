@@ -2,23 +2,25 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.OrleansRuntime
 {
     public class AsyncSerialExecutorTests
     {
-        public Logger logger;
+        public ITestOutputHelper output;
         private SafeRandom random;
         public int operationsInProgress;
 
-        public AsyncSerialExecutorTests()
+        public AsyncSerialExecutorTests(ITestOutputHelper output)
         {
-            LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger("AsyncSerialExecutorTests", LoggerType.Application);
+            this.output = output;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Async")]
@@ -45,7 +47,7 @@ namespace UnitTests.OrleansRuntime
             for (int i = 0; i < 10; i++)
             {
                 int capture = i;
-                logger.Info("Submitting Task {0}.", capture);
+                output.WriteLine("Submitting Task {0}.", capture);
                 tasks.Add(executor.AddNext(() => Operation(capture)));
             }
             await Task.WhenAll(tasks);
@@ -64,7 +66,7 @@ namespace UnitTests.OrleansRuntime
                 enqueueTasks.Add(
                     Task.Run(() =>
                     {
-                        logger.Info("Submitting Task {0}.", capture);
+                        output.WriteLine("Submitting Task {0}.", capture);
                         tasks.Push(executor.AddNext(() => Operation(capture)));
                     }));
             }
@@ -78,16 +80,16 @@ namespace UnitTests.OrleansRuntime
             operationsInProgress++;
             var delay = random.NextTimeSpan(TimeSpan.FromSeconds(2));
 
-            logger.Info("Task {0} Staring", opNumber);
+            output.WriteLine("Task {0} Staring", opNumber);
             await Task.Delay(delay);
             if (operationsInProgress != 1) Assert.True(false, $"2: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
-            logger.Info("Task {0} after first delay", opNumber);
+            output.WriteLine("Task {0} after first delay", opNumber);
             await Task.Delay(delay);
             if (operationsInProgress != 1) Assert.True(false, $"3: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
             operationsInProgress--;
-            logger.Info("Task {0} Done", opNumber);
+            output.WriteLine("Task {0} Done", opNumber);
         }
     }
 }

@@ -15,6 +15,7 @@ namespace Microsoft.Orleans.ServiceFabric
 
     using Microsoft.Orleans.ServiceFabric.Models;
     using Microsoft.Orleans.ServiceFabric.Utilities;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Gateway provider which reads gateway information from Service Fabric's naming service.
@@ -32,25 +33,25 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private Timer timer;
 
-        private Logger log;
+        private ILogger log;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricGatewayProvider"/> class.
         /// </summary>
         /// <param name="siloResolver">The silo resolver.</param>
-        public FabricGatewayProvider(IFabricServiceSiloResolver siloResolver)
+        /// <param name="logger">logger to use</param>
+        public FabricGatewayProvider(IFabricServiceSiloResolver siloResolver, ILogger<FabricGatewayProvider> logger)
         {
             this.fabricServiceSiloResolver = siloResolver;
             this.refreshPeriod = TimeSpan.FromSeconds(5);
+            this.log = logger;
             this.MaxStaleness = this.refreshPeriod;
         }
 
         /// <inheritdoc />
-        public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
+        public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
         {
             this.fabricServiceSiloResolver.Subscribe(this);
-
-            this.log = logger.GetLogger(nameof(FabricGatewayProvider));
             await this.RefreshAsync();
             this.timer = new Timer(this.Refresh, null, this.refreshPeriod, this.refreshPeriod);
         }
@@ -67,7 +68,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <inheritdoc />
         public bool SubscribeToGatewayNotificationEvents(IGatewayListListener subscriber)
         {
-            this.log.Verbose($"Subscribing {subscriber} to gateway notification events.");
+            this.log.Debug($"Subscribing {subscriber} to gateway notification events.");
             this.subscribers.TryAdd(subscriber, subscriber);
             return true;
         }
@@ -75,7 +76,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <inheritdoc />
         public bool UnSubscribeFromGatewayNotificationEvents(IGatewayListListener subscriber)
         {
-            this.log.Verbose($"Unsubscribing {subscriber} from gateway notification events.");
+            this.log.Debug($"Unsubscribing {subscriber} from gateway notification events.");
             this.subscribers.TryRemove(subscriber, out subscriber);
             return true;
         }
@@ -84,9 +85,9 @@ namespace Microsoft.Orleans.ServiceFabric
         public void OnUpdate(FabricSiloInfo[] silos)
         {
             this.gateways = silos.Select(silo => silo.GatewayAddress.ToGatewayUri()).ToList();
-            if (this.log.IsVerbose)
+            if (this.log.IsEnabled(LogLevel.Debug))
             {
-                this.log.Verbose($"Updating {this.subscribers.Count} subscribers with {this.gateways.Count} gateways.");
+                this.log.Debug($"Updating {this.subscribers.Count} subscribers with {this.gateways.Count} gateways.");
             }
 
             foreach (var subscriber in this.subscribers.Values)

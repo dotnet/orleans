@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -15,7 +16,7 @@ namespace Orleans.Runtime.ReminderService
             this.grainReferenceConverter = grainReferenceConverter;
         }
 
-        public async Task Init(GlobalConfiguration config, Logger logger)
+        public async Task Init(GlobalConfiguration config)
         {
             serviceId = config.ServiceId.ToString();
             orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders, this.grainReferenceConverter);

@@ -2,7 +2,9 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using UnitTests.GrainInterfaces;
@@ -10,6 +12,8 @@ using Orleans.TestingHost;
 using Xunit;
 using TestExtensions;
 using Tester;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace Tests.GeoClusterTests
 {
@@ -36,9 +40,29 @@ namespace Tests.GeoClusterTests
 
                 options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
 
-                options.ClusterConfiguration.ApplyToAllNodes(o=>o.TraceLevelOverrides.Add(new Tuple<string, Severity>("LogViews", Severity.Verbose2)));
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
 
                 return new TestCluster(options);
+            }
+
+            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureServices(services => ConfigureLogging(services, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                }
+
+                private void ConfigureLogging(IServiceCollection services, string filePath)
+                {
+                    services.AddLogging(builder =>
+                    {
+                        TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
+                        builder.AddFilter("LogViews", LogLevel.Trace);
+                    });
+                }
             }
         }
         public BasicLogTestGrainTests(Fixture fixture)

@@ -1,10 +1,13 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using UnitTests.StreamingTests;
 using Xunit;
 
@@ -16,7 +19,6 @@ namespace Tester.AzureUtils.Streaming
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
         private readonly SubscriptionMultiplicityTestRunner runner;
-
         public override TestCluster CreateTestCluster()
         {
             TestUtils.CheckForAzureStorage();
@@ -36,7 +38,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AQStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
         
         [SkippableFact, TestCategory("Functional")]

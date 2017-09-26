@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric.Description;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric
@@ -62,7 +63,7 @@ namespace Microsoft.Orleans.ServiceFabric
             var endpoints = activation.GetEndpoints();
             var siloEndpoint = GetEndpoint(endpoints, SiloEndpointName);
             var gatewayEndpoint = GetEndpoint(endpoints, GatewayEndpointName);
-
+            this.SiloHost = new SiloHostWrapper();
             // Set the endpoints according to Service Fabric configuration.
             if (string.IsNullOrWhiteSpace(this.configuration.Defaults.HostNameOrIPAddress))
             {
@@ -82,7 +83,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Gets or sets the underlying <see cref="ISiloHost"/>.
         /// </summary>
         /// <remarks>Exposed for testability.</remarks>
-        internal ISiloHost SiloHost { get; set; } = new SiloHostWrapper();
+        internal ISiloHost SiloHost { get; set; }
 
         /// <summary>
         /// Starts the silo.

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 using Orleans.Runtime.Configuration;
@@ -32,7 +33,9 @@ namespace Orleans.Runtime.GrainDirectory
             Logger logger,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle)
+            IMultiClusterOracle multiClusterOracle,
+            ILoggerFactory loggerFactory)
+            :base(loggerFactory)
         {
             this.router = router;
             this.logger = logger;

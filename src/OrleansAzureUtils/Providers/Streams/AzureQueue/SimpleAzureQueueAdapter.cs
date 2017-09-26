@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -14,17 +15,17 @@ namespace Orleans.Providers.Streams.AzureQueue
         protected readonly string DataConnectionString;
         protected readonly string QueueName;
         protected AzureQueueDataManager Queue;
-
+        private readonly ILoggerFactory loggerFactory;
         public string Name { get ; private set; }
         public bool IsRewindable { get { return false; } }
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.WriteOnly; } }
 
-        public SimpleAzureQueueAdapter(string dataConnectionString, string providerName, string queueName)
+        public SimpleAzureQueueAdapter(ILoggerFactory loggerFactory, string dataConnectionString, string providerName, string queueName)
         {
             if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (String.IsNullOrEmpty(queueName)) throw new ArgumentNullException("queueName");
-
+            this.loggerFactory = loggerFactory;
             DataConnectionString = dataConnectionString;
             Name = providerName;
             QueueName = queueName;
@@ -61,7 +62,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             if (Queue == null)
             {
-                var tmpQueue = new AzureQueueDataManager(QueueName, DataConnectionString);
+                var tmpQueue = new AzureQueueDataManager(this.loggerFactory, QueueName, DataConnectionString);
                 await tmpQueue.InitQueueAsync();
                 if (Queue == null)
                 {

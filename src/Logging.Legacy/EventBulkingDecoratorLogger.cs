@@ -92,7 +92,19 @@ namespace Microsoft.Orleans.Logging.Legacy
             int count;
             bool isExcluded = excludedBulkLogCodes.Contains(logCode)
                               || (sev == LogLevel.Debug || sev == LogLevel.Trace);
-            
+
+            var sinceIntervalTicks = now.Ticks - lastBulkLogMessageFlushTicks;
+            KeyValuePair<int, int>[] bulkMessageCounts = null;
+            if (sinceIntervalTicks >= this.eventBulkingConfig.BulkEventInterval.Ticks)
+            {
+                // Take local copy of pending bulk message counts, now that this bulk message compaction period has finished
+                bulkMessageCounts = recentLogMessageCounts
+                    .Where(keyPair => keyPair.Value > this.eventBulkingConfig.BulkEventLimit).ToArray();
+                recentLogMessageCounts.Clear();
+                //set lastBulkLogMessageFlushTicks to now
+                Interlocked.Exchange(ref this.lastBulkLogMessageFlushTicks, now.Ticks);
+            }
+
             // Increment recent message counts, if appropriate
             if (isExcluded)
             {
@@ -103,17 +115,10 @@ namespace Microsoft.Orleans.Logging.Legacy
             {
                 count = recentLogMessageCounts.AddOrUpdate(logCode, 1, (key, value) => ++value);
             }
-
-            var sinceIntervalTicks = now.Ticks - lastBulkLogMessageFlushTicks;
+                
             //if it is time to flush bulked messages
-            if (sinceIntervalTicks >= this.eventBulkingConfig.BulkEventInterval.Ticks)
+            if (bulkMessageCounts != null && bulkMessageCounts.Length > 0)
             {
-                // Take local copy of pending bulk message counts, now that this bulk message compaction period has finished
-                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value >= this.eventBulkingConfig.BulkEventLimit).ToArray();
-                recentLogMessageCounts.Clear();
-                //set lastBulkLogMessageFlushTicks to now
-                Interlocked.Exchange(ref this.lastBulkLogMessageFlushTicks, now.Ticks);
-          
                 // Output summary counts for any pending bulk message occurrances
                 foreach (var logCodeCountPair in bulkMessageCounts)
                 {
@@ -124,7 +129,7 @@ namespace Microsoft.Orleans.Logging.Legacy
             }
 
             // Should the current log message be output?
-            return isExcluded || (count < this.eventBulkingConfig.BulkEventLimit);
+            return isExcluded || (count <= this.eventBulkingConfig.BulkEventLimit);
         }
     }
 }

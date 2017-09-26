@@ -9,6 +9,7 @@ using org.apache.zookeeper;
 using org.apache.zookeeper.data;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Host
 {
@@ -34,7 +35,7 @@ namespace Orleans.Runtime.Host
     /// </remarks>
     public class ZooKeeperBasedMembershipTable : IMembershipTable, IGatewayListProvider
     {
-        private Logger Logger;
+        private ILogger logger;
 
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
 
@@ -55,14 +56,18 @@ namespace Orleans.Runtime.Host
 
         private TimeSpan maxStaleness;
 
+        public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger)
+        {
+            this.logger = logger;
+        }
+
         /// <summary>
         /// Initializes the ZooKeeper based gateway provider
         /// </summary>
         /// <param name="config">The given client configuration.</param>
-        /// <param name="logger">The logger to be used by this instance</param>
-        public Task InitializeGatewayListProvider(ClientConfiguration config, Logger logger)
+        public Task InitializeGatewayListProvider(ClientConfiguration config)
         {
-            InitConfig(logger,config.DataConnectionString, config.DeploymentId);
+            InitConfig(config.DataConnectionString, config.DeploymentId);
             maxStaleness = config.GatewayListRefreshPeriod;
             return Task.CompletedTask;
         }
@@ -72,11 +77,10 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitPath">if set to true, we'll try to create a node named "/DeploymentId"</param>
-        /// <param name="logger">The logger to be used by this instance</param>
         /// <returns></returns>
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath, Logger logger)
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath)
         {
-            InitConfig(logger, config.DataConnectionString, config.DeploymentId);
+            InitConfig(config.DataConnectionString, config.DeploymentId);
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.
@@ -88,19 +92,18 @@ namespace Orleans.Runtime.Host
                     await zk.createAsync(deploymentPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     await zk.sync(deploymentPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    logger.Info("Created new deployment path: " + deploymentPath);
+                    this.logger.Info("Created new deployment path: " + deploymentPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    logger.Verbose("Deployment path already exists: " + deploymentPath);
+                    this.logger.Debug("Deployment path already exists: " + deploymentPath);
                 }
             });
         }
 
-        private void InitConfig(Logger logger, string dataConnectionString, string deploymentId)
+        private void InitConfig(string dataConnectionString, string deploymentId)
         {
             watcher = new ZooKeeperWatcher(logger);
-            Logger = logger;
             deploymentPath = "/" + deploymentId;
             deploymentConnectionString = dataConnectionString + deploymentPath;
             rootConnectionString = dataConnectionString;
@@ -376,17 +379,17 @@ namespace Orleans.Runtime.Host
         /// </summary>
         private class ZooKeeperWatcher : Watcher
         {
-            private readonly Logger logger;
-            public ZooKeeperWatcher(Logger logger)
+            private readonly ILogger logger;
+            public ZooKeeperWatcher(ILogger logger)
             {
                 this.logger = logger;
             }
 
             public override Task process(WatchedEvent @event)
             {
-                if (logger.IsVerbose)
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Verbose(@event.ToString());
+                    logger.Debug(@event.ToString());
                 }
                 return Task.CompletedTask;
             }

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
@@ -9,12 +10,13 @@ namespace Orleans.Runtime
     internal class LocalReminderServiceFactory
     {
         private readonly IReminderTable reminderTable;
-        private readonly Logger logger;
-
-        public LocalReminderServiceFactory(IReminderTable reminderTable)
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
+        public LocalReminderServiceFactory(IReminderTable reminderTable, ILoggerFactory loggerFactory)
         {
             this.reminderTable = reminderTable;
-            logger = LogManager.GetLogger("ReminderFactory", LoggerType.Runtime);
+            logger = loggerFactory.CreateLogger<LocalReminderServiceFactory>();
+            this.loggerFactory = loggerFactory;
         }
 
         internal IReminderService CreateReminderService(
@@ -30,7 +32,7 @@ namespace Orleans.Runtime
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
             var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
 
-            return new LocalReminderService(silo, grainId, this.reminderTable, silo.GlobalConfig, iniTimeSpan);
+            return new LocalReminderService(silo, grainId, this.reminderTable, silo.GlobalConfig, iniTimeSpan, this.loggerFactory);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.Messaging
@@ -23,7 +24,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal InboundMessageQueue()
+        internal InboundMessageQueue(ILoggerFactory loggerFactory)
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
             messageQueues = new BlockingCollection<Message>[n];
@@ -40,7 +41,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 i++;
             }
-            log = LogManager.GetLogger("Orleans.Messaging.InboundMessageQueue");
+            log = new LoggerWrapper<InboundMessageQueue>(loggerFactory);
         }
 
         public void Stop()

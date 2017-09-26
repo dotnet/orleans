@@ -1,4 +1,5 @@
-﻿using Orleans.CodeGeneration;
+﻿using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;
@@ -14,18 +15,18 @@ namespace Orleans.Runtime
         private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
         private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
 
         public GrainReferenceRuntime(
-            Factory<string, Logger> loggerFactory,
+            ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
             IInternalGrainFactory internalGrainFactory,
             SerializationManager serializationManager)
         {
             this.responseCallbackDelegate = this.ResponseCallback;
-            this.logger = loggerFactory.Invoke(nameof(GrainReferenceRuntime));
+            this.logger = logger;
             this.RuntimeClient = runtimeClient;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;

@@ -6,12 +6,9 @@ namespace Orleans.Runtime
 {
     internal class CachedReflectionOnlyTypeResolver : CachedTypeResolver
     {
-        private static readonly Logger logger;
-
         static CachedReflectionOnlyTypeResolver()
         {
             Instance = new CachedReflectionOnlyTypeResolver();
-            logger = LogManager.GetLogger("AssemblyLoader.CachedReflectionOnlyTypeResolver");
         }
 
         public static new CachedReflectionOnlyTypeResolver Instance { get; private set; }
@@ -47,33 +44,12 @@ namespace Orleans.Runtime
             }
             catch (IOException)
             {
-                if (logger.IsVerbose2)
-                {
-                    logger.Verbose2(FormatReflectionOnlyAssemblyResolveFailureMessage(sender, args));
-                }
 
                 var dirName = Path.GetDirectoryName(args.RequestingAssembly.Location);
                 var assemblyName = new AssemblyName(args.Name);
                 var fileName = string.Format("{0}.dll", assemblyName.Name);
                 var pathName = Path.Combine(dirName, fileName);
-                if (logger.IsVerbose2)
-                {
-                    logger.Verbose2("failed to find assembly {0} in {1}; searching for {2} instead.",
-                        assemblyName.FullName, dirName, pathName);
-                }
-
-                try
-                {
-                    return Assembly.ReflectionOnlyLoadFrom(pathName);
-                }
-                catch (FileNotFoundException)
-                {
-                    if (logger.IsVerbose2)
-                    {
-                        logger.Verbose(FormatReflectionOnlyAssemblyResolveFailureMessage(sender, args));
-                    }
-                    throw;
-                }
+                return Assembly.ReflectionOnlyLoadFrom(pathName);
             }
         }
 

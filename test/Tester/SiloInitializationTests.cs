@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Globalization;
 using System.Reflection;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace Tester
@@ -72,7 +74,7 @@ namespace Tester
 
         private static SiloHost CreateSiloHost(AppDomain appDomain, ClusterConfiguration clusterConfig)
         {
-            var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig };
+            var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig};
 
             return (SiloHost)appDomain.CreateInstanceFromAndUnwrap(
                 "OrleansRuntime.dll",

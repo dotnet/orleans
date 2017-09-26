@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 
 namespace Orleans.Streams
@@ -70,8 +71,8 @@ namespace Orleans.Streams
     public class ClusterConfigDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
     {
         public ClusterConfigDeploymentLeaseBasedBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle,
-            ClusterConfiguration clusterConfiguration, Factory<string, Logger> loggerFac)
-            : base(serviceProvider, siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), loggerFac)
+            ClusterConfiguration clusterConfiguration, ILoggerFactory loggerFactory)
+            : base(serviceProvider, siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), loggerFactory)
         { }
     }
 
@@ -166,23 +167,24 @@ namespace Orleans.Streams
         private int minimumResponsibilty;
         private int maximumRespobsibility;
         private IServiceProvider serviceProvider;
-        private Logger logger;
-
+        private ILogger logger;
+        private ILoggerFactory loggerFactory;
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="serviceProvider"></param>
         /// <param name="siloStatusOracle"></param>
         /// <param name="deploymentConfig"></param>
-        /// <param name="loggerFac"></param>
-        public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, Factory<string, Logger> loggerFac)
+        /// <param name="loggerFactory"></param>
+        public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
         {
             this.serviceProvider = serviceProvider;
             this.deploymentConfig = deploymentConfig;
             this.siloStatusOracle = siloStatusOracle;
             this.myQueues = new List<AcquiredQueue>();
             this.isStarting = true;
-            this.logger = loggerFac(this.GetType().Name);
+            this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<LeaseBasedQueueBalancer>();
         }
 
         /// <inheritdoc/>
@@ -199,9 +201,10 @@ namespace Orleans.Streams
             this.siloMaturityPeriod = siloMaturityPeriod;
             NotifyAfterStart().Ignore();
             //make lease renew frequency to be every half of lease time, to avoid renew failing due to timing issues, race condition or clock difference. 
-            this.renewLeaseTimer = new AsyncTaskSafeTimer(this.MaintainAndBalanceQueues, null, this.siloMaturityPeriod, this.leaseLength.Divide(2));
+            var timerLogger = this.loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
+            this.renewLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.MaintainAndBalanceQueues, null, this.siloMaturityPeriod, this.leaseLength.Divide(2));
             //try to acquire maximum leases every leaseLength 
-            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
+            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
             this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues);

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -28,7 +29,8 @@ namespace Orleans.Runtime.GrainDirectory
             GrainId grainId,
             string clusterId,
             IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle) : base(grainId, r.MyAddress)
+            IMultiClusterOracle multiClusterOracle,
+            ILoggerFactory loggerFactory) : base(grainId, r.MyAddress, loggerFactory)
         {
             this.router = r;
             this.clusterId = clusterId;

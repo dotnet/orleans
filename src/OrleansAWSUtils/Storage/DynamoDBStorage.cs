@@ -1,6 +1,7 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using System;
@@ -30,17 +31,17 @@ namespace OrleansAWSUtils.Storage
         private int readCapacityUnits = 10;
         private int writeCapacityUnits = 5;
         private AmazonDynamoDBClient ddbClient;
-        private Logger Logger;
+        private ILogger Logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
         /// <param name="dataConnectionString">The connection string to be parsed for DynamoDB connection settings</param>
-        /// <param name="logger">Orleans Logger instance</param>
-        public DynamoDBStorage(string dataConnectionString, Logger logger = null)
+        /// <param name="loggerFactory">logger factory used to create loggers</param>
+        public DynamoDBStorage(string dataConnectionString, ILoggerFactory loggerFactory)
         {
             ParseDataConnectionString(dataConnectionString);
-            Logger = logger ?? LogManager.GetLogger($"DynamoDBStorage", LoggerType.Runtime);
+            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
             CreateClient();
         }
 
@@ -228,7 +229,7 @@ namespace OrleansAWSUtils.Storage
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsVerbose2) Logger.Verbose2("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
 
             try
             {
@@ -264,7 +265,7 @@ namespace OrleansAWSUtils.Storage
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
         {
-            if (Logger.IsVerbose2) Logger.Verbose2("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
 
             try
             {
@@ -346,7 +347,7 @@ namespace OrleansAWSUtils.Storage
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsVerbose2) Logger.Verbose2("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
 
             try
             {
@@ -380,7 +381,7 @@ namespace OrleansAWSUtils.Storage
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
-            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
 
             if (toDelete == null) throw new ArgumentNullException("collection");
 
@@ -443,7 +444,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception)
             {
-                if (Logger.IsVerbose) Logger.Verbose("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -489,7 +490,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception)
             {
-                if (Logger.IsVerbose) Logger.Verbose("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -541,7 +542,7 @@ namespace OrleansAWSUtils.Storage
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (Logger.IsVerbose2) Logger.Verbose2("Put entries {0} table", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
 
             if (toCreate == null) throw new ArgumentNullException("collection");
 

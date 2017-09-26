@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
@@ -13,21 +14,24 @@ namespace Orleans.Runtime.Counters
         internal IMessageCenter MessageCenter { get; set; }
         internal ISiloMetricsDataPublisher MetricsDataPublisher { get; set; }
         internal NodeConfiguration NodeConfig { get; set; }
-        
+
+        private readonly ILoggerFactory loggerFactory;
         private TimeSpan reportFrequency;
         private bool overloadLatched;
         private bool overloadValue;
         private readonly RuntimeStatisticsGroup runtimeStats;
         private AsyncTaskSafeTimer tableReportTimer;
-        private static readonly Logger logger = LogManager.GetLogger("SiloPerformanceMetrics", LoggerType.Runtime);
+        private readonly ILogger logger;
         private float? cpuUsageLatch;
 
-        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, NodeConfiguration cfg = null)
+        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
         {
+            this.loggerFactory = loggerFactory;
             runtimeStats = runtime;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
             overloadValue = false;
+            this.logger = loggerFactory.CreateLogger<SiloPerformanceMetrics>();
             NodeConfig = cfg ?? new NodeConfiguration();
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => IsOverloaded.ToString());
         }
@@ -156,7 +160,7 @@ namespace Orleans.Runtime.Counters
                         tableReportTimer.Dispose();
                     }
                     // Start a new fresh timer. 
-                    tableReportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency);
+                    tableReportTimer = new AsyncTaskSafeTimer(loggerFactory.CreateLogger<AsyncTaskSafeTimer>(), Reporter, null, reportFrequency, reportFrequency);
                 }
             }
         }

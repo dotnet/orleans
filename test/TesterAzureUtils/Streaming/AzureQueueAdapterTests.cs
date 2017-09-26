@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
@@ -14,6 +15,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
@@ -28,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
         private const int NumMessagesPerBatch = 20;
         private string deploymentId;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
-
+        private readonly ILoggerFactory loggerFactory;
         private static readonly SafeRandom Random = new SafeRandom();
 
         public AzureQueueAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
@@ -36,13 +38,13 @@ namespace Tester.AzureUtils.Streaming
             this.output = output;
             this.fixture = fixture;
             this.deploymentId = MakeDeploymentId();
-            LogManager.Initialize(new NodeConfiguration());
+            this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
@@ -57,7 +59,7 @@ namespace Tester.AzureUtils.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), this.fixture.Services);
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, new LoggerWrapper("AzureQueueAdapter", this.loggerFactory), this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 

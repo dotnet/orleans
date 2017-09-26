@@ -4,12 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -83,7 +86,7 @@ namespace UnitTests.MessageCenterTests
             {
                 Gateways = gatewayEndpoints
             };
-            var gatewayManager = new GatewayManager(cfg, listProvider);
+            var gatewayManager = new GatewayManager(cfg, listProvider, NullLoggerFactory.Instance);
 
             var counts = new int[4];
 
@@ -140,7 +143,7 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
-            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
+            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
             {
                 return Task.CompletedTask;
             }

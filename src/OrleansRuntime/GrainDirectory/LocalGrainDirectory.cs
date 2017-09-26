@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
@@ -96,9 +97,10 @@ namespace Orleans.Runtime.GrainDirectory
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
-            RegistrarManager registrarManager)
+            RegistrarManager registrarManager,
+            ILoggerFactory loggerFactory)
         {
-            this.log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");
+            this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
             var globalConfig = clusterConfig.Globals;
 
             var clusterId = globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null;
@@ -124,8 +126,9 @@ namespace Orleans.Runtime.GrainDirectory
                     this,
                     this.DirectoryCache,
                     activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly(),
-                    grainFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle);
+                    grainFactory,
+                    loggerFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, loggerFactory);
 
             if (globalConfig.SeedNodes.Count > 0)
             {
@@ -134,11 +137,11 @@ namespace Orleans.Runtime.GrainDirectory
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
             DirectoryPartition = grainDirectoryPartitionFactory();
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory);
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId);
-            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle);
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId, loggerFactory);
+            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId, loggerFactory);
+            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle, loggerFactory);
 
             // add myself to the list of members
             AddServer(MyAddress);
