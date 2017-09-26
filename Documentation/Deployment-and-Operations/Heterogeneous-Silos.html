@@ -84,6 +84,7 @@
 <li>Grain type<code>D</code>can be only placed on Silo 3</li>
 <li>Grain Type<code>E</code>can be only placed on Silo 4.</li>
 </ul>
+<p>All silos should reference interfaces of all grain types of the cluster, but grain classes should only be referenced by the silos that will host them.</p>
 <p>The client does not know which silo support a given Grain Type.</p>
 <p><strong>A given Grain Type implementation must be the same on each silo that support it. The following scenario is NOT valid:</strong></p>
 <p>On Silo 1 and 2:</p>
@@ -98,8 +99,10 @@
    public Task SomeOtherMethod() { … }
 }
 </code></pre><h2 id="configuration">Configuration</h2>
-<p>No configuration is needed, you can deploy different binaries on each silo in your cluster.</p>
-<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>NodeConfiguration</code>.</p>
+<p>No configuration is needed, you can deploy different binaries on each silo in your cluster.
+However, if necessary, you can change the interval that silos check for changes in types supported in <code>ClusterConfig.Globals.TypeMapRefreshInterval</code>.</p>
+<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>NodeConfiguration</code>.
+In code based config you can find it in <code>ClusterConfig.Defaults.ExcludedGrainTypes</code>, which is a list names of the types you want to exclude.</p>
 <h2 id="limitations">Limitations</h2>
 <ul>
 <li>Connected clients will not be notified if the set of supported Grain Types changed. In the previous example:<ul>
