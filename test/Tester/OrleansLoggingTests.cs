@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Orleans.Logging.Legacy;
+using Orleans.Logging;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -101,7 +102,7 @@ namespace Tester
                 logger.LogInformation(eventId, message);
             }
             //same event message should only appear BulkMessageLimit times
-            Assert.Equal(messageBulkingConfig.BulkEventLimit + 1,
+            Assert.Equal(messageBulkingConfig.BulkEventLimit,
                 statefulLogConsumer.ReceivedMessages.Where(m => m.Equals(message)).Count());
             await Task.Delay(TimeSpan.FromSeconds(3));
             logger.LogInformation(eventId, message);
@@ -172,6 +173,9 @@ namespace Tester
             Assert.Equal(expectedLogMessages2, logConsumer.GetEntryCount(logCode2));
             Assert.Equal(0, logConsumer.GetEntryCount(logCode1 - 1)); //  "Should not see any other entries -1"
             Assert.Equal(0, logConsumer.GetEntryCount(logCode2 + 1)); //  "Should not see any other entries +1"
+
+            //dispose log providers
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
         [Fact]
@@ -211,13 +215,15 @@ namespace Tester
             Assert.Equal(expectedBulkLogMessages1,
                 logConsumer.GetEntryCount(logCode1 + BulkEventSummaryOffset));
             Assert.Equal(expectedLogMessages1, logConsumer.GetEntryCount(logCode1));
+            //dispose log providers
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
         [Fact]
         public void Logger_BulkMessageLimit_DifferentFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_DifferentFinalLogCode";
-            int n = 10000;
+            int n = 100;
             var bulkEventOptions = new EventBulkingOptions();
             bulkEventOptions.BulkEventInterval = TimeSpan.FromMilliseconds(50);
 
@@ -235,7 +241,7 @@ namespace Tester
         public void Logger_BulkMessageLimit_SameFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_SameFinalLogCode";
-            int n = 10000;
+            int n = 100;
             var bulkEventOptions = new EventBulkingOptions();
             bulkEventOptions.BulkEventInterval = TimeSpan.FromMilliseconds(50);
 
@@ -276,7 +282,8 @@ namespace Tester
 
             var serviceProvider = new ServiceCollection().AddLogging(builder =>
                     builder.AddLegacyOrleansLogging(new List<ILogConsumer>() { logConsumer }, null,
-                        eventBulkingOptions))
+                        eventBulkingOptions)
+                        .AddFile("Test.log"))
                 .BuildServiceProvider();
             var logger = serviceProvider.GetService<ILoggerFactory>().CreateLogger(testName);
 
@@ -308,6 +315,8 @@ namespace Tester
             Assert.Equal(expectedBulkLogMessages,
                 logConsumer.GetEntryCount(mainLogCode + BulkEventSummaryOffset));
             Assert.Equal(0, logConsumer.GetEntryCount(mainLogCode - 1));  //  "Should not see any other entries -1"
+            //dispose log providers
+            (serviceProvider as IDisposable)?.Dispose();
         }
 
         public class TestLogConsumer : ILogConsumer
