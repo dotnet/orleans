@@ -22,10 +22,15 @@ namespace Tester.AzureUtils
     [TestCategory("Azure"), TestCategory("Storage")]
     public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTests.Fixture>, IDisposable
     {
-        public class Fixture
+        public class Fixture : IDisposable
         {
             public ILoggerFactory LoggerFactory { get; set; } =
                 TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+
+            public void Dispose()
+            {
+                this.LoggerFactory.Dispose();
+            }
         }
 
         private string deploymentId;

@@ -109,7 +109,7 @@ namespace Microsoft.Orleans.Logging.Legacy
             if (sinceIntervalTicks >= this.eventBulkingConfig.BulkEventInterval.Ticks)
             {
                 // Take local copy of pending bulk message counts, now that this bulk message compaction period has finished
-                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value >= this.eventBulkingConfig.BulkEventLimit).ToArray();
+                var bulkMessageCounts = recentLogMessageCounts.Where(keyPair => keyPair.Value > this.eventBulkingConfig.BulkEventLimit).ToArray();
                 recentLogMessageCounts.Clear();
                 //set lastBulkLogMessageFlushTicks to now
                 Interlocked.Exchange(ref this.lastBulkLogMessageFlushTicks, now.Ticks);
@@ -124,7 +124,7 @@ namespace Microsoft.Orleans.Logging.Legacy
             }
 
             // Should the current log message be output?
-            return isExcluded || (count < this.eventBulkingConfig.BulkEventLimit);
+            return isExcluded || (count <= this.eventBulkingConfig.BulkEventLimit);
         }
     }
 }
