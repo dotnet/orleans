@@ -15,6 +15,7 @@ In this example the cluster support grain of type `A`, `B`, `C`, `D`, `E`:
 * Grain type`C`can be placed on Silo 1, 2 or 3. 
 * Grain type`D`can be only placed on Silo 3
 * Grain Type`E`can be only placed on Silo 4.
+* All silos should reference interfaces of all grain types but implementations should only be referenced by the silos which want to support them.
 
 The client does not know which silo support a given Grain Type.
 
@@ -39,8 +40,10 @@ public class C: Grain, IMyGrainInterface, IMyOtherGrainInterface
 ## Configuration
 
 No configuration is needed, you can deploy different binaries on each silo in your cluster.
+However if you are interested , you can change the interval that silos check for changes in types supported in `ClusterConfig.Globals.TypeMapRefreshInterval`.
 
 For testing purpose, you can use the property `ExcludedGrainTypes` in `NodeConfiguration`.
+In code based config you can find it in `ClusterConfig.Defaults.ExcludedGrainTypes` which is a list of strings which are name of the types you want to exclude.
 
 ## Limitations
 
