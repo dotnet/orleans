@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Development
 {
+    /// <summary>
+    /// In memory lease provider for development and test use.
+    /// This provider stores lease information in memory an can be lost if grain
+    /// becomes inactive or if silo crashes.  This implementation is only intended
+    /// for test or local development purposes - NOT FOR PRODUCTION USE.
+    /// </summary>
     public class InMemoryLeaseProvider : ILeaseProvider
     {
         private readonly IDevelopmentLeaseProviderGrain leaseProvider;
@@ -48,6 +54,11 @@ namespace Orleans.Runtime.Development
     {
     }
 
+    /// <summary>
+    /// Grain that stores lead information in memory.
+    /// TODO: Consider making this a stateful grain, as a production viable implementation of lease provider that works with storage
+    /// providers.
+    /// </summary>
     public class DevelopmentLeaseProviderGrain : Grain, IDevelopmentLeaseProviderGrain
     {
         private readonly Dictionary<Tuple<string, string>, Lease> leases = new Dictionary<Tuple<string, string>, Lease>();
@@ -96,19 +107,13 @@ namespace Orleans.Runtime.Development
         {
             DateTime now = DateTime.UtcNow;
             // if lease exists, and we have the right token, and lease has not expired, renew.
-            if (this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease))
+            if (!this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
             {
-                // check token
-                if (lease.Token != acquiredLease.Token)
-                {
-                    return new AcquireLeaseResult(null, ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
-                }
-                // we don't care if lease has expired or not as long was owner has not changed.
-                lease.ExpiredUtc = now + acquiredLease.Duration;
-                return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey, acquiredLease.Duration, lease.Token, now), ResponseCode.OK, null);
+                return new AcquireLeaseResult(null, ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
             }
-            // else try an aquire
-            return Acquire(category, new LeaseRequest { ResourceKey = acquiredLease.ResourceKey, Duration = acquiredLease.Duration } );
+            // we don't care if lease has expired or not as long as owner has not changed.
+            lease.ExpiredUtc = now + acquiredLease.Duration;
+            return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey, acquiredLease.Duration, lease.Token, now), ResponseCode.OK, null);
         }
 
         private class Lease
