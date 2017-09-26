@@ -933,7 +933,7 @@ namespace Orleans.Runtime
     internal class ProviderManagerSystemTarget : SystemTarget
     {
         public ProviderManagerSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.ProviderManagerSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(GrainConstants.ProviderManagerSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

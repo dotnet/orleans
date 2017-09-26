@@ -19,8 +19,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor;
         public StreamProviderManagerAgent(Silo silo, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
-            : base(Constants.StreamProviderManagerAgentSystemTargetId, silo.SiloAddress, loggerFactory)
-
+            : base(GrainConstants.StreamProviderManagerAgentSystemTargetId, silo.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<StreamProviderManagerAgent>();
             this.streamProviderManager = (StreamProviderManager)silo.StreamProviderManager;

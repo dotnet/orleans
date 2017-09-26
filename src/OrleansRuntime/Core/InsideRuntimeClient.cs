@@ -182,7 +182,7 @@ namespace Orleans.Runtime
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
                 message.TargetSilo = targetSilo;
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
-                message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
+                message.Category = targetGrainId.Equals(GrainConstants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
             }
             if (target.IsObserverReference)

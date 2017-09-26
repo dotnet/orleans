@@ -17,7 +17,7 @@ namespace Orleans.Runtime.LogConsistency
     internal class ProtocolGateway : SystemTarget, ILogConsistencyProtocolGateway
     {
         public ProtocolGateway(SiloAddress silo, ILoggerFactory loggerFactory)
-            : base(Constants.ProtocolGatewayId, silo, loggerFactory)
+            : base(GrainConstants.ProtocolGatewayId, silo, loggerFactory)
         {
         }
 

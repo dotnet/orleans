@@ -191,7 +191,7 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster);
-                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(GrainConstants.ClusterDirectoryServiceId, clusterGatewayAddress);
                     var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.config.ClusterId);
                     batchResponses.Add(r);
                 }
@@ -321,7 +321,7 @@ namespace Orleans.Runtime.GrainDirectory
             // remove loser activations
             foreach (var kvp in loser_activations_per_silo)
             {
-                var catalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, kvp.Key);
+                var catalog = this.grainFactory.GetSystemTarget<ICatalog>(GrainConstants.CatalogId, kvp.Key);
                 catalog.DeleteActivations(kvp.Value).Ignore();
             }
         }

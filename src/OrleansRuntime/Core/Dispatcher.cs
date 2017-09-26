@@ -764,7 +764,7 @@ namespace Orleans.Runtime
 
         internal void SendSystemTargetMessage(Message message)
         {
-            message.Category = message.TargetGrain.Equals(Constants.MembershipOracleId) ? 
+            message.Category = message.TargetGrain.Equals(GrainConstants.MembershipOracleId) ? 
                 Message.Categories.Ping : Message.Categories.System;
 
             if (message.TargetSilo == null)

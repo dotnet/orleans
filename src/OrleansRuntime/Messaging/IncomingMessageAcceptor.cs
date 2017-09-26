@@ -132,7 +132,7 @@ namespace Orleans.Runtime.Messaging
             if (expectProxiedConnection)
             {
                 // Proxied Gateway Connection - must have sender id
-                if (client.Equals(Constants.SiloDirectConnectionId))
+                if (client.Equals(GrainConstants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_NotAProxiedConnection, $"Gateway received unexpected non-proxied connection from {client} at source address {sock.RemoteEndPoint}");
                     return false;
@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Direct connection - should not have sender id
-                if (!client.Equals(Constants.SiloDirectConnectionId))
+                if (!client.Equals(GrainConstants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_UnexpectedProxiedConnection, $"Silo received unexpected proxied connection from {client} at source address {sock.RemoteEndPoint}");
                     return false;
@@ -533,7 +533,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
+            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !GrainConstants.SystemMembershipTableId.Equals(msg.SendingGrain))
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request) return;

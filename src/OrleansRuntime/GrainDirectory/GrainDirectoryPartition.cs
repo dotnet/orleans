@@ -509,7 +509,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                         foreach (var siloActivations in activationsToDrop)
                         {
-                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, siloActivations.Key);
+                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(GrainConstants.CatalogId, siloActivations.Key);
                             remoteCatalog.DeleteActivations(siloActivations.Value).Ignore();
                         }
                     }

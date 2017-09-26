@@ -45,7 +45,7 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             ILoggerFactory loggerFactory)
-            : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(GrainConstants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
             this.localConfiguration = localConfiguration;
@@ -134,7 +134,7 @@ namespace Orleans.Runtime
         public async Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
         {
             IStreamProviderManagerAgent streamProviderUpdateAgent =
-                RuntimeClient.InternalGrainFactory.GetSystemTarget<IStreamProviderManagerAgent>(Constants.StreamProviderManagerAgentSystemTargetId, this.localSiloDetails.SiloAddress);
+                RuntimeClient.InternalGrainFactory.GetSystemTarget<IStreamProviderManagerAgent>(GrainConstants.StreamProviderManagerAgentSystemTargetId, this.localSiloDetails.SiloAddress);
 
             await this.providerManagerSystemTarget.ScheduleTask(() => streamProviderUpdateAgent.UpdateStreamProviders(streamProviderConfigurations))
                 .WithTimeout(TimeSpan.FromSeconds(25));

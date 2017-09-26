@@ -50,7 +50,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void ID_IsSystem()
         {
-            GrainId testGrain = Constants.DirectoryServiceId;
+            GrainId testGrain = GrainConstants.DirectoryServiceId;
             output.WriteLine("Testing GrainID " + testGrain);
             Assert.True(testGrain.IsSystemTarget); // System grain ID is not flagged as a system ID
 

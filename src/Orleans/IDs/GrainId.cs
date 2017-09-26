@@ -218,7 +218,7 @@ namespace Orleans.Runtime
         private string ToStringImpl(bool detailed)
         {
             string name = string.Empty;
-            if (Constants.TryGetSystemGrainName(this, out name))
+            if (GrainConstants.TryGetSystemGrainName(this, out name))
             {
                 return name;
             }
@@ -250,7 +250,7 @@ namespace Orleans.Runtime
                     fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
                     break;
                 case UniqueKey.Category.SystemTarget:
-                    string explicitName = Constants.SystemTargetName(this);
+                    string explicitName = GrainConstants.SystemTargetName(this);
                     if (TypeCode != 0)
                     {
                         var typeStr = TypeCode.ToString("X");

@@ -96,9 +96,9 @@ namespace Orleans.Runtime
         {
             var systemTarget = (ISystemTargetBase) target;
             systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!GrainConstants.IsSingletonSystemTarget(systemTarget.GrainId))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).Increment();
+                FindSystemTargetCounter(GrainConstants.SystemTargetName(systemTarget.GrainId)).Increment();
             }
         }
 
@@ -107,9 +107,9 @@ namespace Orleans.Runtime
             var systemTarget = (ISystemTargetBase) target;
             SystemTarget ignore;
             systemTargets.TryRemove(target.ActivationId, out ignore);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!GrainConstants.IsSingletonSystemTarget(systemTarget.GrainId))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
+                FindSystemTargetCounter(GrainConstants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
             }
         }
 

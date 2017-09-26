@@ -166,7 +166,7 @@ namespace UnitTests.Grains
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.Info("Sending Ping to remote silo {0}", siloAddress);
 
-            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, siloAddress);
+            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(GrainConstants.MembershipOracleId, siloAddress);
 
             await oracle.Ping(1);
             logger.Info("Ping reply received for {0}", siloAddress);
@@ -174,7 +174,7 @@ namespace UnitTests.Grains
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(GrainConstants.SiloControlId, silo);
         }
     }
 
