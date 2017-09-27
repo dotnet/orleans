@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Core;
 using Orleans.Providers;
@@ -25,7 +26,7 @@ namespace Orleans.Transactions
         private readonly ITransactionDataCopier<TState> copier;
         private readonly ITransactionAgent transactionAgent;
         private readonly IProviderRuntime runtime;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private readonly Dictionary<long, TState> transactionCopy;
         private readonly AsyncSerialExecutor<bool> storageExecutor;
@@ -44,14 +45,14 @@ namespace Orleans.Transactions
 
         public TState State => GetState();
 
-        public TransactionalState(ITransactionalStateConfiguration transactionalStateConfiguration, IGrainActivationContext context, ITransactionDataCopier<TState> copier, ITransactionAgent transactionAgent, IProviderRuntime runtime, Factory<string, Logger> loggerFactory)
+        public TransactionalState(ITransactionalStateConfiguration transactionalStateConfiguration, IGrainActivationContext context, ITransactionDataCopier<TState> copier, ITransactionAgent transactionAgent, IProviderRuntime runtime, ILoggerFactory loggerFactory)
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
             this.copier = copier;
             this.transactionAgent = transactionAgent;
             this.runtime = runtime;
-            this.logger = loggerFactory($"{this.context.GrainIdentity}+{this.config.StateName}");
+            this.logger = loggerFactory.CreateLogger($"{this.context.GrainIdentity}+{this.config.StateName}");
             this.transactionCopy = new Dictionary<long, TState>();
             this.storageExecutor = new AsyncSerialExecutor<bool>();
             this.log = new SortedDictionary<long, LogRecord<TState>>();
@@ -64,7 +65,7 @@ namespace Orleans.Transactions
         {
             var info = TransactionContext.GetTransactionInfo();
 
-            if (this.logger.IsVerbose2) this.logger.Verbose2("Write {0}", info);
+            this.logger.Debug("Write {0}", info);
 
             if (info.IsReadOnly)
             {
@@ -299,7 +300,7 @@ namespace Orleans.Transactions
 
             var info = TransactionContext.GetTransactionInfo();
 
-            if (this.logger.IsVerbose2) this.logger.Verbose2("Read {0}", info);
+            this.logger.Debug("Read {0}", info);
 
             Restore();
 

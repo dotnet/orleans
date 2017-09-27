@@ -1,6 +1,7 @@
 ﻿
 using System;
 using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions
 {
@@ -20,39 +21,34 @@ namespace Orleans.Transactions
 
     internal static class LoggerExtensions
     {
-        internal static void Verbose(this Logger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
+        internal static void Debug(this ILogger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose, format, args, null);
+            logger.Debug((int)errorCode, format, args, null);
         }
 
-        internal static void Verbose2(this Logger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
+        internal static void Trace(this ILogger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose2, format, args, null);
+            logger.Trace((int)errorCode, format, args, null);
         }
 
-        internal static void Verbose3(this Logger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
+        internal static void Info(this ILogger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose3, format, args, null);
+            logger.Info((int)errorCode, format, args, null);
         }
 
-        internal static void Info(this Logger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
+        internal static void Warn(this ILogger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Info, format, args, null);
+            logger.Warn((int)errorCode, format, args, null);
         }
 
-        internal static void Warn(this Logger logger, OrleansTransactionsErrorCode errorCode, string format, params object[] args)
+        internal static void Warn(this ILogger logger, OrleansTransactionsErrorCode errorCode, string message, Exception exception)
         {
-            logger.Log((int)errorCode, Severity.Warning, format, args, null);
+            logger.Warn((int)errorCode,  message, new object[] { }, exception);
         }
 
-        internal static void Warn(this Logger logger, OrleansTransactionsErrorCode errorCode, string message, Exception exception)
+        internal static void Error(this ILogger logger, OrleansTransactionsErrorCode errorCode, string message, Exception exception = null)
         {
-            logger.Log((int)errorCode, Severity.Warning, message, new object[] { }, exception);
-        }
-
-        internal static void Error(this Logger logger, OrleansTransactionsErrorCode errorCode, string message, Exception exception = null)
-        {
-            logger.Log((int)errorCode, Severity.Error, message, new object[] { }, exception);
+            logger.Error((int)errorCode, message, exception);
         }
     }
 }

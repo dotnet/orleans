@@ -23,15 +23,16 @@ namespace Orleans.Transactions
     /// </summary>
     internal class TransactionLog
     {
-        private readonly ITransactionLogStorage transactionLogStorage;
+        private readonly Factory<Task<ITransactionLogStorage>> storageFactory;
+        private ITransactionLogStorage transactionLogStorage;
 
         private TransactionLogOperatingMode currentLogMode;
 
         private long lastStartRecordValue;
 
-        public TransactionLog(ITransactionLogStorage transactionLogStorage)
+        public TransactionLog(Factory<Task<ITransactionLogStorage>> storageFactory)
         {
-            this.transactionLogStorage = transactionLogStorage;
+            this.storageFactory = storageFactory;
 
             currentLogMode = TransactionLogOperatingMode.Uninitialized;
         }
@@ -41,11 +42,11 @@ namespace Orleans.Transactions
         /// is called on the log.
         /// </summary>
         /// <returns></returns>
-        public Task Initialize()
+        public async Task Initialize()
         {
             currentLogMode = TransactionLogOperatingMode.RecoveryMode;
 
-            return transactionLogStorage.Initialize();
+            transactionLogStorage = await storageFactory();
         }
 
         /// <summary>

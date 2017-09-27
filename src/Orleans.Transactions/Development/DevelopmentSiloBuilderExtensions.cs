@@ -1,16 +1,14 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.Development
 {
     public static class DevelopmentSiloBuilderExtensions
     {
         /// <summary>
-        /// Configure cluster to use an in-cluster transaction manager.
+        /// Configure cluster to use an in-memory transaction log.
+        /// For development and test purposes only
         /// </summary>
-        /// <param name="builder"></param>
-        /// <returns></returns>
         public static ISiloBuilder UseInMemoryTransactionLog(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(UseInMemoryTransactionLog);
@@ -18,7 +16,7 @@ namespace Orleans.Transactions.Development
 
         private static void UseInMemoryTransactionLog(IServiceCollection services)
         {
-            services.AddTransient<ITransactionLogStorage, InMemoryTransactionLogStorage>();
+            services.AddTransient(InMemoryTransactionLogStorage.Create);
         }
     }
 }
