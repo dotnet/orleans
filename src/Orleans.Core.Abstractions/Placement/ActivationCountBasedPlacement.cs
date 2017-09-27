@@ -3,9 +3,9 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    public class ActivationCountBasedPlacement : PlacementStrategy
+    internal class ActivationCountBasedPlacement : PlacementStrategy
     {
-        public static ActivationCountBasedPlacement Singleton { get; } = new ActivationCountBasedPlacement();
+        internal static ActivationCountBasedPlacement Singleton { get; } = new ActivationCountBasedPlacement();
 
         private ActivationCountBasedPlacement()
         {}

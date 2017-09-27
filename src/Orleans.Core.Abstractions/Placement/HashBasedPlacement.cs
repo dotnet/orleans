@@ -3,10 +3,10 @@
 namespace Orleans.Runtime
 {
     [Serializable]
-    public  class HashBasedPlacement : PlacementStrategy
+    internal class HashBasedPlacement : PlacementStrategy
     {
 
-        public static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();
+        internal static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();
 
 
         public HashBasedPlacement()

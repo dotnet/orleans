@@ -3,9 +3,9 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    public class RandomPlacement : PlacementStrategy
+    internal class RandomPlacement : PlacementStrategy
     {
-        public static RandomPlacement Singleton { get; } = new RandomPlacement();
+        internal static RandomPlacement Singleton { get; } = new RandomPlacement();
 
         private RandomPlacement()
         { }
