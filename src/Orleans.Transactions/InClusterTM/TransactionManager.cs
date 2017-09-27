@@ -10,14 +10,15 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
-    internal class TransactionManager : ITransactionManager
+    public class TransactionManager : ITransactionManager
     {
         private const int MaxCheckpointBatchSize = 200;
-        private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan DefaultLogMaintenanceInterval = TimeSpan.FromSeconds(1);
 
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
         private readonly ActiveTransactionsTracker activeTransactionsTracker;
+        private readonly TimeSpan logMaintenanceInterval;
 
         // Index of transactions by transactionId.
         private readonly ConcurrentDictionary<long, Transaction> transactionsTable;
@@ -41,15 +42,15 @@ namespace Orleans.Transactions
         private long checkpointedLSN;
 
         protected readonly Logger Logger;
-
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
 
-        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory)
+        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory, TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
             this.Logger = new LoggerWrapper<TransactionManager>(loggerFactory);
+            this.logMaintenanceInterval = logMaintenanceInterval ?? DefaultLogMaintenanceInterval;
 
             activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, loggerFactory);
 
@@ -67,7 +68,6 @@ namespace Orleans.Transactions
 
             this.checkpointedLSN = 0;
             this.IsRunning = false;
-
         }
 
         #region ITransactionManager
@@ -113,10 +113,9 @@ namespace Orleans.Transactions
             this.BeginGroupCommitLoop();
             this.BeginCheckpointLoop();
 
+            this.IsRunning = true;
             this.transactionLogMaintenanceTask = MaintainTransactionLog();
             this.transactionLogMaintenanceTask.Ignore(); // protect agains unhandled exception in unexpected cases.
-
-            this.IsRunning = true;
         }
 
         public async Task StopAsync()
@@ -596,8 +595,15 @@ namespace Orleans.Transactions
         {
             while(this.IsRunning)
             {
-                await TransactionLogMaintenance();
-                await Task.Delay(LogMaintenanceInterval);
+                try
+                {
+                    await TransactionLogMaintenance();
+                } catch(Exception ex)
+                {
+                    this.Logger.Error(0, $"Error while maintaining transaction log.", ex);
+                }
+
+                await Task.Delay(this.logMaintenanceInterval);
             }
         }
 
