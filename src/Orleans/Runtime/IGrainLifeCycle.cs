@@ -24,10 +24,6 @@ namespace Orleans.Runtime
         Activate = SetupState + 1<<10,
     }
 
-    public interface IGrainLifecycle : ILifecycleObservable
-    {
-    }
-
     public static class GrainLifecycleExtensions
     {
         public static IDisposable Subscribe(this IGrainLifecycle observable, GrainLifecycleStage stage, ILifecycleObserver observer)
