@@ -10,6 +10,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
@@ -21,19 +22,13 @@ using Xunit.Abstractions;
 
 namespace UnitTests
 {
-    public class ConfigTests : IDisposable
+    public class ConfigTests
     {
         private readonly ITestOutputHelper output;
 
         public ConfigTests(ITestOutputHelper output)
         {
-            LogManager.UnInitialize();
             this.output = output;
-        }
-
-        public void Dispose()
-        {
-            LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -133,162 +128,6 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void NodeLogFileName()
-        {
-            string siloName = "MyNode1";
-            string baseLogFileName = siloName + ".log";
-            string baseLogFileNamePlusOne = siloName + "-1.log";
-            string expectedLogFileName = baseLogFileName;
-            string configFileName = "Config_NonTimestampedLogFileNames.xml";
-
-            if (File.Exists(baseLogFileName)) File.Delete(baseLogFileName);
-            if (File.Exists(expectedLogFileName)) File.Delete(expectedLogFileName);
-
-            var config = new ClusterConfiguration();
-            config.LoadFromFile(configFileName);
-            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
-            string fname = n.TraceFileName;
-
-            Assert.Equal(baseLogFileName, fname);
-
-            LogManager.Initialize(n);
-
-            Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
-            Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
-            Assert.False(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void NodeLogFileNameAlreadyExists()
-        {
-            string siloName = "MyNode2";
-            string baseLogFileName = siloName + ".log";
-            string baseLogFileNamePlusOne = siloName + "-1.log";
-            string expectedLogFileName = baseLogFileName;
-            string configFileName = "Config_NonTimestampedLogFileNames.xml";
-
-            if (File.Exists(baseLogFileName)) File.Delete(baseLogFileName);
-            if (File.Exists(expectedLogFileName)) File.Delete(expectedLogFileName);
-
-            if (!File.Exists(baseLogFileName)) File.Create(baseLogFileName).Close();
-
-            var config = new ClusterConfiguration();
-            config.LoadFromFile(configFileName);
-            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
-            string fname = n.TraceFileName;
-
-            Assert.Equal(baseLogFileName, fname);
-
-            LogManager.Initialize(n);
-
-            Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
-            Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
-            Assert.False(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void LogFile_Write_AlreadyExists()
-        {
-            const string siloName = "MyNode3";
-            const string configFileName = "Config_NonTimestampedLogFileNames.xml";
-
-            string logFileName = siloName + ".log";
-            FileInfo fileInfo = new FileInfo(logFileName);
-
-            CreateIfNotExists(fileInfo);
-            Assert.True(fileInfo.Exists, "Log file should exist: " + fileInfo.FullName);
-
-            long initialSize = fileInfo.Length;
-
-            var config = new ClusterConfiguration();
-            config.LoadFromFile(configFileName);
-            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
-            string fname = n.TraceFileName;
-
-            Assert.Equal(logFileName, fname);
-
-            LogManager.Initialize(n);
-
-            Assert.True(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
-
-            Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
-
-            myLogger.Info("Write something");
-            LogManager.Flush();
-
-            fileInfo.Refresh(); // Need to refresh cached view of FileInfo
-
-            Assert.True(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
-
-            long currentSize = fileInfo.Length;
-
-            Assert.True(currentSize > initialSize, string.Format("Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize));
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void LogFile_Write_NotExists()
-        {
-            const string siloName = "MyNode4";
-            const string configFileName = "Config_NonTimestampedLogFileNames.xml";
-
-            string logFileName = siloName + ".log";
-            FileInfo fileInfo = new FileInfo(logFileName);
-
-            DeleteIfExists(fileInfo);
-
-            Assert.False(File.Exists(fileInfo.FullName), "Log file should not exist: " + fileInfo.FullName);
-
-            long initialSize = 0;
-
-            var config = new ClusterConfiguration();
-            config.LoadFromFile(configFileName);
-            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
-            string fname = n.TraceFileName;
-
-            Assert.Equal(logFileName, fname);
-
-            LogManager.Initialize(n);
-
-            Assert.True(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
-
-            Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
-
-            myLogger.Info("Write something");
-            LogManager.Flush();
-
-            fileInfo.Refresh(); // Need to refresh cached view of FileInfo
-
-            Assert.True(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
-
-            long currentSize = fileInfo.Length;
-
-            Assert.True(currentSize > initialSize, string.Format("Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize));
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void LogFile_Create()
-        {
-            const string siloName = "MyNode5";
-
-            string logFileName = siloName + ".log";
-            FileInfo fileInfo = new FileInfo(logFileName);
-
-            DeleteIfExists(fileInfo);
-
-            bool fileExists = fileInfo.Exists;
-            Assert.False(fileExists, "Log file should not exist: " + fileInfo.FullName);
-
-            CreateIfNotExists(fileInfo);
-
-            fileExists = fileInfo.Exists;
-            Assert.True(fileExists, "Log file should exist: " + fileInfo.FullName);
-
-            long initialSize = fileInfo.Length;
-            bool isLogFileEmpty = initialSize == 0;
-            Assert.True(isLogFileEmpty, $"Log file {logFileName} should be empty. Current size = {initialSize}");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_Default_ToString()
         {
             var cfg = new ClientConfiguration();
@@ -347,40 +186,6 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
-        public void ClientConfig_LogConsumers()
-        {
-            LogManager.UnInitialize();
-
-            string filename = "Config_LogConsumers-ClientConfiguration.xml";
-
-            var cfg = ClientConfiguration.LoadFromFile(filename);
-            Assert.Equal(filename, cfg.SourceFile);
-
-            LogManager.Initialize(cfg);
-            Assert.Collection(LogManager.LogConsumers,
-                lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
-                lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
-        public void ServerConfig_LogConsumers()
-        {
-            LogManager.UnInitialize();
-
-            string filename = "Config_LogConsumers-OrleansConfiguration.xml";
-
-            var cfg = new ClusterConfiguration();
-            cfg.LoadFromFile(filename);
-            Assert.Equal(filename, cfg.SourceFile);
-
-            LogManager.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
-
-            Assert.Collection(LogManager.LogConsumers,
-                lc => Assert.IsAssignableFrom<TelemetryLogConsumer>(lc),
-                lc => Assert.IsAssignableFrom<DummyLogConsumer>(lc));
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ClientConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -391,7 +196,7 @@ namespace UnitTests
             Assert.Single(cfg.TelemetryConfiguration.Consumers);
             var consumer = cfg.TelemetryConfiguration.Consumers.First();
             Assert.Equal(typeof(DummyMetricTelemetryConsumer), consumer.ConsumerType);
-            Assert.Collection(consumer.Properties, kv => 
+            Assert.Collection(consumer.Properties, kv =>
             {
                 Assert.Equal("connString", kv.Key);
                 Assert.Equal("foo", kv.Value);
@@ -910,8 +715,7 @@ namespace UnitTests
             const string filename = "DevTestServerConfiguration.xml";
             Guid myGuid = Guid.Empty;
 
-            LogManager.Initialize(new NodeConfiguration());
-
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
@@ -956,15 +760,14 @@ namespace UnitTests
 
             string deploymentId = "SiloConfig_Azure_Default" + TestConstants.random.Next();
             string connectionString = "UseDevelopmentStorage=true";
-
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
 
             output.WriteLine(initialConfig.Globals);
 
             // Do same code that AzureSilo does for configuring silo host
-
-            var host = new SiloHost("SiloConfig_Azure_Default", initialConfig); // Use supplied config data + Initializes logger configurations
+            var siloName = "SiloConfig_Azure_Default";
+            var host = new SiloHost(siloName, initialConfig); // Use supplied config data + Initializes logger configurations
             host.SetSiloType(Silo.SiloType.Secondary);
             ////// Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
@@ -990,7 +793,6 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.Globals.CacheSize = 11;
-
             var host = new SiloHost(siloName, config); // Use supplied config data + Initializes logger configurations
 
             ClusterConfiguration siloConfig = host.Config;
@@ -1066,14 +868,11 @@ namespace UnitTests
         public void SiloConfig_Azure_SystemStore()
         {
             const string filename = "Config_NewAzure.xml";
-
-            LogManager.Initialize(new NodeConfiguration());
-
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 
             output.WriteLine(siloConfig.Globals);
-
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
             Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
@@ -1088,9 +887,8 @@ namespace UnitTests
         public void SiloConfig_OldAzure()
         {
             const string filename = "Config_OldAzure.xml";
-
-            LogManager.Initialize(new NodeConfiguration());
-
+            
+            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 

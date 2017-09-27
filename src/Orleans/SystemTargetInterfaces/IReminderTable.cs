@@ -5,7 +5,6 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-
 namespace Orleans
 {
     /// <summary>
@@ -15,7 +14,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config, Logger logger);
+        Task Init(GlobalConfiguration config);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 

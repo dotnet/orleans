@@ -61,14 +61,13 @@ namespace Orleans.Runtime.Configuration
         /// Load this configuratin from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
-        /// <param name="logger"></param>
-        public void Load(XmlElement xmlElement, Logger logger)
+        public void Load(XmlElement xmlElement)
         {
             bool found = false;
             foreach (XmlNode node in xmlElement.ChildNodes)
             {
                 found = true;
-                var config = GrainTypeConfiguration.Load((XmlElement)node, logger);
+                var config = GrainTypeConfiguration.Load((XmlElement)node);
                 if (null == config) continue;
 
                 if (config.AreDefaults)
@@ -303,8 +302,7 @@ namespace Orleans.Runtime.Configuration
         /// Load this configuration from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
-        /// <param name="logger"></param>
-        public static GrainTypeConfiguration Load(XmlElement xmlElement, Logger logger)
+        public static GrainTypeConfiguration Load(XmlElement xmlElement)
         {
             string fullTypeName = null;
             bool areDefaults = xmlElement.LocalName == "Defaults";

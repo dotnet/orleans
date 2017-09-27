@@ -13,7 +13,7 @@ def branch = GithubBranchName
 
         def newJob = job(Utilities.getFullJobName(project, newJobName, isPR)) {
             steps {
-                batchFile("call Build.cmd && SET OrleansDataConnectionString= && ${testScript}")
+                batchFile("SET BuildConfiguration=Release&& call Build.cmd && SET OrleansDataConnectionString= && ${testScript}")
             }
         }
 

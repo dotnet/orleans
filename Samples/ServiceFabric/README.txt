@@ -8,7 +8,7 @@ Service Fabric services can be classified into Stateless and Stateful services. 
 StatelessCalculatorApp
 ==
 
-This application contains a single, statelss service: StatelessCalculatorService.
+This application contains a single, stateless service: StatelessCalculatorService.
 The Orleans cluster is initialized in StatelessCalculatorService.CreateServiceInstanceListeners().
 Two endpoints are added to PackageRoot\ServiceManifest.xml:
 	  <Endpoint Name="OrleansSiloEndpoint" Protocol="tcp"/>

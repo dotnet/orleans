@@ -19,6 +19,7 @@ using Orleans.Serialization;
 using Orleans.Streams.Core;
 using Orleans.Streams;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -95,7 +96,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
         private readonly CachedVersionSelectorManager versionSelectorManager;
-
+        private readonly ILoggerFactory loggerFactory;
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -112,14 +113,16 @@ namespace Orleans.Runtime
             IStreamProviderRuntime providerRuntime,
             IStreamProviderManager providerManager,
             IServiceProvider serviceProvider,
-            CachedVersionSelectorManager versionSelectorManager)
-            : base(Constants.CatalogId, messageCenter.MyAddress)
+            CachedVersionSelectorManager versionSelectorManager,
+            ILoggerFactory loggerFactory)
+            : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             localSiloName = localSiloDetails.Name;
             directory = grainDirectory;
             activations = activationDirectory;
             this.scheduler = scheduler;
+            this.loggerFactory = loggerFactory;
             GrainTypeManager = typeManager;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
@@ -130,10 +133,10 @@ namespace Orleans.Runtime
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
             this.providerManager = providerManager;
-            logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
+            logger = new LoggerWrapper<Catalog>(loggerFactory);
             this.config = config.Globals;
-            ActivationCollector = new ActivationCollector(config);
-            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager, versionSelectorManager.CompatibilityDirectorManager);
+            ActivationCollector = new ActivationCollector(config, loggerFactory);
+            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager, versionSelectorManager.CompatibilityDirectorManager, loggerFactory);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
             config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
@@ -203,6 +206,7 @@ namespace Orleans.Runtime
 
             var t = GrainTimer.FromTaskCallback(
                 this.RuntimeClient.Scheduler,
+                this.loggerFactory.CreateLogger<GrainTimer>(),
                 OnTimer,
                 null,
                 TimeSpan.Zero,
@@ -476,7 +480,8 @@ namespace Orleans.Runtime
                         this.nodeConfig,
                         this.maxWarningRequestProcessingTime,
                         this.maxRequestProcessingTime,
-                        this.RuntimeClient);
+                        this.RuntimeClient,
+                        this.loggerFactory);
                     RegisterMessageTarget(result);
                 }
             } // End lock

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -6,6 +7,9 @@ using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Logging;
 
 namespace Orleans.Runtime.Host
 {
@@ -40,22 +44,40 @@ namespace Orleans.Runtime.Host
         /// Defaults to <c>OrleansProxyEndpoint</c>
         /// </summary>
         public string ProxyEndpointConfigurationKeyName { get; set; }
-        
+
         private SiloHost host;
         private OrleansSiloInstanceManager siloInstanceManager;
         private SiloInstanceTableEntry myEntry;
         private readonly Logger logger;
         private readonly IServiceRuntimeWrapper serviceRuntimeWrapper;
+        //TODO: hook this up with SiloBuilder when SiloBuilder supports create AzureSilo
+        private static ILoggerFactory DefaultLoggerFactory = CreateDefaultLoggerFactory("AzureSilo.log");
+
+        private readonly ILoggerFactory loggerFactory = DefaultLoggerFactory;
+
+        public AzureSilo()
+            :this(new ServiceRuntimeWrapper(DefaultLoggerFactory), DefaultLoggerFactory)
+        {
+        }
 
         /// <summary>
         /// Constructor
         /// </summary>
-        public AzureSilo()
-            : this(new ServiceRuntimeWrapper())
+        public AzureSilo(ILoggerFactory loggerFactory)
+            : this(new ServiceRuntimeWrapper(loggerFactory), loggerFactory)
         {
         }
 
-        internal AzureSilo(IServiceRuntimeWrapper serviceRuntimeWrapper)
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
+        {
+            var factory = new LoggerFactory();
+            factory.AddProvider(new FileLoggerProvider(filePath));
+            if (ConsoleText.IsConsoleAvailable)
+                factory.AddConsole();
+            return factory;
+        }
+
+        internal AzureSilo(IServiceRuntimeWrapper serviceRuntimeWrapper, ILoggerFactory loggerFactory)
         {
             this.serviceRuntimeWrapper = serviceRuntimeWrapper;
             DataConnectionConfigurationSettingName = AzureConstants.DataConnectionConfigurationSettingName;
@@ -65,7 +87,8 @@ namespace Orleans.Runtime.Host
             StartupRetryPause = AzureConstants.STARTUP_TIME_PAUSE; // 5 seconds
             MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
 
-            logger = LogManager.GetLogger("OrleansAzureSilo", LoggerType.Runtime);
+            this.loggerFactory = loggerFactory;
+            logger = new LoggerWrapper<AzureSilo>(loggerFactory);
         }
 
         /// <summary>
@@ -83,7 +106,7 @@ namespace Orleans.Runtime.Host
 
                 try
                 {
-                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(deploymentId, connectionString);
+                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(deploymentId, connectionString, loggerFactory);
                     var instances = await manager.DumpSiloInstanceTable();
                     logger.Verbose(instances);
                 }
@@ -105,7 +128,7 @@ namespace Orleans.Runtime.Host
         /// <returns>Default ClusterConfiguration </returns>
         public static ClusterConfiguration DefaultConfiguration()
         {
-            return DefaultConfiguration(new ServiceRuntimeWrapper());
+            return DefaultConfiguration(new ServiceRuntimeWrapper(DefaultLoggerFactory));
         }
 
         internal static ClusterConfiguration DefaultConfiguration(IServiceRuntimeWrapper serviceRuntimeWrapper)
@@ -231,7 +254,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(
-                    deploymentId, connectionString).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
+                    deploymentId, connectionString, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
             }
             catch (Exception exc)
             {

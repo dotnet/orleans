@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
@@ -37,11 +38,10 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        /// <param name="logger">Logger to use.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, Logger logger = null)
+        /// <param name="loggerFactory">Logger factory to use.</param>
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            var loggerName = "AzureTableDataManager-" + typeof(T).Name;
-            Logger = logger ?? LogManager.GetLogger(loggerName, LoggerType.Runtime);
+            Logger = new LoggerWrapper<AzureTableDataManager<T>>(loggerFactory);
             TableName = tableName;
             ConnectionString = storageConnectionString;
 

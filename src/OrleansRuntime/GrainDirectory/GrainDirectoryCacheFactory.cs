@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -26,11 +27,12 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory router,
             IGrainDirectoryCache<TValue> cache,
             Func<List<ActivationAddress>, TValue> updateFunc,
-            IInternalGrainFactory grainFactory)
+            IInternalGrainFactory grainFactory,
+            ILoggerFactory loggerFactory)
         {
             var adaptiveCache = cache as AdaptiveGrainDirectoryCache<TValue>;
             return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer<TValue>(router, adaptiveCache, updateFunc, grainFactory)
+                ? new AdaptiveDirectoryCacheMaintainer<TValue>(router, adaptiveCache, updateFunc, grainFactory, loggerFactory)
                 : null;
         }
     }

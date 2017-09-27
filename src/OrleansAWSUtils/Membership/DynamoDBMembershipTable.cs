@@ -1,5 +1,6 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using OrleansAWSUtils.Storage;
 using System;
@@ -19,15 +20,21 @@ namespace Orleans.Runtime.MembershipService
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private const int MAX_BATCH_SIZE = 25;
 
-        private Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
         private string deploymentId;
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger log)
+        public DynamoDBMembershipTable(ILoggerFactory loggerFactory)
         {
-            logger = log;
+            this.loggerFactory = loggerFactory;
+            logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
+        }
+
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
+        {
             deploymentId = config.DeploymentId;
-            storage = new DynamoDBStorage(config.DataConnectionString, log);
+            storage = new DynamoDBStorage(config.DataConnectionString, loggerFactory);
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
@@ -81,7 +88,7 @@ namespace Orleans.Runtime.MembershipService
                 };
                 var entry = await storage.ReadSingleEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, fields => new SiloInstanceRecord(fields));
                 MembershipTableData data = entry != null ? Convert(new List<SiloInstanceRecord> { entry }) : new MembershipTableData(_tableVersion);
-                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -100,7 +107,7 @@ namespace Orleans.Runtime.MembershipService
                 var records = await storage.QueryAsync(TABLE_NAME_DEFAULT_VALUE, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
                 MembershipTableData data = Convert(records);
-                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;
             }
@@ -116,7 +123,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("InsertRow entry = {0}", entry.ToFullString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}", entry.ToFullString());
                 var tableEntry = Convert(entry);
 
                 bool result;
@@ -149,7 +156,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
                 var siloEntry = Convert(entry);
                 int currentEtag = 0;
                 if (!int.TryParse(etag, out currentEtag))
@@ -193,7 +200,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("Merge entry = {0}", entry.ToFullString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";

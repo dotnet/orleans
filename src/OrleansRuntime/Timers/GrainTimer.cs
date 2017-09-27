@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
@@ -15,7 +16,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
+        private readonly ILogger logger;
         private Task currentlyExecutingTickTask;
         private readonly OrleansTaskScheduler scheduler;
         private readonly IActivationData activationData;
@@ -24,16 +25,16 @@ namespace Orleans.Runtime
         
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
-        private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
             scheduler.CheckSchedulingContextValidity(ctxt);
             this.scheduler = scheduler;
             this.activationData = activationData;
-
+            this.logger = logger;
             this.Name = name;
             this.asyncCallback = asyncCallback;
-            timer = new AsyncTaskSafeTimer( 
+            timer = new AsyncTaskSafeTimer(logger, 
                 stateObj => TimerTick(stateObj, ctxt),
                 state);
             this.dueTime = dueTime;
@@ -44,6 +45,7 @@ namespace Orleans.Runtime
 
         internal static GrainTimer FromTimerCallback(
             OrleansTaskScheduler scheduler,
+            ILogger logger,
             TimerCallback callback,
             object state,
             TimeSpan dueTime,
@@ -53,6 +55,7 @@ namespace Orleans.Runtime
             return new GrainTimer(
                 scheduler,
                 null,
+                logger, 
                 ob =>
                 {
                     if (callback != null)
@@ -67,6 +70,7 @@ namespace Orleans.Runtime
 
         internal static IGrainTimer FromTaskCallback(
             OrleansTaskScheduler scheduler,
+            ILogger logger,
             Func<object, Task> asyncCallback,
             object state,
             TimeSpan dueTime,
@@ -74,7 +78,7 @@ namespace Orleans.Runtime
             string name = null,
             IActivationData activationData = null)
         {
-            return new GrainTimer(scheduler, activationData, asyncCallback, state, dueTime, period, name);
+            return new GrainTimer(scheduler, activationData, logger, asyncCallback, state, dueTime, period, name);
         }
 
         public void Start()
@@ -115,8 +119,8 @@ namespace Orleans.Runtime
             
             totalNumTicks++;
 
-            if (logger.IsVerbose3)
-                logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
             {
@@ -124,7 +128,7 @@ namespace Orleans.Runtime
                 currentlyExecutingTickTask = asyncCallback(state);
                 await currentlyExecutingTickTask;
                 
-                if (logger.IsVerbose3) logger.Verbose3(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {

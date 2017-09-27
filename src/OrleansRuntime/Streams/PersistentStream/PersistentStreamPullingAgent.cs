@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -40,10 +41,11 @@ namespace Orleans.Streams
             GrainId id, 
             string strProviderName,
             IStreamProviderRuntime runtime,
+            ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
             QueueId queueId,
             PersistentStreamProviderConfig config)
-            : base(id, runtime.ExecutingSiloAddress, true)
+            : base(id, runtime.ExecutingSiloAddress, true, loggerFactory)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");

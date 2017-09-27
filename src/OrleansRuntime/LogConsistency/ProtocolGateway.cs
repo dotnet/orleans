@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Core;
 using Orleans.MultiCluster;
@@ -15,8 +16,8 @@ namespace Orleans.Runtime.LogConsistency
     [Reentrant]
     internal class ProtocolGateway : SystemTarget, ILogConsistencyProtocolGateway
     {
-        public ProtocolGateway(SiloAddress silo)
-            : base(Constants.ProtocolGatewayId, silo)
+        public ProtocolGateway(SiloAddress silo, ILoggerFactory loggerFactory)
+            : base(Constants.ProtocolGatewayId, silo, loggerFactory)
         {
         }
 

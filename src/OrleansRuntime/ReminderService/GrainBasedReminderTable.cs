@@ -3,7 +3,8 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -12,18 +13,19 @@ namespace Orleans.Runtime.ReminderService
     internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private InMemoryRemindersTable remTable;
-        private Logger logger;
+        private ILogger logger;
 
         public override Task OnActivateAsync()
         {
-            logger = LogManager.GetLogger(String.Format("GrainBasedReminderTable_{0}", Data.Address.ToString()), LoggerType.Runtime);
+            var loggerFactory = this.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            logger = loggerFactory.CreateLogger(String.Format("{0}_{1}", typeof(GrainBasedReminderTable).FullName, Data.Address.ToString()));
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
-            remTable = new InMemoryRemindersTable();
+            remTable = new InMemoryRemindersTable(loggerFactory);
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
             return Task.CompletedTask;
         }
 
-        public Task Init(GlobalConfiguration config, Logger logger)
+        public Task Init(GlobalConfiguration config)
         {
             return Task.CompletedTask;
         }
@@ -42,7 +44,7 @@ namespace Orleans.Runtime.ReminderService
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             ReminderTableData t = remTable.ReadRows(begin, end);
-            logger.Verbose("Read {0} reminders from memory: {1}, {2}", t.Reminders.Count, Environment.NewLine, Utils.EnumerableToString(t.Reminders));
+            logger.Debug("Read {0} reminders from memory: {1}, {2}", t.Reminders.Count, Environment.NewLine, Utils.EnumerableToString(t.Reminders));
             return Task.FromResult(t);
         }
 
@@ -65,7 +67,7 @@ namespace Orleans.Runtime.ReminderService
         /// <returns>true if a row with <paramref name="grainRef"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
         public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            if (logger.IsVerbose) logger.Verbose("RemoveRow entry grainRef = {0}, reminderName = {1}, eTag = {2}", grainRef, reminderName, eTag);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RemoveRow entry grainRef = {0}, reminderName = {1}, eTag = {2}", grainRef, reminderName, eTag);
             bool result = remTable.RemoveRow(grainRef, reminderName, eTag);
             if (result == false)
             {

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -87,8 +88,8 @@ namespace Orleans.Runtime.Scheduler
         internal readonly int WorkerThreadStatisticsNumber;
         private readonly ICorePerformanceMetrics performanceMetrics;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
-            : base((system ? "System." : "") + threadNumber)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ILoggerFactory loggerFactory, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
+            : base((system ? "System." : "") + threadNumber, loggerFactory)
         {
             pool = gtp;
             scheduler = sched;

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -32,12 +33,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly Logger                         logger;
         [NonSerialized]
         private readonly AsyncLock                      initLock;
-
+        [NonSerialized]
+        private readonly ILoggerFactory loggerFactory;
         internal bool IsRewindable { get; private set; }
 
         internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
             IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
-            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager)
+            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager,
+            ILoggerFactory loggerFactory)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
@@ -51,14 +54,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             isDisposed = false;
             logger = providerRuntime.GetLogger(GetType().Name);
             initLock = new AsyncLock();
-
+            this.loggerFactory = loggerFactory;
             ConnectToRendezvous().Ignore();
         }
 
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, fireAndForgetDelivery, optimizeForImmutableData));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;

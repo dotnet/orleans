@@ -77,7 +77,6 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
         public CustomSerializerTests(TestEnvironmentFixture fixture)
         {
             this.fixture = fixture;
-            LogManager.Initialize(new NodeConfiguration());
         }
 
         [Fact, TestCategory("Serialization")]

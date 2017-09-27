@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -11,21 +12,22 @@ namespace Orleans.Runtime.Counters
         private RuntimeStatisticsGroup runtimeStats;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
-        private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
+        private readonly Logger logger;
 
-        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, ITelemetryProducer telemetryProducer)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
             ApplicationRequestsStatisticsGroup.Init(initializationParams.GlobalConfig.ResponseTimeout);
-            SchedulerStatisticsGroup.Init();
+            SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
-            runtimeStats = new RuntimeStatisticsGroup();
-            this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager);
-            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, initializationParams.NodeConfig);
-            this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval, telemetryProducer);
+            this.logger = new LoggerWrapper<SiloStatisticsManager>(loggerFactory);
+            runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
+            this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager, loggerFactory);
+            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, loggerFactory, initializationParams.NodeConfig);
+            this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval, telemetryProducer, loggerFactory);
 
             initializationParams.ClusterConfig.OnConfigChange(
                 "Defaults/LoadShedding",

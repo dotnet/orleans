@@ -9,6 +9,7 @@ using Tester.StorageFacet.Infrastructure;
 using Tester.StorageFacet.Implementations;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
@@ -31,7 +32,8 @@ namespace Tester
                 {
                     ISiloBuilder builder = new SiloBuilder()
                         .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration);
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
 
                     // Setup storage feature infrastructure.
                     // - Setup infrastructure.

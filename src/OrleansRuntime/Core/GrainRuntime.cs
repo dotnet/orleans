@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Timers;
@@ -8,7 +9,7 @@ namespace Orleans.Runtime
     internal class GrainRuntime : IGrainRuntime
     {
         private readonly ISiloRuntimeClient runtimeClient;
-
+        private readonly ILoggerFactory loggerFactory;
         public GrainRuntime(
             GlobalConfiguration globalConfig,
             ILocalSiloDetails localSiloDetails,
@@ -17,7 +18,8 @@ namespace Orleans.Runtime
             IReminderRegistry reminderRegistry,
             IStreamProviderManager streamProviderManager,
             IServiceProvider serviceProvider,
-            ISiloRuntimeClient runtimeClient)
+            ISiloRuntimeClient runtimeClient,
+            ILoggerFactory loggerFactory)
         {
             this.runtimeClient = runtimeClient;
             ServiceId = globalConfig.ServiceId;
@@ -28,6 +30,7 @@ namespace Orleans.Runtime
             ReminderRegistry = reminderRegistry;
             StreamProviderManager = streamProviderManager;
             ServiceProvider = serviceProvider;
+            this.loggerFactory = loggerFactory;
         }
 
         public Guid ServiceId { get; }
@@ -48,7 +51,7 @@ namespace Orleans.Runtime
 
         public Logger GetLogger(string loggerName)
         {
-            return LogManager.GetLogger(loggerName, LoggerType.Grain);
+            return new LoggerWrapper(loggerName, this.loggerFactory);
         }
 
         public void DeactivateOnIdle(Grain grain)

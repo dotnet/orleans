@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -23,20 +24,20 @@ namespace Orleans.Runtime
         private int decodeOffset;
 
         private readonly bool supportForwarding;
-        private Logger Log;
+        private ILogger Log;
         private readonly SerializationManager serializationManager;
         private readonly DeserializationContext deserializationContext;
 
         internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
 
         public IncomingMessageBuffer(
-            Logger logger,
+            ILoggerFactory loggerFactory,
             SerializationManager serializationManager,
             bool supportForwarding = false,
             int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
             int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
-            Log = logger;
+            Log = loggerFactory.CreateLogger<IncomingMessageBuffer>();
             this.serializationManager = serializationManager;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
@@ -202,7 +203,7 @@ namespace Orleans.Runtime
                         headerLength,
                         bodyLength,
                         msg.ToString());
-                    if (Log.IsVerbose3) Log.Verbose3("Received large message {0}", msg.ToLongString());
+                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Received large message {0}", msg.ToLongString());
                 }
 
                 // update parse receiveOffset and clear lengths

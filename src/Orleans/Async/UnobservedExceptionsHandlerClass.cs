@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {
@@ -8,7 +9,7 @@ namespace Orleans
     internal class UnobservedExceptionsHandlerClass
     {
         private static readonly Object lockObject = new Object();
-        private static readonly Logger logger = LogManager.GetLogger("UnobservedExceptionHandler");
+        private static ILogger logger;
         private static UnobservedExceptionDelegate unobservedExceptionHandler;
         private static readonly bool alreadySubscribedToTplEvent = false;
 
@@ -24,6 +25,11 @@ namespace Orleans
                     alreadySubscribedToTplEvent = true;
                 }
             }
+        }
+
+        internal static void InitLogger(ILoggerFactory loggerFactory)
+        {
+            logger = loggerFactory.CreateLogger<UnobservedExceptionsHandlerClass>();
         }
 
         internal static bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)

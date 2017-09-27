@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Core;
@@ -114,7 +113,6 @@ namespace Orleans
         /// <param name="period">Period of subsequent timer ticks.</param>
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             EnsureRuntime();
@@ -148,7 +146,6 @@ namespace Orleans
         /// </summary>
         /// <param name="reminder">Reminder to unregister.</param>
         /// <returns>Completion promise for this operation.</returns>
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task UnregisterReminder(IGrainReminder reminder)
         {
             EnsureRuntime();
@@ -160,7 +157,6 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Reminder to return</param>
         /// <returns>Promise for Reminder handle.</returns>
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task<IGrainReminder> GetReminder(string reminderName)
         {
             EnsureRuntime();
@@ -171,21 +167,18 @@ namespace Orleans
         /// Returns a list of all reminders registered by the grain.
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task<List<IGrainReminder>> GetReminders()
         {
             EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminders();
         }
 
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual IEnumerable<IStreamProvider> GetStreamProviders()
         {
             EnsureRuntime();
             return Runtime.StreamProviderManager.GetStreamProviders();
         }
 
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -240,7 +233,6 @@ namespace Orleans
         /// Returns a logger object that this grain's code can use for tracing.
         /// </summary>
         /// <returns>Name of the logger to use.</returns>
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
             EnsureRuntime();

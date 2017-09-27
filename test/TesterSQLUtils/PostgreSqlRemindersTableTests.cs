@@ -1,7 +1,9 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.SqlUtils;
 using TestExtensions;
@@ -13,9 +15,15 @@ namespace UnitTests.RemindersTest
     [TestCategory("Reminders"), TestCategory("PostgreSql")]
     public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {
-        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(nameof(PostgreSqlRemindersTableTests), Severity.Verbose3);
+        }
+
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(nameof(PostgreSqlRemindersTableTests), LogLevel.Trace);
+            return filters;
         }
 
         protected override IReminderTable CreateRemindersTable()

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Microsoft.Orleans.ServiceFabric
 {
     using Microsoft.ServiceFabric.Services.Communication.Runtime;

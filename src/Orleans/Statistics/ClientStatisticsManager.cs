@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -14,15 +15,15 @@ namespace Orleans.Runtime
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
         private readonly Logger logger;
-
-        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider)
+        private readonly ILoggerFactory loggerFactory;
+        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         {
             this.config = config;
             this.serviceProvider = serviceProvider;
-            runtimeStats = new RuntimeStatisticsGroup();
-            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager);
-            logger = LogManager.GetLogger(GetType().Name);
-
+            runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
+            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager, loggerFactory);
+            logger = new LoggerWrapper<ClientStatisticsManager>(loggerFactory);
+            this.loggerFactory = loggerFactory;
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
             ApplicationRequestsStatisticsGroup.Init(config.ResponseTimeout);
@@ -51,7 +52,7 @@ namespace Orleans.Runtime
                     configurableMetricsDataPublisher.AddConfiguration(
                         config.DeploymentId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
                 }
-                tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats)
+                tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats, this.loggerFactory)
                 {
                     MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
                 };
@@ -61,7 +62,7 @@ namespace Orleans.Runtime
                 // Hook up to publish client metrics to Azure storage table
                 var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
                 await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
-                tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats)
+                tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats, this.loggerFactory)
                 {
                     MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
                 };

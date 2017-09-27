@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -15,9 +16,15 @@ namespace UnitTests.MembershipTests
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
-            : base(fixture, environment)
+            : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(typeof(ZookeeperMembershipTableTests).Name, Severity.Verbose3);
+        }
+
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(typeof(ZookeeperMembershipTableTests).Name, LogLevel.Trace);
+            return filters;
         }
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)

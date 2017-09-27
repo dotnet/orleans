@@ -22,6 +22,7 @@ namespace Orleans.Providers
         /// <param name="loggerName">Name of the logger being requested.</param>
         /// <returns>Object reference to the requested logger.</returns>
         /// <seealso cref="LoggerType"/>
+        //TODO: Mark it as [Obsolete] after all runtime has migrated
         Logger GetLogger(string loggerName);
 
         /// <summary>

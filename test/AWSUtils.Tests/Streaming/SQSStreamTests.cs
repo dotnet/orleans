@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -75,7 +76,7 @@ namespace AWSUtils.Tests.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         ////------------------------ One to One ----------------------//

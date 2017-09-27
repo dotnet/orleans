@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
@@ -23,8 +24,8 @@ namespace Orleans.Runtime.TestHooks
         private readonly ISilo silo;
         private readonly IConsistentRingProvider consistentRingProvider;
 
-        public TestHooksSystemTarget(ISilo silo, ILocalSiloDetails siloDetails)
-            : base(Constants.TestHooksSystemTargetId, siloDetails.SiloAddress)
+        public TestHooksSystemTarget(ISilo silo, ILocalSiloDetails siloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.TestHooksSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             this.silo = silo;
             consistentRingProvider = this.silo.Services.GetRequiredService<IConsistentRingProvider>();
@@ -100,9 +101,9 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.silo.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
 
-        public Task AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly)
+        public Task AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly, ILogger logger)
         {
-            CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
+            CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly, logger);
             return Task.CompletedTask;
         }
 

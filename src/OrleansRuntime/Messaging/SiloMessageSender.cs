@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
@@ -17,8 +18,8 @@ namespace Orleans.Runtime.Messaging
         internal static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
 
         
-        internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager)
-            : base(nameSuffix, msgCtr.MessagingConfiguration, serializationManager)
+        internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            : base(nameSuffix, msgCtr.MessagingConfiguration, serializationManager, loggerFactory)
         {
             messageCenter = msgCtr;
             lastConnectionFailure = new Dictionary<SiloAddress, DateTime>();

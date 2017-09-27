@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -54,7 +55,7 @@ namespace Orleans.ServiceBus.Providers
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
         private ITelemetryProducer telemetryProducer;
-
+		private ILoggerFactory loggerFactory;        
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
@@ -127,6 +128,7 @@ namespace Orleans.ServiceBus.Providers
 
             providerConfig = providerCfg;
             serviceProvider = svcProvider;
+            this.loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
             this.SerializationManager = this.serviceProvider.GetRequiredService<SerializationManager>();
             adapterSettings = new EventHubStreamProviderSettings(providerName);
@@ -138,7 +140,7 @@ namespace Orleans.ServiceBus.Providers
             if (CheckpointerFactory == null)
             {
                 checkpointerSettings = adapterSettings.GetCheckpointerSettings(providerConfig, serviceProvider);
-                CheckpointerFactory = partition => EventHubCheckpointer.Create(checkpointerSettings, adapterSettings.StreamProviderName, partition);
+                CheckpointerFactory = partition => EventHubCheckpointer.Create(checkpointerSettings, adapterSettings.StreamProviderName, partition, this.loggerFactory);
             }
 
             if (CacheFactory == null)

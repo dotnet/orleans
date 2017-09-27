@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -50,7 +51,8 @@ namespace Tester.StreamingTests
                 return new SiloBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureServices(ConfigureServices);
+                    .ConfigureServices(ConfigureServices)
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }
 
             private void ConfigureServices(IServiceCollection services)

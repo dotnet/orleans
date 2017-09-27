@@ -15,6 +15,7 @@
   <ItemGroup>
     <PackageReference Include="System.Net.Requests" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
   </ItemGroup>
 
   <ItemGroup>

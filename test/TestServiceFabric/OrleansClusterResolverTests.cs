@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -23,7 +23,7 @@ namespace TestServiceFabric
         private readonly TestOutputLogger log;
 
         private readonly IFabricQueryManager queryManager;
-
+        private readonly ITestOutputHelper output;
         public OrleansClusterResolverTests(ITestOutputHelper output)
         {
             this.serviceName = new Uri("fabric:/test/robust/coffee");
@@ -35,15 +35,18 @@ namespace TestServiceFabric
 
             this.queryManager = Substitute.For<IFabricQueryManager>();
             this.log = new TestOutputLogger(output);
+            this.output = output;
         }
 
         [Fact]
         public async Task ClusterResolverBasicTest()
         {
+            var loggerFactory = new LoggerFactory();
+            loggerFactory.AddProvider(new TestOutputLoggerProvider(this.output));
             var resolver = new FabricServiceSiloResolver(
                 this.serviceName,
                 this.queryManager,
-                this.log.GetLogger);
+                loggerFactory);
             await resolver.Refresh();
         }
     }

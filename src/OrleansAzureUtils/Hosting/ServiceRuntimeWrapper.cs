@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.Host
@@ -85,7 +86,7 @@ namespace Orleans.Runtime.Host
     /// </summary>
     internal class ServiceRuntimeWrapper : IServiceRuntimeWrapper, IDeploymentConfiguration
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private Assembly assembly;
         private Type roleEnvironmentType;
         private EventInfo stoppingEvent;
@@ -97,9 +98,9 @@ namespace Orleans.Runtime.Host
         private dynamic role;
 
 
-        public ServiceRuntimeWrapper()
+        public ServiceRuntimeWrapper(ILoggerFactory loggerFactory)
         {
-            logger = LogManager.GetLogger("ServiceRuntimeWrapper");
+            logger = loggerFactory.CreateLogger<ServiceRuntimeWrapper>();
             Initialize();
         }
 

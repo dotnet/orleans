@@ -13,6 +13,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -46,7 +47,7 @@ namespace AWSUtils.Tests.Streaming
 
         public void Dispose()
         {
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         [SkippableFact]
@@ -60,7 +61,7 @@ namespace AWSUtils.Tests.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, LogManager.GetLogger("SQSAdapter", LoggerType.Application), this.fixture.Services);
+            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, new LoggerWrapper<SQSAdapter>(NullLoggerFactory.Instance), this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 

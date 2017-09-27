@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Orleans.ServiceFabric;
 using Microsoft.Orleans.ServiceFabric.Models;
 using Orleans.Runtime;
@@ -40,7 +41,7 @@ namespace TestServiceFabric
                 this.siloDetails,
                 globalConfig,
                 this.resolver,
-                name => new TestOutputLogger(this.Output, name));
+                new NullLogger<FabricMembershipOracle>());
         }
 
         [Fact]

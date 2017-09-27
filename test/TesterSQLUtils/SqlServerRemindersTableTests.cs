@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
@@ -16,9 +17,15 @@ namespace UnitTests.RemindersTest
     [TestCategory("Reminders"), TestCategory("SqlServer")]
     public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
-        public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(nameof (SqlServerRemindersTableTests), Severity.Verbose3);
+        }
+
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(nameof(SqlServerRemindersTableTests), LogLevel.Trace);
+            return filters;
         }
 
         protected override IReminderTable CreateRemindersTable()

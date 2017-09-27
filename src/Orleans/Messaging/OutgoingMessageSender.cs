@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -20,8 +21,8 @@ namespace Orleans.Messaging
     {
         private readonly SerializationManager serializationManager;
 
-        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config, SerializationManager serializationManager)
-            : base(nameSuffix, config)
+        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            : base(nameSuffix, config, loggerFactory)
         {
             this.serializationManager = serializationManager;
         }

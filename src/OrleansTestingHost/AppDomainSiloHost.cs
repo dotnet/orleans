@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -18,6 +19,7 @@ using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.TestHooks;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Orleans.TestingHost
 {
@@ -53,7 +55,7 @@ namespace Orleans.TestingHost
             /// <param name="cachedAssembly">The generated assembly.</param>
             public void AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly)
             {
-                CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
+                CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly, NullLogger.Instance);
             }
         }
 

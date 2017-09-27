@@ -2,6 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -10,6 +12,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.General
 {
@@ -34,7 +37,8 @@ namespace UnitTests.General
                     return new SiloBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices);
+                        .ConfigureServices(ConfigureServices)
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
                 }
             }
 
@@ -80,7 +84,6 @@ namespace UnitTests.General
         {
             public const string HardcodedValue = "Hardcoded Test Value";
             private int numberOfReleasedInstances;
-
             public HardcodedGrainActivator(IServiceProvider service) : base(service)
             {
             }
@@ -89,7 +92,7 @@ namespace UnitTests.General
             {
                 if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
                 {
-                    return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(null), HardcodedValue, numberOfReleasedInstances);
+                    return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(NullLoggerFactory.Instance), HardcodedValue, numberOfReleasedInstances);
                 }
 
                 return base.Create(context);

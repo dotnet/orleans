@@ -7,6 +7,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -90,7 +91,7 @@ namespace Orleans.Messaging
         private int numberOfConnectedGateways = 0;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
-
+        private readonly ILoggerFactory loggerFactory;
         public ProxiedMessageCenter(
             ClientConfiguration config,
             IPAddress localAddress,
@@ -100,8 +101,10 @@ namespace Orleans.Messaging
             SerializationManager serializationManager,
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,
-            IClusterConnectionStatusListener connectionStatusListener)
+            IClusterConnectionStatusListener connectionStatusListener,
+            ILoggerFactory loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
             this.SerializationManager = serializationManager;
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
@@ -111,12 +114,12 @@ namespace Orleans.Messaging
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
             MessagingConfiguration = config;
-            GatewayManager = new GatewayManager(config, gatewayListProvider);
+            GatewayManager = new GatewayManager(config, gatewayListProvider, loggerFactory);
             PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
-            logger = LogManager.GetLogger("Messaging.ProxiedMessageCenter", LoggerType.Runtime);
+            logger = new LoggerWrapper<ProxiedMessageCenter>(loggerFactory);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
@@ -182,7 +185,7 @@ namespace Orleans.Messaging
                 {
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
@@ -213,7 +216,7 @@ namespace Orleans.Messaging
                     Uri addr = gatewayNames[msgNumber % numGateways];
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
@@ -249,7 +252,7 @@ namespace Orleans.Messaging
                         if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
-                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory);
                             gatewayConnections[addr] = gatewayConnection;
                             if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));

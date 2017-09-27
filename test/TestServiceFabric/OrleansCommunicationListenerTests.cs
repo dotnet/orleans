@@ -7,10 +7,13 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Orleans.ServiceFabric;
 using Newtonsoft.Json;
 using NSubstitute;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace TestServiceFabric
@@ -31,7 +34,6 @@ namespace TestServiceFabric
             Dns.GetHostName());
 
         private readonly MockServiceContext serviceContext;
-
         private readonly ClusterConfiguration clusterConfig = new ClusterConfiguration { Defaults = { Generation = 864 } };
 
         public OrleansCommunicationListenerTests()
@@ -62,7 +64,7 @@ namespace TestServiceFabric
                 SiloHost = siloHost
             };
 
-            siloHost.NodeConfig.Returns(_ => clusterConfig.CreateNodeConfigurationForSilo(listener.SiloName));
+            siloHost.NodeConfig.Returns(_ => clusterConfig.GetOrCreateNodeConfigurationForSilo(listener.SiloName));
 
             var result = await listener.OpenAsync(CancellationToken.None);
             var publishedEndpoints = JsonConvert.DeserializeObject<FabricSiloInfo>(result);

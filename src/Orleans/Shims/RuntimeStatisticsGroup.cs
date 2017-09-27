@@ -1,14 +1,20 @@
 ﻿using System;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
     internal class RuntimeStatisticsGroup : IDisposable
     {
-        private static readonly Logger logger = LogManager.GetLogger("RuntimeStatisticsGroup", LoggerType.Runtime);
+        private readonly ILogger logger;
         public long MemoryUsage => 0;
         public long TotalPhysicalMemory => int.MaxValue;
         public long AvailableMemory => TotalPhysicalMemory;
         public float CpuUsage => 0;
+
+        public RuntimeStatisticsGroup(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger<RuntimeStatisticsGroup>();
+        }
 
         internal void Start()
         {

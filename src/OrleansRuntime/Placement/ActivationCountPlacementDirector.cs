@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
@@ -42,9 +43,9 @@ namespace Orleans.Runtime.Placement
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
-        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig)
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, LoggerWrapper<ActivationCountPlacementDirector> logger)
         {
-            logger = LogManager.GetLogger(this.GetType().Name);
+            this.logger = logger;
 
             SelectSilo = SelectSiloPowerOfK;
             if (globalConfig.ActivationCountBasedPlacementChooseOutOf <= 0)

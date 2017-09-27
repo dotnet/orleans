@@ -2,25 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.ReminderService
 {
     internal class AzureBasedReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private RemindersTableManager remTableManager;
 
-        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory)
         {
             this.grainReferenceConverter = grainReferenceConverter;
+            this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
+            this.loggerFactory = loggerFactory;
+
         }
 
-        public async Task Init(GlobalConfiguration config, Logger logger)
+        public async Task Init(GlobalConfiguration config)
         {
-            this.logger = logger;
-            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders);
+            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders, this.loggerFactory);
         }
 
         #region Utility methods
@@ -115,7 +118,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await remTableManager.FindReminderEntries(key);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read for grain {0} Table=" + Environment.NewLine + "{1}", key, data.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read for grain {0} Table=" + Environment.NewLine + "{1}", key, data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -132,7 +135,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read in {0} Table=" + Environment.NewLine + "{1}", RangeFactory.CreateRange(begin, end), data);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read in {0} Table=" + Environment.NewLine + "{1}", RangeFactory.CreateRange(begin, end), data);
                 return data;
             }
             catch (Exception exc)
@@ -147,7 +150,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
                 var result = await remTableManager.FindReminderEntry(grainRef, reminderName);
                 return result == null ? null : ConvertFromTableEntry(result.Item1, result.Item2);
             }
@@ -163,7 +166,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (logger.IsVerbose) logger.Verbose("UpsertRow entry = {0}", entry.ToString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpsertRow entry = {0}", entry.ToString());
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, remTableManager.ServiceId, remTableManager.DeploymentId);
 
                 string result = await remTableManager.UpsertRow(remTableEntry);
@@ -192,7 +195,7 @@ namespace Orleans.Runtime.ReminderService
             };
             try
             {
-                if (logger.IsVerbose2) logger.Verbose2("RemoveRow entry = {0}", entry.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RemoveRow entry = {0}", entry.ToString());
 
                 bool result = await remTableManager.DeleteReminderEntryConditionally(entry, eTag);
                 if (result == false)

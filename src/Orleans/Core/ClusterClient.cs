@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {
@@ -15,6 +16,7 @@ namespace Orleans
         private readonly OutsideRuntimeClient runtimeClient;
         private readonly AsyncLock initLock = new AsyncLock();
         private LifecycleState state = LifecycleState.Created;
+        private readonly LoggerWrapper appLogger;
 
         private enum LifecycleState
         {
@@ -31,10 +33,14 @@ namespace Orleans
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="configuration">The client configuration.</param>
-        public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration)
+        /// <param name="loggerFactory">Logger factory used to create loggers</param>
+        public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration, ILoggerFactory loggerFactory)
         {
             this.Configuration = configuration;
             this.runtimeClient = runtimeClient;
+            //set PropagateActivityId flag from node cofnig
+            RequestContext.PropagateActivityId = configuration.PropagateActivityId;
+            this.appLogger = new LoggerWrapper("Application", loggerFactory);
         }
 
         /// <inheritdoc />
@@ -49,7 +55,7 @@ namespace Orleans
             get
             {
                 this.ThrowIfDisposedOrNotInitialized();
-                return this.runtimeClient.AppLogger;
+                return this.appLogger;
             }
         }
 

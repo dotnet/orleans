@@ -2,16 +2,18 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureGossipTableTests : AzureStorageBasicTests 
+    public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
     {
         private readonly Logger logger;
 
@@ -23,10 +25,11 @@ namespace Tester.AzureUtils
         private SiloAddress siloAddress2;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
         private AzureTableBasedGossipChannel gossipTable; // This type is internal
-
+        private readonly ILoggerFactory loggerFactory;
         public AzureGossipTableTests()
         {
-            logger = LogManager.GetLogger("AzureGossipTableTests", LoggerType.Application);
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
+            logger = new LoggerWrapper<AzureGossipTableTests>(loggerFactory);
         
             globalServiceId = Guid.NewGuid();
             deploymentId = "test-" + globalServiceId;
@@ -52,12 +55,17 @@ namespace Tester.AzureUtils
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
 
-            gossipTable = new AzureTableBasedGossipChannel();
+            gossipTable = new AzureTableBasedGossipChannel(loggerFactory);
             var done = gossipTable.Initialize(config.ServiceId, config.DataConnectionString);
             if (!done.Wait(timeout))
             {
                 throw new TimeoutException("Could not create/read table.");
             }
+        }
+
+        public void Dispose()
+        {
+            this.loggerFactory.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]

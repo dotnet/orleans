@@ -3,6 +3,7 @@ using OrleansAWSUtils.Storage;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -14,11 +15,8 @@ namespace OrleansAWSUtils.Streams
         /// <summary>
         /// Async method to delete all used queques, for specific provider and deploymentId
         /// </summary>
-        /// <param name="providerName"></param>
-        /// <param name="deploymentId"></param>
-        /// <param name="storageConnectionString"></param>
         /// <returns> Task object for this async method </returns>
-        public static async Task DeleteAllUsedQueues(string providerName, string deploymentId, string storageConnectionString)
+        public static async Task DeleteAllUsedQueues(string providerName, string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
             if (deploymentId != null)
             {
@@ -28,7 +26,7 @@ namespace OrleansAWSUtils.Streams
                 var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
-                    var manager = new SQSStorage(queueId.ToString(), storageConnectionString, deploymentId);
+                    var manager = new SQSStorage(loggerFactory, queueId.ToString(), storageConnectionString, deploymentId);
                     manager.InitQueueAsync().Wait();
                     deleteTasks.Add(manager.DeleteQueue());
                 }

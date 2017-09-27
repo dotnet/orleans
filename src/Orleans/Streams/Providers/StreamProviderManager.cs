@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
@@ -10,9 +11,9 @@ namespace Orleans.Streams
     internal class StreamProviderManager : IStreamProviderManager
     {
         private ProviderLoader<IStreamProviderImpl> appStreamProviders;
-        public StreamProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders)
+        public StreamProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
-            appStreamProviders = new ProviderLoader<IStreamProviderImpl>(loadedProviderTypeLoaders);
+            appStreamProviders = new ProviderLoader<IStreamProviderImpl>(loadedProviderTypeLoaders, loggerFactory);
         }
         internal async Task LoadStreamProviders(
             IDictionary<string, ProviderCategoryConfiguration> configs,

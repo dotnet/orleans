@@ -6,10 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -43,12 +45,13 @@ namespace UnitTests.TimerTests
             GrainFactory = fixture.GrainFactory;
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
+            var filters = new LoggerFilterOptions();
 #if DEBUG
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Reminder", Severity.Verbose3);
+            filters.AddFilter("Storage", LogLevel.Trace);
+            filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
-            log = LogManager.GetLogger(this.GetType().Name, LoggerType.Application);
+
+            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(cfg.TraceFileName, filters));
         }
 
         public IGrainFactory GrainFactory { get; }

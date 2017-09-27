@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.LogConsistency;
 using Orleans.MultiCluster;
 using Orleans.SystemTargetInterfaces;
@@ -39,7 +40,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public ProtocolServices(
             Grain gr,
-            Factory<string, Logger> logFactory,
+            ILoggerFactory loggerFactory,
             IMultiClusterRegistrationStrategy strategy,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
@@ -47,7 +48,7 @@ namespace Orleans.Runtime.LogConsistency
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
-            this.log = logFactory("LogConsistencyProtocolServices");
+            this.log = new LoggerWrapper<ProtocolServices>(loggerFactory);
             this.grainFactory = grainFactory;
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;

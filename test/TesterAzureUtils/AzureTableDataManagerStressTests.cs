@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
@@ -26,7 +27,7 @@ namespace Tester.AzureUtils
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString);
+            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
 
             PartitionKey = "AzureTableDataManagerStressTests-" + Guid.NewGuid();
         }

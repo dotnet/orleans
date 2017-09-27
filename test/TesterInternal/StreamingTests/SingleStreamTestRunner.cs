@@ -34,7 +34,7 @@ namespace UnitTests.StreamingTests
         {
             this.client = client;
             this.streamProviderName = streamProvider;
-            this.logger = LogManager.GetLogger("SingleStreamTestRunner", LoggerType.Application);
+            this.logger = new LoggerWrapper<SingleStreamTestRunner>(TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log"));
             this.testNumber = testNum;
             this.runFullTest = fullTest;
             this.random = TestConstants.random;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
@@ -33,14 +34,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public GlobalSingleInstanceRegistrar(
             LocalGrainDirectory localDirectory,
-            Factory<string, Logger> loggerFactory,
+            LoggerWrapper<GlobalSingleInstanceRegistrar> logger,
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
-            this.logger = loggerFactory(nameof(GlobalSingleInstanceRegistrar));
+            this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;

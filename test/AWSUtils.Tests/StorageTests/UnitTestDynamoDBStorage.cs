@@ -5,6 +5,7 @@ using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace AWSUtils.Tests.StorageTests
@@ -89,7 +90,7 @@ namespace AWSUtils.Tests.StorageTests
         public const string INSTANCE_TABLE_NAME = "UnitTestDDBTableData";
 
         public UnitTestDynamoDBStorage()
-            : base($"Service={AWSTestConstants.Service}")
+            : base($"Service={AWSTestConstants.Service}", NullLoggerFactory.Instance)
         {
             if (AWSTestConstants.IsDynamoDbAvailable)
             {
