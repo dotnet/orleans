@@ -139,11 +139,10 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId, loggerFactory);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId, loggerFactory);
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, GrainConstants.DirectoryServiceId, loggerFactory);
+            CacheValidator = new RemoteGrainDirectory(this, GrainConstants.DirectoryCacheValidatorId, loggerFactory);
             RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, GrainConstants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle, loggerFactory);
 
-            // add myself to the list of members
             AddServer(MyAddress);
 
             Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) => 
