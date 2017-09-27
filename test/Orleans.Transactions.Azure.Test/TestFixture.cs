@@ -3,6 +3,7 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using Orleans.Transactions.Tests;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.Transactions.Azure.Tests
 {
@@ -23,6 +24,7 @@ namespace Orleans.Transactions.Azure.Tests
                 return new SiloBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName))
                     .UseInClusterTransactionManager(new TransactionsConfiguration())
                     .UseAzureTransactionLog(new AzureTransactionLogConfiguration() {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.

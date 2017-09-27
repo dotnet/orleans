@@ -9,7 +9,6 @@
   <PropertyGroup>
     <AssemblyName>Microsoft.Orleans.Transactions.Azure</AssemblyName>
     <RootNamespace>Orleans.Transactions.Azure</RootNamespace>
-    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,10 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj" />
   </ItemGroup>
 
 </Project>
