@@ -126,10 +126,12 @@ namespace Orleans.Runtime
         private string ToStringImpl(bool detailed)
         {
             string name = string.Empty;
+#if ABSTRACTIONS_TODO
             if (Constants.TryGetSystemGrainName(this, out name))
             {
                 return name;
             }
+#endif
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
@@ -148,7 +150,7 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Tail(8);
+                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
                     fullString = String.Format("*grn/{0}/{1}", typeString, idString);
                     break;
                 case UniqueKey.Category.Client:
@@ -158,6 +160,7 @@ namespace Orleans.Runtime
                     fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
                     break;
                 case UniqueKey.Category.SystemTarget:
+#if ABSTRACTIONS_TODO
                     string explicitName = Constants.SystemTargetName(this);
                     if (TypeCode != 0)
                     {
@@ -166,6 +169,7 @@ namespace Orleans.Runtime
                     }
                     fullString = explicitName;
                     break;
+#endif
                 default:
                     fullString = "???/" + idString;
                     break;
