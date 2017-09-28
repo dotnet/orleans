@@ -29,7 +29,7 @@ namespace Orleans
         private Logger callBackDataLogger;
         private ILogger timerLogger;
         private ClientConfiguration config;
-        private IOptions<ClientMessagingOptions> clientMessagingOptions;
+        private ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
@@ -132,7 +132,10 @@ namespace Orleans
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
             this.config = this.ServiceProvider.GetRequiredService<ClientConfiguration>();
-            this.clientMessagingOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientMessagingOptions>>();
+
+            var resolvedClientMessagingOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientMessagingOptions>>();
+            this.clientMessagingOptions = resolvedClientMessagingOptions.Value;
+
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
             this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
@@ -141,8 +144,7 @@ namespace Orleans
             this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
-            BufferPool.InitGlobalBufferPool(clientMessagingOptions);
-
+            BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions);
 
             try
             {

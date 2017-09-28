@@ -33,6 +33,7 @@ using Orleans.LogConsistency;
 using Orleans.Storage;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Utilities;
+using System;
 
 namespace Orleans.Hosting
 {
@@ -55,8 +56,24 @@ namespace Orleans.Hosting
                     return () => initializationParams.NodeConfig;
                 });
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
-            // register legacy logging to new options mapping for Silo options
-            services.AddLegacySiloConfigurationSupport();
+            // register legacy configuration to new options mapping for Silo options
+            services.AddLegacyClusterConfigurationSupport();
+            services.PostConfigure<SiloMessagingOptions>(options =>
+            {
+                //
+                // Assign environment specific defaults post configuration if user did not configured otherwise.
+                //
+
+                if (options.SiloSenderQueues==0)
+                {
+                    options.SiloSenderQueues = Environment.ProcessorCount;
+                }
+
+                if (options.GatewaySenderQueues==0)
+                {
+                    options.GatewaySenderQueues = Environment.ProcessorCount;
+                }
+            });
             services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();

@@ -142,7 +142,10 @@ namespace Orleans.Serialization
             logger = new LoggerWrapper<SerializationManager>(loggerFactory);
             this.serviceProvider = serviceProvider;
             RegisterBuiltInSerializers();
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, serializatonProviderOptions.Value.FallbackSerializationProvider);
+
+            var serializatonProviderOptionsValue = serializatonProviderOptions.Value;
+
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, serializatonProviderOptionsValue.FallbackSerializationProvider);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -176,7 +179,7 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            RegisterSerializationProviders(serializatonProviderOptions.Value.SerializationProviders);
+            RegisterSerializationProviders(serializatonProviderOptionsValue.SerializationProviders);
         }
 
         internal void RegisterBuiltInSerializers()

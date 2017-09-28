@@ -7,7 +7,7 @@ namespace Orleans.Configuration
 {
     public static class LegacyConfigurationExtensions
     {
-        public static IServiceCollection AddLegacySiloConfigurationSupport(this IServiceCollection services)
+        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services)
         {
             // Global configuration
 

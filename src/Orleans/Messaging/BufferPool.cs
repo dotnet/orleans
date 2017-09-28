@@ -39,9 +39,11 @@ namespace Orleans.Runtime
             private set;
         }
 
-        internal static void InitGlobalBufferPool(IOptions<MessagingOptions> messagingConfigurationOptions)
+        internal static void InitGlobalBufferPool(IOptions<MessagingOptions> messagingOptions)
         {
-            GlobalPool = new BufferPool(messagingConfigurationOptions.Value.BufferPoolBufferSize, messagingConfigurationOptions.Value.BufferPoolMaxSize, messagingConfigurationOptions.Value.BufferPoolPreallocationSize, "Global");
+            var messagingOptionsValue = messagingOptions.Value;
+
+            GlobalPool = new BufferPool(messagingOptionsValue.BufferPoolBufferSize, messagingOptionsValue.BufferPoolMaxSize, messagingOptionsValue.BufferPoolPreallocationSize, "Global");
         }
 
         /// <summary>
