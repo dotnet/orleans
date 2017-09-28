@@ -230,14 +230,23 @@ namespace Orleans.CodeGeneration
                 // STEP 3 : Dump useful info for debugging
                 Console.WriteLine($"Orleans-CodeGen - Options {Environment.NewLine}\tInputLib={options.InputAssembly.FullName}{Environment.NewLine}\tOutputFileName={options.OutputFileName}");
 
+                bool referencesOrleans = options.InputAssembly.Name.Equals("Orleans.dll");
                 if (options.ReferencedAssemblies != null)
                 {
                     Console.WriteLine("Orleans-CodeGen - Using referenced libraries:");
-                    foreach (string assembly in options.ReferencedAssemblies) Console.WriteLine("\t{0} => {1}", Path.GetFileName(assembly), assembly);
+                    foreach (string assembly in options.ReferencedAssemblies)
+                    {
+                        var fileName = Path.GetFileName(assembly);
+                        Console.WriteLine("\t{0} => {1}", fileName, assembly);
+                        if (fileName != null && fileName.Equals("Orleans.dll")) referencesOrleans = true;
+                    }
                 }
 
-                // STEP 5 : Finally call code generation
-                if (!CreateGrainClientAssembly(options)) return -1;
+                if (referencesOrleans)
+                {
+                    // STEP 5 : Finally call code generation
+                    if (!CreateGrainClientAssembly(options)) return -1;
+                }
 
                 // DONE!
                 return 0;
