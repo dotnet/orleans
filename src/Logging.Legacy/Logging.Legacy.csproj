@@ -14,7 +14,7 @@
 
   <PropertyGroup>
     <AssemblyName>Microsoft.Orleans.Logging.Legacy</AssemblyName>
-    <RootNamespace>Microsoft.Orleans.Logging.Legacy</RootNamespace>
+    <RootNamespace>Orleans.Logging.Legacy</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
