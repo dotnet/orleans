@@ -461,7 +461,7 @@ namespace Orleans.Serialization
         {
             var ep = ReadIPEndPoint();
             var gen = ReadInt();
-            return SiloAddress.New(ep, gen);
+            return SiloAddressFactory.New(ep, gen);
         }
 
         /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
@@ -519,7 +519,7 @@ namespace Orleans.Serialization
             var grain = ReadGrainId();
             var act = ReadActivationId();
 
-            if (silo.Equals(SiloAddress.Zero))
+            if (silo.Equals(SiloAddressFactory.Zero))
                 silo = null;
 
             if (act.Equals(ActivationId.Zero))

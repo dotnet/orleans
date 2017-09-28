@@ -408,7 +408,7 @@ namespace Orleans.Runtime
             {
                 grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
-                SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
+                SiloAddress siloAddress = SiloAddressFactory.FromParsableString(systemTargetStr);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
             }
             else
@@ -449,7 +449,7 @@ namespace Orleans.Runtime
             if (IsSystemTarget)
             {
                 var siloAddressStr = info.GetString("SystemTargetSilo");
-                SystemTargetSilo = SiloAddress.FromParsableString(siloAddressStr);
+                SystemTargetSilo = SiloAddressFactory.FromParsableString(siloAddressStr);
             }
             if (IsObserverReference)
             {

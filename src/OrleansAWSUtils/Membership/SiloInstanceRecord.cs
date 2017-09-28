@@ -109,7 +109,7 @@ namespace Orleans.Runtime.MembershipService
                 IPAddress address = IPAddress.Parse(addressStr);
                 int port = Int32.Parse(portStr);
                 int generation = Int32.Parse(genStr);
-                return SiloAddress.New(new IPEndPoint(address, port), generation);
+                return SiloAddressFactory.New(new IPEndPoint(address, port), generation);
             }
             catch (Exception exc)
             {

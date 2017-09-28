@@ -71,7 +71,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 Port = Int32.Parse(segments[2]);
                 Generation = Int32.Parse(segments[3]);
 
-                this.SiloAddress = SiloAddress.New(new IPEndPoint(Address, Port), Generation);
+                this.SiloAddress = SiloAddressFactory.New(new IPEndPoint(Address, Port), Generation);
             }
             catch (Exception exc)
             {

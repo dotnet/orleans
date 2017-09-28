@@ -148,7 +148,7 @@ namespace Orleans.Runtime
             switch (uri.Scheme)
             {
                 case "gwy.tcp":
-                    return SiloAddress.New(uri.ToIPEndPoint(), uri.Segments.Length > 1 ? int.Parse(uri.Segments[1]) : 0);
+                    return SiloAddressFactory.New(uri.ToIPEndPoint(), uri.Segments.Length > 1 ? int.Parse(uri.Segments[1]) : 0);
             }
             return null;
         }

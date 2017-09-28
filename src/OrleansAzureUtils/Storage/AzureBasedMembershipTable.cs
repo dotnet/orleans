@@ -203,7 +203,7 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.Generation))
                 int.TryParse(tableEntry.Generation, out gen);
 
-            parse.SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), port), gen);
+            parse.SiloAddress = SiloAddressFactory.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), port), gen);
 
             parse.RoleName = tableEntry.RoleName;
             if (!string.IsNullOrEmpty(tableEntry.SiloName))
@@ -235,7 +235,7 @@ namespace Orleans.Runtime.MembershipService
                 string[] silos = tableEntry.SuspectingSilos.Split('|');
                 foreach (string silo in silos)
                 {
-                    suspectingSilos.Add(SiloAddress.FromParsableString(silo));
+                    suspectingSilos.Add(SiloAddressFactory.FromParsableString(silo));
                 }
             }
 

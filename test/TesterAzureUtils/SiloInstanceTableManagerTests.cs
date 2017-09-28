@@ -45,8 +45,8 @@ namespace Tester.AzureUtils
             TestUtils.CheckForAzureStorage();
             this.output = output;
             deploymentId = "test-" + Guid.NewGuid();
-            generation = SiloAddress.AllocateNewGeneration();
-            siloAddress = SiloAddress.NewLocalAddress(generation);
+            generation = SiloAddressFactory.AllocateNewGeneration();
+            siloAddress = SiloAddressFactory.NewLocalAddress(generation);
 
             output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
 
@@ -190,7 +190,7 @@ namespace Tester.AzureUtils
 
             IPAddress address = IPAddress.Parse(ipAddress);
             IPEndPoint endpoint = new IPEndPoint(address, port);
-            SiloAddress siloAddress = SiloAddress.New(endpoint, generation);
+            SiloAddress siloAddress = SiloAddressFactory.New(endpoint, generation);
 
             string MembershipRowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 

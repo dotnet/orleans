@@ -82,7 +82,7 @@ namespace Orleans
 
         internal SiloAddress SiloAddress
         {
-            get { return Runtime?.SiloAddress ?? SiloAddress.Zero; }
+            get { return Runtime?.SiloAddress ?? SiloAddressFactory.Zero; }
         }
 
         /// <summary>

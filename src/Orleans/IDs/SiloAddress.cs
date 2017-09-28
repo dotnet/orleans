@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -17,12 +16,6 @@ namespace Orleans.Runtime
     {
         internal static readonly int SizeBytes = 24; // 16 for the address, 4 for the port, 4 for the generation
 
-        /// <summary> Special constant value to indicate an empty SiloAddress. </summary>
-        public static SiloAddress Zero { get; private set; }
-
-        private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_MEDIUM;
-        private static readonly TimeSpan internCacheCleanupInterval = TimeSpan.Zero;
-
         private int hashCode = 0;
         private bool hashCodeSet = false;
 
@@ -32,99 +25,13 @@ namespace Orleans.Runtime
         public IPEndPoint Endpoint { get; private set; }
         public int Generation { get; private set; }
 
-        private const char SEPARATOR = '@';
-
-        private static readonly DateTime epoch = new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        private static readonly Interner<SiloAddress, SiloAddress> siloAddressInterningCache;
-
-        private static readonly IPEndPoint localEndpoint = new IPEndPoint(ClusterConfiguration.GetLocalIPAddress(), 0); // non loopback local ip.
-
-        static SiloAddress()
-        {
-            siloAddressInterningCache = new Interner<SiloAddress, SiloAddress>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
-            var sa = new SiloAddress(new IPEndPoint(0, 0), 0);
-            Zero = siloAddressInterningCache.Intern(sa, sa);
-        }
-
-        /// <summary>
-        /// Factory for creating new SiloAddresses for silo on this machine with specified generation number.
-        /// </summary>
-        /// <param name="gen">Generation number of the silo.</param>
-        /// <returns>SiloAddress object initialized with the non-loopback local IP address and the specified silo generation.</returns>
-        public static SiloAddress NewLocalAddress(int gen)
-        {
-            return New(localEndpoint, gen);
-        }
-
-        /// <summary>
-        /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
-        /// </summary>
-        /// <param name="ep">IP endpoint address of the silo.</param>
-        /// <param name="gen">Generation number of the silo.</param>
-        /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
-        public static SiloAddress New(IPEndPoint ep, int gen)
-        {
-            var sa = new SiloAddress(ep, gen);
-            return siloAddressInterningCache.Intern(sa, sa);
-        }
-
-        private SiloAddress(IPEndPoint endpoint, int gen)
+        internal SiloAddress(IPEndPoint endpoint, int gen)
         {
             Endpoint = endpoint;
             Generation = gen;
         }
 
         public bool IsClient { get { return Generation < 0; } }
-
-        /// <summary> Allocate a new silo generation number. </summary>
-        /// <returns>A new silo generation number.</returns>
-        public static int AllocateNewGeneration()
-        {
-            long elapsed = (DateTime.UtcNow.Ticks - epoch.Ticks) / TimeSpan.TicksPerSecond;
-            return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
-        }
-
-        /// <summary>
-        /// Return this SiloAddress in a standard string form, suitable for later use with the <c>FromParsableString</c> method.
-        /// </summary>
-        /// <returns>SiloAddress in a standard string format.</returns>
-        public string ToParsableString()
-        {
-            // This must be the "inverse" of FromParsableString, and must be the same across all silos in a deployment.
-            // Basically, this should never change unless the data content of SiloAddress changes
-
-            return String.Format("{0}:{1}@{2}", Endpoint.Address, Endpoint.Port, Generation);
-        }
-
-        /// <summary>
-        /// Create a new SiloAddress object by parsing string in a standard form returned from <c>ToParsableString</c> method.
-        /// </summary>
-        /// <param name="addr">String containing the SiloAddress info to be parsed.</param>
-        /// <returns>New SiloAddress object created from the input data.</returns>
-        public static SiloAddress FromParsableString(string addr)
-        {
-            // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
-            // Basically, this should never change unless the data content of SiloAddress changes
-
-            // First is the IPEndpoint; then '@'; then the generation
-            int atSign = addr.LastIndexOf(SEPARATOR);
-            if (atSign < 0)
-            {
-                throw new FormatException("Invalid string SiloAddress: " + addr);
-            }
-            var epString = addr.Substring(0, atSign);
-            var genString = addr.Substring(atSign + 1);
-            // IPEndpoint is the host, then ':', then the port
-            int lastColon = epString.LastIndexOf(':');
-            if (lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
-
-            var hostString = epString.Substring(0, lastColon);
-            var portString = epString.Substring(lastColon + 1);
-            var host = IPAddress.Parse(hostString);
-            int port = Int32.Parse(portString);
-            return New(new IPEndPoint(host, port), Int32.Parse(genString));
-        }
 
         /// <summary> Object.ToString method override. </summary>
         public override string ToString()

@@ -17,18 +17,18 @@ namespace UnitTests.GeoClusterTests
         public void TestMultiClusterGatewaySelection()
         {
             var candidates = new SiloAddress[] {
-                SiloAddress.New(new IPEndPoint(0,0),0),
-                SiloAddress.New(new IPEndPoint(0,0),1),
-                SiloAddress.New(new IPEndPoint(0,1),0),
-                SiloAddress.New(new IPEndPoint(0,1),1),
-                SiloAddress.New(new IPEndPoint(0,234),1),
-                SiloAddress.New(new IPEndPoint(1,0),0),
-                SiloAddress.New(new IPEndPoint(1,0),1),
-                SiloAddress.New(new IPEndPoint(1,1),1),
-                SiloAddress.New(new IPEndPoint(1,234),1),
-                SiloAddress.New(new IPEndPoint(2,234),1),
-                SiloAddress.New(new IPEndPoint(3,234),1),
-                SiloAddress.New(new IPEndPoint(4,234),1),
+                SiloAddressFactory.New(new IPEndPoint(0,0),0),
+                SiloAddressFactory.New(new IPEndPoint(0,0),1),
+                SiloAddressFactory.New(new IPEndPoint(0,1),0),
+                SiloAddressFactory.New(new IPEndPoint(0,1),1),
+                SiloAddressFactory.New(new IPEndPoint(0,234),1),
+                SiloAddressFactory.New(new IPEndPoint(1,0),0),
+                SiloAddressFactory.New(new IPEndPoint(1,0),1),
+                SiloAddressFactory.New(new IPEndPoint(1,1),1),
+                SiloAddressFactory.New(new IPEndPoint(1,234),1),
+                SiloAddressFactory.New(new IPEndPoint(2,234),1),
+                SiloAddressFactory.New(new IPEndPoint(3,234),1),
+                SiloAddressFactory.New(new IPEndPoint(4,234),1),
             };
             
             Func<SiloAddress,UpdateFaultCombo> group = (SiloAddress a) => new UpdateFaultCombo(a.Endpoint.Port, a.Generation);

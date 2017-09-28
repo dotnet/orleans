@@ -132,7 +132,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (globalConfig.SeedNodes.Count > 0)
             {
-                seed = globalConfig.SeedNodes.Contains(MyAddress.Endpoint) ? MyAddress : SiloAddress.New(globalConfig.SeedNodes[0], 0);
+                seed = globalConfig.SeedNodes.Contains(MyAddress.Endpoint) ? MyAddress : SiloAddressFactory.New(globalConfig.SeedNodes[0], 0);
             }
 
             stopPreparationResolver = new TaskCompletionSource<bool>();

@@ -255,7 +255,7 @@ namespace Orleans
             await this.gatewayListProvider.InitializeGatewayListProvider(config)
                                .WithTimeout(initTimeout);
 
-            var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
+            var generation = -SiloAddressFactory.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
             transport.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);

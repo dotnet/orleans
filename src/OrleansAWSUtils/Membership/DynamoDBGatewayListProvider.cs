@@ -63,7 +63,7 @@ namespace Orleans.Runtime.MembershipService
             var records = await storage.ScanAsync<Uri>(TABLE_NAME_DEFAULT_VALUE, expressionValues,
                 expression, gateway =>
                 {
-                    return SiloAddress.New(
+                    return SiloAddressFactory.New(
                         new IPEndPoint(
                             IPAddress.Parse(gateway[SiloInstanceRecord.ADDRESS_PROPERTY_NAME].S),
                             int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N)),

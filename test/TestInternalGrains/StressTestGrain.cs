@@ -66,7 +66,7 @@ namespace UnitTests.Grains
                 var reply = new List<Tuple<SiloAddress, ActivationId>>();
                 for (int i = 0; i < 10; i++)
                 {
-                    reply.Add(new Tuple<SiloAddress, ActivationId>(SiloAddress.NewLocalAddress(0), ActivationId.NewId()));
+                    reply.Add(new Tuple<SiloAddress, ActivationId>(SiloAddressFactory.NewLocalAddress(0), ActivationId.NewId()));
                 }
                 list.Add(new Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>(id, 3, reply));
             }

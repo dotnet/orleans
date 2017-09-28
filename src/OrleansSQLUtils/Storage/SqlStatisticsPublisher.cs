@@ -77,7 +77,7 @@ namespace Orleans.Providers.SqlServer
             this.hostName = hostName;
             clientId = client;
             clientAddress = address;
-            generation = SiloAddress.AllocateNewGeneration();
+            generation = SiloAddressFactory.AllocateNewGeneration();
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace Orleans.Providers.SqlServer
             this.hostName = hostName;
             if(!isSilo)
             {
-                generation = SiloAddress.AllocateNewGeneration();
+                generation = SiloAddressFactory.AllocateNewGeneration();
             }
         }
 

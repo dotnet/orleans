@@ -58,10 +58,10 @@ namespace Orleans.Runtime
 
             if (this.NodeConfig.Generation == 0)
             {
-                this.NodeConfig.Generation = SiloAddress.AllocateNewGeneration();
+                this.NodeConfig.Generation = SiloAddressFactory.AllocateNewGeneration();
             }
 
-            this.SiloAddress = SiloAddress.New(this.NodeConfig.Endpoint, this.NodeConfig.Generation);
+            this.SiloAddress = SiloAddressFactory.New(this.NodeConfig.Endpoint, this.NodeConfig.Generation);
             this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
         }
 

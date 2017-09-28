@@ -336,7 +336,7 @@ namespace OrleansManager
 
         private static SiloAddress ParseSilo(string s)
         {
-            return SiloAddress.FromParsableString(s);
+            return SiloAddressFactory.FromParsableString(s);
         }
 
         public static void WriteStatus(string msg)

@@ -29,7 +29,7 @@ namespace TestServiceFabric
             this.siloDetails = new MockSiloDetails
             {
                 Name = Guid.NewGuid().ToString("N"),
-                SiloAddress = SiloAddress.NewLocalAddress(SiloAddress.AllocateNewGeneration())
+                SiloAddress = SiloAddressFactory.NewLocalAddress(SiloAddressFactory.AllocateNewGeneration())
             };
 
             this.resolver = new MockResolver();
@@ -125,12 +125,12 @@ namespace TestServiceFabric
             var silos = new[]
             {
                 CreateSiloInfo(
-                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1), 1),
-                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2), 1),
+                    SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 1), 1),
+                    SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 2), 1),
                     "HappyNewSilo"),
                 CreateSiloInfo(
-                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 3), 2),
-                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 4), 2),
+                    SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 3), 2),
+                    SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 4), 2),
                     "OtherNewSilo"),
             };
             

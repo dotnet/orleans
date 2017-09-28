@@ -115,7 +115,7 @@ namespace Orleans.Runtime.Host
             var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value));
 
             var keyParts = siloKV.Key.Split(KeySeparator);
-            ret.Address = SiloAddress.FromParsableString(keyParts.Last());
+            ret.Address = SiloAddressFactory.FromParsableString(keyParts.Last());
             ret.DeploymentId = deploymentId;
             ret.LastIndex = siloKV.ModifyIndex;
 
@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Host
                 Status = siloRegistration.Status,
                 ProxyPort = siloRegistration.ProxyPort,
                 StartTime = siloRegistration.StartTime,
-                SuspectTimes = siloRegistration.SuspectingSilos?.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(silo.Id), silo.Time)).ToList(),
+                SuspectTimes = siloRegistration.SuspectingSilos?.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddressFactory.FromParsableString(silo.Id), silo.Time)).ToList(),
                 IAmAliveTime = siloRegistration.IAmAliveTime,
                 SiloName = siloRegistration.SiloName,
 

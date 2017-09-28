@@ -69,7 +69,7 @@ namespace Orleans.AzureUtils
                 IPAddress address = IPAddress.Parse(addressStr);
                 int port = Int32.Parse(portStr);
                 int generation = Int32.Parse(genStr);
-                return SiloAddress.New(new IPEndPoint(address, port), generation);
+                return SiloAddressFactory.New(new IPEndPoint(address, port), generation);
             }
             catch (Exception exc)
             {
@@ -218,7 +218,7 @@ namespace Orleans.AzureUtils
             if (!string.IsNullOrEmpty(gateway.Generation))
                 int.TryParse(gateway.Generation, out gen);
 
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
+            SiloAddress address = SiloAddressFactory.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
             return address.ToGatewayUri();
         }
 

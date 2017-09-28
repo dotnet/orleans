@@ -177,7 +177,7 @@ namespace OrleansSQLUtils.Storage
                         entry.SuspectTimes.AddRange(suspectingSilos.Split('|').Select(s =>
                         {
                             var split = s.Split(',');
-                            return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]),
+                            return new Tuple<SiloAddress, DateTime>(SiloAddressFactory.FromParsableString(split[0]),
                                 LogFormatter.ParseDate(split[1]));
                         }));
                     }
@@ -221,7 +221,7 @@ namespace OrleansSQLUtils.Storage
                 int port = record.GetValue<int>(portName);
                 int generation = record.GetValue<int>(nameof(Columns.Generation));
                 string address = record.GetValue<string>(nameof(Columns.Address));
-                var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(address), port), generation);
+                var siloAddress = SiloAddressFactory.New(new IPEndPoint(IPAddress.Parse(address), port), generation);
                 return siloAddress;
             }
 

@@ -82,7 +82,7 @@ namespace Orleans.AzureUtils
             this.isSilo = isSilo;
             if (!this.isSilo)
             {
-                clientEpoch = SiloAddress.AllocateNewGeneration();
+                clientEpoch = SiloAddressFactory.AllocateNewGeneration();
             }
             counter = 0;
             var tableName = isSilo ? "OrleansSiloStatistics" : "OrleansClientStatistics";
