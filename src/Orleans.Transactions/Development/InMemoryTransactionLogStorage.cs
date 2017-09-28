@@ -29,11 +29,6 @@ namespace Orleans.Transactions.Development
             lastLogRecordIndex = 0;
         }
 
-        public Task Initialize()
-        {
-            return Task.CompletedTask;
-        }
-
         public Task<CommitRecord> GetFirstCommitRecord()
         {
             if (log.Count == 0)
@@ -113,6 +108,11 @@ namespace Orleans.Transactions.Development
             }
 
             return Task.CompletedTask;
+        }
+
+        public static Factory<Task<ITransactionLogStorage>> Create(IServiceProvider sp)
+        {
+            return () => Task.FromResult<ITransactionLogStorage>(new InMemoryTransactionLogStorage());
         }
     }
 }

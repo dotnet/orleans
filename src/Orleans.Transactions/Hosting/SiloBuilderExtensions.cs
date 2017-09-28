@@ -11,9 +11,6 @@ namespace Orleans.Transactions
         /// <summary>
         /// Configure cluster to use an in-cluster transaction manager.
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="config"></param>
-        /// <returns></returns>
         public static ISiloBuilder UseInClusterTransactionManager(this ISiloBuilder builder, TransactionsConfiguration config)
         {
             return builder.ConfigureServices(UseInClusterTransactionManager)
@@ -23,7 +20,6 @@ namespace Orleans.Transactions
         /// <summary>
         /// Configure cluster to support the use of transactional state.
         /// </summary>
-        /// <param name="builder"></param>
         public static ISiloBuilder UseTransactionalState(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(UseTransactionalState);

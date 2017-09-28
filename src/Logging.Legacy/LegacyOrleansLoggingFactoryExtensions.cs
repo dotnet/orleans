@@ -4,7 +4,7 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Microsoft.Orleans.Logging.Legacy
+namespace Orleans.Logging.Legacy
 {
     public static class LegacyOrleansLoggingFactoryExtensions
     {

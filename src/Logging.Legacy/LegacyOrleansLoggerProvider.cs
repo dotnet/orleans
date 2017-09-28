@@ -5,9 +5,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Runtime.InteropServices.ComTypes;
 
-namespace Microsoft.Orleans.Logging.Legacy
+namespace Orleans.Logging.Legacy
 {
     /// <summary>
     /// Provides an ILoggerProvider, whose implementation try to preserve orleans legacy logging features and abstraction

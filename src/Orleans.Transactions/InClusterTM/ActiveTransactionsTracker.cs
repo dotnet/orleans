@@ -2,7 +2,6 @@
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
@@ -10,7 +9,7 @@ namespace Orleans.Transactions
     {
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly object lockObj;
         private readonly Thread allocationThread;
         private readonly AutoResetEvent allocationEvent;
@@ -25,7 +24,7 @@ namespace Orleans.Transactions
         {
             this.config = configOption.Value;
             this.transactionLog = transactionLog;
-            this.logger = new LoggerWrapper<ActiveTransactionsTracker>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger(nameof(ActiveTransactionsTracker));
             lockObj = new object();
 
             allocationEvent = new AutoResetEvent(true);

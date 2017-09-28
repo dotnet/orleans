@@ -9,7 +9,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Orleans.Logging.Legacy;
+using Orleans.Logging.Legacy;
 using Orleans.Logging;
 using TestExtensions;
 using Xunit;

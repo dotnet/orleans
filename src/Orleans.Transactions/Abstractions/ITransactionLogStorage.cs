@@ -8,13 +8,6 @@ namespace Orleans.Transactions.Abstractions
     /// </summary>
     public interface ITransactionLogStorage
     {
-        /// <summary>
-        /// Initialize the log (in Recovery Mode). This method must be called before any other method
-        /// is called on the log.
-        /// </summary>
-        /// <returns></returns>
-        Task Initialize();
-
         ///// <summary>
         ///// Gets the first CommitRecord in the log.
         ///// </summary>
