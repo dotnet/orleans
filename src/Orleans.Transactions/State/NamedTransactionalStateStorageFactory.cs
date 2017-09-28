@@ -28,8 +28,9 @@ namespace Orleans.Transactions
                 ? this.context.ActivationServices.GetService<IStorageProvider>()
                 : this.context.ActivationServices.GetServiceByName<IStorageProvider>(storageName);
             if (storageProvider != null) return new TransactionalStateStorageProviderWrapper<TState>(storageProvider, context);
-
-            throw new InvalidOperationException($"Transactional storage {storageName} was not found.");
+            throw (string.IsNullOrEmpty(storageName))
+                ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IStorageProvider)} was found while attempting to create transactional state storage.")
+                : new InvalidOperationException($"No {nameof(ITransactionalStateStorageFactory)} nor {nameof(IStorageProvider)} with the name {storageName} was found while attempting to create transactional state storage.");
         }
     }
 }
