@@ -48,10 +48,10 @@ namespace UnitTests.StorageTests.Relational
                 Guid grainId = GetRandom<Guid>();
                 if(type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)), type.FullName);
+                    return grainFactory.GetGrain(GrainIdFactory.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)), type.FullName);
                 }
 
-                return grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
+                return grainFactory.GetGrain(GrainIdFactory.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
             },
             [typeof(long)] = (grainFactory, type, keyExtension, state) =>
             {
@@ -62,10 +62,10 @@ namespace UnitTests.StorageTests.Relational
                 long grainId = GetRandom<long>();
                 if(type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)), type.FullName);
+                    return grainFactory.GetGrain(GrainIdFactory.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)), type.FullName);
                 }
 
-                return grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
+                return grainFactory.GetGrain(GrainIdFactory.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
             },
             [typeof(string)] = (grainFactory, type, keyExtension, state) =>
             {
@@ -75,10 +75,10 @@ namespace UnitTests.StorageTests.Relational
                 var grainId = GetRandomCharacters(symbolSet, range);
                 if(type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(GrainId.FromParsableString(GrainId.GetGrainId(NormalGrainTypeCode, grainId).ToParsableString()));
+                    return grainFactory.GetGrain(GrainIdFactory.FromParsableString(GrainIdFactory.GetGrainId(NormalGrainTypeCode, grainId).ToParsableString()));
                 }
 
-                return grainFactory.GetGrain(GrainId.FromParsableString(GrainId.GetGrainId(NormalGrainTypeCode, grainId).ToParsableString()), type.FullName);
+                return grainFactory.GetGrain(GrainIdFactory.FromParsableString(GrainIdFactory.GetGrainId(NormalGrainTypeCode, grainId).ToParsableString()), type.FullName);
             }
         };
 

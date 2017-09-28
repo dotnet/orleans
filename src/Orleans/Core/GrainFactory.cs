@@ -60,7 +60,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
+            var grainId = GrainIdFactory.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -69,7 +69,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
+            var grainId = GrainIdFactory.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -79,7 +79,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
+            var grainId = GrainIdFactory.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -92,7 +92,7 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
+            var grainId = GrainIdFactory.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -104,7 +104,7 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
+            var grainId = GrainIdFactory.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 

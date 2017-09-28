@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             // GrainInterfaceMap only holds IGrain types, not ISystemTarget types, so resolved via Orleans.CodeGeneration.
             // Resolve this before merge.
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
-            var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
+            var grainId = GrainIdFactory.GetGrainServiceGrainId(0, typeCode);
 
             return new LocalReminderService(silo, grainId, this.reminderTable, silo.GlobalConfig, iniTimeSpan, this.loggerFactory);
         }

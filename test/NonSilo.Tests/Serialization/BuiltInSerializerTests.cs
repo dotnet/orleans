@@ -269,7 +269,7 @@ namespace UnitTests.Serialization
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            var grain = GrainId.NewId();
+            var grain = GrainIdFactory.NewId();
             var addr = ActivationAddress.GetAddress(null, grain, null);
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, addr, false);
             Assert.IsAssignableFrom<ActivationAddress>(deserialized);
@@ -567,12 +567,12 @@ namespace UnitTests.Serialization
             source4[0] = new GrainReference[2];
             source4[1] = new GrainReference[3];
             source4[2] = new GrainReference[1];
-            source4[0][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[0][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][2] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[2][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[0][0] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
+            source4[0][1] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
+            source4[1][0] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
+            source4[1][1] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
+            source4[1][2] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
+            source4[2][0] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source4);
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
@@ -582,7 +582,7 @@ namespace UnitTests.Serialization
                 source5[i] = new GrainReference[64];
                 for (int j = 0; j < source5[i].Length; j++)
                 {
-                    source5[i][j] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+                    source5[i][j] = environment.InternalGrainFactory.GetGrain(GrainIdFactory.NewId());
                 }
             }
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source5);
@@ -776,7 +776,7 @@ namespace UnitTests.Serialization
         //public void Serialize_RequestInvocationHistory()
         //{
         //    //Message inMsg = new Message();
-        //    //inMsg.TargetGrain = GrainId.NewId();
+        //    //inMsg.TargetGrain = GrainIdFactory.NewId();
         //    //inMsg.TargetActivation = ActivationId.NewId();
         //    //inMsg.InterfaceId = 12;
         //    //inMsg.MethodId = 13;
@@ -816,7 +816,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            GrainId grainId = GrainId.NewId();
+            GrainId grainId = GrainIdFactory.NewId();
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
 
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, input);
@@ -832,7 +832,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            GrainId grainId = GrainId.NewId();
+            GrainId grainId = GrainIdFactory.NewId();
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
             Assert.True(input.IsBound);
 

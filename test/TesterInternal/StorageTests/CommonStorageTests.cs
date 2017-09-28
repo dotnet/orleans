@@ -206,7 +206,7 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>A grain reference and a state pair.</returns>
         internal Tuple<GrainReference, GrainState<TestState1>> GetTestReferenceAndState(long grainId, string version)
         {
-            return Tuple.Create(this.grainFactory.GetGrain(GrainId.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            return Tuple.Create(this.grainFactory.GetGrain(GrainIdFactory.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });
         }
 
         /// <summary>
@@ -217,7 +217,7 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>A grain reference and a state pair.</returns>
         internal Tuple<GrainReference, GrainState<TestState1>> GetTestReferenceAndState(string grainId, string version)
         {
-            return Tuple.Create(this.grainFactory.GetGrain(GrainId.FromParsableString(GrainId.GetGrainId(RandomUtilities.NormalGrainTypeCode, grainId).ToParsableString())), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            return Tuple.Create(this.grainFactory.GetGrain(GrainIdFactory.FromParsableString(GrainIdFactory.GetGrainId(RandomUtilities.NormalGrainTypeCode, grainId).ToParsableString())), new GrainState<TestState1> { State = new TestState1(), ETag = version });
         }
     }
 }

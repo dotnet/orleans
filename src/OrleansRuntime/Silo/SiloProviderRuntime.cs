@@ -121,7 +121,7 @@ namespace Orleans.Runtime.Providers
             IProviderConfiguration providerConfig)
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
-            var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
+            var managerId = GrainIdFactory.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.

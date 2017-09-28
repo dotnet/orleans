@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Messaging
                 //convert handshake cliendId to a GeoClient ID 
                 if (this.globalConfig.HasMultiClusterNetwork)
                 {
-                    client = GrainId.NewClientId(client.PrimaryKey, this.globalConfig.ClusterId);
+                    client = GrainIdFactory.NewClientId(client.PrimaryKey, this.globalConfig.ClusterId);
                 }
             }
 
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Messaging
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
             if (this.globalConfig.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.globalConfig.ClusterId);
+                msg.SendingGrain = GrainIdFactory.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.globalConfig.ClusterId);
             }
 
             // Are we overloaded?

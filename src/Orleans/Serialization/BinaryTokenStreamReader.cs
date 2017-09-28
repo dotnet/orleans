@@ -469,7 +469,7 @@ namespace Orleans.Serialization
         internal GrainId ReadGrainId()
         {
             UniqueKey key = ReadUniqueKey();
-            return GrainId.GetGrainId(key);
+            return GrainIdFactory.GetGrainId(key);
         }
 
         /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>

@@ -216,7 +216,7 @@ namespace Orleans.Streams
             var keyExtension = grainsWithKeyExtensions.Contains(implTypeCode)
                 ? streamId.Namespace
                 : null;
-            GrainId grainId = GrainId.GetGrainId(implTypeCode, streamId.Guid, keyExtension);
+            GrainId grainId = GrainIdFactory.GetGrainId(implTypeCode, streamId.Guid, keyExtension);
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 
