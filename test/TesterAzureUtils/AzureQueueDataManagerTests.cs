@@ -24,7 +24,7 @@ namespace Tester.AzureUtils
         public AzureQueueDataManagerTests()
         {
             ClientConfiguration config = new ClientConfiguration();
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestsUtils.GetLegacyTraceFileName(config.ClientName, DateTime.UtcNow));
             logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
             this.loggerFactory = loggerFactory;
         }

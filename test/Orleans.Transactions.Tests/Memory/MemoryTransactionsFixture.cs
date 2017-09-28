@@ -1,4 +1,5 @@
-﻿using Orleans.Runtime.Configuration;
+﻿using System;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -25,7 +26,7 @@ namespace Orleans.Transactions.Tests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName))
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)))
                     .UseInClusterTransactionManager(new TransactionsConfiguration())
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();

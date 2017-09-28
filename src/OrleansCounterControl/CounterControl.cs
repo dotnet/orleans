@@ -154,8 +154,7 @@ namespace Orleans.Counter.Control
         internal static ILoggerFactory InitDefaultLogging()
         {
             Trace.Listeners.Clear();
-            var cfg = new NodeConfiguration { TraceFilePattern = null };
-            return CreateDefaultLoggerFactory(cfg.TraceFileName);
+            return CreateDefaultLoggerFactory("CounterControl.log");
         }
 
         private static ILoggerFactory CreateDefaultLoggerFactory(string filePath)

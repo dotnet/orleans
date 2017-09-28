@@ -29,19 +29,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public string ConfigFileName { get; set; }
 
-        /// <summary>
-        /// Directory to use for the trace log file written by this silo.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// <para>
-        /// When deciding The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// </remarks>
-        public string TraceFilePath { get; set; }
-
         /// <summary> Configuration data for the Orleans system. </summary>
         public ClusterConfiguration Config { get; set; }
 
@@ -466,13 +453,6 @@ namespace Orleans.Runtime.Host
 
             NodeConfig = Config.GetOrCreateNodeConfigurationForSilo(Name);
             Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
-
-            if (TraceFilePath != null)
-            {
-                var traceFileName = NodeConfig.TraceFileName;
-                if (traceFileName != null && !Path.IsPathRooted(traceFileName))
-                    NodeConfig.TraceFileName = TraceFilePath + "\\" + traceFileName;
-            }
 
             ConfigLoaded = true;
         }

@@ -47,7 +47,7 @@ namespace Tester.EventSourcingTests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)));
             }
 
             private void ConfigureLogging(ILoggingBuilder builder, string filePath)

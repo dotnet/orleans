@@ -45,7 +45,7 @@ namespace UnitTests.MembershipTests
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
-            loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName, filters);
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             logger = new LoggerWrapper<MembershipTableTestsBase>(loggerFactory);
 
             deploymentId = "test-" + Guid.NewGuid();

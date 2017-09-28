@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Configuration
     /// Individual node-specific silo configuration parameters.
     /// </summary>
     [Serializable]
-    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration
+    public class NodeConfiguration :IStatisticsConfiguration
     {
         private readonly DateTime creationTimestamp;
         private string siloName;
@@ -28,7 +28,6 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 siloName = value;
-                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
 
@@ -134,22 +133,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public LimitManager LimitManager { get; private set; }
 
-        private string traceFilePattern;
-        /// <summary>
-        /// </summary>
-        public string TraceFilePattern
-        {
-            get { return traceFilePattern; }
-            set
-            {
-                traceFilePattern = value;
-                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
-            }
-        }
-        /// <summary>
-        /// </summary>
-        public string TraceFileName { get; set; }
-
         /// <summary>
         ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
         /// </summary>
@@ -237,8 +220,7 @@ namespace Orleans.Runtime.Configuration
 
             LoadSheddingEnabled = false;
             LoadSheddingLimit = 95;
-
-            TraceFilePattern = "{0}-{1}.log";
+            
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             StatisticsMetricsTableWriteInterval = DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD;
@@ -280,9 +262,7 @@ namespace Orleans.Runtime.Configuration
 
             LoadSheddingEnabled = other.LoadSheddingEnabled;
             LoadSheddingLimit = other.LoadSheddingLimit;
-
-            TraceFilePattern = other.TraceFilePattern;
-            TraceFileName = other.TraceFileName;
+            
             PropagateActivityId = other.PropagateActivityId;
 
             StatisticsProviderName = other.StatisticsProviderName;
@@ -348,7 +328,6 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
             sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
-            sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             return sb.ToString();
@@ -450,9 +429,6 @@ namespace Orleans.Runtime.Configuration
                                 LoadSheddingLimit = 100;
                             }
                         }
-                        break;
-                    case "Tracing":
-                        ConfigUtilities.ParseTracing(this, child, SiloName);
                         break;
                     case "Statistics":
                         ConfigUtilities.ParseStatistics(this, child, SiloName);

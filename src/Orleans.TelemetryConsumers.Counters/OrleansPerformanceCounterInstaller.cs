@@ -31,8 +31,7 @@ namespace OrleansTelemetryConsumers.Counters
         public OrleansPerformanceCounterInstaller()
         {
             Trace.Listeners.Clear();
-            var cfg = new NodeConfiguration { TraceFilePattern = null};
-            var loggerFactory = CreateDefaultLoggerFactory(cfg.TraceFileName);
+            var loggerFactory = CreateDefaultLoggerFactory($"{this.GetType()}.log");
 
             var parts = new ApplicationPartManager();
             parts.AddApplicationPartsFromAppDomain();

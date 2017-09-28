@@ -38,7 +38,7 @@ namespace UnitTests.General
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
                         .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)));
                 }
             }
 
