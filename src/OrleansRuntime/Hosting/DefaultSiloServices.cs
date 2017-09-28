@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.CodeGeneration;
@@ -47,7 +46,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ISilo, SiloWrapper>();
             services.TryAddFromExisting<ILocalSiloDetails, SiloInitializationParameters>();
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
-            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().GlobalConfig);
+            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
             services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
             services.TryAddSingleton<Factory<NodeConfiguration>>(
                 sp =>
@@ -56,6 +55,8 @@ namespace Orleans.Hosting
                     return () => initializationParams.NodeConfig;
                 });
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
+            // register legacy logging to new options mapping for Silo options
+            services.AddLegacySiloConfigurationSupport();
             services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
@@ -114,7 +115,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
             services.TryAddSingleton<SiloAssemblyLoader>();
             services.TryAddSingleton<GrainTypeManager>();
-            services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();

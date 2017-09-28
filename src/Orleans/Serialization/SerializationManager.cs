@@ -15,10 +15,12 @@ using System.Text;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Serialization
 {
@@ -130,11 +132,9 @@ namespace Orleans.Serialization
         #endregion
 
         #region Static initialization
-        
-        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ITraceConfiguration traceConfig, ILoggerFactory loggerFactory)
+
+        public SerializationManager(IServiceProvider serviceProvider, IOptions<SerializationProviderOptions> serializatonProviderOptions, ITraceConfiguration traceConfig, ILoggerFactory loggerFactory)
         {
-            var serializationProviders = config.SerializationProviders;
-            var fallbackType = config.FallbackSerializationProvider;
             this.LargeObjectSizeThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
@@ -142,7 +142,7 @@ namespace Orleans.Serialization
             logger = new LoggerWrapper<SerializationManager>(loggerFactory);
             this.serviceProvider = serviceProvider;
             RegisterBuiltInSerializers();
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, fallbackType);
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, serializatonProviderOptions.Value.FallbackSerializationProvider);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -176,7 +176,7 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            RegisterSerializationProviders(serializationProviders);
+            RegisterSerializationProviders(serializatonProviderOptions.Value.SerializationProviders);
         }
 
         internal void RegisterBuiltInSerializers()

@@ -197,7 +197,7 @@ namespace Orleans.Runtime
             if (context == null && !oneWay)
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
-            if (message.IsExpirableMessage(Config.Globals))
+            if (message.IsExpirableMessage(Config.Globals.DropExpiredMessages))
                 message.TimeToLive = ResponseTimeout;
 
             if (!oneWay)

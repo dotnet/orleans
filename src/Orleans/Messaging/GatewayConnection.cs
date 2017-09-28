@@ -36,7 +36,7 @@ namespace Orleans.Messaging
         private DateTime lastConnect;
 
         internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ILoggerFactory loggerFactory)
-            : base("GatewayClientSender_" + address, mc.MessagingConfiguration, mc.SerializationManager, loggerFactory)
+            : base("GatewayClientSender_" + address, mc.SerializationManager, loggerFactory)
         {
             this.messageFactory = messageFactory;
             Address = address;

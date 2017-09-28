@@ -8,6 +8,8 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -15,7 +17,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans
 {
@@ -27,6 +29,7 @@ namespace Orleans
         private Logger callBackDataLogger;
         private ILogger timerLogger;
         private ClientConfiguration config;
+        private IOptions<ClientMessagingOptions> clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
@@ -111,13 +114,13 @@ namespace Orleans
         {
             this.ServiceProvider = services;
 
-            var connectionLostHandlers = services.GetServices<ConnectionToClusterLostHandler>();
+            var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
             foreach (var handler in connectionLostHandlers)
             {
                 this.ClusterConnectionLost += handler;
             }
 
-            var clientInvokeCallbacks = services.GetServices<ClientInvokeCallback>();
+            var clientInvokeCallbacks = this.ServiceProvider.GetServices<ClientInvokeCallback>();
             foreach (var handler in clientInvokeCallbacks)
             {
                 this.ClientInvokeCallback += handler;
@@ -128,16 +131,17 @@ namespace Orleans
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
-            this.config = services.GetRequiredService<ClientConfiguration>();
+            this.config = this.ServiceProvider.GetRequiredService<ClientConfiguration>();
+            this.clientMessagingOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientMessagingOptions>>();
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            services.GetService<TelemetryManager>()?.AddFromConfiguration(services, config.TelemetryConfiguration);
+            this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
 
             StatisticsCollector.Initialize(config);
             this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
-            BufferPool.InitGlobalBufferPool(config);
+            BufferPool.InitGlobalBufferPool(clientMessagingOptions);
 
 
             try
@@ -627,7 +631,7 @@ namespace Orleans
             {
                 message.DebugContext = debugContext;
             }
-            if (message.IsExpirableMessage(config))
+            if (message.IsExpirableMessage(config.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
                 message.TimeToLive = responseTimeout;
@@ -654,7 +658,7 @@ namespace Orleans
 
         private bool TryResendMessage(Message message)
         {
-            if (!message.MayResend(config))
+            if (!message.MayResend(config.MaxResendCount))
             {
                 return false;
             }

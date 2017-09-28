@@ -300,9 +300,9 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsExpirableMessage(IMessagingConfiguration config)
+        public bool IsExpirableMessage(bool dropExpiredMessages)
         {
-            if (!config.DropExpiredMessages) return false;
+            if (!dropExpiredMessages) return false;
 
             GrainId id = TargetGrain;
             if (id == null) return false;
@@ -342,9 +342,9 @@ namespace Orleans.Runtime
         }
 
         // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
-        public bool MayResend(IMessagingConfiguration config)
+        public bool MayResend(int maxResendCount)
         {
-            return ResendCount < config.MaxResendCount;
+            return ResendCount < maxResendCount;
         }
 
         // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing

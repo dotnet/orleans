@@ -2,7 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -38,9 +39,9 @@ namespace Orleans.Runtime
             private set;
         }
 
-        internal static void InitGlobalBufferPool(IMessagingConfiguration config)
+        internal static void InitGlobalBufferPool(IOptions<MessagingOptions> messagingConfigurationOptions)
         {
-            GlobalPool = new BufferPool(config.BufferPoolBufferSize, config.BufferPoolMaxSize, config.BufferPoolPreallocationSize, "Global");
+            GlobalPool = new BufferPool(messagingConfigurationOptions.Value.BufferPoolBufferSize, messagingConfigurationOptions.Value.BufferPoolMaxSize, messagingConfigurationOptions.Value.BufferPoolPreallocationSize, "Global");
         }
 
         /// <summary>
