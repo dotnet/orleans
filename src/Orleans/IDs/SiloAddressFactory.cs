@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -92,6 +95,55 @@ namespace Orleans.Runtime
             var host = IPAddress.Parse(hostString);
             int port = Int32.Parse(portString);
             return SiloAddressFactory.New(new IPEndPoint(host, port), Int32.Parse(genString));
+        }
+
+        /// <summary>Get a consistent hash value for this silo address.</summary>
+        /// <returns>Consistent hash value for this silo address.</returns>
+        public static int GetConsistentHashCode(this SiloAddress @this)
+        {
+            if (@this.hashCodeSet) return @this.hashCode;
+
+            // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
+            string siloAddressInfoToHash = @this.Endpoint + @this.Generation.ToString(CultureInfo.InvariantCulture);
+            @this.hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
+            @this.hashCodeSet = true;
+            return @this.hashCode;
+        }
+
+        /// <summary>
+        /// Return a long string representation of this SiloAddress, including it's consistent hash value.
+        /// </summary>
+        /// <remarks>
+        /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
+        /// </remarks>
+        /// <returns>String representaiton of this SiloAddress.</returns>
+        public static string ToStringWithHashCode(this SiloAddress @this)
+        {
+            return String.Format("{0}/x{1, 8:X8}", @this.ToString(), GetConsistentHashCode(@this));
+        }
+
+        public static List<uint> GetUniformHashCodes(this SiloAddress @this, int numHashes)
+        {
+            if (@this.uniformHashCache != null) return @this.uniformHashCache;
+
+            var hashes = new List<uint>();
+            for (int i = 0; i < numHashes; i++)
+            {
+                uint hash = GetUniformHashCode(@this, i);
+                hashes.Add(hash);
+            }
+            @this.uniformHashCache = hashes;
+            return @this.uniformHashCache;
+        }
+
+        private static uint GetUniformHashCode(SiloAddress address, int extraBit)
+        {
+            var writer = new BinaryTokenStreamWriter();
+            writer.Write(address);
+            writer.Write(extraBit);
+            byte[] bytes = writer.ToByteArray();
+            writer.ReleaseBuffers();
+            return JenkinsHash.ComputeHash(bytes);
         }
     }
 }

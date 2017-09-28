@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -16,11 +14,12 @@ namespace Orleans.Runtime
     {
         internal static readonly int SizeBytes = 24; // 16 for the address, 4 for the port, 4 for the generation
 
-        private int hashCode = 0;
-        private bool hashCodeSet = false;
-
-        [NonSerialized]
-        private List<uint> uniformHashCache;
+        // TODO theses values are set by extensions method in SiloAddressFactory. We should find a 
+        // way to cachec this value without this ugly hack
+        internal int hashCode = 0;
+        internal bool hashCodeSet = false;
+        [NonSerialized] internal List<uint> uniformHashCache;
+        // TODO END
 
         public IPEndPoint Endpoint { get; private set; }
         public int Generation { get; private set; }
@@ -51,18 +50,6 @@ namespace Orleans.Runtime
             return ToString();
         }
 
-        /// <summary>
-        /// Return a long string representation of this SiloAddress, including it's consistent hash value.
-        /// </summary>
-        /// <remarks>
-        /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
-        /// </remarks>
-        /// <returns>String representaiton of this SiloAddress.</returns>
-        public string ToStringWithHashCode()
-        {
-            return String.Format("{0}/x{1, 8:X8}", ToString(), GetConsistentHashCode());
-        }
-
         /// <summary> Object.Equals method override. </summary>
         public override bool Equals(object obj)
         {
@@ -74,43 +61,6 @@ namespace Orleans.Runtime
         {
             // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
             return Endpoint.GetHashCode() ^ Generation.GetHashCode();
-        }
-
-        /// <summary>Get a consistent hash value for this silo address.</summary>
-        /// <returns>Consistent hash value for this silo address.</returns>
-        public int GetConsistentHashCode()
-        {
-            if (hashCodeSet) return hashCode;
-
-            // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
-            string siloAddressInfoToHash = Endpoint + Generation.ToString(CultureInfo.InvariantCulture);
-            hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
-            hashCodeSet = true;
-            return hashCode;
-        }
-
-        public List<uint> GetUniformHashCodes(int numHashes)
-        {
-            if (uniformHashCache != null) return uniformHashCache;
-
-            var hashes = new List<uint>();
-            for (int i = 0; i < numHashes; i++)
-            {
-                uint hash = GetUniformHashCode(i);
-                hashes.Add(hash);
-            }
-            uniformHashCache = hashes;
-            return uniformHashCache;
-        }
-
-        private uint GetUniformHashCode(int extraBit)
-        {
-            var writer = new BinaryTokenStreamWriter();
-            writer.Write(this);
-            writer.Write(extraBit);
-            byte[] bytes = writer.ToByteArray();
-            writer.ReleaseBuffers();
-            return JenkinsHash.ComputeHash(bytes);
         }
 
         /// <summary>
