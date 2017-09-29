@@ -395,28 +395,28 @@ namespace Orleans.Runtime
                 {
                     genericStr = null;
                 }
-                return FromGrainId(GrainIdFactory.FromParsableString(grainIdStr), runtime, genericStr);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, genericStr);
             }
             else if (observerIndex >= 0)
             {
                 grainIdStr = trimmed.Substring(grainIdIndex, observerIndex - grainIdIndex).Trim();
                 string observerIdStr = trimmed.Substring(observerIndex + (OBSERVER_ID_STR + "=").Length);
                 GuidId observerId = GuidId.FromParsableString(observerIdStr);
-                return NewObserverGrainReference(GrainIdFactory.FromParsableString(grainIdStr), observerId, runtime);
+                return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId, runtime);
             }
             else if (systemTargetIndex >= 0)
             {
                 grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
                 SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
-                return FromGrainId(GrainIdFactory.FromParsableString(grainIdStr), runtime, null, siloAddress);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
             }
             else
             {
                 grainIdStr = trimmed.Substring(grainIdIndex);
-                return FromGrainId(GrainIdFactory.FromParsableString(grainIdStr), runtime);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
             }
-            //return FromGrainId(GrainIdFactory.FromParsableString(grainIdStr), generic);
+            //return FromGrainId(GrainId.FromParsableString(grainIdStr), generic);
         }
 
 
@@ -445,7 +445,7 @@ namespace Orleans.Runtime
         {
             // Reset the property value using the GetValue method.
             var grainIdStr = info.GetString("GrainId");
-            GrainId = GrainIdFactory.FromParsableString(grainIdStr);
+            GrainId = GrainId.FromParsableString(grainIdStr);
             if (IsSystemTarget)
             {
                 var siloAddressStr = info.GetString("SystemTargetSilo");

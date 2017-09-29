@@ -256,11 +256,11 @@ namespace OrleansManager
             long grainIdLong;
             Guid grainIdGuid;
             if (long.TryParse(grainIdStr, out grainIdLong))
-                grainId = GrainIdFactory.GetGrainId(implementationTypeCode, grainIdLong);
+                grainId = GrainId.GetGrainId(implementationTypeCode, grainIdLong);
             else if (Guid.TryParse(grainIdStr, out grainIdGuid))
-                grainId = GrainIdFactory.GetGrainId(implementationTypeCode, grainIdGuid);
+                grainId = GrainId.GetGrainId(implementationTypeCode, grainIdGuid);
             else 
-                grainId = GrainIdFactory.GetGrainId(implementationTypeCode, grainIdStr);
+                grainId = GrainId.GetGrainId(implementationTypeCode, grainIdStr);
             
             WriteStatus(string.Format("**Full Grain Id to {0} is: GrainId = {1}", operation, grainId.ToFullString()));
             return grainId;

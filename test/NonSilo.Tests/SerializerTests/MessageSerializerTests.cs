@@ -78,8 +78,8 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
-            resp.SendingGrain = GrainIdFactory.NewId();
-            resp.TargetGrain = GrainIdFactory.NewId();
+            resp.SendingGrain = GrainId.NewId();
+            resp.TargetGrain = GrainId.NewId();
             resp.IsAlwaysInterleave = true;
             Assert.True(resp.IsUsingInterfaceVersions);
 

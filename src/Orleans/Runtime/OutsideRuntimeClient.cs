@@ -98,7 +98,7 @@ namespace Orleans
         {
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.handshakeClientId = GrainIdFactory.NewClientId();
+            this.handshakeClientId = GrainId.NewClientId();
             tryResendMessage = TryResendMessage;
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();

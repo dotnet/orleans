@@ -211,7 +211,7 @@ namespace Orleans.Serialization
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainIdFactory.FromParsableString(jo["GrainId"].ToObject<string>());
+            GrainId grainId = GrainId.FromParsableString(jo["GrainId"].ToObject<string>());
             return grainId;
         }
     }

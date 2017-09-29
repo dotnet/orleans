@@ -587,7 +587,7 @@ namespace Orleans.Runtime
                 }
 
                 var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-                var grainId = (IGrainIdentity)GrainIdFactory.GetGrainServiceGrainId(0, typeCode);
+                var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(0, typeCode);
                 var grainService = (GrainService)ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId, serviceConfig.Value);
                 RegisterSystemTarget(grainService);
 
