@@ -2,10 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Core.Abstractions.Internal
 {
     internal static class InternerConstants
     {
@@ -54,7 +52,7 @@ namespace Orleans
     internal class Interner<K, T> : IDisposable where T : class
     {
         private readonly TimeSpan cacheCleanupInterval;
-        private readonly SafeTimer cacheCleanupTimer;
+        private readonly Timer cacheCleanupTimer;
 
         [NonSerialized]
         private readonly ConcurrentDictionary<K, WeakReference<T>> internCache;
@@ -77,11 +75,8 @@ namespace Orleans
             this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Timeout.InfiniteTimeSpan : cleanupFreq;
             if (Timeout.InfiniteTimeSpan != cacheCleanupInterval)
             {
-                cacheCleanupTimer = new SafeTimer(NullLogger.Instance, InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
+                cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
-#if DEBUG_INTERNER
-            StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=" + Environment.NewLine + "{1}", internCache.Count, PrintInternerContent()));
-#endif
         }
 
         /// <summary>

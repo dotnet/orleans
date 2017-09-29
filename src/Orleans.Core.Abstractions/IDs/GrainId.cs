@@ -1,9 +1,7 @@
 using System;
 using System.Globalization;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Orleans.Core;
-using Orleans.Serialization;
+using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
@@ -321,21 +319,6 @@ namespace Orleans.Runtime
 
             var key = UniqueKey.Parse(grainId);
             return FindOrCreateGrainId(key);
-        }
-
-        internal byte[] ToByteArray()
-        {
-            var writer = new BinaryTokenStreamWriter();
-            writer.Write(this);
-            var result = writer.ToByteArray();
-            writer.ReleaseBuffers();
-            return result;
-        }
-
-        internal static GrainId FromByteArray(byte[] byteArray)
-        {
-            var reader = new BinaryTokenStreamReader(byteArray);
-            return reader.ReadGrainId();
         }
     }
 }
