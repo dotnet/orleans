@@ -57,10 +57,8 @@ SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 SET SOLUTION=%CMDHOME%\Orleans.sln
 
 :: Set DateTime suffix for debug builds
-if "%BuildConfiguration%" == "Debug" (
-    for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%i
-	SET AdditionalConfigurationProperties=;VersionDateSuffix=%DATE_SUFFIX%
-)
+if "%BuildConfiguration%" == "Debug" for /f %%j in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%j
+if "%BuildConfiguration%" == "Debug" SET AdditionalConfigurationProperties=;VersionDateSuffix=%DATE_SUFFIX%
 
 if "%1" == "Pack" GOTO :Package
 
