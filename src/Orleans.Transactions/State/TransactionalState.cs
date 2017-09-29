@@ -37,7 +37,7 @@ namespace Orleans.Transactions
         private ITransactionalStateStorage<TState> storage;
 
         // only to be modified at save/load time
-        private MetaData metaData;
+        private Metadata metaData;
         private string eTag;
         private bool validState;
 
@@ -45,8 +45,8 @@ namespace Orleans.Transactions
         private TState value;
         private readonly SortedDictionary<long, LogRecord<TState>> log;
         private TransactionalResourceVersion version;
-        private long HighestRead;
-        private long highCommit;
+        private long highestReadTransactionId;
+        private long highCommitTransactionId;
 
         public TState State => GetState();
 
@@ -89,7 +89,7 @@ namespace Orleans.Transactions
             // Validation
             //
 
-            if (this.version.TransactionId > info.TransactionId || this.HighestRead >= info.TransactionId)
+            if (this.version.TransactionId > info.TransactionId || this.highestReadTransactionId >= info.TransactionId)
             {
                 // Prevent cycles. Wait-die
                 throw new OrleansTransactionWaitDieException(info.TransactionId);
@@ -137,8 +137,8 @@ namespace Orleans.Transactions
             long wlb = 0;
             if (readVersion.HasValue)
             {
-                this.HighestRead = Math.Max(this.HighestRead, readVersion.Value.TransactionId - 1);
-                wlb = this.HighestRead;
+                this.highestReadTransactionId = Math.Max(this.highestReadTransactionId, readVersion.Value.TransactionId - 1);
+                wlb = this.highestReadTransactionId;
             }
 
             if (!ValidateWrite(writeVersion))
@@ -188,7 +188,7 @@ namespace Orleans.Transactions
             // Learning that t is committed implies that all pending transactions before t also committed
             if (transactionId > this.metaData.StableVersion.TransactionId)
             {
-                this.highCommit = Math.Max(this.highCommit, transactionId);
+                this.highCommitTransactionId = Math.Max(this.highCommitTransactionId, transactionId);
                 try
                 {
                     bool success = await this.storageExecutor.AddNext(() => GuardState(() => PersistCommit(transactionId)));
@@ -226,7 +226,7 @@ namespace Orleans.Transactions
             }
 
             // check if we need to do a log write
-            if (this.metaData.StableVersion.TransactionId >= transactionId && this.metaData.HighestRead >= wlb)
+            if (this.metaData.StableVersion.TransactionId >= transactionId && this.metaData.HighestReadTransactionId >= wlb)
             {
                 // Logs already persisted, nothing to do here
                 return true;
@@ -234,7 +234,7 @@ namespace Orleans.Transactions
 
             List<PendingTransactionState<TState>> pending = this.log.Select(kvp => new PendingTransactionState<TState>(kvp.Value.Version.ToString(), kvp.Key, kvp.Value.NewVal)).ToList();
             this.metaData.HighestVersion = this.version;
-            this.metaData.HighestRead = wlb;
+            this.metaData.HighestReadTransactionId = wlb;
             this.eTag = await this.storage.Persist(StateName, this.eTag, this.metaData.ToString(), pending);
 
             return true;
@@ -242,7 +242,7 @@ namespace Orleans.Transactions
 
         private async Task<bool> PersistCommit(long transactionId)
         {
-            transactionId = Math.Max(this.highCommit, transactionId);
+            transactionId = Math.Max(this.highCommitTransactionId, transactionId);
             if (transactionId <= this.metaData.StableVersion.TransactionId)
             {
                 // Transaction commit already persisted.
@@ -274,7 +274,7 @@ namespace Orleans.Transactions
 
             this.metaData.StableVersion = stableversion;
             this.metaData.HighestVersion = this.version;
-            this.metaData.HighestRead = this.HighestRead;
+            this.metaData.HighestReadTransactionId = this.highestReadTransactionId;
             this.eTag = await this.storage.Confirm(StateName, this.eTag, this.metaData.ToString(), stableversion.ToString());
 
             return true;
@@ -341,7 +341,7 @@ namespace Orleans.Transactions
 
             info.RecordRead(transactionalResource, readVersion, this.metaData.StableVersion.TransactionId);
 
-            this.HighestRead = Math.Max(this.HighestRead, info.TransactionId - 1);
+            this.highestReadTransactionId = Math.Max(this.highestReadTransactionId, info.TransactionId - 1);
 
             TState copy = this.copier.DeepCopy(readState);
 
@@ -433,8 +433,8 @@ namespace Orleans.Transactions
             TransactionalStorageLoadResponse<TState> loadResponse = await this.storage.Load(StateName);
             
             this.eTag = loadResponse.ETag;
-            this.metaData = MetaData.FromString(loadResponse.Metadata);
-            this.HighestRead = this.metaData.HighestRead;
+            this.metaData = Metadata.FromString(loadResponse.Metadata);
+            this.highestReadTransactionId = this.metaData.HighestReadTransactionId;
             this.version = this.metaData.HighestVersion;
             this.value = loadResponse.CommittedState;
             this.log.Clear();
@@ -484,7 +484,7 @@ namespace Orleans.Transactions
         }
 
         [Serializable]
-        private class MetaData
+        private class Metadata
         {
             [JsonIgnore]
             public TransactionalResourceVersion HighestVersion { get; set; }
@@ -502,16 +502,16 @@ namespace Orleans.Transactions
                 set { this.StableVersion = (TransactionalResourceVersion.TryParse(value, out TransactionalResourceVersion version)) ? version : default(TransactionalResourceVersion); }
             }
 
-            public long HighestRead { get; set; }
+            public long HighestReadTransactionId { get; set; }
 
             public override string ToString()
             {
                 return JsonConvert.SerializeObject(this);
             }
 
-            public static MetaData FromString(string metadataString)
+            public static Metadata FromString(string metadataString)
             {
-                return (!string.IsNullOrEmpty(metadataString)) ? JsonConvert.DeserializeObject<MetaData>(metadataString) : new MetaData();
+                return (!string.IsNullOrEmpty(metadataString)) ? JsonConvert.DeserializeObject<Metadata>(metadataString) : new Metadata();
             }
         }
     }
