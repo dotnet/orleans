@@ -26,24 +26,24 @@ namespace Orleans.TestingHost
     /// <summary>Allows programmatically hosting an Orleans silo in the curent app domain, exposing some marshable members via remoting.</summary>
     public class AppDomainSiloHost : MarshalByRefObject
     {
-        private readonly ISilo silo;
+        private readonly ISiloHost host;
 
         /// <summary>Creates and initializes a silo in the current app domain.</summary>
         /// <param name="name">Name of this silo.</param>
-        /// <param name="siloBuilderFactoryType">Type of silo builder factory.</param>
+        /// <param name="siloBuilderFactoryType">Type of silo host builder factory.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
         public AppDomainSiloHost(string name, Type siloBuilderFactoryType, ClusterConfiguration config)
         {
             var builderFactory = (ISiloBuilderFactory)Activator.CreateInstance(siloBuilderFactoryType);
-            ISiloBuilder builder = builderFactory.CreateSiloBuilder(name, config);
+            ISiloHostBuilder builder = builderFactory.CreateSiloBuilder(name, config);
             builder.ConfigureServices((services) => services.AddSingleton<TestHooksSystemTarget>());
-            this.silo = builder.Build();
+            this.host = builder.Build();
             InitializeTestHooksSystemTarget();
-            this.AppDomainTestHook = new AppDomainTestHooks(this.silo);
+            this.AppDomainTestHook = new AppDomainTestHooks(this.host);
         }
 
         /// <summary> SiloAddress for this silo. </summary>
-        public SiloAddress SiloAddress => this.silo.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
+        public SiloAddress SiloAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
         
         internal AppDomainTestHooks AppDomainTestHook { get; }
 
@@ -99,19 +99,19 @@ namespace Orleans.TestingHost
         /// <summary>Starts the silo</summary>
         public void Start()
         {
-            this.silo.StartAsync().GetAwaiter().GetResult();
+            this.host.StartAsync().GetAwaiter().GetResult();
         }
 
         /// <summary>Gracefully shuts down the silo</summary>
         public void Shutdown()
         {
-            this.silo.StopAsync().GetAwaiter().GetResult();
+            this.host.StopAsync().GetAwaiter().GetResult();
         }
 
         private void InitializeTestHooksSystemTarget()
         {
-            var testHook = this.silo.Services.GetRequiredService<TestHooksSystemTarget>();
-            var providerRuntime = this.silo.Services.GetRequiredService<SiloProviderRuntime>();
+            var testHook = this.host.Services.GetRequiredService<TestHooksSystemTarget>();
+            var providerRuntime = this.host.Services.GetRequiredService<SiloProviderRuntime>();
             providerRuntime.RegisterSystemTarget(testHook);
         }
     }
@@ -122,22 +122,22 @@ namespace Orleans.TestingHost
     /// </summary>
     internal class AppDomainTestHooks : MarshalByRefObject
     {
-        private readonly ISilo silo;
+        private readonly ISiloHost host;
 
-        public AppDomainTestHooks(ISilo silo)
+        public AppDomainTestHooks(ISiloHost host)
         {
-            this.silo = silo;
+            this.host = host;
         }
 
         internal IBootstrapProvider GetBootstrapProvider(string name)
         {
-            var bootstrapProviderManager = silo.Services.GetRequiredService<BootstrapProviderManager>();
+            var bootstrapProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
             IBootstrapProvider provider = (IBootstrapProvider)bootstrapProviderManager.GetProvider(name);
             return CheckReturnBoundaryReference("bootstrap provider", provider);
         }
 
         /// <summary>Find the named storage provider loaded in this silo. </summary>
-        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)silo.Services.GetRequiredService<StorageProviderManager>().GetProvider(name));
+        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)this.host.Services.GetRequiredService<StorageProviderManager>().GetProvider(name));
 
         private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
         {
@@ -154,8 +154,8 @@ namespace Orleans.TestingHost
         public IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
         {
             var x = new Dictionary<GrainId, IGrainInfo>();
-            LocalGrainDirectory localGrainDirectory = silo.Services.GetRequiredService<LocalGrainDirectory>();
-            var catalog = silo.Services.GetRequiredService<Catalog>();
+            LocalGrainDirectory localGrainDirectory = this.host.Services.GetRequiredService<LocalGrainDirectory>();
+            var catalog = this.host.Services.GetRequiredService<Catalog>();
             foreach (var kvp in localGrainDirectory.DirectoryPartition.GetItems())
             {
                 if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
@@ -178,13 +178,13 @@ namespace Orleans.TestingHost
 
             simulatedMessageLoss[destination] = lossPercentage;
 
-            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
+            var mc = this.host.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = ShouldDrop;
         }
 
         internal void UnblockSiloCommunication()
         {
-            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
+            var mc = this.host.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
         }
@@ -193,12 +193,12 @@ namespace Orleans.TestingHost
         {
             get
             {
-                var mco = this.silo.Services.GetRequiredService<MultiClusterOracle>();
+                var mco = this.host.Services.GetRequiredService<MultiClusterOracle>();
                 return mco.ProtocolMessageFilterForTesting;
             }
             set
             {
-                var mco = this.silo.Services.GetRequiredService<MultiClusterOracle>();
+                var mco = this.host.Services.GetRequiredService<MultiClusterOracle>();
                 mco.ProtocolMessageFilterForTesting = value;
             }
         }

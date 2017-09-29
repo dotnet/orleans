@@ -7,7 +7,7 @@ namespace Tester.StorageFacet.Infrastructure
 {
     public static class ExampleStorageExtensions
     {
-        public static void UseExampleStorage(this ISiloBuilder builder)
+        public static void UseExampleStorage(this ISiloHostBuilder builder)
         {
             builder.ConfigureServices(services =>
             {
@@ -19,7 +19,7 @@ namespace Tester.StorageFacet.Infrastructure
             });
         }
 
-        public static void UseAsDefaultExampleStorage<TFactoryType>(this ISiloBuilder builder)
+        public static void UseAsDefaultExampleStorage<TFactoryType>(this ISiloHostBuilder builder)
             where TFactoryType : class, IExampleStorageFactory
         {
             builder.ConfigureServices(services =>

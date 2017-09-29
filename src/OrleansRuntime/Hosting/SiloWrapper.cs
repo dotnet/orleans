@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
-    internal class SiloWrapper : ISilo
+    internal class SiloWrapper : ISiloHost
     {
         private readonly Silo silo;
 
