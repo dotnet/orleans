@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
+    public delegate bool StreamFilterPredicate(IStreamIdentity stream, object filterData, object item);
+
     /// <summary>
     /// This interface generalizes the standard .NET IObserveable interface to allow asynchronous consumption of items.
     /// Asynchronous here means that the consumer can process items asynchronously and signal item completion to the 
