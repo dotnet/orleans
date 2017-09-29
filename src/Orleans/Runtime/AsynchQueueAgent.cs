@@ -8,14 +8,12 @@ namespace Orleans.Runtime
 {
     internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
     {
-        private readonly IMessagingConfiguration config;
         private BlockingCollection<T> requestQueue;
         private QueueTrackingStatistic queueTracking;
 
-        protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg, ILoggerFactory loggerFactory)
+        protected AsynchQueueAgent(string nameSuffix, ILoggerFactory loggerFactory)
             : base(nameSuffix, loggerFactory)
         {
-            config = cfg;
             requestQueue = new BlockingCollection<T>();
             if (StatisticsCollector.CollectQueueStats)
             {

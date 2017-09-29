@@ -1,6 +1,3 @@
-using Microsoft.Extensions.Logging;
-using Orleans.Logging;
-
 namespace Orleans.CodeGeneration
 {
     using System;
@@ -8,9 +5,13 @@ namespace Orleans.CodeGeneration
     using System.IO;
     using System.Reflection;
     using Orleans.CodeGenerator;
+    using Orleans.Configuration;
+    using Orleans.Logging;
     using Orleans.Runtime;
     using Orleans.Serialization;
     using Orleans.Runtime.Configuration;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Options;
 
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.
@@ -128,9 +129,14 @@ namespace Orleans.CodeGeneration
             }
 
             var config = new ClusterConfiguration();
+            var serializationProviderOptions = Options.Create(new SerializationProviderOptions
+            {
+                SerializationProviders = config.Globals.SerializationProviders,
+                FallbackSerializationProvider = config.Globals.FallbackSerializationProvider
+            });
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new FileLoggerProvider("ClientGenerator.log"));
-            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults, loggerFactory), loggerFactory);
+            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, serializationProviderOptions, config.Defaults, loggerFactory), loggerFactory);
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);

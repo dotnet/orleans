@@ -40,7 +40,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             this.grainFactory = grainFactory;
             if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
-            var config = siloDetails.GlobalConfig;
+            var config = siloDetails.ClusterConfig.Globals;
             logger = new LoggerWrapper<MultiClusterOracle>(loggerFactory);
             localData = new MultiClusterOracleData(logger, grainFactory);
             clusterId = config.ClusterId;

@@ -29,9 +29,6 @@ namespace Orleans.Runtime
         private readonly MessageFactory messagefactory;
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
-        private readonly double rejectionInjectionRate;
-        private readonly bool errorInjection;
-        private readonly double errorInjectionRate;
         private readonly SafeRandom random;
         private readonly ILogger invokeWorkItemLogger;
         private readonly ILoggerFactory loggerFactory;
@@ -59,10 +56,6 @@ namespace Orleans.Runtime
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             logger = new LoggerWrapper<Dispatcher>(loggerFactory);
-            rejectionInjectionRate = config.Globals.RejectionInjectionRate;
-            double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
-            errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;
-            errorInjectionRate = rejectionInjectionRate + messageLossInjectionRate;
             random = new SafeRandom();
         }
 
@@ -94,14 +87,6 @@ namespace Orleans.Runtime
             {
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ReceiveMessage on system target.");
                 throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
-            }
-
-            if (errorInjection && ShouldInjectError(message))
-            {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_InjectingRejection, "Injecting a rejection");
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ErrorInjection");
-                RejectMessage(message, Message.RejectionTypes.Unrecoverable, null, "Injected rejection");                
-                return;
             }
 
             try
@@ -571,7 +556,7 @@ namespace Orleans.Runtime
 
         internal bool TryResendMessage(Message message)
         {
-            if (!message.MayResend(this.config.Globals)) return false;
+            if (!message.MayResend(this.config.Globals.MaxResendCount)) return false;
 
             message.ResendCount = message.ResendCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
@@ -850,23 +835,6 @@ namespace Orleans.Runtime
                 runLoop = true;
             }
             while (runLoop);
-        }
-
-        private bool ShouldInjectError(Message message)
-        {
-            if (!errorInjection || message.Direction != Message.Directions.Request) return false;
-
-            double r = random.NextDouble() * 100;
-            if (!(r < errorInjectionRate)) return false;
-
-            if (r < rejectionInjectionRate)
-            {
-                return true;
-            }
-
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_InjectingMessageLoss, "Injecting a message loss");
-            // else do nothing and intentionally drop message on the floor to inject a message loss
-            return true;
         }
 
         #endregion

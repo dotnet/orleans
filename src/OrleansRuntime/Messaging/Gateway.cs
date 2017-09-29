@@ -363,7 +363,7 @@ namespace Orleans.Runtime.Messaging
             private readonly CounterStatistic gatewaySends;
             private readonly SerializationManager serializationManager;
             internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
-                : base(name, gateway.MessagingConfiguration, loggerFactory)
+                : base(name, loggerFactory)
             {
                 this.gateway = gateway;
                 this.messageFactory = messageFactory;

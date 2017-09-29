@@ -1,6 +1,6 @@
-
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
@@ -15,7 +15,7 @@ namespace UnitTests.OrleansRuntime
         public ExceptionsTests(TestEnvironmentFixture fixture)
         {
             this.fixture = fixture;
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            BufferPool.InitGlobalBufferPool(Options.Create(new ClientMessagingOptions()));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

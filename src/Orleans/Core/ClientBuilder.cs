@@ -37,6 +37,8 @@ namespace Orleans
                 {
                     services.TryAddSingleton(this.clientConfiguration ?? ClientConfiguration.StandardLoad());
                     services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+                    // register legacy configuration to new options mapping for Client options
+                    services.AddLegacyClientConfigurationSupport();
                     services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
                 });
             this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
