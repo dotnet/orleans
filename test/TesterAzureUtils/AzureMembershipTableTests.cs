@@ -1,7 +1,9 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.AzureUtils.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -35,7 +37,13 @@ namespace Tester.AzureUtils
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBasedMembershipTable(loggerFactory);
+            var options = new AzureMembershipTableOptions()
+            {
+                MaxStorageBusyRetries = 3,
+                DataConnectionString = this.connectionString,
+                DeploymentId = this.deploymentId
+            };
+            return new AzureBasedMembershipTable(loggerFactory, new OptionsWrapper<AzureMembershipTableOptions>(options));
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

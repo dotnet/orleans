@@ -75,7 +75,7 @@ namespace Tester.AzureUtils.Persistence
                     providerConfig.AddChildConfiguration(provider3);
                 }
 
-                return new TestCluster(options);
+                return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
             }
         }
 

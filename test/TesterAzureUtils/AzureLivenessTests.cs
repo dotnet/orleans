@@ -3,8 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.AzureUtils.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
+using OrleansAzureUtils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -27,7 +32,18 @@ namespace Tester.AzureUtils
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseAzureMembershipTableFromLegacyConfigurationSupport()
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

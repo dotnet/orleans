@@ -1,6 +1,9 @@
 ﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
+using OrleansZooKeeperUtils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -24,6 +27,21 @@ namespace Tester.ZooKeeperUtils
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseZooKeeperMembershipTable(options =>
+                    {
+                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]

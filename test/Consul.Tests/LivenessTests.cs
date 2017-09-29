@@ -1,6 +1,9 @@
 ﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
+using OrleansConsulUtils;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -26,6 +29,21 @@ namespace Consul.Tests
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConsulMembershipTable(options =>
+                    {
+                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
+                        options.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

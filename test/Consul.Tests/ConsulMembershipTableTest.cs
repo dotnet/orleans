@@ -4,6 +4,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.ConsulUtils.Configuration;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests;
@@ -33,15 +35,19 @@ namespace Consul.Tests
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
-
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>());
+            var options = new ConsulMembershipTableOptions()
+            {
+                DataConnectionString = this.connectionString,
+                DeploymentId = this.deploymentId
+            };
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), new OptionsWrapper<ConsulMembershipTableOptions>(options));
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
 
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>());
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), new OptionsWrapper<ConsulMembershipTableOptions>(new ConsulMembershipTableOptions()));
         }
 
         protected override async Task<string> GetConnectionString()

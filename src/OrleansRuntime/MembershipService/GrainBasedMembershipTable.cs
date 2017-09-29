@@ -8,6 +8,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
+    //empty marker class inject into DI to see if user configure Silo to use MembershiptableGrain
+    internal class GrainBasedMembershipTableOptions
+    {
+    }
+
     [Reentrant]
     [OneInstancePerCluster]
     internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
@@ -29,7 +34,7 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
+        public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
             return Task.CompletedTask;

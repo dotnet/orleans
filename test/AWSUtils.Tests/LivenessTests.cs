@@ -8,9 +8,11 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using OrleansAWSUtils;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -53,19 +55,34 @@ namespace AWSUtils.Tests.Liveness
         {
         }
 
+        public static string ConnectionString = "Service=http://localhost:8000;";
         public override TestCluster CreateTestCluster()
         {
             if (!isDynamoDbAvailable.Value)
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = "Service=http://localhost:8000;"; ;
+            options.ClusterConfiguration.Globals.DataConnectionString = ConnectionString ;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansAWSUtils";
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseDynamoDBMembershipTable(options =>
+                    {
+                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
+                        options.DataConnectionString = ConnectionString;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

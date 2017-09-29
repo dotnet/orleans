@@ -6,6 +6,8 @@ using Consul;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.ConsulUtils.Configuration;
 
 namespace Orleans.Runtime.Host
 {
@@ -23,7 +25,7 @@ namespace Orleans.Runtime.Host
         private String _connectionString;
 
         private TimeSpan _maxStaleness;
-
+        private readonly ConsulMembershipTableOptions membershipTableOptions;
         public TimeSpan MaxStaleness
         {
             get { return _maxStaleness; }
@@ -34,9 +36,10 @@ namespace Orleans.Runtime.Host
             get { return true; }
         }
 
-        public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger)
+        public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger, IOptions<ConsulMembershipTableOptions> membershipTableOptions)
         {
             this._logger = logger;
+            this.membershipTableOptions = membershipTableOptions.Value;
         }
 
         public Task InitializeGatewayListProvider(ClientConfiguration config)
@@ -51,16 +54,15 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Initializes the Consul based membership table.
         /// </summary>
-        /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitTableVersion">Will be ignored: Consul does not support the extended Membership Protocol TableVersion</param>
         /// <returns></returns>
         /// <remarks>
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialise
         /// </remarks>
-        public Task InitializeMembershipTable(GlobalConfiguration config, Boolean tryInitTableVersion)
+        public Task InitializeMembershipTable(Boolean tryInitTableVersion)
         {
-            Init(config.DeploymentId, config.DataConnectionString);
+            Init(this.membershipTableOptions.DeploymentId, membershipTableOptions.DataConnectionString);
 
             return Task.CompletedTask;
         }

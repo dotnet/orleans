@@ -1,11 +1,13 @@
 ﻿using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using OrleansAWSUtils.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
@@ -36,8 +38,12 @@ namespace AWSUtils.Tests.MembershipTests
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
-
-            return new DynamoDBMembershipTable(this.loggerFactory);
+            var options = new DynamoDBMembershipTableOptions()
+            {
+                DataConnectionString = this.connectionString,
+                DeploymentId = this.deploymentId
+            };
+            return new DynamoDBMembershipTable(this.loggerFactory, new OptionsWrapper<DynamoDBMembershipTableOptions>(options));
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

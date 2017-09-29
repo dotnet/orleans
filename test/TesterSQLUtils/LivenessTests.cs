@@ -2,9 +2,14 @@
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
+using OrleansSQLUtils;
+using OrleansSQLUtils.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -22,7 +27,18 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster().UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseSqlMembershipFromLegacyConfigurationSupport()
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
@@ -71,7 +87,23 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options)
+                .UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .ConfigureServices(svc => svc.Configure<SqlMembershipTableOptions>(options =>
+                    {
+                        options.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
+                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
+                    }))
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
@@ -120,7 +152,22 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .ConfigureServices(svc => svc.Configure<SqlMembershipTableOptions>(options =>
+                    {
+                        options.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
+                    }))
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
   </ItemGroup>
 

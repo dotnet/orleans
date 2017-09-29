@@ -10,6 +10,8 @@ using org.apache.zookeeper.data;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OrleansZooKeeperUtils.Configuration;
 
 namespace Orleans.Runtime.Host
 {
@@ -55,10 +57,11 @@ namespace Orleans.Runtime.Host
         private string rootConnectionString;
 
         private TimeSpan maxStaleness;
-
-        public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger)
+        private readonly ZooKeeperMembershipTableOptions membershipTableOptions;
+        public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger, IOptions<ZooKeeperMembershipTableOptions> membershipTableOptions)
         {
             this.logger = logger;
+            this.membershipTableOptions = membershipTableOptions.Value;
         }
 
         /// <summary>
@@ -78,9 +81,9 @@ namespace Orleans.Runtime.Host
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitPath">if set to true, we'll try to create a node named "/DeploymentId"</param>
         /// <returns></returns>
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath)
+        public async Task InitializeMembershipTable(bool tryInitPath)
         {
-            InitConfig(config.DataConnectionString, config.DeploymentId);
+            InitConfig(membershipTableOptions.DataConnectionString, membershipTableOptions.DeploymentId);
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.

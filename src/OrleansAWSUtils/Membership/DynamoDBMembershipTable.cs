@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using OrleansAWSUtils.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -23,18 +25,17 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
-        private string deploymentId;
-
-        public DynamoDBMembershipTable(ILoggerFactory loggerFactory)
+        private readonly DynamoDBMembershipTableOptions options;
+        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipTableOptions> options)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
+            this.options = options.Value;
         }
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
+        public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            deploymentId = config.DeploymentId;
-            storage = new DynamoDBStorage(config.DataConnectionString, loggerFactory);
+            storage = new DynamoDBStorage(options.DataConnectionString, loggerFactory);
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
@@ -83,7 +84,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var keys = new Dictionary<string, AttributeValue>
                 {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) },
+                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(options.DeploymentId) },
                     { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.ConstructSiloIdentity(siloAddress)) }
                 };
                 var entry = await storage.ReadSingleEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, fields => new SiloInstanceRecord(fields));
@@ -103,7 +104,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) } };
+                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(options.DeploymentId) } };
                 var records = await storage.QueryAsync(TABLE_NAME_DEFAULT_VALUE, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
                 MembershipTableData data = Convert(records);
@@ -299,7 +300,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var tableEntry = new SiloInstanceRecord
             {
-                DeploymentId = deploymentId,
+                DeploymentId = options.DeploymentId,
                 Address = memEntry.SiloAddress.Endpoint.Address.ToString(),
                 Port = memEntry.SiloAddress.Endpoint.Port,
                 Generation = memEntry.SiloAddress.Generation,
@@ -345,7 +346,7 @@ namespace Orleans.Runtime.MembershipService
         {
             return new SiloInstanceRecord
             {
-                DeploymentId = deploymentId,
+                DeploymentId = options.DeploymentId,
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress)
             };

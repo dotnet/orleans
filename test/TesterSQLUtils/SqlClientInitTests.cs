@@ -6,7 +6,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.SqlUtils;
+using Orleans.TestingHost.Utils;
+using OrleansSQLUtils;
+using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
@@ -36,7 +40,19 @@ namespace Tester.SQLUtils
                 options.ClientConfiguration.DataConnectionString = connectionString;
                 options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
 
-                return new TestCluster(options);
+                return new TestCluster(options)
+                    .UseSiloBuilderFactory<SiloBuilderFactory>();
+            }
+
+            public class SiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloHostBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseSqlMembershipFromLegacyConfigurationSupport()
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                }
             }
 
         }

@@ -13,10 +13,10 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly AsyncLock initializationLock = new AsyncLock();
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private IMembershipTable membershipTable;
 
-        public MembershipTableFactory(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
+        public MembershipTableFactory(IServiceProvider serviceProvider, ILogger<MembershipTableFactory> logger)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
@@ -28,44 +28,31 @@ namespace Orleans.Runtime.MembershipService
             using (await this.initializationLock.LockAsync())
             {
                 if (membershipTable != null) return membershipTable;
-
-                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                IMembershipTable result;
-                switch (globalConfig.LivenessType)
-                {
-                    case LivenessProviderType.MembershipTableGrain:
-                        result = await this.GetMembershipTableGrain();
-                        break;
-                    case LivenessProviderType.SqlServer:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
-                        break;
-                    case LivenessProviderType.AzureTable:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
-                        break;
-                    case LivenessProviderType.ZooKeeper:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
-                            Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
-                            this.logger,
-                            this.serviceProvider);
-                        break;
-                    case LivenessProviderType.Custom:
-                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
-                            globalConfig.MembershipTableAssembly,
-                            this.logger,
-                            this.serviceProvider);
-                        break;
-                    default:
-                        throw new NotImplementedException(
-                            $"No membership table provider found for {nameof(globalConfig.LivenessType)}={globalConfig.LivenessType}");
-                }
                 
-                await result.InitializeMembershipTable(globalConfig, true);
+                // get membership through DI
+                var result = this.serviceProvider.GetService<IMembershipTable>();
+                //if empty, then try to check if user configured using GranBasedMembership
+                if (result == null)
+                {
+                    //if configured through UseGrainBasedMembershipTable method on ISiloHostBuilder, then this won't be null
+                    var options = this.serviceProvider.GetService<GrainBasedMembershipTableOptions>();
+                    //if configured through legacy GlobalConfiguration, then livenessProviderType should set to MembershipTableGrain
+                    var globalConfig = this.serviceProvider.GetService<GlobalConfiguration>();
+                    if(options != null || globalConfig.LivenessType == LivenessProviderType.MembershipTableGrain)
+                        result = await this.GetMembershipTableGrain();
+                }
+                //if nothing found still, throw exception
+                if(result == null)
+                    throw new NotImplementedException(
+                        $"No membership table provider configured with Silo");
+
+                await result.InitializeMembershipTable(true);
                 membershipTable = result;
             }
 
             return membershipTable;
         }
-
+        
         private async Task<IMembershipTable> GetMembershipTableGrain()
         {
             var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();

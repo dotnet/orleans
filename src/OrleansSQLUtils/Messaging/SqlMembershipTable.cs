@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
+using OrleansSQLUtils.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -15,22 +17,23 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan maxStaleness;
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
-
-        public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter, ILogger<SqlMembershipTable> logger)
+        private readonly SqlMembershipTableOptions membershipTableoptions;
+        public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SqlMembershipTableOptions> membershipTableoptions, ILogger<SqlMembershipTable> logger)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;
+            this.membershipTableoptions = membershipTableoptions.Value;
         }
 
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            deploymentId = config.DeploymentId;
+            deploymentId = membershipTableoptions.DeploymentId;
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.InitializeMembershipTable called.");
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(membershipTableoptions.AdoInvariant, membershipTableoptions.DataConnectionString, this.grainReferenceConverter);
             
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
