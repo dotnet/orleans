@@ -25,7 +25,7 @@ namespace Orleans.Runtime.TestHooks
         private readonly IConsistentRingProvider consistentRingProvider;
 
         public TestHooksSystemTarget(ISilo silo, ILocalSiloDetails siloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.TestHooksSystemTargetId, siloDetails.SiloAddress, loggerFactory)
+            : base(GrainConstants.TestHooksSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             this.silo = silo;
             consistentRingProvider = this.silo.Services.GetRequiredService<IConsistentRingProvider>();

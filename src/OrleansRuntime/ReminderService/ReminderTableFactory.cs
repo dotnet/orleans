@@ -44,7 +44,7 @@ namespace Orleans.Runtime.ReminderService
                         logger,
                         this.serviceProvider);
                 case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
-                    return this.grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+                    return this.grainFactory.GetGrain<IReminderTableGrain>(GrainConstants.ReminderTableGrainId);
                 case GlobalConfiguration.ReminderServiceProviderType.MockTable:
                     return new MockReminderTable(config.MockReminderTableTimeout);
                 case GlobalConfiguration.ReminderServiceProviderType.Custom:

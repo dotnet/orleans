@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler,
             ClusterConfiguration config,
             ILoggerFactory loggerFactory)
-            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
+            : base(GrainConstants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
         {
             grainDirectory = dir;
             myAddress = siloDetails.SiloAddress;

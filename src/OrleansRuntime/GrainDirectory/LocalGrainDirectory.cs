@@ -139,11 +139,10 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId, loggerFactory);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId, loggerFactory);
-            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle, loggerFactory);
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, GrainConstants.DirectoryServiceId, loggerFactory);
+            CacheValidator = new RemoteGrainDirectory(this, GrainConstants.DirectoryCacheValidatorId, loggerFactory);
+            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, GrainConstants.ClusterDirectoryServiceId, clusterId, grainFactory, multiClusterOracle, loggerFactory);
 
-            // add myself to the list of members
             AddServer(MyAddress);
 
             Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) => 
@@ -475,12 +474,12 @@ namespace Orleans.Runtime.GrainDirectory
                 return MyAddress;
             }
 
-            if (Constants.SystemMembershipTableId.Equals(grainId))
+            if (GrainConstants.SystemMembershipTableId.Equals(grainId))
             {
                 if (Seed == null)
                 {
                     string grainName;
-                    if (!Constants.TryGetSystemGrainName(grainId, out grainName))
+                    if (!GrainConstants.TryGetSystemGrainName(grainId, out grainName))
                         grainName = "MembershipTableGrain";
                     
                     var errorMsg = grainName + " cannot run without Seed node - please check your silo configuration file and make sure it specifies a SeedNode element. " +
@@ -1126,7 +1125,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
-            return this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            return this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(GrainConstants.DirectoryServiceId, silo);
         }
 
         private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)

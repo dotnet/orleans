@@ -75,12 +75,12 @@ namespace Orleans.Runtime.MembershipService
                 this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
                 var catalog = this.serviceProvider.GetRequiredService<Catalog>();
                 await catalog.CreateSystemGrain(
-                    Constants.SystemMembershipTableId,
+                    GrainConstants.SystemMembershipTableId,
                     typeof(GrainBasedMembershipTable).FullName);
             }
 
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-            var result = grainFactory.GetGrain<IMembershipTableGrain>(Constants.SystemMembershipTableId);
+            var result = grainFactory.GetGrain<IMembershipTableGrain>(GrainConstants.SystemMembershipTableId);
 
             if (isPrimarySilo)
             {

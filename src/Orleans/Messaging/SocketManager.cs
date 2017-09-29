@@ -69,7 +69,7 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                WriteConnectionPreamble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreamble(s, GrainConstants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
                 var receiveAsyncEventArgs = new SocketAsyncEventArgs
                 {

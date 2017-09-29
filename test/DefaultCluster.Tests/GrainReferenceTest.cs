@@ -156,8 +156,8 @@ namespace DefaultCluster.Tests.General
         [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
         public void GrainReference_Interning_Sys_DirectoryGrain()
         {
-            var g1 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
-            var g2 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
+            var g1 = GrainReference.FromGrainId(GrainConstants.DirectoryServiceId, null);
+            var g2 = GrainReference.FromGrainId(GrainConstants.DirectoryServiceId, null);
             Assert.Equal(g1, g2); // Should be equal GrainReferences.
             Assert.Same(g1, g2); // Should be same / interned GrainReference object
 

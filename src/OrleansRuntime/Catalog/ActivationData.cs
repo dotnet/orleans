@@ -201,7 +201,7 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
             RegistrationStrategy = registrationStrategy;
-            if (!Grain.IsSystemTarget && !Constants.IsSystemGrain(Grain))
+            if (!Grain.IsSystemTarget && !GrainConstants.IsSystemGrain(Grain))
             {
                 this.collector = collector;
             }

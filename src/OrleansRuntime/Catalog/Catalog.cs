@@ -115,7 +115,7 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory)
-            : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
+            : base(GrainConstants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             localSiloName = localSiloDetails.Name;

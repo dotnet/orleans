@@ -77,7 +77,7 @@ namespace NonSilo.Tests
 
             int maxRetries = 10;
             int expectedRetries = countLimit;
-            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Constants.INFINITE_TIMESPAN);
+            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, TimeSpan.FromMilliseconds(-1));
             int value = promise.Result;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"

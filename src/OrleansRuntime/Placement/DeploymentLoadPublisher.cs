@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             IInternalGrainFactory grainFactory,
             OrleansTaskScheduler scheduler,
             ILoggerFactory loggerFactory)
-            : base(Constants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress, loggerFactory)
+            : base(GrainConstants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
             this.siloDetails = siloDetails;
@@ -78,7 +78,7 @@ namespace Orleans.Runtime
                     try
                     {
                         tasks.Add(this.grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
-                            Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
+                            GrainConstants.DeploymentLoadPublisherSystemTargetId, siloAddress)
                             .UpdateRuntimeStatistics(this.siloDetails.SiloAddress, myStats));
                     }
                     catch (Exception)
@@ -123,7 +123,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
+                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(GrainConstants.SiloControlId, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {
