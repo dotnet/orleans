@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Transactions</PackageId>
     <Title>Microsoft Orleans Transactions support</Title>
-    <Description>Core Transaction library of Microsoft Orleans used both on the client and server.</Description>
+    <Description>Core Transaction library of Microsoft Orleans used on the server.</Description>
     <PackageTags>$(PackageTags) Transactions</PackageTags>
   </PropertyGroup>
 

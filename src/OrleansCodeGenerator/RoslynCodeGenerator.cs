@@ -225,7 +225,9 @@ namespace Orleans.CodeGenerator
         public string GenerateSourceForAssembly(Assembly input)
         {
             RegisterGeneratedCodeTargets(input);
-            if (!ShouldGenerateCodeForAssembly(input))
+
+            if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null
+                || input.GetCustomAttribute<SkipCodeGenerationAttribute>() != null)
             {
                 return string.Empty;
             }

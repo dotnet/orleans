@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
 
-namespace Microsoft.Orleans.Logging.Legacy
+namespace Orleans.Logging.Legacy
 {
     /// <summary>
     /// EventBulkingLoggerProvider, which has event bulking feature in. If you want to add event bulking feature on top of your logger provider,

@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Net;
 
-namespace Microsoft.Orleans.Logging.Legacy
+namespace Orleans.Logging.Legacy
 {
     /// <summary>
     /// LegacyFileLogConsumer, which logs message into a file in orleans logging message style
