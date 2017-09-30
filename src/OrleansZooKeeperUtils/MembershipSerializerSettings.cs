@@ -77,7 +77,7 @@ namespace Orleans.Runtime.Host
             {
                 JObject jo = JObject.Load(reader);
                 string seStr = jo["SiloAddress"].ToObject<string>(serializer);
-                return SiloAddress.FromParsableString(seStr);
+                return SiloAddressFactory.FromParsableString(seStr);
             }
         }
     }

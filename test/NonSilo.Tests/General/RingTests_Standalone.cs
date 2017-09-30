@@ -102,7 +102,7 @@ namespace UnitTests.General
 
             for (int i = 1; i <= n; i++)
             {
-                SiloAddress addr = SiloAddress.NewLocalAddress(i);
+                SiloAddress addr = SiloAddressFactory.NewLocalAddress(i);
                 rings.Add(addr, new ConsistentRingProvider(addr, NullLoggerFactory.Instance));
             }
             return rings;

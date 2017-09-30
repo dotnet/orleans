@@ -41,9 +41,9 @@ namespace Tester.AzureUtils
                 return;
             }
             IPEndPoint ep1 = new IPEndPoint(ip, 21111);
-            siloAddress1 = SiloAddress.New(ep1, 0);
+            siloAddress1 = SiloAddressFactory.New(ep1, 0);
             IPEndPoint ep2 = new IPEndPoint(ip, 21112);
-            siloAddress2 = SiloAddress.New(ep2, 0);
+            siloAddress2 = SiloAddressFactory.New(ep2, 0);
 
             logger.Info("DeploymentId={0}", deploymentId);
 

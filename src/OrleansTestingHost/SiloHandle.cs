@@ -20,7 +20,7 @@ namespace Orleans.TestingHost
         public SiloAddress SiloAddress { get; set; }
 
         /// <summary>Get the proxy address of the silo</summary>
-        public SiloAddress ProxyAddress => SiloAddress.New(this.NodeConfiguration.ProxyGatewayEndpoint, 0);
+        public SiloAddress ProxyAddress => SiloAddressFactory.New(this.NodeConfiguration.ProxyGatewayEndpoint, 0);
 
         /// <summary>Gets whether the remote silo is expected to be active</summary>
         public abstract bool IsActive { get; }

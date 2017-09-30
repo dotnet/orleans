@@ -97,7 +97,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 // Start the silo.
                 if (this.configuration.Defaults.Generation == 0)
                 {
-                    this.configuration.Defaults.Generation = SiloAddress.AllocateNewGeneration();
+                    this.configuration.Defaults.Generation = SiloAddressFactory.AllocateNewGeneration();
                 }
 
                 this.SiloHost.Start(this.SiloName, this.configuration);

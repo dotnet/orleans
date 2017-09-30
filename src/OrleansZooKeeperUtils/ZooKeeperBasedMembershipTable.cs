@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Host
                 var childrenResult = await zk.getChildrenAsync("/");//get all the child nodes (without the data)
 
                 var childrenTasks = //get the data from each child node
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child))).ToList();
+                    childrenResult.Children.Select(child => GetRow(zk, SiloAddressFactory.FromParsableString(child))).ToList();
 
                 var childrenTaskResults = await Task.WhenAll(childrenTasks);
 

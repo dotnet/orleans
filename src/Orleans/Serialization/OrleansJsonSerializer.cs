@@ -235,7 +235,7 @@ namespace Orleans.Serialization
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+            SiloAddress addr = SiloAddressFactory.FromParsableString(jo["SiloAddress"].ToObject<string>());
             return addr;
         }
     }

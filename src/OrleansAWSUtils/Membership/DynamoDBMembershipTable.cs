@@ -254,7 +254,7 @@ namespace Orleans.Runtime.MembershipService
 
             parse.ProxyPort = tableEntry.ProxyPort;
 
-            parse.SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), tableEntry.Port), tableEntry.Generation);
+            parse.SiloAddress = SiloAddressFactory.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), tableEntry.Port), tableEntry.Generation);
 
             if (!string.IsNullOrEmpty(tableEntry.SiloName))
             {
@@ -275,7 +275,7 @@ namespace Orleans.Runtime.MembershipService
                 string[] silos = tableEntry.SuspectingSilos.Split('|');
                 foreach (string silo in silos)
                 {
-                    suspectingSilos.Add(SiloAddress.FromParsableString(silo));
+                    suspectingSilos.Add(SiloAddressFactory.FromParsableString(silo));
                 }
             }
 

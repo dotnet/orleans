@@ -107,7 +107,7 @@ namespace Orleans.Messaging
             this.loggerFactory = loggerFactory;
             this.SerializationManager = serializationManager;
             lockable = new object();
-            MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
+            MyAddress = SiloAddressFactory.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;

@@ -453,7 +453,7 @@ namespace Orleans.Serialization
         /// <summary> Write a <c>ActivationAddress</c> value to the stream. </summary>
         internal void Write(ActivationAddress addr)
         {
-            Write(addr.Silo ?? SiloAddress.Zero);
+            Write(addr.Silo ?? SiloAddressFactory.Zero);
 
             // GrainId must not be null
             Write(addr.Grain);

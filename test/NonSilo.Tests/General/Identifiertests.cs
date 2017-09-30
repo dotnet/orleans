@@ -60,7 +60,7 @@ namespace UnitTests.General
             Assert.Equal(testGrain, sGrain); // Should be equivalent GrainId object
             Assert.Same(testGrain, sGrain); // Should be same / intern'ed GrainId object
 
-            ActivationId testActivation = ActivationId.GetSystemActivation(testGrain, SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2456), 0));
+            ActivationId testActivation = ActivationId.GetSystemActivation(testGrain, SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 2456), 0));
             output.WriteLine("Testing ActivationID " + testActivation);
             Assert.True(testActivation.IsSystem); // System activation ID is not flagged as a system ID
         }
@@ -343,8 +343,8 @@ namespace UnitTests.General
         public void Interning_SiloAddress()
         {
             //string addrStr1 = "1.2.3.4@11111@1";
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
-            SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            SiloAddress a1 = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            SiloAddress a2 = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
             Assert.Equal(a1, a2); // Should be equal SiloAddress's
             Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
@@ -359,8 +359,8 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void Interning_SiloAddress2()
         {
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
-            SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2222), 12345);
+            SiloAddress a1 = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            SiloAddress a2 = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 2222), 12345);
             Assert.NotEqual(a1, a2); // Should not be equal SiloAddress's
             Assert.NotSame(a1, a2); // Should not be same / intern'ed SiloAddress object
         }
@@ -368,7 +368,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void Interning_SiloAddress_Serialization()
         {
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            SiloAddress a1 = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
 
             // Round-trip through Serializer
             SiloAddress a3 = (SiloAddress)this.environment.SerializationManager.RoundTripSerializationForTesting(a1);
@@ -406,10 +406,10 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void SiloAddress_ToFrom_ParsableString()
         {
-            SiloAddress address1 = SiloAddress.NewLocalAddress(12345);
+            SiloAddress address1 = SiloAddressFactory.NewLocalAddress(12345);
 
             string addressStr1 = address1.ToParsableString();
-            SiloAddress addressObj1 = SiloAddress.FromParsableString(addressStr1);
+            SiloAddress addressObj1 = SiloAddressFactory.FromParsableString(addressStr1);
 
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 address1, addressStr1, addressObj1);
@@ -418,7 +418,7 @@ namespace UnitTests.General
 
             //const string addressStr2 = "127.0.0.1-11111-144611139";
             const string addressStr2 = "127.0.0.1:11111@144611139";
-            SiloAddress addressObj2 = SiloAddress.FromParsableString(addressStr2);
+            SiloAddress addressObj2 = SiloAddressFactory.FromParsableString(addressStr2);
             string addressStr2Out = addressObj2.ToParsableString();
 
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
@@ -448,7 +448,7 @@ namespace UnitTests.General
             TestGrainReference(grainRef);
 
             GrainId systemTragetGrainId = GrainId.NewSystemTargetGrainIdByTypeCode(2);
-            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddress.NewLocalAddress(1));
+            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddressFactory.NewLocalAddress(1));
             this.environment.GrainFactory.BindGrainReference(grainRef);
             TestGrainReference(grainRef);
 

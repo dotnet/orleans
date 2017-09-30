@@ -76,8 +76,8 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
             InvokeMethodRequest request = new InvokeMethodRequest(0, 2, 0, null);
             Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
-            resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
-            resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
+            resp.SendingSilo = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
+            resp.TargetSilo = SiloAddressFactory.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
             resp.IsAlwaysInterleave = true;

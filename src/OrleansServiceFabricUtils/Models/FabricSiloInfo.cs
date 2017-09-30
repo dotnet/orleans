@@ -19,8 +19,8 @@
         public FabricSiloInfo(NodeConfiguration config)
         {
             this.Name = config.SiloName;
-            this.Silo = SiloAddress.New(config.Endpoint, config.Generation).ToParsableString();
-            this.Gateway = SiloAddress.New(config.ProxyGatewayEndpoint, config.Generation).ToParsableString();
+            this.Silo = SiloAddressFactory.New(config.Endpoint, config.Generation).ToParsableString();
+            this.Gateway = SiloAddressFactory.New(config.ProxyGatewayEndpoint, config.Generation).ToParsableString();
         }
 
         /// <summary>
@@ -50,13 +50,13 @@
         /// Gets the parsed silo address.
         /// </summary>
         [JsonIgnore]
-        public SiloAddress SiloAddress => string.IsNullOrWhiteSpace(this.Silo) ? null : SiloAddress.FromParsableString(this.Silo);
+        public SiloAddress SiloAddress => string.IsNullOrWhiteSpace(this.Silo) ? null : SiloAddressFactory.FromParsableString(this.Silo);
 
         /// <summary>
         /// Gets the parsed gateway address.
         /// </summary>
         [JsonIgnore]
-        public SiloAddress GatewayAddress => string.IsNullOrWhiteSpace(this.Gateway) ? null : SiloAddress.FromParsableString(this.Gateway);
+        public SiloAddress GatewayAddress => string.IsNullOrWhiteSpace(this.Gateway) ? null : SiloAddressFactory.FromParsableString(this.Gateway);
 
         /// <inheritdoc />
         public override string ToString()

@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Messaging
 
             SocketManager = new SocketManager(config, this.loggerFactory);
             ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.loggerFactory);
-            MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
+            MyAddress = SiloAddressFactory.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
             MessagingConfiguration = config;
             InboundQueue = new InboundMessageQueue(this.loggerFactory);
             OutboundQueue = new OutboundMessageQueue(this, config, this.serializationManager, this.loggerFactory);

@@ -44,9 +44,9 @@ namespace Tester.GeoClusterTests
             IPAddress ip;
             Assert.True(IPAddress.TryParse("127.0.0.1", out ip));
             IPEndPoint ep1 = new IPEndPoint(ip, 21111);
-            var siloAddress1 = SiloAddress.New(ep1, 0);
+            var siloAddress1 = SiloAddressFactory.New(ep1, 0);
             IPEndPoint ep2 = new IPEndPoint(ip, 21112);
-            var siloAddress2 = SiloAddress.New(ep2, 0);
+            var siloAddress2 = SiloAddressFactory.New(ep2, 0);
 
             var G1 = new GatewayEntry()
             {

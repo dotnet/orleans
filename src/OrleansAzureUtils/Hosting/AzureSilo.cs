@@ -217,7 +217,7 @@ namespace Orleans.Runtime.Host
 
             host.SetSiloType(Silo.SiloType.Secondary);
 
-            int generation = SiloAddress.AllocateNewGeneration();
+            int generation = SiloAddressFactory.AllocateNewGeneration();
 
             // Bootstrap this Orleans silo instance
 
