@@ -57,37 +57,35 @@ SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 SET SOLUTION=%CMDHOME%\Orleans.sln
 
 :: Set DateTime suffix for debug builds
-if "%BuildConfiguration%" == "Debug" (
-    for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%i
-	SET AdditionalConfigurationProperties=";VersionDateSuffix=%DATE_SUFFIX%"
-)
+if "%BuildConfiguration%" == "Debug" for /f %%j in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set DATE_SUFFIX=%%j
+if "%BuildConfiguration%" == "Debug" SET AdditionalConfigurationProperties=;VersionDateSuffix=%DATE_SUFFIX%
 
 if "%1" == "Pack" GOTO :Package
 
 @echo ===== Building %SOLUTION% =====
-SET STEP="Download build tools"
+SET STEP=Download build tools
 call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES_PATH%
 
 @echo Build %BuildConfiguration% ==============================
-SET STEP="Restore %BuildConfiguration%"
+SET STEP=Restore %BuildConfiguration%
 
 call %_dotnet% restore %BUILD_FLAGS% /bl:%BuildConfiguration%-Restore.binlog /p:Configuration=%BuildConfiguration%%AdditionalConfigurationProperties% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo "RESTORE ok for %BuildConfiguration% %SOLUTION%"
+@echo RESTORE ok for %BuildConfiguration% %SOLUTION%
 
-SET STEP="Build %BuildConfiguration%"
+SET STEP=Build %BuildConfiguration%
 call %_dotnet% build --no-restore %BUILD_FLAGS% /bl:%BuildConfiguration%-Build.binlog /p:Configuration=%BuildConfiguration%%AdditionalConfigurationProperties% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo "BUILD ok for %BuildConfiguration% %SOLUTION%"
+@echo BUILD ok for %BuildConfiguration% %SOLUTION%
 
 
 :Package
 @echo Package BuildConfiguration ============================
-SET STEP="Pack %BuildConfiguration%"
+SET STEP=Pack %BuildConfiguration%
 
 call %_dotnet% pack --no-build --no-restore %BUILD_FLAGS% /bl:%BuildConfiguration%-Pack.binlog /p:Configuration=%BuildConfiguration%%AdditionalConfigurationProperties% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo "PACKAGE ok for %BuildConfiguration% %SOLUTION%"
+@echo PACKAGE ok for %BuildConfiguration% %SOLUTION%
 
 
 :BuildFinished
