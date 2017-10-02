@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         private readonly Func<Message, bool> resendFunc;
         private readonly Action<Message> unregister;
         private readonly TaskCompletionSource<object> context;
-        private readonly IMessagingConfiguration config;
+        private readonly MessagingOptions messagingOptions;
 
         private bool alreadyFired;
         private TimeSpan timeout;
@@ -42,7 +43,7 @@ namespace Orleans.Runtime
             TaskCompletionSource<object> ctx, 
             Message msg, 
             Action<Message> unregisterDelegate,
-            IMessagingConfiguration config,
+            MessagingOptions messagingOptions,
             Logger logger,
             ILogger timerLogger)
         {
@@ -57,7 +58,7 @@ namespace Orleans.Runtime
             Message = msg;
             unregister = unregisterDelegate;
             alreadyFired = false;
-            this.config = config;
+            this.messagingOptions = messagingOptions;
             this.TransactionInfo = TransactionContext.GetTransactionInfo();
             this.timerLogger = timerLogger;
         }
@@ -79,9 +80,9 @@ namespace Orleans.Runtime
 
             TimeSpan firstPeriod = timeout;
             TimeSpan repeatPeriod = Constants.INFINITE_TIMESPAN; // Single timeout period --> No repeat
-            if (config.ResendOnTimeout && config.MaxResendCount > 0)
+            if (messagingOptions.ResendOnTimeout && messagingOptions.MaxResendCount > 0)
             {
-                firstPeriod = repeatPeriod = timeout.Divide(config.MaxResendCount + 1);
+                firstPeriod = repeatPeriod = timeout.Divide(messagingOptions.MaxResendCount + 1);
             }
             // Start time running
             DisposeTimer();
@@ -183,7 +184,7 @@ namespace Orleans.Runtime
                 if (alreadyFired)
                     return;
 
-                if (config.ResendOnTimeout && resendFunc(msg))
+                if (messagingOptions.ResendOnTimeout && resendFunc(msg))
                 {
                     if (logger.IsVerbose) logger.Verbose(resendLogMessageFormat, msg.ResendCount, msg);
                     return;

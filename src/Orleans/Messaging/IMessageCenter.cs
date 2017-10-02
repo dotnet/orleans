@@ -1,5 +1,4 @@
 using System.Threading;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -20,7 +19,5 @@ namespace Orleans.Runtime
         int SendQueueLength { get; }
 
         int ReceiveQueueLength { get; }
-
-        IMessagingConfiguration MessagingConfiguration { get; }
     }
 }

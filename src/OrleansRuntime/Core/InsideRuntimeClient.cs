@@ -18,6 +18,8 @@ using Orleans.Streams;
 using Orleans.Transactions;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -31,6 +33,7 @@ namespace Orleans.Runtime
         private readonly ILogger timerLogger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
+        private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly Func<Message, bool> tryResendMessage;
@@ -59,7 +62,8 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             IEnumerable<IGrainCallFilter> registeredInterceptors,
             Factory<ITransactionAgent> transactionAgent,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<SiloMessagingOptions> messagingOptions)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -79,6 +83,7 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
+            this.messagingOptions = messagingOptions.Value;
             this.callbackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
@@ -208,7 +213,7 @@ namespace Orleans.Runtime
                     context,
                     message,
                     unregisterCallback,
-                    Config.Globals,
+                    messagingOptions,
                     this.callbackDataLogger,
                     this.timerLogger);
                 callbacks.TryAdd(message.Id, callbackData);
