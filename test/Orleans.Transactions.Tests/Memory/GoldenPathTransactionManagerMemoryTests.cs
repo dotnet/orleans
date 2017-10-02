@@ -3,7 +3,7 @@ using System;
 using System.Threading.Tasks;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Development;
 
@@ -22,9 +22,8 @@ namespace Orleans.Transactions.Tests
 
         private static ITransactionManager MakeTransactionManager()
         {
-            ILoggerFactory loggerFactory = new LoggerFactory();
             Factory<Task<ITransactionLogStorage>> storageFactory = () => Task.FromResult<ITransactionLogStorage>(new InMemoryTransactionLogStorage());
-            ITransactionManager tm = new TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), loggerFactory, LogMaintenanceInterval);
+            ITransactionManager tm = new TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }

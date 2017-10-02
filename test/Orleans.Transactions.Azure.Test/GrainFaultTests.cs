@@ -10,6 +10,7 @@ namespace Orleans.Transactions.Azure.Tests
         public GrainFaultTests(TestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)
         {
+            TestFixture.CheckForAzureStorage();
         }
     }
 }

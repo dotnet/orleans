@@ -17,6 +17,13 @@ namespace Orleans.Transactions
 
         Transactions_IdAllocationFailed = OrleansTransactions + 1,
         Transactions_PrepareFailed      = Transactions_IdAllocationFailed+1,
+
+        // transaction manager errors
+        TransactionManagerErrorCodes = OrleansTransactions + 1000,
+        TransactionManager_GroupCommitError = TransactionManagerErrorCodes,
+        TransactionManager_CheckpointError = TransactionManager_GroupCommitError + 1,
+        TransactionManager_TransactionLogMaintenanceError = TransactionManager_CheckpointError + 1,
+        TransactionManager_TransactionLogTruncationError = TransactionManager_TransactionLogMaintenanceError + 1,
     }
 
     internal static class LoggerExtensions

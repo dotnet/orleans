@@ -4,6 +4,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
+using Xunit;
 
 namespace Orleans.Transactions.Azure.Tests
 {
@@ -31,6 +32,15 @@ namespace Orleans.Transactions.Azure.Tests
                         TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.DeploymentId.GetHashCode())%100000}",
                         ConnectionString = TestDefaultConfiguration.DataConnectionString})
                     .UseTransactionalState();
+            }
+        }
+
+        public static void CheckForAzureStorage()
+        {
+            string error;
+            if (!StorageEmulator.TryCheckForAzureStorage(TestDefaultConfiguration.DataConnectionString, out error))
+            {
+                throw new SkipException(error);
             }
         }
     }

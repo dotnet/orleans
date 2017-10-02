@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
@@ -23,14 +23,15 @@ namespace Orleans.Transactions.Azure.Tests
 
         private static ITransactionManager MakeTransactionManager()
         {
-            ILoggerFactory loggerFactory = new LoggerFactory();
-            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsConfiguration>(new TransactionsConfiguration()), loggerFactory, LogMaintenanceInterval);
+            TestFixture.CheckForAzureStorage();
+            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsConfiguration>(new TransactionsConfiguration()), NullLoggerFactory.Instance, LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }
 
         private static async Task<ITransactionLogStorage> StorageFactory()
         {
+            TestFixture.CheckForAzureStorage();
             var config = new ClientConfiguration();
             var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
             var azureConfig = Options.Create(new AzureTransactionLogConfiguration()
