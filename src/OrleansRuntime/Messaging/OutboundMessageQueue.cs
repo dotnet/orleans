@@ -4,6 +4,8 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -29,12 +31,12 @@ namespace Orleans.Runtime.Messaging
 
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
-        internal OutboundMessageQueue(MessageCenter mc, IMessagingConfiguration config, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
             messageCenter = mc;
             pingSender = new SiloMessageSender("PingSender", messageCenter, serializationManager, loggerFactory);
             systemSender = new SiloMessageSender("SystemSender", messageCenter, serializationManager, loggerFactory);
-            senders = new Lazy<SiloMessageSender>[config.SiloSenderQueues];
+            senders = new Lazy<SiloMessageSender>[options.Value.SiloSenderQueues];
 
             for (int i = 0; i < senders.Length; i++)
             {

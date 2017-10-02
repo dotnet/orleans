@@ -647,7 +647,7 @@ namespace Orleans
                     context,
                     message,
                     unregisterCallback,
-                    config,
+                    this.clientMessagingOptions,
                     this.callBackDataLogger,
                     this.timerLogger);
                 callbacks.TryAdd(message.Id, callbackData);
