@@ -57,17 +57,17 @@ namespace Orleans.Serialization
         public readonly MethodInfo GetTypeFromHandle;
 
         /// <summary>
-        /// The <see cref="MethodInfo"/> for the <see cref="SerializationManager.Serializer"/> delegate.
+        /// The <see cref="MethodInfo"/> for the <see cref="Serializer"/> delegate.
         /// </summary>
         public readonly MethodInfo SerializerDelegate;
 
         /// <summary>
-        /// The <see cref="MethodInfo"/> for the <see cref="SerializationManager.Deserializer"/> delegate.
+        /// The <see cref="MethodInfo"/> for the <see cref="Deserializer"/> delegate.
         /// </summary>
         public readonly MethodInfo DeserializerDelegate;
 
         /// <summary>
-        /// The <see cref="MethodInfo"/> for the <see cref="SerializationManager.DeepCopier"/> delegate.
+        /// The <see cref="MethodInfo"/> for the <see cref="DeepCopier"/> delegate.
         /// </summary>
         public readonly MethodInfo DeepCopierDelegate;
 
@@ -86,9 +86,9 @@ namespace Orleans.Serialization
 
             this.RecordObjectWhileDeserializing = TypeUtils.Method((IDeserializationContext ctx) => ctx.RecordObject(default(object)));
             this.SerializerDelegate =
-                TypeUtils.Method((SerializationManager.Serializer del) => del.Invoke(default(object), default(ISerializationContext), default(Type)));
-            this.DeserializerDelegate = TypeUtils.Method((SerializationManager.Deserializer del) => del.Invoke(default(Type), default(IDeserializationContext)));
-            this.DeepCopierDelegate = TypeUtils.Method((SerializationManager.DeepCopier del) => del.Invoke(default(object), default(ICopyContext)));
+                TypeUtils.Method((Serializer del) => del.Invoke(default(object), default(ISerializationContext), default(Type)));
+            this.DeserializerDelegate = TypeUtils.Method((Deserializer del) => del.Invoke(default(Type), default(IDeserializationContext)));
+            this.DeepCopierDelegate = TypeUtils.Method((DeepCopier del) => del.Invoke(default(object), default(ICopyContext)));
         }
     }
 }

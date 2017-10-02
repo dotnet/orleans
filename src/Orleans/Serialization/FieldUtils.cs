@@ -72,7 +72,7 @@ namespace Orleans.Serialization
 
             // Value types need to be passed by-ref.
             var parameterTypes = new[] { declaringType.MakeByRefType(), field.FieldType };
-            var delegateType = typeof(SerializationManager.ValueTypeSetter<,>).MakeGenericType(field.DeclaringType, field.FieldType);
+            var delegateType = typeof(ValueTypeSetter<,>).MakeGenericType(field.DeclaringType, field.FieldType);
 
             return GetSetDelegate(field, delegateType, parameterTypes);
         }

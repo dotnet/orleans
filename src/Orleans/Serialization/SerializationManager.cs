@@ -25,41 +25,41 @@ using Orleans.Configuration;
 namespace Orleans.Serialization
 {
     /// <summary>
+    /// The delegate used to set fields in value types.
+    /// </summary>
+    /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
+    /// <typeparam name="TField">The field type.</typeparam>
+    /// <param name="instance">The instance having its field set.</param>
+    /// <param name="value">The value being set.</param>
+    public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
+
+    /// <summary>
+    /// Deserializer function.
+    /// </summary>
+    /// <param name="expected">Expected Type to receive.</param>
+    /// <param name="context">The context under which this object is being deserialized.</param>
+    /// <returns>Rehydrated object of the specified Type read from the current position in the input stream.</returns>
+    public delegate object Deserializer(Type expected, IDeserializationContext context);
+
+    /// <summary> Serializer function. </summary>
+    /// <param name="raw">Input object to be serialized.</param>
+    /// <param name="context">The context under which this object is being serialized.</param>
+    /// <param name="expected">Current Type active in this stream.</param>
+    public delegate void Serializer(object raw, ISerializationContext context, Type expected);
+
+    /// <summary>
+    /// Deep copier function.
+    /// </summary>
+    /// <param name="original">Original object to be deep copied.</param>
+    /// <param name="context">The serialization context.</param>
+    /// <returns>Deep copy of the original object.</returns>
+    public delegate object DeepCopier(object original, ICopyContext context);
+
+    /// <summary>
     /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
     public sealed class SerializationManager : IDisposable
     {
-        /// <summary>
-        /// Deep copier function.
-        /// </summary>
-        /// <param name="original">Original object to be deep copied.</param>
-        /// <param name="context">The serialization context.</param>
-        /// <returns>Deep copy of the original object.</returns>
-        public delegate object DeepCopier(object original, ICopyContext context);
-
-        /// <summary> Serializer function. </summary>
-        /// <param name="raw">Input object to be serialized.</param>
-        /// <param name="context">The context under which this object is being serialized.</param>
-        /// <param name="expected">Current Type active in this stream.</param>
-        public delegate void Serializer(object raw, ISerializationContext context, Type expected);
-
-        /// <summary>
-        /// Deserializer function.
-        /// </summary>
-        /// <param name="expected">Expected Type to receive.</param>
-        /// <param name="context">The context under which this object is being deserialized.</param>
-        /// <returns>Rehydrated object of the specified Type read from the current position in the input stream.</returns>
-        public delegate object Deserializer(Type expected, IDeserializationContext context);
-
-        /// <summary>
-        /// The delegate used to set fields in value types.
-        /// </summary>
-        /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
-        /// <typeparam name="TField">The field type.</typeparam>
-        /// <param name="instance">The instance having its field set.</param>
-        /// <param name="value">The value being set.</param>
-        public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
-
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
         
         #region Privates
