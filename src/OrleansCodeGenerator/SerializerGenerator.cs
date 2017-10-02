@@ -291,9 +291,9 @@ namespace Orleans.CodeGenerator
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
             Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
             Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
-            Expression<Action> getGetter = () => SerializationManager.GetGetter(default(FieldInfo));
-            Expression<Action> getReferenceSetter = () => SerializationManager.GetReferenceSetter(default(FieldInfo));
-            Expression<Action> getValueSetter = () => SerializationManager.GetValueSetter(default(FieldInfo));
+            Expression<Action> getGetter = () => FieldUtils.GetGetter(default(FieldInfo));
+            Expression<Action> getReferenceSetter = () => FieldUtils.GetReferenceSetter(default(FieldInfo));
+            Expression<Action> getValueSetter = () => FieldUtils.GetValueSetter(default(FieldInfo));
 
             // Expressions for specifying binding flags.
             var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
