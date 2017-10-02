@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     buffer = ReadFromSocket(socket, size); // Receive the client ID
                     if (buffer == null) return false;
-                    grainId = GrainId.FromByteArray(buffer);
+                    grainId = GrainIdExtensions.FromByteArray(buffer);
                 }
                 return true;
             }

@@ -1,9 +1,7 @@
 using System;
 using System.Globalization;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Orleans.Core;
-using Orleans.Serialization;
+using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
@@ -218,10 +216,12 @@ namespace Orleans.Runtime
         private string ToStringImpl(bool detailed)
         {
             string name = string.Empty;
+#if ABSTRACTIONS_TODO
             if (Constants.TryGetSystemGrainName(this, out name))
             {
                 return name;
             }
+#endif
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
@@ -240,7 +240,7 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Tail(8);
+                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
                     fullString = String.Format("*grn/{0}/{1}", typeString, idString);
                     break;
                 case UniqueKey.Category.Client:
@@ -250,6 +250,7 @@ namespace Orleans.Runtime
                     fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
                     break;
                 case UniqueKey.Category.SystemTarget:
+#if ABSTRACTIONS_TODO
                     string explicitName = Constants.SystemTargetName(this);
                     if (TypeCode != 0)
                     {
@@ -258,6 +259,7 @@ namespace Orleans.Runtime
                     }
                     fullString = explicitName;
                     break;
+#endif
                 default:
                     fullString = "???/" + idString;
                     break;
@@ -317,21 +319,6 @@ namespace Orleans.Runtime
 
             var key = UniqueKey.Parse(grainId);
             return FindOrCreateGrainId(key);
-        }
-
-        internal byte[] ToByteArray()
-        {
-            var writer = new BinaryTokenStreamWriter();
-            writer.Write(this);
-            var result = writer.ToByteArray();
-            writer.ReleaseBuffers();
-            return result;
-        }
-
-        internal static GrainId FromByteArray(byte[] byteArray)
-        {
-            var reader = new BinaryTokenStreamReader(byteArray);
-            return reader.ReadGrainId();
         }
     }
 }
