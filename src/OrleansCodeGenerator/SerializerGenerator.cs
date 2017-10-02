@@ -104,8 +104,8 @@ namespace Orleans.CodeGenerator
         /// <returns>Syntax for the deserializer method.</returns>
         private static MemberDeclarationSyntax GenerateDeserializerMethod(Type type, List<FieldInfoMember> fields)
         {
-            Expression<Action> deserializeInner =
-                () => SerializationManager.DeserializeInner(default(Type), default(IDeserializationContext));
+            Expression<Action<IDeserializationContext>> deserializeInner =
+                ctx => ctx.DeserializeInner(default(Type));
             var contextParameter = SF.IdentifierName("context");
 
             var resultDeclaration =
@@ -134,10 +134,9 @@ namespace Orleans.CodeGenerator
             foreach (var field in fields)
             {
                 var deserialized =
-                    deserializeInner.Invoke()
+                    deserializeInner.Invoke(contextParameter)
                         .AddArgumentListArguments(
-                            SF.Argument(SF.TypeOfExpression(field.Type)),
-                            SF.Argument(contextParameter));
+                            SF.Argument(SF.TypeOfExpression(field.Type)));
                 body.Add(
                     SF.ExpressionStatement(
                         field.GetSetter(
@@ -171,9 +170,9 @@ namespace Orleans.CodeGenerator
 
         private static MemberDeclarationSyntax GenerateSerializerMethod(Type type, List<FieldInfoMember> fields)
         {
-            Expression<Action> serializeInner =
-                () =>
-                SerializationManager.SerializeInner(default(object), default(ISerializationContext), default(Type));
+            Expression<Action<ISerializationContext>> serializeInner =
+                ctx =>
+                    ctx.SerializeInner(default(object), default(Type));
             var contextParameter = SF.IdentifierName("context");
 
             var body = new List<StatementSyntax>
@@ -194,10 +193,9 @@ namespace Orleans.CodeGenerator
             {
                 body.Add(
                     SF.ExpressionStatement(
-                        serializeInner.Invoke()
+                        serializeInner.Invoke(contextParameter)
                             .AddArgumentListArguments(
                                 SF.Argument(field.GetGetter(inputExpression, forceAvoidCopy: true)),
-                                SF.Argument(contextParameter),
                                 SF.Argument(SF.TypeOfExpression(field.FieldInfo.FieldType.GetTypeSyntax())))));
             }
 
@@ -656,14 +654,13 @@ namespace Orleans.CodeGenerator
                 }
 
                 // Deep-copy the value.
-                Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object), default(ICopyContext));
+                Expression<Action<ICopyContext>> deepCopyInner = ctx => ctx.DeepCopyInner(default(object));
                 var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 return SF.CastExpression(
                     typeSyntax,
-                    deepCopyInner.Invoke()
+                    deepCopyInner.Invoke(serializationContextExpression)
                                  .AddArgumentListArguments(
-                                     SF.Argument(deepCopyValueExpression),
-                                     SF.Argument(serializationContextExpression)));
+                                     SF.Argument(deepCopyValueExpression)));
             }
 
             /// <summary>
