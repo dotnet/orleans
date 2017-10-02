@@ -25,8 +25,6 @@ namespace Orleans.TestingHost.Utils
         /// <param name="filePath"></param>
         public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
         {
-            if (ConsoleText.IsConsoleAvailable)
-                builder.AddConsole();
             builder.AddFile(filePath);
         }
 
@@ -54,8 +52,6 @@ namespace Orleans.TestingHost.Utils
         {
             var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
             factory.AddProvider(new FileLoggerProvider(filePath));
-            if (ConsoleText.IsConsoleAvailable)
-                factory.AddConsole();
             return factory;
         }
 
