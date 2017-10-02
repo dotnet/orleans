@@ -32,10 +32,13 @@ namespace Orleans.TestingHost
         /// <param name="name">Name of this silo.</param>
         /// <param name="siloBuilderFactoryType">Type of silo host builder factory.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
-        public AppDomainSiloHost(string name, Type siloBuilderFactoryType, ClusterConfiguration config)
+        /// <param name="traceToConsole">whether the host to trace to console or not</param>
+        public AppDomainSiloHost(string name, Type siloBuilderFactoryType, ClusterConfiguration config, bool traceToConsole)
         {
             var builderFactory = (ISiloBuilderFactory)Activator.CreateInstance(siloBuilderFactoryType);
             ISiloHostBuilder builder = builderFactory.CreateSiloBuilder(name, config);
+            if (traceToConsole && ConsoleText.IsConsoleAvailable)
+                builder.ConfigureLogging(loggingBuilder => loggingBuilder.AddConsole());
             builder.ConfigureServices((services) => services.AddSingleton<TestHooksSystemTarget>());
             this.host = builder.Build();
             InitializeTestHooksSystemTarget();

@@ -220,6 +220,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             var silo = AppDomainSiloHandle.Create(
                 siloName,
+                false,
                 siloType,
                 typeof(TestVersionGrains.VersionGrainsSiloBuilderFactory),
                 options.ClusterConfiguration,

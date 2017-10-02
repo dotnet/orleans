@@ -148,7 +148,11 @@ namespace Orleans.TestingHost
         {
             this.SiloBuilderFactoryType = typeof(TSiloBuilderFactory);
         }
-        
+
+        /// <summary>Gets or sets whether the cluster will output traces in the console, this is a short cut which would configure both client
+        /// and silos with ConsoleLoggerProvider into their DI container</summary>
+        public bool TraceToConsole { get; set; } = false;
+
         /// <summary>Build a cluster configuration.</summary>
         /// <param name="baseSiloPort">Base port number to use for silos</param>
         /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>

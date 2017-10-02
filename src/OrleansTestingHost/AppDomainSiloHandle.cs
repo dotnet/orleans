@@ -31,7 +31,7 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(string siloName, Silo.SiloType type, Type siloBuilderFactory, ClusterConfiguration config, NodeConfiguration nodeConfiguration, IDictionary<string, GeneratedAssembly> additionalAssemblies, string applicationBase = null)
+        public static SiloHandle Create(string siloName, bool traceToConsole, Silo.SiloType type, Type siloBuilderFactory, ClusterConfiguration config, NodeConfiguration nodeConfiguration, IDictionary<string, GeneratedAssembly> additionalAssemblies, string applicationBase = null)
         {
             AppDomainSetup setup = GetAppDomainSetupInfo(applicationBase);
 
@@ -59,7 +59,7 @@ namespace Orleans.TestingHost
                     optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
                 }
 
-                var args = new object[] { siloName, siloBuilderFactory, config };
+                var args = new object[] { siloName, siloBuilderFactory, config, traceToConsole };
 
                 var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
                     typeof(AppDomainSiloHost).Assembly.FullName, typeof(AppDomainSiloHost).FullName, false,

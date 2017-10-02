@@ -13,6 +13,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost
 {
@@ -41,7 +42,7 @@ namespace Orleans.TestingHost
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
         private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
-
+        private bool traceToConsole = false;
         /// <summary>
         /// Client configuration to use when initializing the client
         /// </summary>
@@ -116,6 +117,7 @@ namespace Orleans.TestingHost
             : this(options.ClusterConfiguration, options.ClientConfiguration)
         {
             this.siloBuilderFactoryType = options.SiloBuilderFactoryType;
+            this.traceToConsole = options.TraceToConsole;
         }
 
         /// <summary>
@@ -457,9 +459,12 @@ namespace Orleans.TestingHost
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
 
-            this.InternalClient = (IInternalClusterClient)new ClientBuilder()
+           var clientBuilder = new ClientBuilder()
                 .UseConfiguration(clientConfig)
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clientConfig.TraceFileName)).Build();
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clientConfig.TraceFileName));
+            if (this.traceToConsole && ConsoleText.IsConsoleAvailable)
+                clientBuilder.ConfigureLogging(builder => builder.AddConsole());
+            this.InternalClient = (IInternalClusterClient) clientBuilder.Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
@@ -541,7 +546,7 @@ namespace Orleans.TestingHost
 
         private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration, this.additionalAssemblies);
+            return AppDomainSiloHandle.Create(siloName, this.traceToConsole, type, this.siloBuilderFactoryType, config, nodeConfiguration, this.additionalAssemblies);
         }
 
         #endregion
