@@ -82,8 +82,24 @@ namespace OrleansAWSUtils.Storage
 
         private void CreateClient()
         {
-            var credentials = new BasicAWSCredentials(accessKey, secretKey);
-            sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                // Local SQS instance (for testing)
+                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
+            }
+            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+            {
+                // AWS SQS instance (auth via explicit credentials)
+                var credentials = new BasicAWSCredentials(accessKey, secretKey);
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            }
+            else
+            {
+                // AWS SQS instance (implicit auth - EC2 IAM Roles etc)
+                sqsClient = new AmazonSQSClient(new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            }
         }
 
         private async Task<string> GetQueueUrl()
