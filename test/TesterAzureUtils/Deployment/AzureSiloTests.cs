@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils.Deployment
@@ -27,11 +27,24 @@ namespace Tester.AzureUtils.Deployment
         [SkippableFact, TestCategory("Functional")]
         public async Task ValidateConfiguration_Startup()
         {
+            TestUtils.CheckForAzureStorage();
+
+            await ValidateConfigurationAtStartup(TestDefaultConfiguration.DataConnectionString);
+        }
+
+        [SkippableFact]
+        public async Task ValidateConfiguration_Startup_Emulator()
+        {
             Skip.IfNot(StorageEmulator.TryStart(), "This test explicitly requires the Azure Storage emulator to run");
 
+            await ValidateConfigurationAtStartup("UseDevelopmentStorage=true");
+        }
+
+        private async Task ValidateConfigurationAtStartup(string connectionString)
+        {
             var serviceRuntime = new TestServiceRuntimeWrapper();
             serviceRuntime.DeploymentId = "foo";
-            serviceRuntime.Settings["DataConnectionString"] = "UseDevelopmentStorage=true";
+            serviceRuntime.Settings["DataConnectionString"] = connectionString;
             serviceRuntime.InstanceName = "name";
 
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
