@@ -40,6 +40,16 @@ namespace Orleans.Serialization
         /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
         /// <returns>The object from the specified offset.</returns>
         object FetchReferencedObject(int offset);
+
+        object DeserializeInner(Type expected);
+    }
+
+    public static class IDeserializationContextExtensions
+    {
+        public static T DeserializeInner<T>(this IDeserializationContext @this)
+        {
+            return (T) @this.DeserializeInner(typeof(T));
+        }
     }
 
     public static class DeserializationContextExtensions
@@ -114,6 +124,11 @@ namespace Orleans.Serialization
 
         public object AdditionalContext => this.SerializationManager.RuntimeClient;
 
+        public object DeserializeInner(Type expected)
+        {
+            return SerializationManager.DeserializeInner(expected, this);
+        }
+
         internal class NestedDeserializationContext : IDeserializationContext
         {
             private readonly IDeserializationContext parent;
@@ -141,6 +156,7 @@ namespace Orleans.Serialization
             public void RecordObject(object obj, int offset) => this.parent.RecordObject(obj, offset);
             public void RecordObject(object obj) => this.RecordObject(obj, this.CurrentObjectOffset);
             public object FetchReferencedObject(int offset) => this.parent.FetchReferencedObject(offset);
+            public object DeserializeInner(Type expected) => this.parent.DeserializeInner(expected);
         }
     }
 }
