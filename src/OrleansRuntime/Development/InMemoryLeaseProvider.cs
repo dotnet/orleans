@@ -118,9 +118,18 @@ namespace Orleans.Runtime.Development
 
         private class Lease
         {
-            public DateTime ExpiredUtc { get; set; }
-            public string Token => ExpiredUtc.Ticks.ToString();
+            private DateTime expiredUtc;
+
+            public DateTime ExpiredUtc
+            {
+                get { return expiredUtc; }
+                set
+                {
+                    expiredUtc = value;
+                    Token = Guid.NewGuid().ToString();
+                }
+            }
+            public string Token { get; private set; }
         }
     }
-
 }
