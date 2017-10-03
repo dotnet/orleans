@@ -186,18 +186,13 @@ namespace Orleans.Runtime
         {
             if (uniformHashCache != null) return uniformHashCache;
 
-            var hashes = new List<uint>();
-            for (int i = 0; i < numHashes; i++)
-            {
-                uint hash = GetUniformHashCode(i);
-                hashes.Add(hash);
-            }
-            uniformHashCache = hashes;
+            uniformHashCache = GetUniformHashCodesImpl(numHashes);
             return uniformHashCache;
         }
 
-        private uint GetUniformHashCode(int extraBit)
+        private List<uint> GetUniformHashCodesImpl(int numHashes)
         {
+            var hashes = new List<uint>();
             var bytes = new byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
             var tmpInt = new int[1];
 
@@ -228,11 +223,16 @@ namespace Orleans.Runtime
             tmpInt[0] = this.Generation;
             Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
             offset += sizeof(int);
-            // extraBit
-            tmpInt[0] = extraBit;
-            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
 
-            return JenkinsHash.ComputeHash(bytes);
+            for (int extraBit = 0; extraBit < numHashes; extraBit++)
+            {
+                // extraBit
+                tmpInt[0] = extraBit;
+                Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+                hashes.Add(JenkinsHash.ComputeHash(bytes));
+            }
+            
+            return hashes;
         }
 
         /// <summary>
