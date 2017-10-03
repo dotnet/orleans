@@ -51,23 +51,18 @@ namespace Orleans.CodeGeneration
 #else
             var generatedCode = GenerateCodeInternal(options);
 #endif
-
-            if (!string.IsNullOrWhiteSpace(generatedCode))
+            
+            using (var sourceWriter = new StreamWriter(outputFileName))
             {
-                using (var sourceWriter = new StreamWriter(outputFileName))
-                {
-                    sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
-                    DisableWarnings(sourceWriter, SuppressCompilerWarnings);
-                    sourceWriter.WriteLine(generatedCode);
-                    RestoreWarnings(sourceWriter, SuppressCompilerWarnings);
-                    sourceWriter.WriteLine("#endif");
-                }
-
-                Console.WriteLine($"Orleans-CodeGen - Generated file written {outputFileName}");
-                return true;
+                sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
+                DisableWarnings(sourceWriter, SuppressCompilerWarnings);
+                sourceWriter.WriteLine(generatedCode ?? string.Empty);
+                RestoreWarnings(sourceWriter, SuppressCompilerWarnings);
+                sourceWriter.WriteLine("#endif");
             }
 
-            return false;
+            Console.WriteLine($"Orleans-CodeGen - Generated file written {outputFileName}");
+            return !string.IsNullOrWhiteSpace(generatedCode);
         }
 
         internal static string GenerateSourceForAssembly(Assembly grainAssembly)
