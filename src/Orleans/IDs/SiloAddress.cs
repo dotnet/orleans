@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -198,11 +198,40 @@ namespace Orleans.Runtime
 
         private uint GetUniformHashCode(int extraBit)
         {
-            var writer = new BinaryTokenStreamWriter();
-            writer.Write(this);
-            writer.Write(extraBit);
-            byte[] bytes = writer.ToByteArray();
-            writer.ReleaseBuffers();
+            var bytes = new byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
+            var tmpInt = new int[1];
+
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = 9;
+            }
+
+            // Endpoint IP Address
+            if (this.Endpoint.AddressFamily == AddressFamily.InterNetwork) // IPv4
+            {
+                for (int i = 0; i < 12; i++)
+                {
+                    bytes[i] = 0;
+                }
+                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 12, 4);
+            }
+            else // IPv6
+            {
+                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 0, 16);
+            }
+            var offset = 16;
+            // Port
+            tmpInt[0] = this.Endpoint.Port;
+            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            offset += sizeof(int);
+            // Generation
+            tmpInt[0] = this.Generation;
+            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            offset += sizeof(int);
+            // extraBit
+            tmpInt[0] = extraBit;
+            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+
             return JenkinsHash.ComputeHash(bytes);
         }
 

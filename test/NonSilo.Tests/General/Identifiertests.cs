@@ -47,6 +47,26 @@ namespace UnitTests.General
             }
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressGetUniformHashCodes()
+        {
+            int numberofHash = 3;
+            var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 8080), 26);
+
+            var result = siloAddress.GetUniformHashCodes(numberofHash);
+
+            for (int i = 0; i < numberofHash; i++)
+            {
+                var sw = new BinaryTokenStreamWriter();
+                sw.Write(siloAddress);
+                sw.Write(i);
+                var tmp = sw.ToByteArray();
+                var expected = JenkinsHash.ComputeHash(sw.ToByteArray());
+
+                Assert.Equal(expected, result[i]);
+            }
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void ID_IsSystem()
         {
