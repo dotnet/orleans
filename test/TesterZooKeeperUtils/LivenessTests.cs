@@ -23,10 +23,9 @@ namespace Tester.ZooKeeperUtils
 
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 
         public class SiloBuilderFactory : ISiloBuilderFactory
@@ -35,6 +34,7 @@ namespace Tester.ZooKeeperUtils
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseZooKeeperMembershipTable(options =>
                     {
                         options.DeploymentId = clusterConfiguration.Globals.DeploymentId;

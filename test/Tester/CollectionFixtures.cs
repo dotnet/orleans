@@ -31,6 +31,7 @@ namespace Tester
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseAzureMemebershipTable(options =>
                     {
                         options.DeploymentId = clusterConfiguration.Globals.DeploymentId;

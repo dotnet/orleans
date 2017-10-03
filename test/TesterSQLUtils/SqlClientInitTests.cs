@@ -50,6 +50,7 @@ namespace Tester.SQLUtils
                 {
                     return new SiloHostBuilder()
                         .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
                         .UseSqlMembershipFromLegacyConfigurationSupport()
                         .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
                 }

@@ -41,6 +41,7 @@ namespace Tester.AzureUtils
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseAzureMembershipTableFromLegacyConfigurationSupport()
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }

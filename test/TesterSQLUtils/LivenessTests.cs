@@ -13,6 +13,18 @@ using OrleansSQLUtils.Configuration;
 
 namespace UnitTests.MembershipTests
 {
+    public class SiloBuilderFactory : ISiloBuilderFactory
+    {
+        public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+        {
+            return new SiloHostBuilder()
+                .ConfigureSiloName(siloName)
+                .UseConfiguration(clusterConfiguration)
+                .UseSqlMembershipFromLegacyConfigurationSupport()
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+        }
+    }
+
     public class LivenessTests_SqlServer : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest";
@@ -28,17 +40,6 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster().UseSiloBuilderFactory<SiloBuilderFactory>();
-        }
-
-        public class SiloBuilderFactory : ISiloBuilderFactory
-        {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
-            {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseSqlMembershipFromLegacyConfigurationSupport()
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
-            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
@@ -91,21 +92,6 @@ namespace UnitTests.MembershipTests
                 .UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 
-        public class SiloBuilderFactory : ISiloBuilderFactory
-        {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
-            {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .ConfigureServices(svc => svc.Configure<SqlMembershipTableOptions>(options =>
-                    {
-                        options.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                    }))
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
-            }
-        }
-
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
         public async Task Liveness_PostgreSql_1()
         {
@@ -153,21 +139,6 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
-        }
-
-        public class SiloBuilderFactory : ISiloBuilderFactory
-        {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
-            {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .ConfigureServices(svc => svc.Configure<SqlMembershipTableOptions>(options =>
-                    {
-                        options.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                    }))
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
-            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]

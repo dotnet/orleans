@@ -32,7 +32,6 @@ namespace Tester.AzureUtils.Persistence
                 Guid serviceId = Guid.NewGuid();
                 var options = new TestClusterOptions(initialSilosCount: 4);
                 options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
                 options.ClusterConfiguration.Globals.ServiceId = serviceId;
 

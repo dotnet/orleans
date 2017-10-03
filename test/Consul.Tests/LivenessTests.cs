@@ -23,8 +23,6 @@ namespace Consul.Tests
 
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansConsulUtils";
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -37,6 +35,7 @@ namespace Consul.Tests
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseConsulMembershipTable(options =>
                     {
                         options.DeploymentId = clusterConfiguration.Globals.DeploymentId;

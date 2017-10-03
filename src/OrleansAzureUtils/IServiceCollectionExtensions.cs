@@ -16,11 +16,12 @@ namespace OrleansAzureUtils
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configureOptions"></param>
-        public static void UseAzureMemebershipTable(this IServiceCollection services,
+        public static IServiceCollection UseAzureMemebershipTable(this IServiceCollection services,
             Action<AzureMembershipTableOptions> configureOptions)
         {
             services.Configure<AzureMembershipTableOptions>(configureOptions);
             services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+            return services;
         }
 
         /// <summary>
@@ -28,10 +29,11 @@ namespace OrleansAzureUtils
         /// </summary>
         /// <param name="services"></param>
         /// <param name="config"></param>
-        public static void UseAzureMemebershipTable(this IServiceCollection services, IConfiguration config)
+        public static IServiceCollection UseAzureMemebershipTable(this IServiceCollection services, IConfiguration config)
         {
             services.Configure<AzureMembershipTableOptions>(config);
             services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+            return services;
         }
 
 

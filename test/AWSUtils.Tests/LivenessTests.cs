@@ -63,7 +63,6 @@ namespace AWSUtils.Tests.Liveness
 
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = ConnectionString ;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -76,6 +75,7 @@ namespace AWSUtils.Tests.Liveness
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseDynamoDBMembershipTable(options =>
                     {
                         options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
