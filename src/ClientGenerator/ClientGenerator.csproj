@@ -18,6 +18,8 @@
     <PreserveCompilationContext>true</PreserveCompilationContext>
     <PublishRoot>$(SourceRoot)Bootstrap/$(Configuration)/published/</PublishRoot>
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   
   <ItemGroup>
@@ -70,6 +72,7 @@
     <ItemGroup>
       <PublishedFiles Include="$(PublishRoot)**/*" Exclude="$(PublishRoot)**/$(AssemblyName).*;$(PublishRoot)*/refs/**/*" />
       <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).deps.json" />
+      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" />
       <_PackageFiles Include="@(PublishedFiles)">
         <PackagePath>tasks/$(RecursiveDir)</PackagePath>
         <Visible>false</Visible>
