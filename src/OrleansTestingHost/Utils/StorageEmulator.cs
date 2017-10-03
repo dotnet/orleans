@@ -141,32 +141,6 @@ namespace Orleans.TestingHost.Utils
             }
         }
 
-        public static bool TryCheckForAzureStorage(string dataConnectionString, out string error)
-        {
-            error = string.Empty;
-            if (string.IsNullOrWhiteSpace(dataConnectionString))
-            {
-                error = "No connection string found. Skipping";
-                return false;
-            }
-
-            bool usingLocalWAS = string.Equals(dataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
-                return true;
-            }
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
-            {
-                error = "Azure Storage Emulator could not be started.";
-                return false;
-            }
-            return true;
-        }
-
         /// <summary>
         /// Creates a new <see cref="ProcessStartInfo">ProcessStartInfo</see> to be used as an argument
         /// to other operations in this class.

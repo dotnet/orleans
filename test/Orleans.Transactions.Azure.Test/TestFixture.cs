@@ -5,11 +5,18 @@ using TestExtensions;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
 using Xunit;
+using System;
 
 namespace Orleans.Transactions.Azure.Tests
 {
     public class TestFixture : BaseTestClusterFixture
     {
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
+        }
+
         protected override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions();
@@ -35,12 +42,25 @@ namespace Orleans.Transactions.Azure.Tests
             }
         }
 
-        public static void CheckForAzureStorage()
+        public static void CheckForAzureStorage(string dataConnectionString)
         {
-            string error;
-            if (!StorageEmulator.TryCheckForAzureStorage(TestDefaultConfiguration.DataConnectionString, out error))
+            if (string.IsNullOrWhiteSpace(dataConnectionString))
             {
-                throw new SkipException(error);
+                throw new SkipException("No connection string found. Skipping");
+            }
+
+            bool usingLocalWAS = string.Equals(dataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+
+            if (!usingLocalWAS)
+            {
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
+                return;
+            }
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if (!StorageEmulator.TryStart())
+            {
+                throw new SkipException("Azure Storage Emulator could not be started.");
             }
         }
     }

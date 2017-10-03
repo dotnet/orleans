@@ -22,10 +22,25 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            string error;
-            if(!StorageEmulator.TryCheckForAzureStorage(TestDefaultConfiguration.DataConnectionString, out error))
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                throw new SkipException(error);
+                throw new SkipException("No connection string found. Skipping");
+            }
+
+            bool usingLocalWAS = string.Equals(TestDefaultConfiguration.DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+
+            if (!usingLocalWAS)
+            {
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
+                return;
+            }
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if (!StorageEmulator.TryStart())
+            {
+                string errorMsg = "Azure Storage Emulator could not be started.";
+                Console.WriteLine(errorMsg);
+                throw new SkipException(errorMsg);
             }
         }
 
