@@ -13,6 +13,7 @@ namespace Orleans.ServiceBus.Providers
     ///   indicates which application layer event this token is for, within an EventHub message.  It is required for uniqueness
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
+    [Serializable]
     public class EventHubSequenceTokenV2 : EventHubSequenceToken
     {
         /// <summary>
