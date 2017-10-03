@@ -12,7 +12,7 @@ using TestExtensions;
 namespace Orleans.Transactions.Azure.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
-    public class GoldenPathTransactionManagerTest : GoldenPathTransactionManagerTestRunner, IClassFixture<TestFixture>
+    public class GoldenPathTransactionManagerTest : GoldenPathTransactionManagerTestRunner
     {
         private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromMilliseconds(10);
         private static readonly TimeSpan StorageDelay = TimeSpan.FromSeconds(30);
@@ -24,6 +24,7 @@ namespace Orleans.Transactions.Azure.Tests
 
         private static ITransactionManager MakeTransactionManager()
         {
+            TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
             ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsConfiguration>(new TransactionsConfiguration()), NullLoggerFactory.Instance, LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
@@ -31,6 +32,7 @@ namespace Orleans.Transactions.Azure.Tests
 
         private static async Task<ITransactionLogStorage> StorageFactory()
         {
+            TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
             var config = new ClientConfiguration();
             var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
             var azureConfig = Options.Create(new AzureTransactionLogConfiguration()
