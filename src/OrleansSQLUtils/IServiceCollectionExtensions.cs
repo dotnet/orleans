@@ -51,6 +51,7 @@ namespace OrleansSQLUtils
                 options.DeploymentId = configuration.DeploymentId;
                 options.AdoInvariant = configuration.AdoInvariant;
             });
+            services.AddSingleton<IMembershipTable, SqlMembershipTable>();
             return services;
         }
 

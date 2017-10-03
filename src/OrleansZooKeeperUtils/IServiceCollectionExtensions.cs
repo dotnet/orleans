@@ -52,6 +52,7 @@ namespace OrleansZooKeeperUtils
                 options.DataConnectionString = configuration.DataConnectionString;
                 options.DeploymentId = configuration.DeploymentId;
             });
+            services.AddSingleton<IMembershipTable, ZooKeeperBasedMembershipTable>();
             return services;
         }
 

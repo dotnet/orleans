@@ -51,7 +51,6 @@ namespace UnitTests.Streaming.Reliability
 
             this.numExpectedSilos = 2;
             var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
@@ -77,6 +76,7 @@ namespace UnitTests.Streaming.Reliability
             {
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
                     .UseAzureMemebershipTable(options =>
                     {
                         options.DeploymentId = clusterConfiguration.Globals.DeploymentId;

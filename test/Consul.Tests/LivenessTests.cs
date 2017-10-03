@@ -26,7 +26,7 @@ namespace Consul.Tests
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 
         public class SiloBuilderFactory : ISiloBuilderFactory

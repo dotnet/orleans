@@ -54,6 +54,7 @@ namespace OrleansConsulUtils
                 options.DataConnectionString = configuration.DataConnectionString;
                 options.DeploymentId = configuration.DeploymentId;
             });
+            services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
             return services;
         }
 

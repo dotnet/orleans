@@ -28,10 +28,9 @@ namespace Orleans.Runtime.Host
         /// </summary>
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
-        private ILogger logger;
         public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger)
         {
-            this.logger = logger;
+            watcher = new ZooKeeperWatcher(logger);
         }
 
         /// <summary>
@@ -40,7 +39,6 @@ namespace Orleans.Runtime.Host
         /// <param name="config">The given client configuration.</param>
         public Task InitializeGatewayListProvider(ClientConfiguration config)
         {
-            watcher = new ZooKeeperWatcher(logger);
             deploymentPath = "/" + config.DeploymentId;
             deploymentConnectionString = config.DataConnectionString + deploymentPath;
             maxStaleness = config.GatewayListRefreshPeriod;
@@ -121,12 +119,13 @@ namespace Orleans.Runtime.Host
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
         private string rootConnectionString;
-
-        private readonly ZooKeeperMembershipTableOptions membershipTableOptions;
+        
         public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger, IOptions<ZooKeeperMembershipTableOptions> membershipTableOptions)
         {
             this.logger = logger;
-            this.membershipTableOptions = membershipTableOptions.Value;
+            var options = membershipTableOptions.Value;
+            watcher = new ZooKeeperWatcher(logger);
+            InitConfig(options.DataConnectionString, options.DeploymentId);
         }
 
         /// <summary>
@@ -136,7 +135,6 @@ namespace Orleans.Runtime.Host
         /// <returns></returns>
         public async Task InitializeMembershipTable(bool tryInitPath)
         {
-            InitConfig(membershipTableOptions.DataConnectionString, membershipTableOptions.DeploymentId);
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.
@@ -159,7 +157,6 @@ namespace Orleans.Runtime.Host
 
         private void InitConfig(string dataConnectionString, string deploymentId)
         {
-            watcher = new ZooKeeperWatcher(logger);
             deploymentPath = "/" + deploymentId;
             deploymentConnectionString = dataConnectionString + deploymentPath;
             rootConnectionString = dataConnectionString;

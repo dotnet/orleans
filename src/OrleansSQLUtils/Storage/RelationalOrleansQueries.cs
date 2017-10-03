@@ -35,11 +35,6 @@ namespace Orleans.SqlUtils
         /// </summary>
         private readonly DbStoredQueries dbStoredQueries;
 
-        internal static Task CreateInstance(string adoInvariant, string dataConnectionString, object grainReferenceConverter)
-        {
-            throw new NotImplementedException();
-        }
-
         private readonly IGrainReferenceConverter grainReferenceConverter;
 
         /// <summary>
