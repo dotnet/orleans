@@ -50,7 +50,7 @@ namespace Orleans.CodeGenerator
             return this.typesToProcess.Contains(type) || this.processedTypes.Contains(type);
         }
 
-        internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
+        internal bool RecordTypeToGenerate(Type t, Assembly targetAssembly)
         {
             if (!TypeUtilities.IsAccessibleFromAssembly(t, targetAssembly))
             {
@@ -66,7 +66,7 @@ namespace Orleans.CodeGenerator
 
             if (typeInfo.IsArray)
             {
-                RecordTypeToGenerate(typeInfo.GetElementType(), module, targetAssembly);
+                RecordTypeToGenerate(typeInfo.GetElementType(), targetAssembly);
                 return false;
             }
 
@@ -84,7 +84,7 @@ namespace Orleans.CodeGenerator
                 var args = typeInfo.GetGenericArguments();
                 foreach (var arg in args)
                 {
-                    RecordTypeToGenerate(arg, module, targetAssembly);
+                    RecordTypeToGenerate(arg, targetAssembly);
                 }
             }
 
@@ -93,7 +93,7 @@ namespace Orleans.CodeGenerator
 
             if (t.IsConstructedGenericType)
             {
-                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
+                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), targetAssembly);
             }
 
             if (typeInfo.IsOrleansPrimitive() || this.serializationManager.HasSerializer(t) ||

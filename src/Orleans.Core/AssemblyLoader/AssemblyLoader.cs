@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -50,9 +52,9 @@ namespace Orleans.Runtime
         ///     assemblies to be loaded based on examination of their ReflectionOnly type
         ///     information (e.g. AssemblyLoaderCriteria.LoadTypesAssignableFrom).</param>
         /// <param name="logger">A logger to provide feedback to.</param>
-        /// <returns>List of discovered assembly locations</returns>
+        /// <returns>List of discovered assemblies</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom")]
-        public static List<string> LoadAssemblies(
+        public static List<Assembly> LoadAssemblies(
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
@@ -64,50 +66,29 @@ namespace Orleans.Runtime
                     pathNameCriteria,
                     reflectionCriteria,
                     logger);
-
-            int count = 0;
+            
+            var loadedAssemblies = new List<Assembly>();
             List<string> discoveredAssemblyLocations = loader.DiscoverAssemblies();
             foreach (var pathName in discoveredAssemblyLocations)
             {
                 loader.logger.Info("Loading assembly {0}...", pathName);
+
                 // It is okay to use LoadFrom here because we are loading application assemblies deployed to the specific directory.
                 // Such application assemblies should not be deployed somewhere else, e.g. GAC, so this is safe.
-                Assembly.LoadFrom(pathName);
-                ++count;
-            }
-            loader.logger.Info("{0} assemblies loaded.", count);
-            return discoveredAssemblyLocations;
-        }
-
-        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
-        {
-            try
-            {
-                var assembly = Assembly.Load(new AssemblyName(assemblyName));
-                var foundType =
-                    TypeUtils.GetTypes(
-                        assembly,
-                        type => typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface,
-                        logger).FirstOrDefault();
-                if (foundType == null)
+                try
                 {
-                    return null;
+                    loadedAssemblies.Add(loader.LoadAssemblyFromProbingPath(pathName));
                 }
+                catch (Exception exception)
+                {
+                    loader.logger.Warn(ErrorCode.Loader_AssemblyLoadError, $"Failed to load assembly {pathName}.", exception);
+                }
+            }
 
-                return (T)ActivatorUtilities.GetServiceOrCreateInstance(serviceProvider, foundType);
-            }
-            catch (FileNotFoundException)
-            {
-                logger.Info(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, $"Failed to find assembly {assemblyName} to create instance of {typeof(T)}.");
-                return null;
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exc.Message, exc);
-                throw;
-            }
+            loader.logger.Info("{0} assemblies loaded.", loadedAssemblies.Count);
+            return loadedAssemblies;
         }
-
+        
         public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
         {
             try
@@ -239,16 +220,14 @@ namespace Orleans.Runtime
             return assemblies;
         }
 
-        private static Assembly TryReflectionOnlyLoadFromOrFallback(string assembly)
+        private Assembly TryReflectionOnlyLoadFromOrFallback(string assembly)
         {
             if (TypeUtils.CanUseReflectionOnly)
             {
                 return Assembly.ReflectionOnlyLoadFrom(assembly);
             }
-            else
-            {
-                return Assembly.LoadFrom(assembly);
-            }
+
+            return this.LoadAssemblyFromProbingPath(assembly);
         }
 
         private bool ShouldExcludeAssembly(string pathName)
@@ -535,6 +514,24 @@ namespace Orleans.Runtime
         private bool AssemblyPassesLoadCriteria(string pathName)
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
+        }
+
+        private Assembly LoadAssemblyFromProbingPath(string path)
+        {
+            var assemblyName = GetAssemblyNameFromMetadata(path);
+            return Assembly.Load(assemblyName);
+        }
+
+        private static AssemblyName GetAssemblyNameFromMetadata(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var peFile = new PEReader(stream))
+            {
+                var reader = peFile.GetMetadataReader();
+                var definition = reader.GetAssemblyDefinition();
+                var name = reader.GetString(definition.Name);
+                return new AssemblyName(name);
+            }
         }
     }
 }

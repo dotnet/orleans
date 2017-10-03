@@ -7,13 +7,13 @@ namespace Orleans.CodeGeneration
     /// Base class of all the activation attributes 
     /// </summary>
     [AttributeUsage(System.AttributeTargets.All)]
-    public abstract class GeneratedAttribute : Attribute
+    public abstract class GrainSupportClassAttribute : Attribute
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="GeneratedAttribute"/> class.
+        /// Initializes a new instance of the <see cref="GrainSupportClassAttribute"/> class.
         /// </summary>
         /// <param name="targetType">The type which this implementation applies to.</param>
-        protected GeneratedAttribute(Type targetType)
+        protected GrainSupportClassAttribute(Type targetType)
         {
             this.TargetType = targetType;
         }
@@ -28,7 +28,7 @@ namespace Orleans.CodeGeneration
     /// Identifies a class that knows how to map the messages targeting a specifies interface ID to a grain (CLR) interface.
     /// </summary>
     [AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class MethodInvokerAttribute : GeneratedAttribute
+    public sealed class MethodInvokerAttribute : GrainSupportClassAttribute
     {
         /// <summary>Initializes a new instance of the <see cref="MethodInvokerAttribute"/> class.</summary>
         /// <param name="targetType">The grain implementation type</param>
@@ -45,7 +45,7 @@ namespace Orleans.CodeGeneration
 
     /// <summary>Identifies a concrete grain reference to an interface ID</summary>
     [AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class GrainReferenceAttribute : GeneratedAttribute
+    public sealed class GrainReferenceAttribute : GrainSupportClassAttribute
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceAttribute"/> class.
@@ -56,20 +56,25 @@ namespace Orleans.CodeGeneration
         {
         }
     }
-
+    
     /// <summary>
     /// Identifies a class that contains all the serializer methods for a type.
     /// </summary>
     [AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed class SerializerAttribute : GeneratedAttribute
+    public sealed class SerializerAttribute : Attribute
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializerAttribute"/> class.
         /// </summary>
         /// <param name="targetType">The type that this implementation can serialize.</param>
         public SerializerAttribute(Type targetType)
-            : base(targetType)
         {
+            this.TargetType = targetType;
         }
+
+        /// <summary>
+        /// Gets the type which this implementation applies to.
+        /// </summary>
+        public Type TargetType { get; }
     }
 }

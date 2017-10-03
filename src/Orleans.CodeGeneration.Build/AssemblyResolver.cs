@@ -143,8 +143,7 @@ namespace Orleans.CodeGeneration
                     var assembly = TryLoadAssemblyFromPath(path);
                     if (assembly != null) return assembly;
                 }
-
-                this.log($"Could not resolve {name.Name}");
+                
                 return null;
             }
             catch (Exception exception)
@@ -157,7 +156,6 @@ namespace Orleans.CodeGeneration
             {
                 try
                 {
-                    this.log($"Trying to load assembly from path {path}");
 #if NETCOREAPP2_0
                     return this.loadContext.LoadFromAssemblyPath(path);
 #else

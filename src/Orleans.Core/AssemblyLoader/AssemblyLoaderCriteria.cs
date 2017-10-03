@@ -40,10 +40,12 @@ namespace Orleans.Runtime
                 AssemblyLoaderReflectionCriterion.NewCriterion(
                     (Type type, out IEnumerable<string> ignored) =>
                     {
+                        var reflectionOnlyType = TypeUtils.ToReflectionOnlyType(type);
+
                         ignored = null;
                         foreach (var requiredType in requiredTypes)
                         {
-                            if (requiredType.IsAssignableFrom(type))
+                            if (requiredType.IsAssignableFrom(reflectionOnlyType))
                             {
                                 //  we found a match! load the assembly.
                                 return true;
@@ -57,19 +59,6 @@ namespace Orleans.Runtime
         internal static AssemblyLoaderReflectionCriterion LoadTypesAssignableFrom(Type requiredType)
         {
             return LoadTypesAssignableFrom(new [] {requiredType});
-        }
-
-        internal static readonly string[] 
-            SystemBinariesList = 
-                new string[]
-                    {
-                        "Orleans.Core.dll",
-                        "Orleans.Runtime.dll"
-                    };
-
-        internal static AssemblyLoaderPathNameCriterion ExcludeSystemBinaries()
-        {
-            return ExcludeFileNames(SystemBinariesList);
         }
 
         private static AssemblyLoaderPathNameCriterion GetFileNameCriterion(IEnumerable<string> list, bool includeList)

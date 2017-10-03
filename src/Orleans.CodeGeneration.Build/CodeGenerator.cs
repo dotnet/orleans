@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
-using Orleans.Logging;
+using Orleans.ApplicationParts;
 using Orleans.Runtime.Configuration;
 using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Metadata;
 #if NETCOREAPP2_0
 using System.Runtime.Loader;
 #endif
@@ -25,6 +26,7 @@ namespace Orleans.CodeGeneration
             162, // CS0162 - Unreachable code detected.
             219, // CS0219 - The variable 'V' is assigned but its value is never used.
             414, // CS0414 - The private field 'F' is assigned but its value is never used.
+            618, // CS0616 - Member is obsolete.
             649, // CS0649 - Field 'F' is never assigned to, and will always have its default value.
             693, // CS0693 - Type parameter 'type parameter' has the same name as the type parameter from outer type 'T'
             1591, // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
@@ -65,19 +67,29 @@ namespace Orleans.CodeGeneration
             return !string.IsNullOrWhiteSpace(generatedCode);
         }
 
-        internal static string GenerateSourceForAssembly(Assembly grainAssembly)
+        private static string GenerateSourceForAssembly(Assembly grainAssembly)
         {
             using (var loggerFactory = new LoggerFactory())
             {
                 var config = new ClusterConfiguration();
-                loggerFactory.AddProvider(new ConsoleLoggerProvider(new ConsoleLoggerSettings()));
+                loggerFactory.AddConsole(LogLevel.Warning);
                 var serializationProviderOptions = Options.Create(
                     new SerializationProviderOptions
                     {
                         SerializationProviders = config.Globals.SerializationProviders,
                         FallbackSerializationProvider = config.Globals.FallbackSerializationProvider
                     });
-                var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, serializationProviderOptions, null, loggerFactory), loggerFactory);
+                var applicationPartManager = new ApplicationPartManager();
+                applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
+                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
+                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
+                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+                applicationPartManager.AddApplicationPart(grainAssembly);
+                applicationPartManager.AddApplicationPart(typeof(RuntimeVersion).Assembly);
+                applicationPartManager.AddApplicationPartsFromReferences(grainAssembly);
+                applicationPartManager.AddApplicationPartsFromReferences(typeof(RuntimeVersion).Assembly);
+                var serializationManager = new SerializationManager(null, serializationProviderOptions, applicationPartManager, loggerFactory, new CachedTypeResolver());
+                var codeGenerator = new RoslynCodeGenerator(serializationManager, applicationPartManager, loggerFactory);
                 return codeGenerator.GenerateSourceForAssembly(grainAssembly);
             }
         }

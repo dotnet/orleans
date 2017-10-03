@@ -17,8 +17,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// The collection of serializers.
         /// </summary>
-        private readonly CachedReadConcurrentDictionary<Type, SerializationManager.SerializerMethods> serializers =
-            new CachedReadConcurrentDictionary<Type, SerializationManager.SerializerMethods>();
+        private readonly CachedReadConcurrentDictionary<Type, SerializerMethods> serializers =
+            new CachedReadConcurrentDictionary<Type, SerializerMethods>();
 
         /// <summary>
         /// The field filter used for generating serializers for subclasses of <see cref="Exception"/>.
@@ -32,7 +32,7 @@ namespace Orleans.Serialization
         /// This serializer operates on <see cref="RemoteNonDeserializableException"/> instances, however it 
         /// includes only fields from <see cref="Exception"/> and no sub-class fields.
         /// </remarks>
-        private readonly SerializationManager.SerializerMethods fallbackBaseExceptionSerializer;
+        private readonly SerializerMethods fallbackBaseExceptionSerializer;
         
         /// <summary>
         /// The serializer generator.
@@ -201,9 +201,9 @@ namespace Orleans.Serialization
             }
         }
 
-        private SerializationManager.SerializerMethods GetSerializerMethods(Type actualType)
+        private SerializerMethods GetSerializerMethods(Type actualType)
         {
-            SerializationManager.SerializerMethods methods;
+            SerializerMethods methods;
             if (!this.serializers.TryGetValue(actualType, out methods))
             {
                 methods = this.generator.GenerateSerializer(

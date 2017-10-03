@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost
 {
@@ -18,9 +15,7 @@ namespace Orleans.TestingHost
     public class AppDomainSiloHandle : SiloHandle
     {
         private bool isActive = true;
-
-        private IDictionary<string, GeneratedAssembly> additionalAssemblies;
-
+        
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
 
@@ -31,39 +26,32 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(string siloName, Silo.SiloType type, Type siloBuilderFactory, ClusterConfiguration config, NodeConfiguration nodeConfiguration, IDictionary<string, GeneratedAssembly> additionalAssemblies, string applicationBase = null)
+        public static SiloHandle Create(
+            string siloName,
+            Silo.SiloType type,
+            Type siloBuilderFactory,
+            ClusterConfiguration config,
+            NodeConfiguration nodeConfiguration,
+            Action<AppDomain> configureAppDomain = null,
+            string applicationBase = null)
         {
             AppDomainSetup setup = GetAppDomainSetupInfo(applicationBase);
 
             var appDomain = AppDomain.CreateDomain(siloName, null, setup);
-
+            configureAppDomain?.Invoke(appDomain);
+            
             try
             {
-                // Load each of the additional assemblies.
-                AppDomainSiloHost.CodeGeneratorOptimizer optimizer = null;
-                foreach (var assembly in additionalAssemblies.Where(asm => asm.Value != null))
-                {
-                    if (optimizer == null)
-                    {
-                        optimizer =
-                            (AppDomainSiloHost.CodeGeneratorOptimizer)
-                            appDomain.CreateInstanceAndUnwrap(
-                                typeof(AppDomainSiloHost.CodeGeneratorOptimizer).Assembly.FullName, typeof(AppDomainSiloHost.CodeGeneratorOptimizer).FullName, false,
-                                BindingFlags.Default,
-                                null,
-                                null,
-                                CultureInfo.CurrentCulture,
-                                new object[] { });
-                    }
+                var args = new object[] {siloName, siloBuilderFactory, config};
 
-                    optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
-                }
-
-                var args = new object[] { siloName, siloBuilderFactory, config };
-
-                var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
-                    typeof(AppDomainSiloHost).Assembly.FullName, typeof(AppDomainSiloHost).FullName, false,
-                    BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
+                var siloHost = (AppDomainSiloHost) appDomain.CreateInstanceAndUnwrap(
+                    typeof(AppDomainSiloHost).Assembly.FullName,
+                    typeof(AppDomainSiloHost).FullName,
+                    false,
+                    BindingFlags.Default,
+                    null,
+                    args,
+                    CultureInfo.CurrentCulture,
                     new object[] { });
 
                 appDomain.UnhandledException += ReportUnobservedException;
@@ -78,11 +66,8 @@ namespace Orleans.TestingHost
                     SiloAddress = siloHost.SiloAddress,
                     Type = type,
                     AppDomain = appDomain,
-                    additionalAssemblies = additionalAssemblies,
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
-
-                retValue.ImportGeneratedAssemblies();
 
                 return retValue;
             }
@@ -91,38 +76,6 @@ namespace Orleans.TestingHost
                 UnloadAppDomain(appDomain);
                 throw;
             }
-        }
-
-
-        private Dictionary<string, GeneratedAssembly> TryGetGeneratedAssemblies()
-        {
-            var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
-            {
-                try
-                {
-                    if (this.SiloHost != null)
-                    {
-                        var generatedAssemblies = new AppDomainSiloHost.GeneratedAssemblies();
-                        this.SiloHost.UpdateGeneratedAssemblies(generatedAssemblies);
-
-                        return generatedAssemblies.Assemblies;
-                    }
-                }
-                catch (Exception exc)
-                {
-                    WriteLog($"UpdateGeneratedAssemblies threw an exception. Ignoring it. Exception: {exc}");
-                }
-
-                return null;
-            });
-
-            // best effort to try to import generated assemblies, otherwise move on.
-            if (tryToRetrieveGeneratedAssemblies.Wait(TimeSpan.FromSeconds(3)))
-            {
-                return tryToRetrieveGeneratedAssemblies.Result;
-            }
-
-            return null;
         }
 
         /// <inheritdoc />
@@ -146,9 +99,7 @@ namespace Orleans.TestingHost
                     throw;
                 }
             }
-
-            ImportGeneratedAssemblies();
-
+            
             this.isActive = false;
             try
             {
@@ -193,27 +144,6 @@ namespace Orleans.TestingHost
                 var appDomain = this.AppDomain;
                 appDomain.UnhandledException -= ReportUnobservedException;
                 Task.Run(() => AppDomain.Unload(appDomain)).Ignore();
-            }
-        }
-
-        /// <summary>
-        /// Imports assemblies generated by runtime code generation from the provided silo.
-        /// </summary>
-        private void ImportGeneratedAssemblies()
-        {
-            var generatedAssemblies = this.TryGetGeneratedAssemblies();
-            if (generatedAssemblies != null)
-            {
-                foreach (var assembly in generatedAssemblies)
-                {
-                    // If we have never seen generated code for this assembly before, or generated code might be
-                    // newer, store it for later silo creation.
-                    GeneratedAssembly existing;
-                    if (!additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
-                    {
-                        additionalAssemblies[assembly.Key] = assembly.Value;
-                    }
-                }
             }
         }
 

@@ -24,7 +24,7 @@
         private readonly ConcurrentDictionary<Type, SerializerBundle> serializers =
             new ConcurrentDictionary<Type, SerializerBundle>();
 
-        private readonly TypeSerializer typeSerializer = new TypeSerializer();
+        private readonly TypeSerializer typeSerializer;
 
         /// <summary>
         /// The serializer used when a concrete type is not known.
@@ -40,11 +40,12 @@
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
-        public ILBasedSerializer()
+        public ILBasedSerializer(ITypeResolver typeResolver)
         {
+            this.typeSerializer = new TypeSerializer(typeResolver);
             var fallbackExceptionSerializer = new ILBasedExceptionSerializer(this.generator, this.typeSerializer);
             this.exceptionSerializer = new SerializerBundle(
-                new SerializationManager.SerializerMethods(
+                new SerializerMethods(
                     fallbackExceptionSerializer.DeepCopy,
                     fallbackExceptionSerializer.Serialize,
                     fallbackExceptionSerializer.Deserialize));
@@ -53,13 +54,13 @@
             // The serializer will generate and register serializers for concrete types
             // as they are discovered.
             this.thisSerializer = new SerializerBundle(
-                new SerializationManager.SerializerMethods(
+                new SerializerMethods(
                     this.DeepCopy,
                     this.Serialize,
                     this.Deserialize));
 
             this.namedTypeSerializer = new SerializerBundle(
-                new SerializationManager.SerializerMethods(
+                new SerializerMethods(
                     (original, context) => original,
                     (original, writer, expected) => {
                         var writer1 = writer.StreamWriter;
@@ -182,13 +183,13 @@
         }
 
         /// <summary>
-        /// This class primarily exists as a means to hold a reference to a <see cref="SerializationManager.SerializerMethods"/> structure.
+        /// This class primarily exists as a means to hold a reference to a <see cref="SerializerMethods"/> structure.
         /// </summary>
         private class SerializerBundle
         {
-            public readonly SerializationManager.SerializerMethods Methods;
+            public readonly SerializerMethods Methods;
             
-            public SerializerBundle(SerializationManager.SerializerMethods methods)
+            public SerializerBundle(SerializerMethods methods)
             {
                 this.Methods = methods;
             }

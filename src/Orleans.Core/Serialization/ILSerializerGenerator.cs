@@ -77,7 +77,7 @@ namespace Orleans.Serialization
         /// </param>
         /// <param name="fieldComparer">The comparer used to sort fields, or <see langword="null"/> to use the default.</param>
         /// <returns>The generated serializer.</returns>
-        public SerializationManager.SerializerMethods GenerateSerializer(
+        public SerializerMethods GenerateSerializer(
             Type type,
             Func<FieldInfo, bool> serializationFieldsFilter = null,
             Func<FieldInfo, bool> copyFieldsFilter = null,
@@ -102,7 +102,7 @@ namespace Orleans.Serialization
 
                 var serializer = this.EmitSerializer(type, serializationFields);
                 var deserializer = this.EmitDeserializer(type, serializationFields);
-                return new SerializationManager.SerializerMethods(
+                return new SerializerMethods(
                     copier,
                     serializer.CreateDelegate(),
                     deserializer.CreateDelegate());

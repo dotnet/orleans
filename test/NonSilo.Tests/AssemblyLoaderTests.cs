@@ -107,9 +107,12 @@ namespace UnitTests
 
         private List<string> NewExclusionList()
         {
-            var exclusionList = new List<string>(AssemblyLoaderCriteria.SystemBinariesList);
-            exclusionList.Add("UnitTests.dll");
-            return exclusionList;
+            return new List<string>(new[]
+            {
+                "Orleans.Core.dll",
+                "OrleansRuntime.dll",
+                "UnitTests.dll"
+            });
         }
 
         private AssemblyLoader NewAssemblyLoader(List<string> exclusionList)

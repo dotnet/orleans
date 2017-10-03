@@ -213,7 +213,7 @@ namespace UnitTests.General
 
         #region inheritence
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+     /*   [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_VoidMethod()
         {
             Assert.Throws<GrainInterfaceUtils.RulesViolationException>(() =>
@@ -239,7 +239,7 @@ namespace UnitTests.General
         {
             Assert.Throws<GrainInterfaceUtils.RulesViolationException>(() =>
             GrainInterfaceUtils.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_PropertySetter)));
-        }
+        }*/
 
         #endregion
     }

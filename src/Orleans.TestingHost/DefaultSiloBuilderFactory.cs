@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -12,7 +13,9 @@ namespace Orleans.TestingHost
         public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
         {
             var builder = new SiloHostBuilder();
+
             return builder.ConfigureSiloName(siloName)
+                .AddApplicationPartsFromAppDomain()
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder,
                     clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));

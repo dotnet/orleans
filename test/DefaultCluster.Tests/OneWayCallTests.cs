@@ -20,7 +20,7 @@ namespace DefaultCluster.Tests.General
             var observer = new SimpleGrainObserver();
             var task = grain.Notify(await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
             Assert.True(task.Status == TaskStatus.RanToCompletion, "Task should be synchronously completed.");
-            await observer.ReceivedValue;
+            await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
             Assert.Equal(1, count);
 
@@ -43,7 +43,7 @@ namespace DefaultCluster.Tests.General
                 return g.Notify(observerRef);
             });
 
-            await observer.ReceivedValue;
+            await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
             Assert.Equal(1, count);
 
