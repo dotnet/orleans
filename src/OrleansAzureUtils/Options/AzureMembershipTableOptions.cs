@@ -5,7 +5,7 @@ using System.Text;
 namespace Orleans.AzureUtils.Configuration
 {
     /// <summary>
-    /// Specify options used for <see cref="AzureBasedMembershipTable"/>
+    /// Specify options used for AzureBasedMembershipTable
     /// </summary>
     public class AzureMembershipTableOptions
     {

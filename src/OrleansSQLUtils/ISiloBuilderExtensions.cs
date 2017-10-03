@@ -25,7 +25,7 @@ namespace OrleansSQLUtils
         /// Configure SiloHostBuilder with SqlMembershipTable
         /// </summary>
         /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
+        /// <param name="configuration"></param>
         /// <returns></returns>
         public static ISiloHostBuilder UseSqlMembershipTable(this ISiloHostBuilder builder,
             IConfiguration configuration)
@@ -37,7 +37,6 @@ namespace OrleansSQLUtils
         /// Configure SiloHostBuilder with SqlMembershipTable, and get its configuration from GlobalConfiguration
         /// </summary>
         /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static ISiloHostBuilder UseSqlMembershipFromLegacyConfigurationSupport(this ISiloHostBuilder builder)
         {

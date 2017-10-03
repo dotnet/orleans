@@ -45,7 +45,7 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter, new OptionsWrapper<SqlMembershipTableOptions>(new SqlMembershipTableOptions()), loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new SqlGatewayListProvider(loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter);
         }
 
         protected override string GetAdoInvariant()

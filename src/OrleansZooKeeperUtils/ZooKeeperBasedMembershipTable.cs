@@ -15,6 +15,72 @@ using OrleansZooKeeperUtils.Configuration;
 
 namespace Orleans.Runtime.Host
 {
+    public class ZooKeeperGatewayListProvider : IGatewayListProvider
+    {
+        private ZooKeeperWatcher watcher;
+        /// <summary>
+        /// the node name for this deployment. for eg. /DeploymentId
+        /// </summary>
+        private string deploymentPath;
+
+        /// <summary>
+        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/DeploymentId"
+        /// </summary>
+        private string deploymentConnectionString;
+        private TimeSpan maxStaleness;
+        private ILogger logger;
+        public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger)
+        {
+            this.logger = logger;
+        }
+
+        /// <summary>
+        /// Initializes the ZooKeeper based gateway provider
+        /// </summary>
+        /// <param name="config">The given client configuration.</param>
+        public Task InitializeGatewayListProvider(ClientConfiguration config)
+        {
+            watcher = new ZooKeeperWatcher(logger);
+            deploymentPath = "/" + config.DeploymentId;
+            deploymentConnectionString = config.DataConnectionString + deploymentPath;
+            maxStaleness = config.GatewayListRefreshPeriod;
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
+        /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
+        /// </summary>
+        public async Task<IList<Uri>> GetGateways()
+        {
+            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(this.deploymentConnectionString, this.watcher);
+            return membershipTableData.Members.Select(e => e.Item1).
+                Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
+                Select(m =>
+                {
+                    m.SiloAddress.Endpoint.Port = m.ProxyPort;
+                    return m.SiloAddress.ToGatewayUri();
+                }).ToList();
+        }
+
+        /// <summary>
+        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
+        /// </summary>
+        public TimeSpan MaxStaleness
+        {
+            get { return maxStaleness; }
+        }
+
+        /// <summary>
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
+        /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
+        /// </summary>
+        public bool IsUpdatable
+        {
+            get { return true; }
+        }
+    }
+
     /// <summary>
     /// A Membership Table implementation using Apache Zookeeper 3.4.6 https://zookeeper.apache.org/doc/r3.4.6/
     /// </summary>
@@ -35,7 +101,7 @@ namespace Orleans.Runtime.Host
     /// the table version is the version of /UniqueDeploymentId
     /// the silo entry version is the version of /UniqueDeploymentId/IP:Port@Gen
     /// </remarks>
-    public class ZooKeeperBasedMembershipTable : IMembershipTable, IGatewayListProvider
+    public class ZooKeeperBasedMembershipTable : IMembershipTable
     {
         private ILogger logger;
 
@@ -56,7 +122,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         private string rootConnectionString;
 
-        private TimeSpan maxStaleness;
         private readonly ZooKeeperMembershipTableOptions membershipTableOptions;
         public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger, IOptions<ZooKeeperMembershipTableOptions> membershipTableOptions)
         {
@@ -65,20 +130,8 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Initializes the ZooKeeper based gateway provider
-        /// </summary>
-        /// <param name="config">The given client configuration.</param>
-        public Task InitializeGatewayListProvider(ClientConfiguration config)
-        {
-            InitConfig(config.DataConnectionString, config.DeploymentId);
-            maxStaleness = config.GatewayListRefreshPeriod;
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
         /// Initializes the ZooKeeper based membership table.
         /// </summary>
-        /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitPath">if set to true, we'll try to create a node named "/DeploymentId"</param>
         /// <returns></returns>
         public async Task InitializeMembershipTable(bool tryInitPath)
@@ -140,7 +193,7 @@ namespace Orleans.Runtime.Host
 
                 var tableVersion = ConvertToTableVersion((await getTableNodeTask).Stat);
                 return new MembershipTableData(rows, tableVersion);
-            }, true);
+            }, this.deploymentConnectionString, this.watcher, true);
         }
 
         /// <summary>
@@ -151,6 +204,11 @@ namespace Orleans.Runtime.Host
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
         public Task<MembershipTableData> ReadAll()
+        {
+            return ReadAll(this.deploymentConnectionString, this.watcher);
+        }
+
+        internal static Task<MembershipTableData> ReadAll(string deploymentConnectionString, ZooKeeperWatcher watcher)
         {
             return UsingZookeeper(async zk =>
             {
@@ -164,7 +222,7 @@ namespace Orleans.Runtime.Host
                 var tableVersion = ConvertToTableVersion(childrenResult.Stat);//this is the current table version
 
                 return new MembershipTableData(childrenTaskResults.ToList(), tableVersion);
-            }, true);
+            }, deploymentConnectionString, watcher, true);
         }
 
         /// <summary>
@@ -247,40 +305,7 @@ namespace Orleans.Runtime.Host
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
             //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData));
-        }
-
-        /// <summary>
-        /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
-        /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
-        /// </summary>
-        public async Task<IList<Uri>> GetGateways()
-        {
-            var membershipTableData = await ReadAll();
-            return membershipTableData.Members.Select(e => e.Item1).
-                                            Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
-                                            Select(m =>
-                                            {
-                                                m.SiloAddress.Endpoint.Port = m.ProxyPort;
-                                                return m.SiloAddress.ToGatewayUri();
-                                            }).ToList();
-        }
-
-        /// <summary>
-        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
-        /// </summary>
-        public TimeSpan MaxStaleness
-        {
-            get { return maxStaleness; }
-        }
-
-        /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
-        /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
-        /// </summary>
-        public bool IsUpdatable
-        {
-            get { return true; }
+            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher);
         }
 
         /// <summary>
@@ -300,7 +325,7 @@ namespace Orleans.Runtime.Host
         {
             try
             {
-                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync());
+                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync(), this.deploymentConnectionString, this.watcher);
                 return true;
             }
             catch (KeeperException e)
@@ -338,7 +363,7 @@ namespace Orleans.Runtime.Host
             return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
-        private Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, bool canBeReadOnly = false)
+        private static Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, bool canBeReadOnly = false)
         {
             return ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
         }
@@ -376,26 +401,27 @@ namespace Orleans.Runtime.Host
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
         }
 
-        /// <summary>
-        /// the state of every ZooKeeper client and its push notifications are published using watchers.
-        /// in orleans the watcher is only for debugging purposes
-        /// </summary>
-        private class ZooKeeperWatcher : Watcher
-        {
-            private readonly ILogger logger;
-            public ZooKeeperWatcher(ILogger logger)
-            {
-                this.logger = logger;
-            }
+    }
 
-            public override Task process(WatchedEvent @event)
+    /// <summary>
+    /// the state of every ZooKeeper client and its push notifications are published using watchers.
+    /// in orleans the watcher is only for debugging purposes
+    /// </summary>
+    internal class ZooKeeperWatcher : Watcher
+    {
+        private readonly ILogger logger;
+        public ZooKeeperWatcher(ILogger logger)
+        {
+            this.logger = logger;
+        }
+
+        public override Task process(WatchedEvent @event)
+        {
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.Debug(@event.ToString());
-                }
-                return Task.CompletedTask;
+                logger.Debug(@event.ToString());
             }
+            return Task.CompletedTask;
         }
     }
 }

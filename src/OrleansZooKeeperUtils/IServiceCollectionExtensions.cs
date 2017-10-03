@@ -30,7 +30,7 @@ namespace OrleansZooKeeperUtils
         /// Configure DI container with ZooKeeperMemebershipTable
         /// </summary>
         /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
+        /// <param name="configuration"></param>
         /// <returns></returns>
         public static IServiceCollection UseZooKeeperMembershipTable(this IServiceCollection services,
              IConfiguration configuration)

@@ -47,7 +47,7 @@ namespace Consul.Tests
         {
             ConsulTestUtils.EnsureConsul();
 
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), new OptionsWrapper<ConsulMembershipTableOptions>(new ConsulMembershipTableOptions()));
+            return new ConsulBasedGatewayListProvider(loggerFactory.CreateLogger<ConsulBasedGatewayListProvider>());
         }
 
         protected override async Task<string> GetConnectionString()

@@ -10,11 +10,59 @@ using OrleansSQLUtils.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SqlMembershipTable: IMembershipTable, IGatewayListProvider
+    public class SqlGatewayListProvider : IGatewayListProvider
+    {
+        private readonly ILogger logger;
+        private string deploymentId;
+        private TimeSpan maxStaleness;
+        private RelationalOrleansQueries orleansQueries;
+        private readonly IGrainReferenceConverter grainReferenceConverter;
+
+        public SqlGatewayListProvider(ILogger<SqlGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter)
+        {
+            this.logger = logger;
+            this.grainReferenceConverter = grainReferenceConverter;
+        }
+
+        public TimeSpan MaxStaleness
+        {
+            get { return maxStaleness; }
+        }
+
+
+        public bool IsUpdatable
+        {
+            get { return true; }
+        }
+
+        public async Task InitializeGatewayListProvider(ClientConfiguration config)
+        {
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.InitializeGatewayListProvider called.");
+
+            deploymentId = config.DeploymentId;
+            maxStaleness = config.GatewayListRefreshPeriod;
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
+        }
+
+        public async Task<IList<Uri>> GetGateways()
+        {
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.GetGateways called.");
+            try
+            {
+                return await orleansQueries.ActiveGatewaysAsync(deploymentId);
+            }
+            catch (Exception ex)
+            {
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlMembershipTable.Gateways failed {0}", ex);
+                throw;
+            }
+        }
+    }
+
+    public class SqlMembershipTable: IMembershipTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private string deploymentId;        
-        private TimeSpan maxStaleness;
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly SqlMembershipTableOptions membershipTableoptions;
@@ -45,43 +93,6 @@ namespace Orleans.Runtime.MembershipService
                 {
                     logger.Info("Created new table version row.");
                 }
-            }
-        }
-
-
-        public async Task InitializeGatewayListProvider(ClientConfiguration config)
-        {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.InitializeGatewayListProvider called.");
-
-            deploymentId = config.DeploymentId;            
-            maxStaleness = config.GatewayListRefreshPeriod;
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
-        }
-
-
-        public TimeSpan MaxStaleness
-        {
-            get { return maxStaleness; }
-        }
-
-
-        public bool IsUpdatable
-        {
-            get { return true; }
-        }
-
-
-        public async Task<IList<Uri>> GetGateways()
-        {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.GetGateways called.");
-            try
-            {                
-                return await orleansQueries.ActiveGatewaysAsync(deploymentId);
-            }
-            catch(Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlMembershipTable.Gateways failed {0}", ex);
-                throw;
             }
         }
 

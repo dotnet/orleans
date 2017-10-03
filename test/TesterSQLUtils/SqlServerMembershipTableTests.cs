@@ -48,7 +48,7 @@ namespace UnitTests.MembershipTests
                 DataConnectionString = this.connectionString,
                 DeploymentId = this.deploymentId
             };
-            return new SqlMembershipTable(this.GrainReferenceConverter, new OptionsWrapper<SqlMembershipTableOptions>(options), this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter);
         }
 
         protected override string GetAdoInvariant()
