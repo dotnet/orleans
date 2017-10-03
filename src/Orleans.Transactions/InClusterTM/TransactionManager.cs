@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
@@ -49,7 +48,7 @@ namespace Orleans.Transactions
         {
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
-            this.logger = loggerFactory.CreateLogger(nameof(TransactionManager));
+            this.logger = loggerFactory.CreateLogger<TransactionManager>();
             this.logMaintenanceInterval = logMaintenanceInterval ?? DefaultLogMaintenanceInterval;
 
             activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, loggerFactory);
