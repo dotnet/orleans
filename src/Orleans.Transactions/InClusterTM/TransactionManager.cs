@@ -5,19 +5,19 @@ using System.Collections.Concurrent;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
-    internal class TransactionManager : ITransactionManager
+    public class TransactionManager : ITransactionManager
     {
         private const int MaxCheckpointBatchSize = 200;
-        private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan DefaultLogMaintenanceInterval = TimeSpan.FromSeconds(1);
 
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
         private readonly ActiveTransactionsTracker activeTransactionsTracker;
+        private readonly TimeSpan logMaintenanceInterval;
 
         // Index of transactions by transactionId.
         private readonly ConcurrentDictionary<long, Transaction> transactionsTable;
@@ -40,16 +40,16 @@ namespace Orleans.Transactions
 
         private long checkpointedLSN;
 
-        protected readonly Logger Logger;
-
+        protected readonly ILogger logger;
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
 
-        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory)
+        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory, TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
-            this.Logger = new LoggerWrapper<TransactionManager>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<TransactionManager>();
+            this.logMaintenanceInterval = logMaintenanceInterval ?? DefaultLogMaintenanceInterval;
 
             activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, loggerFactory);
 
@@ -67,7 +67,6 @@ namespace Orleans.Transactions
 
             this.checkpointedLSN = 0;
             this.IsRunning = false;
-
         }
 
         #region ITransactionManager
@@ -113,10 +112,9 @@ namespace Orleans.Transactions
             this.BeginGroupCommitLoop();
             this.BeginCheckpointLoop();
 
+            this.IsRunning = true;
             this.transactionLogMaintenanceTask = MaintainTransactionLog();
             this.transactionLogMaintenanceTask.Ignore(); // protect agains unhandled exception in unexpected cases.
-
-            this.IsRunning = true;
         }
 
         public async Task StopAsync()
@@ -472,7 +470,7 @@ namespace Orleans.Transactions
             }
             catch (Exception e)
             {
-                this.Logger.Error(0, "Group Commit error", e);
+                this.logger.Error(OrleansTransactionsErrorCode.TransactionManager_GroupCommitError, "Group Commit error", e);
                 // Failure to get an acknowledgment of the commits from the log (e.g. timeout exception)
                 // will put the transactions in doubt. We crash and let this be handled in recovery.
                 // TODO: handle other exceptions more gracefuly
@@ -569,7 +567,7 @@ namespace Orleans.Transactions
                 // Retry all failed checkpoint operations.
                 foreach (var tx in transactions) this.checkpointRetryQueue.Enqueue(tx);
 
-                this.Logger.Error(0, "Failure during checkpoint", e);
+                this.logger.Error(OrleansTransactionsErrorCode.TransactionManager_CheckpointError, "Failure during checkpoint", e);
                 throw;
             }
 
@@ -596,8 +594,15 @@ namespace Orleans.Transactions
         {
             while(this.IsRunning)
             {
-                await TransactionLogMaintenance();
-                await Task.Delay(LogMaintenanceInterval);
+                try
+                {
+                    await TransactionLogMaintenance();
+                } catch(Exception ex)
+                {
+                    this.logger.Error(OrleansTransactionsErrorCode.TransactionManager_TransactionLogMaintenanceError, $"Error while maintaining transaction log.", ex);
+                }
+
+                await Task.Delay(this.logMaintenanceInterval);
             }
         }
 
@@ -614,7 +619,7 @@ namespace Orleans.Transactions
                 }
                 catch (Exception e)
                 {
-                    this.Logger.Error(0, $"Failed to truncate log. LSN: {checkpointedLSN}", e);
+                    this.logger.Error(OrleansTransactionsErrorCode.TransactionManager_TransactionLogTruncationError, $"Failed to truncate log. LSN: {checkpointedLSN}", e);
                 }
             }
 

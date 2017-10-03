@@ -9,7 +9,7 @@ namespace Orleans.Transactions.Development
     /// In memory transaction log - for test and development purposes.
     /// NOT FOR PRODUCTION USE.
     /// </summary>
-    internal class InMemoryTransactionLogStorage : ITransactionLogStorage
+    public class InMemoryTransactionLogStorage : ITransactionLogStorage
     {
         private static readonly Task<CommitRecord> NullCommitRecordTask = Task.FromResult<CommitRecord>(null);
 

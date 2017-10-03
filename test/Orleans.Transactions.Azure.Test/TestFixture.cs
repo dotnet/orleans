@@ -4,11 +4,19 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
+using Xunit;
+using System;
 
 namespace Orleans.Transactions.Azure.Tests
 {
     public class TestFixture : BaseTestClusterFixture
     {
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
+        }
+
         protected override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions();
@@ -31,6 +39,28 @@ namespace Orleans.Transactions.Azure.Tests
                         TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.DeploymentId.GetHashCode())%100000}",
                         ConnectionString = TestDefaultConfiguration.DataConnectionString})
                     .UseTransactionalState();
+            }
+        }
+
+        public static void CheckForAzureStorage(string dataConnectionString)
+        {
+            if (string.IsNullOrWhiteSpace(dataConnectionString))
+            {
+                throw new SkipException("No connection string found. Skipping");
+            }
+
+            bool usingLocalWAS = string.Equals(dataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+
+            if (!usingLocalWAS)
+            {
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
+                return;
+            }
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if (!StorageEmulator.TryStart())
+            {
+                throw new SkipException("Azure Storage Emulator could not be started.");
             }
         }
     }
