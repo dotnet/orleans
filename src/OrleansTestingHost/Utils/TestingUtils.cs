@@ -17,22 +17,18 @@ namespace Orleans.TestingHost.Utils
     public static class TestingUtils
     {
         /// <summary>
-        /// Configure <paramref name="builder"/> with a ConsoleLoggerProvider and a TraceSourceLoggerProvider which logs to <paramref name="filePath"/>
-        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// Configure <paramref name="builder"/> with a <see cref="FileLoggerProvider"/> which logs to <paramref name="filePath"/>
         /// by default;
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="filePath"></param>
         public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
         {
-            if (ConsoleText.IsConsoleAvailable)
-                builder.AddConsole();
             builder.AddFile(filePath);
         }
 
         /// <summary>
-        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
-        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// Create the default logger factory, which would configure logger factory with a <see cref="FileLoggerProvider"/> that writes logs to <paramref name="filePath"/> and console.
         /// by default;
         /// </summary>
         /// <param name="filePath">the logger file path</param>
@@ -43,8 +39,7 @@ namespace Orleans.TestingHost.Utils
         }
 
         /// <summary>
-        /// Create the default logger factory, which would create <see cref="Microsoft.Extensions.Logging.ILogger"/>> that writes logs to <paramref name="filePath"/> and console.
-        /// This is to restore legacy default behavior of LogManager, which configure LogManager with a FileTelemetryConsumer and ConsoleTelemetryConsumer
+        /// Create the default logger factory, which would configure logger factory with a <see cref="FileLoggerProvider"/> that writes logs to <paramref name="filePath"/> and console.
         /// by default;
         /// </summary>
         /// <param name="filePath">the logger file path</param>
@@ -54,8 +49,6 @@ namespace Orleans.TestingHost.Utils
         {
             var factory = new LoggerFactory(new List<ILoggerProvider>(), filters);
             factory.AddProvider(new FileLoggerProvider(filePath));
-            if (ConsoleText.IsConsoleAvailable)
-                factory.AddConsole();
             return factory;
         }
 
