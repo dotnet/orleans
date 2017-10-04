@@ -37,7 +37,7 @@ namespace Orleans.Transactions
         private ITransactionalStateStorage<TState> storage;
 
         // only to be modified at save/load time
-        private Metadata metaData;
+        private Metadata metadata;
         private string eTag;
         private bool validState;
 
@@ -101,7 +101,7 @@ namespace Orleans.Transactions
             //
             // Update Transaction Context
             //
-            info.RecordWrite(transactionalResource, this.version, this.metaData.StableVersion.TransactionId);
+            info.RecordWrite(transactionalResource, this.version, this.metadata.StableVersion.TransactionId);
 
             //
             // Modify the State
@@ -186,7 +186,7 @@ namespace Orleans.Transactions
         async Task ITransactionalResource.Commit(long transactionId)
         {
             // Learning that t is committed implies that all pending transactions before t also committed
-            if (transactionId > this.metaData.StableVersion.TransactionId)
+            if (transactionId > this.metadata.StableVersion.TransactionId)
             {
                 this.highCommitTransactionId = Math.Max(this.highCommitTransactionId, transactionId);
                 try
@@ -226,16 +226,16 @@ namespace Orleans.Transactions
             }
 
             // check if we need to do a log write
-            if (this.metaData.StableVersion.TransactionId >= transactionId && this.metaData.HighestReadTransactionId >= wlb)
+            if (this.metadata.StableVersion.TransactionId >= transactionId && this.metadata.HighestReadTransactionId >= wlb)
             {
                 // Logs already persisted, nothing to do here
                 return true;
             }
 
             List<PendingTransactionState<TState>> pending = this.log.Select(kvp => new PendingTransactionState<TState>(kvp.Value.Version.ToString(), kvp.Key, kvp.Value.NewVal)).ToList();
-            this.metaData.HighestVersion = this.version;
-            this.metaData.HighestReadTransactionId = wlb;
-            this.eTag = await this.storage.Persist(StateName, this.eTag, this.metaData.ToString(), pending);
+            this.metadata.HighestVersion = this.version;
+            this.metadata.HighestReadTransactionId = wlb;
+            this.eTag = await this.storage.Persist(StateName, this.eTag, this.metadata.ToString(), pending);
 
             return true;
         }
@@ -243,7 +243,7 @@ namespace Orleans.Transactions
         private async Task<bool> PersistCommit(long transactionId)
         {
             transactionId = Math.Max(this.highCommitTransactionId, transactionId);
-            if (transactionId <= this.metaData.StableVersion.TransactionId)
+            if (transactionId <= this.metadata.StableVersion.TransactionId)
             {
                 // Transaction commit already persisted.
                 return true;
@@ -272,10 +272,10 @@ namespace Orleans.Transactions
                 records.ForEach(kvp => this.log.Remove(kvp.Key));
             }
 
-            this.metaData.StableVersion = stableversion;
-            this.metaData.HighestVersion = this.version;
-            this.metaData.HighestReadTransactionId = this.highestReadTransactionId;
-            this.eTag = await this.storage.Confirm(StateName, this.eTag, this.metaData.ToString(), stableversion.ToString());
+            this.metadata.StableVersion = stableversion;
+            this.metadata.HighestVersion = this.version;
+            this.metadata.HighestReadTransactionId = this.highestReadTransactionId;
+            this.eTag = await this.storage.Confirm(StateName, this.eTag, this.metadata.ToString(), stableversion.ToString());
 
             return true;
         }
@@ -334,12 +334,12 @@ namespace Orleans.Transactions
                 throw new OrleansTransactionVersionDeletedException(info.TransactionId);
             }
 
-            if (info.IsReadOnly && readVersion.TransactionId > this.metaData.StableVersion.TransactionId)
+            if (info.IsReadOnly && readVersion.TransactionId > this.metadata.StableVersion.TransactionId)
             {
                 throw new OrleansTransactionUnstableVersionException(info.TransactionId);
             }
 
-            info.RecordRead(transactionalResource, readVersion, this.metaData.StableVersion.TransactionId);
+            info.RecordRead(transactionalResource, readVersion, this.metadata.StableVersion.TransactionId);
 
             this.highestReadTransactionId = Math.Max(this.highestReadTransactionId, info.TransactionId - 1);
 
@@ -385,7 +385,7 @@ namespace Orleans.Transactions
         {
             foreach (var transactionId in this.log.Keys)
             {
-                if (transactionId > this.metaData.StableVersion.TransactionId && transactionAgent.IsAborted(transactionId))
+                if (transactionId > this.metadata.StableVersion.TransactionId && transactionAgent.IsAborted(transactionId))
                 {
                     Rollback(transactionId);
                     return;
@@ -433,9 +433,9 @@ namespace Orleans.Transactions
             TransactionalStorageLoadResponse<TState> loadResponse = await this.storage.Load(StateName);
             
             this.eTag = loadResponse.ETag;
-            this.metaData = Metadata.FromString(loadResponse.Metadata);
-            this.highestReadTransactionId = this.metaData.HighestReadTransactionId;
-            this.version = this.metaData.HighestVersion;
+            this.metadata = Metadata.FromString(loadResponse.Metadata);
+            this.highestReadTransactionId = this.metadata.HighestReadTransactionId;
+            this.version = this.metadata.HighestVersion;
             this.value = loadResponse.CommittedState;
             this.log.Clear();
             foreach (PendingTransactionState<TState> pendingState in loadResponse.PendingStates)
@@ -486,6 +486,19 @@ namespace Orleans.Transactions
         [Serializable]
         private class Metadata
         {
+            private static readonly JsonSerializerSettings settings = new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.All,
+                PreserveReferencesHandling = PreserveReferencesHandling.Objects,
+                DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                NullValueHandling = NullValueHandling.Ignore,
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
+                Formatting = Formatting.None
+            };
+
             [JsonIgnore]
             public TransactionalResourceVersion HighestVersion { get; set; }
             public string HighestVersionString
@@ -504,22 +517,24 @@ namespace Orleans.Transactions
 
             public long HighestReadTransactionId { get; set; }
 
+            // TODO consider passing metadata type to storage, and letting storage handle serialization
+            #region Serialization
             public override string ToString()
             {
-                return JsonConvert.SerializeObject(this);
+                return JsonConvert.SerializeObject(this, settings);
             }
 
             public static Metadata FromString(string metadataString)
             {
-                return (!string.IsNullOrEmpty(metadataString)) ? JsonConvert.DeserializeObject<Metadata>(metadataString) : new Metadata();
+                return (!string.IsNullOrEmpty(metadataString)) ? JsonConvert.DeserializeObject<Metadata>(metadataString, settings) : new Metadata();
             }
+            #endregion
         }
-    }
 
-    [Serializable]
-    public class LogRecord<T>
-    {
-        public T NewVal { get; set; }
-        public TransactionalResourceVersion Version { get; set; }
+        private class LogRecord<T>
+        {
+            public T NewVal { get; set; }
+            public TransactionalResourceVersion Version { get; set; }
+        }
     }
 }
