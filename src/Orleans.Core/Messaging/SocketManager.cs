@@ -4,8 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
-using Orleans.Configuration;
+using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime

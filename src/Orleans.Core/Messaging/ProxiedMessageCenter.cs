@@ -12,7 +12,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Messaging
 {

@@ -6,9 +6,9 @@ namespace Orleans.Runtime
     {
         public static StatisticsLevel StatisticsCollectionLevel;
 
-        public static void Initialize(IStatisticsConfiguration config)
+        public static void Initialize(StatisticsLevel statisticsLevel)
         {
-            StatisticsCollectionLevel = config.StatisticsCollectionLevel;
+            StatisticsCollectionLevel = statisticsLevel;
         }
 
         private static bool IsInfo

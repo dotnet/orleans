@@ -163,7 +163,7 @@ namespace Orleans.Runtime
 
             var startTime = DateTime.UtcNow;
            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-            StatisticsCollector.Initialize(LocalConfig);
+            StatisticsCollector.Initialize(LocalConfig.StatisticsCollectionLevel);
             
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)

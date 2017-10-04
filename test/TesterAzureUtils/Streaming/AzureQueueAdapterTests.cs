@@ -18,7 +18,7 @@ using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Tester.AzureUtils.Streaming
 {

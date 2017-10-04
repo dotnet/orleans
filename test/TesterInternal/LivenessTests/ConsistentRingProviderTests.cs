@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Hosting;
 using TestExtensions;
 
 namespace UnitTests.LivenessTests

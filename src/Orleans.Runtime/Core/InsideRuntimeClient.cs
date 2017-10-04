@@ -19,7 +19,7 @@ using Orleans.Transactions;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
