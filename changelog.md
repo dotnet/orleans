@@ -5,6 +5,19 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [1.5.2]
+- Non-breaking bug fixes
+  - Fix memory leak when using grain timers #3452
+  - Fix infrequent `NullReferenceException` during activation collection #3399
+  - Improve resiliency in in client message pump loop #3367
+  - Service Fabric: fix leak in registration of partition notifications #3411
+  - Several minor bug fixes and perf improvements #3419 #3420 #3489
+
+- Non-breaking improvements
+  - Support for PostgreSql as a Storage provider #3384
+  - Make JsonConverters inside OrleansJsonSerializer public #3398
+  - Set TypeNameHandling in OrleansJsonSerializer according to configuration #3400
+
 ### [1.5.1]
 - Non-breaking bug fixes
   - Support implicit authentication to DynamoDB (via IAM Roles) #3229
