@@ -8,7 +8,7 @@ namespace Orleans.Runtime
         private static readonly int defaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         public int MaxLocal { get; private set; }
-        
+
         internal StatelessWorkerPlacement(int maxLocal = -1)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute, 
