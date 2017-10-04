@@ -9,9 +9,9 @@ namespace Orleans.TestingHost
 {
     public sealed class DefaultSiloBuilderFactory : ISiloBuilderFactory
     {
-        public ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+        public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
         {
-            ISiloBuilder builder = new SiloBuilder();
+            var builder = new SiloHostBuilder();
             return builder.ConfigureSiloName(siloName)
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder,

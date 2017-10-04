@@ -5,6 +5,8 @@ using System.Net.Sockets;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime
 {
@@ -15,10 +17,11 @@ namespace Orleans.Runtime
         private ILogger logger;
         private const int MAX_SOCKETS = 200;
 
-        internal SocketManager(IMessagingConfiguration config, ILoggerFactory loggerFactory)
+        internal SocketManager(IOptions<MessagingOptions> options, ILoggerFactory loggerFactory)
         {
-            connectionTimeout = config.OpenConnectionTimeout;
-            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
+            var messagingOptions = options.Value;
+            connectionTimeout = messagingOptions.OpenConnectionTimeout;
+            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, messagingOptions.MaxSocketAge, SendingSocketCreator);
             this.logger = loggerFactory.CreateLogger<SocketManager>();
             cache.RaiseFlushEvent += FlushHandler;
         }

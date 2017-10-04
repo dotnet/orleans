@@ -21,7 +21,7 @@ namespace Orleans.Transactions
     ///         This is the normal mode of operation in which the caller can modify the log by
     ///         appending entries and removing entries that are no longer necessary.
     /// </summary>
-    internal class TransactionLog
+    public class TransactionLog
     {
         private readonly Factory<Task<ITransactionLogStorage>> storageFactory;
         private ITransactionLogStorage transactionLogStorage;

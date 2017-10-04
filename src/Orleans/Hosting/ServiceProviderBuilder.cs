@@ -10,7 +10,7 @@ namespace Orleans.Hosting
     /// </summary>
     internal class ServiceProviderBuilder
     {
-        private readonly List<Action<IServiceCollection>> configureServicesDelegates = new List<Action<IServiceCollection>>();
+        private readonly List<Action<HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<HostBuilderContext, IServiceCollection>>();
         private readonly List<object> configureContainerDelegates = new List<object>();
         private IServiceProviderFactoryAdapter serviceProviderFactory;
 
@@ -18,13 +18,13 @@ namespace Orleans.Hosting
         /// Builds the service provider.
         /// </summary>
         /// <returns>The service provider.</returns>
-        public IServiceProvider BuildServiceProvider()
+        public IServiceProvider BuildServiceProvider(HostBuilderContext context)
         {
             // Configure the container.
             var services = new ServiceCollection();
             foreach (var configureServices in this.configureServicesDelegates)
             {
-                configureServices(services);
+                configureServices(context, services);
             }
 
             // If no service provider factory has been specified, set a default.
@@ -34,7 +34,7 @@ namespace Orleans.Hosting
             }
 
             // Create the service provider using the configured factory.
-            return this.serviceProviderFactory.BuildServiceProvider(services);
+            return this.serviceProviderFactory.BuildServiceProvider(context, services);
         }
 
         /// <summary>
@@ -42,7 +42,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configureServices">The service configuration delegate.</param>
         /// <returns>The builder.</returns>
-        public void ConfigureServices(Action<IServiceCollection> configureServices)
+        public void ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureServices)
         {
             if (configureServices == null) throw new ArgumentNullException(nameof(configureServices));
             this.configureServicesDelegates.Add(configureServices);
@@ -60,7 +60,7 @@ namespace Orleans.Hosting
             this.serviceProviderFactory = new ServiceProviderFactoryAdapter<TContainerBuilder>(factory);
             foreach (var builder in this.configureContainerDelegates)
             {
-                var typedDelegate = (Action<TContainerBuilder>)builder;
+                var typedDelegate = (Action<HostBuilderContext, TContainerBuilder>)builder;
                 this.serviceProviderFactory.ConfigureContainer(typedDelegate);
             }
 
@@ -72,7 +72,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <typeparam name="TContainerBuilder">The container builder type.</typeparam>
         /// <param name="configureContainer">The container builder configuration delegate.</param>
-        public void ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
+        public void ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureContainer)
         {
             if (this.serviceProviderFactory != null) this.serviceProviderFactory.ConfigureContainer(configureContainer);
             else this.configureContainerDelegates.Add(configureContainer);

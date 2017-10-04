@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -35,22 +37,23 @@ namespace Orleans.Runtime.Messaging
 
         private readonly Logger logger;
         private readonly ILoggerFactory loggerFactory;
-        private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
+        private readonly SiloMessagingOptions messagingOptions;
         
-        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, GlobalConfiguration globalConfig, ILoggerFactory loggerFactory)
+        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, GlobalConfiguration globalConfig, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options)
         {
+            this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
             this.logger = new LoggerWrapper<Gateway>(this.loggerFactory);
             this.serializationManager = serializationManager;
             acceptor = new GatewayAcceptor(msgCtr, this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig, loggerFactory);
-            senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
+            senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
-            dropper = new GatewayClientCleanupAgent(this, loggerFactory);
+            dropper = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
-            clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
+            clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.gatewayAddress = SiloAddress.New(nodeConfig.ProxyGatewayEndpoint, 0);
             lockable = new object();
         }
@@ -110,7 +113,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     int gatewayToUse = nextGatewaySenderToUseForRoundRobin % senders.Length;
                     nextGatewaySenderToUseForRoundRobin++; // under Gateway lock
-                    clientState = new ClientState(clientId, gatewayToUse, MessagingConfiguration.ClientDropTimeout);
+                    clientState = new ClientState(clientId, gatewayToUse, messagingOptions.ClientDropTimeout);
                     clients[clientId] = clientState;
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }
@@ -284,11 +287,13 @@ namespace Orleans.Runtime.Messaging
         private class GatewayClientCleanupAgent : AsynchAgent
         {
             private readonly Gateway gateway;
+            private readonly TimeSpan clientDropTimeout;
 
-            internal GatewayClientCleanupAgent(Gateway gateway, ILoggerFactory loggerFactory)
+            internal GatewayClientCleanupAgent(Gateway gateway, ILoggerFactory loggerFactory, TimeSpan clientDropTimeout)
                 :base(loggerFactory)
             {
                 this.gateway = gateway;
+                this.clientDropTimeout = clientDropTimeout;
             }
 
             #region Overrides of AsynchAgent
@@ -299,7 +304,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     gateway.DropDisconnectedClients();
                     gateway.DropExpiredRoutingCachedEntries();
-                    Thread.Sleep(gateway.MessagingConfiguration.ClientDropTimeout);
+                    Thread.Sleep(clientDropTimeout);
                 }
             }
 
@@ -316,10 +321,10 @@ namespace Orleans.Runtime.Messaging
             private readonly ConcurrentDictionary<GrainId, Tuple<SiloAddress, DateTime>> clientRoutes;
             private readonly TimeSpan TIME_BEFORE_ROUTE_CACHED_ENTRY_EXPIRES;
 
-            internal ClientsReplyRoutingCache(IMessagingConfiguration messagingConfiguration)
+            internal ClientsReplyRoutingCache(TimeSpan responseTimeout)
             {
                 clientRoutes = new ConcurrentDictionary<GrainId, Tuple<SiloAddress, DateTime>>();
-                TIME_BEFORE_ROUTE_CACHED_ENTRY_EXPIRES = messagingConfiguration.ResponseTimeout.Multiply(5);
+                TIME_BEFORE_ROUTE_CACHED_ENTRY_EXPIRES = responseTimeout.Multiply(5);
             }
 
             internal void RecordClientRoute(GrainId client, SiloAddress gateway)
@@ -363,7 +368,7 @@ namespace Orleans.Runtime.Messaging
             private readonly CounterStatistic gatewaySends;
             private readonly SerializationManager serializationManager;
             internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
-                : base(name, gateway.MessagingConfiguration, loggerFactory)
+                : base(name, loggerFactory)
             {
                 this.gateway = gateway;
                 this.messageFactory = messageFactory;

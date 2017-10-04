@@ -81,11 +81,6 @@ namespace Orleans.Runtime
         public ClusterConfiguration ClusterConfig { get; }
 
         /// <summary>
-        /// Gets the global configuration.
-        /// </summary>
-        public GlobalConfiguration GlobalConfig => this.ClusterConfig.Globals;
-
-        /// <summary>
         /// Gets the node configuration.
         /// </summary>
         public NodeConfiguration NodeConfig { get; private set; }

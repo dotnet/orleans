@@ -33,6 +33,8 @@ using Orleans.Streams;
 using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -97,7 +99,7 @@ namespace Orleans.Runtime
         public SiloType Type => this.initializationParams.Type;
         internal string Name => this.initializationParams.Name;
         internal ClusterConfiguration OrleansConfig => this.initializationParams.ClusterConfig;
-        internal GlobalConfiguration GlobalConfig => this.initializationParams.GlobalConfig;
+        internal GlobalConfiguration GlobalConfig => this.initializationParams.ClusterConfig.Globals;
         internal NodeConfiguration LocalConfig => this.initializationParams.NodeConfig;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
         internal GrainTypeManager LocalGrainTypeManager { get { return grainTypeManager; } }
@@ -176,7 +178,7 @@ namespace Orleans.Runtime
                 var serviceCollection = new ServiceCollection();
                 serviceCollection.AddSingleton<Silo>(this);
                 serviceCollection.AddSingleton(initializationParams);
-                DefaultSiloServices.AddDefaultServices(serviceCollection);
+                DefaultSiloServices.AddDefaultServices(null, serviceCollection);
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
@@ -202,7 +204,8 @@ namespace Orleans.Runtime
             this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
 
-            BufferPool.InitGlobalBufferPool(GlobalConfig);
+            var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
+            BufferPool.InitGlobalBufferPool(siloMessagingOptions);
             //init logger for UnobservedExceptionsHandlerClass
             UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
             if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnobservedExceptionHandler))

@@ -8,6 +8,8 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.LivenessTests
 {
@@ -19,7 +21,7 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
             }
         }
 

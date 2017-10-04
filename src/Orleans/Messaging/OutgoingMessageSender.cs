@@ -21,8 +21,8 @@ namespace Orleans.Messaging
     {
         private readonly SerializationManager serializationManager;
 
-        internal OutgoingMessageSender(string nameSuffix, IMessagingConfiguration config, SerializationManager serializationManager, ILoggerFactory loggerFactory)
-            : base(nameSuffix, config, loggerFactory)
+        internal OutgoingMessageSender(string nameSuffix, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            : base(nameSuffix, loggerFactory)
         {
             this.serializationManager = serializationManager;
         }

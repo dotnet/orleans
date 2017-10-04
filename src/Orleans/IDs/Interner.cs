@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
-using System.Text;
+using System.Threading;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 
@@ -55,7 +53,6 @@ namespace Orleans
     /// <typeparam name="T">Type of objects to be interned / cached</typeparam>
     internal class Interner<K, T> : IDisposable where T : class
     {
-        private static readonly string internCacheName = "Interner-" + typeof(T).Name;
         private readonly TimeSpan cacheCleanupInterval;
         private readonly SafeTimer cacheCleanupTimer;
 
@@ -67,7 +64,7 @@ namespace Orleans
         {
         }
         public Interner(int initialSize)
-            : this(initialSize, Constants.INFINITE_TIMESPAN)
+            : this(initialSize, Timeout.InfiniteTimeSpan)
         {
         }
         public Interner(int initialSize, TimeSpan cleanupFreq)
@@ -77,8 +74,8 @@ namespace Orleans
 
             this.internCache = new ConcurrentDictionary<K, WeakReference<T>>(concurrencyLevel, initialSize);
 
-            this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Constants.INFINITE_TIMESPAN : cleanupFreq;
-            if (Constants.INFINITE_TIMESPAN != cacheCleanupInterval)
+            this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Timeout.InfiniteTimeSpan : cleanupFreq;
+            if (Timeout.InfiniteTimeSpan != cacheCleanupInterval)
             {
                 cacheCleanupTimer = new SafeTimer(NullLogger.Instance, InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
@@ -181,7 +178,7 @@ namespace Orleans
 
         public void Dispose()
         {
-            cacheCleanupTimer.Dispose();
+            cacheCleanupTimer?.Dispose();
         }
     }
 }

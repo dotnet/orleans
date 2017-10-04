@@ -31,14 +31,17 @@ namespace Orleans.Messaging
         internal SiloAddress Silo { get; private set; }
 
         private readonly GatewayClientReceiver receiver;
+        private readonly TimeSpan openConnectionTimeout;
+
         internal Socket Socket { get; private set; }       // Shared by the receiver
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ILoggerFactory loggerFactory)
-            : base("GatewayClientSender_" + address, mc.MessagingConfiguration, mc.SerializationManager, loggerFactory)
+        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
+            : base("GatewayClientSender_" + address, mc.SerializationManager, loggerFactory)
         {
             this.messageFactory = messageFactory;
+            this.openConnectionTimeout = openConnectionTimeout;
             Address = address;
             MsgCenter = mc;
             receiver = new GatewayClientReceiver(this, mc.SerializationManager, loggerFactory);
@@ -167,7 +170,7 @@ namespace Orleans.Messaging
                         }
                         lastConnect = DateTime.UtcNow;
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                        SocketManager.Connect(Socket, Silo.Endpoint, MsgCenter.MessagingConfiguration.OpenConnectionTimeout);
+                        SocketManager.Connect(Socket, Silo.Endpoint, this.openConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
                         MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client

@@ -33,14 +33,17 @@ namespace Orleans
             
             // Configure default services and build the container.
             this.serviceProviderBuilder.ConfigureServices(
-                services =>
+                (context, services) =>
                 {
                     services.TryAddSingleton(this.clientConfiguration ?? ClientConfiguration.StandardLoad());
                     services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+                    // register legacy configuration to new options mapping for Client options
+                    services.AddLegacyClientConfigurationSupport();
                     services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
                 });
             this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
-            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider();
+
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(null);
 
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
 
@@ -60,7 +63,8 @@ namespace Orleans
         /// <inheritdoc />
         public IClientBuilder ConfigureServices(Action<IServiceCollection> configureServices)
         {
-            this.serviceProviderBuilder.ConfigureServices(configureServices);
+            if (configureServices == null) throw new ArgumentNullException(nameof(configureServices));
+            this.serviceProviderBuilder.ConfigureServices((context, services) => configureServices(services));
             return this;
         }
 
@@ -74,11 +78,11 @@ namespace Orleans
         /// <inheritdoc />
         public IClientBuilder ConfigureContainer<TContainerBuilder>(Action<TContainerBuilder> configureContainer)
         {
-            this.serviceProviderBuilder.ConfigureContainer(configureContainer);
+            this.serviceProviderBuilder.ConfigureContainer((HostBuilderContext context, TContainerBuilder containerBuilder) => configureContainer(containerBuilder));
             return this;
         }
 
-        private static void AddDefaultServices(IServiceCollection services)
+        private static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();

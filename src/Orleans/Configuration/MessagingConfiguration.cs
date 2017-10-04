@@ -121,8 +121,6 @@ namespace Orleans.Runtime.Configuration
 
         public List<TypeInfo> SerializationProviders { get; private set; }
         public TypeInfo FallbackSerializationProvider { get; set; }
-        internal double RejectionInjectionRate { get; set; }
-        internal double MessageLossInjectionRate { get; set; }
 
         private static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
@@ -135,7 +133,6 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
         private const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
         private const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
-        private const double DEFAULT_ERROR_INJECTION_RATE = 0.0;
 
         private readonly bool isSiloConfig;
 
@@ -162,14 +159,10 @@ namespace Orleans.Runtime.Configuration
             if (isSiloConfig)
             {
                 MaxForwardCount = DEFAULT_MAX_FORWARD_COUNT;
-                RejectionInjectionRate = DEFAULT_ERROR_INJECTION_RATE;
-                MessageLossInjectionRate = DEFAULT_ERROR_INJECTION_RATE;
             }
             else
             {
                 MaxForwardCount = 0;
-                RejectionInjectionRate = 0.0;
-                MessageLossInjectionRate = 0.0;
             }
             SerializationProviders = new List<TypeInfo>();
         }

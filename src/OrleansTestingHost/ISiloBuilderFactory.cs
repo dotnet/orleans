@@ -5,6 +5,6 @@ namespace Orleans.TestingHost
 {
     public interface ISiloBuilderFactory
     {
-        ISiloBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration);
+        ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration);
     }
 }

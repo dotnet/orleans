@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Counters
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
-            ApplicationRequestsStatisticsGroup.Init(initializationParams.GlobalConfig.ResponseTimeout);
+            ApplicationRequestsStatisticsGroup.Init(initializationParams.ClusterConfig.Globals.ResponseTimeout);
             SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();

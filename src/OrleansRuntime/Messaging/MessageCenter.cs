@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -40,12 +42,10 @@ namespace Orleans.Runtime.Messaging
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
         public SiloAddress MyAddress { get; private set; }
 
-        public IMessagingConfiguration MessagingConfiguration { get; private set; }
-
         public MessageCenter(
             ILocalSiloDetails siloDetails,
             NodeConfiguration nodeConfig,
-            IMessagingConfiguration config,
+            IOptions<SiloMessagingOptions> options,
             SerializationManager serializationManager,
             ISiloPerformanceMetrics metrics,
             MessageFactory messageFactory,
@@ -56,23 +56,22 @@ namespace Orleans.Runtime.Messaging
             this.log = new LoggerWrapper<MessageCenter>(loggerFactory);
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
-            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
+            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, options, metrics);
             if (nodeConfig.IsGatewayNode)
             {
                 Gateway = gatewayFactory(this);
             }
         }
 
-        private void Initialize(IPEndPoint here, int generation, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)
+        private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> options, ISiloPerformanceMetrics metrics = null)
         {
             if(log.IsVerbose3) log.Verbose3("Starting initialization.");
 
-            SocketManager = new SocketManager(config, this.loggerFactory);
+            SocketManager = new SocketManager(options, this.loggerFactory);
             ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.loggerFactory);
             MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
-            MessagingConfiguration = config;
             InboundQueue = new InboundMessageQueue(this.loggerFactory);
-            OutboundQueue = new OutboundMessageQueue(this, config, this.serializationManager, this.loggerFactory);
+            OutboundQueue = new OutboundMessageQueue(this, options, this.serializationManager, this.loggerFactory);
             Metrics = metrics;
             
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
