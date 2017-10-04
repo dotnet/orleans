@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OrleansServiceFabricUtils\OrleansServiceFabricUtils.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

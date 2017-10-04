@@ -2,12 +2,14 @@ using System;
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -70,7 +72,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void ID_IsSystem()
         {
-            GrainId testGrain = Constants.DirectoryServiceId;
+            GrainId testGrain = Orleans.Runtime.Constants.DirectoryServiceId;
             output.WriteLine("Testing GrainID " + testGrain);
             Assert.True(testGrain.IsSystemTarget); // System grain ID is not flagged as a system ID
 
@@ -426,7 +428,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void SiloAddress_ToFrom_ParsableString()
         {
-            SiloAddress address1 = SiloAddress.NewLocalAddress(12345);
+            SiloAddress address1 = SiloAddressUtils.NewLocalSiloAddress(12345);
 
             string addressStr1 = address1.ToParsableString();
             SiloAddress addressObj1 = SiloAddress.FromParsableString(addressStr1);
@@ -468,7 +470,7 @@ namespace UnitTests.General
             TestGrainReference(grainRef);
 
             GrainId systemTragetGrainId = GrainId.NewSystemTargetGrainIdByTypeCode(2);
-            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddress.NewLocalAddress(1));
+            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, null, SiloAddressUtils.NewLocalSiloAddress(1));
             this.environment.GrainFactory.BindGrainReference(grainRef);
             TestGrainReference(grainRef);
 

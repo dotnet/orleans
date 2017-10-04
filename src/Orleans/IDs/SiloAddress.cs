@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -38,23 +37,11 @@ namespace Orleans.Runtime
 
         private static readonly Interner<SiloAddress, SiloAddress> siloAddressInterningCache;
 
-        private static readonly IPEndPoint localEndpoint = new IPEndPoint(ClusterConfiguration.GetLocalIPAddress(), 0); // non loopback local ip.
-
         static SiloAddress()
         {
             siloAddressInterningCache = new Interner<SiloAddress, SiloAddress>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
             var sa = new SiloAddress(new IPEndPoint(0, 0), 0);
             Zero = siloAddressInterningCache.Intern(sa, sa);
-        }
-
-        /// <summary>
-        /// Factory for creating new SiloAddresses for silo on this machine with specified generation number.
-        /// </summary>
-        /// <param name="gen">Generation number of the silo.</param>
-        /// <returns>SiloAddress object initialized with the non-loopback local IP address and the specified silo generation.</returns>
-        public static SiloAddress NewLocalAddress(int gen)
-        {
-            return New(localEndpoint, gen);
         }
 
         /// <summary>

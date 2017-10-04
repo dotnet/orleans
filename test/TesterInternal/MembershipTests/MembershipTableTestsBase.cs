@@ -14,6 +14,7 @@ using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
+using UnitTests.Grains;
 
 namespace UnitTests.MembershipTests
 {
@@ -437,7 +438,7 @@ namespace UnitTests.MembershipTests
 
         private static SiloAddress CreateSiloAddressForTest()
         {
-            var siloAddress = SiloAddress.NewLocalAddress(Interlocked.Increment(ref generation));
+            var siloAddress = SiloAddressUtils.NewLocalSiloAddress(Interlocked.Increment(ref generation));
             siloAddress.Endpoint.Port = 12345;
             return siloAddress;
         }

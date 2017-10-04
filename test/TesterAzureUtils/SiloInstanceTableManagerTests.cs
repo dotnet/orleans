@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using UnitTests.Grains;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -46,7 +47,7 @@ namespace Tester.AzureUtils
             this.output = output;
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
-            siloAddress = SiloAddress.NewLocalAddress(generation);
+            siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
 
             output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
 
