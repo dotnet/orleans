@@ -3,9 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using OrleansAWSUtils.Configuration;
 
-namespace OrleansAWSUtils
+namespace Microsoft.Orleans.Hosting
 {
-    public static class ISiloHostBuilderExtensions
+    public static class AwsUtilsSiloHostBuilderExtensions
     {
         /// <summary>
         /// Configure SiloHostBuilder with DynamoDBMembershipTable
@@ -24,18 +24,6 @@ namespace OrleansAWSUtils
              IConfiguration config)
         {
             builder.ConfigureServices(services => services.UseDynamoDBMembershipTable(config));
-            return builder;
-        }
-
-        /// <summary>
-        /// Configure DI to use DynamoDBMemebershipTable, and get its configuration from GlobalConfiguration.
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <returns></returns>
-        public static ISiloHostBuilder UseDynamoDBMemebershipTableFromLegacyConfiguration(
-            this ISiloHostBuilder builder)
-        {
-            builder.ConfigureServices(services => services.UseDynamoDBMemebershipTableFromLegacyConfigurationSupport());
             return builder;
         }
     }

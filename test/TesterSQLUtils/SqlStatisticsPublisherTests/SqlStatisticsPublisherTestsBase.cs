@@ -73,15 +73,15 @@ namespace UnitTests.SqlStatisticsPublisherTests
         protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
         {
 
-            var options = new SqlMembershipTableOptions()
+            var options = new SqlMembershipOptions()
             {
-                DeploymentId = "statisticsDeployment",
                 AdoInvariant = AdoInvariant,
-                DataConnectionString = ConnectionString
+                ConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), new OptionsWrapper<SqlMembershipTableOptions>(options), 
-            this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
+                this.environment.Services.GetRequiredService<GlobalConfiguration>(), Options.Create<SqlMembershipOptions>(options), 
+                this.loggerFactory.CreateLogger<SqlMembershipTable>());
             await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));

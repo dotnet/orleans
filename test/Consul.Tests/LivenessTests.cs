@@ -3,7 +3,7 @@ using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
-using OrleansConsulUtils;
+using Microsoft.Orleans.Hosting;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,10 +36,9 @@ namespace Consul.Tests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseConsulMembershipTable(options =>
+                    .UseConsulMembership(options =>
                     {
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                        options.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                        options.ConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }

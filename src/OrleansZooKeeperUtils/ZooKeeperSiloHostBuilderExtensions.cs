@@ -5,9 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using OrleansZooKeeperUtils.Configuration;
 
-namespace OrleansZooKeeperUtils
+namespace Microsoft.Orleans.Hosting
 {
-    public static class ISiloHostBuilderExtensions
+    public static class ZooKeeperSiloHostBuilderExtensions
     {
         /// <summary>
         /// Configure siloHostBuilder with ZooKeeperMembershipTable
@@ -16,9 +16,9 @@ namespace OrleansZooKeeperUtils
         /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
-            Action<ZooKeeperMembershipTableOptions> configureOptions)
+            Action<ZooKeeperMembershipOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseZooKeeperMembershipTable(configureOptions));
+            return builder.ConfigureServices(services => services.UseZooKeeperMembership(configureOptions));
         }
 
         /// <summary>
@@ -30,17 +30,7 @@ namespace OrleansZooKeeperUtils
         public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
             IConfiguration configuration)
         {
-            return builder.ConfigureServices(services => services.UseZooKeeperMembershipTable(configuration));
-        }
-
-        /// <summary>
-        /// Configure siloHostBuilder with ZooKeeperMembershipTable, and get its configuration from GlobalConfiguration
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <returns></returns>
-        public static ISiloHostBuilder UseZooKeeperMembershipTableFromLegacyConfigurationSupport(this ISiloHostBuilder builder)
-        {
-            return builder.ConfigureServices(services => services.UseZooKeeperMembershipTableFromLegacyConfigurationSupport());
+            return builder.ConfigureServices(services => services.UseZooKeeperMembership(configuration));
         }
     }
 }

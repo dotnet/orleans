@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Configuration;
 using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -19,12 +20,14 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private OrleansSiloInstanceManager tableManager;
-        private readonly AzureMembershipTableOptions options;
-        public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureMembershipTableOptions> membershipOptions)
+        private readonly AzureTableMembershipOptions options;
+        private readonly string deploymentId;
+        public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureTableMembershipOptions> membershipOptions, GlobalConfiguration globalConfiguration)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
             this.options = membershipOptions.Value;
+            this.deploymentId = globalConfiguration.DeploymentId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -33,7 +36,7 @@ namespace Orleans.Runtime.MembershipService
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                options.DeploymentId, options.DataConnectionString, this.loggerFactory);
+                this.deploymentId, options.ConnectionString, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,

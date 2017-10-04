@@ -39,6 +39,7 @@ namespace UnitTests.MembershipTests
         protected readonly string deploymentId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
+        protected GlobalConfiguration globalConfiguration;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
@@ -52,7 +53,7 @@ namespace UnitTests.MembershipTests
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
-            var globalConfiguration = new GlobalConfiguration
+            globalConfiguration = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
                 AdoInvariant = GetAdoInvariant(),

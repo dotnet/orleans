@@ -6,6 +6,7 @@ using Orleans.Runtime.Configuration;
 
 using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -13,13 +14,46 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly AsyncLock initializationLock = new AsyncLock();
-        private readonly ILogger logger;
+        private readonly Logger logger;
         private IMembershipTable membershipTable;
 
-        public MembershipTableFactory(IServiceProvider serviceProvider, ILogger<MembershipTableFactory> logger)
+        public MembershipTableFactory(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
+        }
+
+        private async Task<IMembershipTable> GetMembershipTableLegacy(GlobalConfiguration globalConfiguration)
+        {
+            IMembershipTable result = null;
+            switch (globalConfiguration.LivenessType)
+            {
+                case LivenessProviderType.MembershipTableGrain:
+                    result = await this.GetMembershipTableGrain();
+                    break;
+                case LivenessProviderType.SqlServer:
+                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
+                    break;
+                case LivenessProviderType.AzureTable:
+                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
+                    break;
+                case LivenessProviderType.ZooKeeper:
+                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                        Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+                        this.logger,
+                        this.serviceProvider);
+                    break;
+                case LivenessProviderType.Custom:
+                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                        globalConfiguration.MembershipTableAssembly,
+                        this.logger,
+                        this.serviceProvider);
+                    break;
+                default:
+                    break;
+            }
+
+            return result;
         }
 
         internal async Task<IMembershipTable> GetMembershipTable()
@@ -35,17 +69,21 @@ namespace Orleans.Runtime.MembershipService
                 if (result == null)
                 {
                     //if configured through UseGrainBasedMembershipTable method on ISiloHostBuilder, then this won't be null
-                    var options = this.serviceProvider.GetService<GrainBasedMembershipTableOptions>();
-                    //if configured through legacy GlobalConfiguration, then livenessProviderType should set to MembershipTableGrain
-                    var globalConfig = this.serviceProvider.GetService<GlobalConfiguration>();
-                    if(options != null || globalConfig.LivenessType == LivenessProviderType.MembershipTableGrain)
+                    var options = this.serviceProvider.GetService<IOptions<GrainBasedMembershipTableOptions>>();
+                    if(options != null)
                         result = await this.GetMembershipTableGrain();
                 }
-                //if nothing found still, throw exception
-                if(result == null)
-                    throw new NotImplementedException(
-                        $"No membership table provider configured with Silo");
-
+                //if nothing found still, try load membership in the legacy way
+                if (result == null)
+                {
+                    var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
+                    result = await GetMembershipTableLegacy(globalConfig);
+                }
+                //if still null, throw exception
+                if (result == null)
+                {
+                    throw new NotImplementedException($"No membership table provider configured with Silo");
+                }
                 await result.InitializeMembershipTable(true);
                 membershipTable = result;
             }

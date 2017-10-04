@@ -33,10 +33,11 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            var options = new ZooKeeperMembershipTableOptions();
-            options.DataConnectionString = this.connectionString;
-            options.DeploymentId = this.deploymentId;
-            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), new OptionsWrapper<ZooKeeperMembershipTableOptions>(options));
+            var options = new ZooKeeperMembershipOptions();
+            options.ConnectionString = this.connectionString;
+           
+            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(),
+               Options.Create<ZooKeeperMembershipOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

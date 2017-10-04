@@ -3,7 +3,7 @@ using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
-using OrleansZooKeeperUtils;
+using Microsoft.Orleans.Hosting;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -37,8 +37,7 @@ namespace Tester.ZooKeeperUtils
                     .UseConfiguration(clusterConfiguration)
                     .UseZooKeeperMembershipTable(options =>
                     {
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }

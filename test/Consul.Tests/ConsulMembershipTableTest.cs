@@ -35,12 +35,11 @@ namespace Consul.Tests
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
-            var options = new ConsulMembershipTableOptions()
+            var options = new ConsulMembershipOptions()
             {
-                DataConnectionString = this.connectionString,
-                DeploymentId = this.deploymentId
+                ConnectionString = this.connectionString
             };
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), new OptionsWrapper<ConsulMembershipTableOptions>(options));
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create<ConsulMembershipOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

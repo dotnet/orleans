@@ -10,6 +10,7 @@ using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
+using OrleansSQLUtils;
 
 namespace UnitTests.MembershipTests
 {
@@ -31,13 +32,13 @@ namespace UnitTests.MembershipTests
         }
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            var options = new SqlMembershipTableOptions()
+            var options = new SqlMembershipOptions()
             {
                 AdoInvariant = GetAdoInvariant(),
-                DataConnectionString = this.connectionString,
-                DeploymentId = this.deploymentId
+                ConnectionString = this.connectionString,
             };
-            return new SqlMembershipTable(this.GrainReferenceConverter, new OptionsWrapper<SqlMembershipTableOptions>(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.globalConfiguration,
+                Options.Create<SqlMembershipOptions>(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

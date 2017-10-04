@@ -12,6 +12,7 @@ using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
+using OrleansAWSUtils;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -40,10 +41,9 @@ namespace AWSUtils.Tests.MembershipTests
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBMembershipTableOptions()
             {
-                DataConnectionString = this.connectionString,
-                DeploymentId = this.deploymentId
+                ConnectionString = this.connectionString,
             };
-            return new DynamoDBMembershipTable(this.loggerFactory, new OptionsWrapper<DynamoDBMembershipTableOptions>(options));
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create<DynamoDBMembershipTableOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

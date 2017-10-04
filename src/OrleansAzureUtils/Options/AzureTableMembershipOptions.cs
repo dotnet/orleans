@@ -5,22 +5,18 @@ using System.Text;
 namespace Orleans.AzureUtils.Configuration
 {
     /// <summary>
-    /// Specify options used for AzureBasedMembershipTable
+    /// Specify options used for AzureTableBasedMembership
     /// </summary>
-    public class AzureMembershipTableOptions
+    public class AzureTableMembershipOptions
     {
         /// <summary>
         /// Retry count for Azure Table operations. 
         /// </summary>
         public int MaxStorageBusyRetries { get; set; }
         /// <summary>
-        /// Deployment Id.
-        /// </summary>
-        public string DeploymentId { get; set; }
-        /// <summary>
         /// Connection string for Azure Storage
         /// </summary>
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
     }
 
 }

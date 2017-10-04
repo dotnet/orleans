@@ -11,54 +11,6 @@ using Orleans.ConsulUtils.Configuration;
 
 namespace Orleans.Runtime.Host
 {
-    public class ConsulBasedGatewayListProvider : IGatewayListProvider
-    {
-        private ConsulClient consulClient;
-        private TimeSpan _maxStaleness;
-        private string deploymentId;
-        private ILogger logger;
-        public ConsulBasedGatewayListProvider(ILogger<ConsulBasedGatewayListProvider> logger)
-        {
-            this.logger = logger;
-        }
-
-        public TimeSpan MaxStaleness
-        {
-            get { return _maxStaleness; }
-        }
-
-        public Boolean IsUpdatable
-        {
-            get { return true; }
-        }
-        public Task InitializeGatewayListProvider(ClientConfiguration configuration)
-        {
-            _maxStaleness = configuration.GatewayListRefreshPeriod;
-
-            this.deploymentId = configuration.DeploymentId;
-
-            consulClient =
-                new ConsulClient(config => config.Address = new Uri(configuration.DataConnectionString));
-
-            return Task.CompletedTask;
-        }
-
-        public async Task<IList<Uri>> GetGateways()
-        {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.deploymentId, this.logger);
-            if (membershipTableData == null) return new List<Uri>();
-
-            return membershipTableData.Members.Select(e => e.Item1).
-                Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
-                Select(m =>
-                {
-                    m.SiloAddress.Endpoint.Port = m.ProxyPort;
-                    return m.SiloAddress.ToGatewayUri();
-                }).ToList();
-        }
-    }
-
-
     /// <summary>
     /// A Membership Table implementation using Consul 0.6.0  https://consul.io/
     /// </summary>
@@ -69,16 +21,17 @@ namespace Orleans.Runtime.Host
 
         private ILogger _logger;
         private readonly ConsulClient _consulClient;
-        private readonly ConsulMembershipTableOptions membershipTableOptions;
-
+        private readonly ConsulMembershipOptions membershipTableOptions;
+        private readonly string deploymentId;
 
         public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulMembershipTableOptions> membershipTableOptions)
+            IOptions<ConsulMembershipOptions> membershipTableOptions, GlobalConfiguration globalConfiguration)
         {
+            this.deploymentId = globalConfiguration.DeploymentId;
             this._logger = logger;
             this.membershipTableOptions = membershipTableOptions.Value;
             _consulClient =
-                new ConsulClient(config => config.Address = new Uri(this.membershipTableOptions.DataConnectionString));
+                new ConsulClient(config => config.Address = new Uri(this.membershipTableOptions.ConnectionString));
         }
 
         /// <summary>
@@ -90,7 +43,7 @@ namespace Orleans.Runtime.Host
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialise
         /// </remarks>
-        public Task InitializeMembershipTable(Boolean tryInitTableVersion)
+        public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             return Task.CompletedTask;
         }
@@ -105,7 +58,7 @@ namespace Orleans.Runtime.Host
 
         public Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this._consulClient, this.membershipTableOptions.DeploymentId, this._logger);
+            return ReadAll(this._consulClient, this.deploymentId, this._logger);
         }
 
         public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string deploymentId, ILogger logger)
@@ -134,7 +87,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 //Use "0" as the eTag then Consul KV CAS will treat the operation as an insert and return false if the KV already exiats.
-                var consulSiloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.membershipTableOptions.DeploymentId, entry, "0");
+                var consulSiloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.deploymentId, entry, "0");
                 var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(consulSiloRegistration);
 
                 var tryUpdate = await _consulClient.KV.CAS(insertKV);
@@ -158,7 +111,7 @@ namespace Orleans.Runtime.Host
             //Update Silo Liveness
             try
             {
-                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.membershipTableOptions.DeploymentId, entry, etag);
+                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.deploymentId, entry, etag);
                 var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration);
 
                 //If the KV.CAS() call returns false then the update failed
@@ -181,25 +134,25 @@ namespace Orleans.Runtime.Host
 
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.membershipTableOptions.DeploymentId, entry.SiloAddress, entry.IAmAliveTime);
+            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.deploymentId, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
         public async Task DeleteMembershipTableEntries(String deploymentId)
         {
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.membershipTableOptions.DeploymentId));
+            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.deploymentId));
         }
 
         private async Task<ConsulSiloRegistration> GetConsulSiloRegistration(SiloAddress siloAddress)
         {
-            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.membershipTableOptions.DeploymentId, siloAddress);
+            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.deploymentId, siloAddress);
             var siloKVEntry = await _consulClient.KV.List(siloKey);
             if (siloKVEntry.Response == null) return null;
 
             var siloKV = siloKVEntry.Response.Single(KV => KV.Key.Equals(siloKey, StringComparison.OrdinalIgnoreCase));
             var iAmAliveKV = siloKVEntry.Response.SingleOrDefault(KV => KV.Key.Equals(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(siloKey), StringComparison.OrdinalIgnoreCase));
 
-            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.membershipTableOptions.DeploymentId, siloKV, iAmAliveKV);
+            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.deploymentId, siloKV, iAmAliveKV);
 
             return siloRegistration;
         }

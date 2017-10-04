@@ -17,7 +17,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using OrleansAzureUtils;
+using Microsoft.Orleans.Hosting;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -77,10 +77,9 @@ namespace UnitTests.Streaming.Reliability
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseAzureMemebershipTable(options =>
+                    .UseAzureTableMemebership(options =>
                     {
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));

@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Orleans.Hosting;
 using Orleans.AzureUtils.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using OrleansAzureUtils;
 using TestExtensions;
 using Xunit;
 
@@ -32,10 +32,9 @@ namespace Tester
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseAzureMemebershipTable(options =>
+                    .UseAzureTableMemebership(options =>
                     {
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));

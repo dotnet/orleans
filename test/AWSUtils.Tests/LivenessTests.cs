@@ -12,7 +12,7 @@ using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using OrleansAWSUtils;
+using Microsoft.Orleans.Hosting;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -78,8 +78,7 @@ namespace AWSUtils.Tests.Liveness
                     .UseConfiguration(clusterConfiguration)
                     .UseDynamoDBMembershipTable(options =>
                     {
-                        options.DeploymentId = clusterConfiguration.Globals.DeploymentId;
-                        options.DataConnectionString = ConnectionString;
+                        options.ConnectionString = ConnectionString;
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }

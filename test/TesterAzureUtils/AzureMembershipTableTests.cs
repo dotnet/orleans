@@ -37,13 +37,12 @@ namespace Tester.AzureUtils
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new AzureMembershipTableOptions()
+            var options = new AzureTableMembershipOptions()
             {
                 MaxStorageBusyRetries = 3,
-                DataConnectionString = this.connectionString,
-                DeploymentId = this.deploymentId
+                ConnectionString = this.connectionString,
             };
-            return new AzureBasedMembershipTable(loggerFactory, new OptionsWrapper<AzureMembershipTableOptions>(options));
+            return new AzureBasedMembershipTable(loggerFactory, Options.Create<AzureTableMembershipOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

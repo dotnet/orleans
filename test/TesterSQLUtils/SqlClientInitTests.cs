@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.SqlUtils;
 using Orleans.TestingHost.Utils;
-using OrleansSQLUtils;
+using Microsoft.Orleans.Hosting;
 using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
@@ -40,22 +40,8 @@ namespace Tester.SQLUtils
                 options.ClientConfiguration.DataConnectionString = connectionString;
                 options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
 
-                return new TestCluster(options)
-                    .UseSiloBuilderFactory<SiloBuilderFactory>();
+                return new TestCluster(options);
             }
-
-            public class SiloBuilderFactory : ISiloBuilderFactory
-            {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
-                {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .UseSqlMembershipFromLegacyConfigurationSupport()
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
-                }
-            }
-
         }
 
         static string statisticProviderName = "SQL";
