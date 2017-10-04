@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -164,7 +166,25 @@ namespace Orleans.Runtime
 
             // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
             string siloAddressInfoToHash = Endpoint + Generation.ToString(CultureInfo.InvariantCulture);
-            hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
+            // TODO: the following is the equivalent to:
+            // hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
+            int tmpHash = 0;
+            try
+            {
+                byte[] data = Encoding.Unicode.GetBytes(siloAddressInfoToHash);
+                byte[] result = sha.ComputeHash(data);
+                for (int i = 0; i < result.Length; i += 4)
+                {
+                    int tmp = (result[i] << 24) | (result[i + 1] << 16) | (result[i + 2] << 8) | (result[i + 3]);
+                    tmpHash = tmpHash ^ tmp;
+                }
+            }
+            finally
+            {
+                sha.Dispose();
+            }
+            hashCode = tmpHash;
             hashCodeSet = true;
             return hashCode;
         }
