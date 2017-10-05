@@ -8,7 +8,7 @@ using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime.Host
+namespace Orleans.Runtime.Membership
 {
     public class ZooKeeperGatewayListProvider : IGatewayListProvider
     {

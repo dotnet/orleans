@@ -8,7 +8,6 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using OrleansSQLUtils.Configuration;
 
 namespace UnitTests.MembershipTests

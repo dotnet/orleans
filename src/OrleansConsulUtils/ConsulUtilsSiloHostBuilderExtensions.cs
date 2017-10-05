@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Orleans.ConsulUtils.Configuration;
 using Orleans.Hosting;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class ConsulUtilsSiloHostBuilderExtensions 
     {

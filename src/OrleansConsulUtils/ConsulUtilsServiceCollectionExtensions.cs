@@ -8,8 +8,9 @@ using Orleans;
 using Orleans.ConsulUtils.Configuration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using Orleans.Runtime.Membership;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting 
 {
     public static class ConsulUtilsServiceCollectionExtensions
     {

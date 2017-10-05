@@ -3,30 +3,30 @@ using Microsoft.Extensions.Configuration;
 using Orleans.AzureUtils.Configuration;
 using Orleans.Hosting;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class AzureUtilsSiloHostBuilderExtensions
     {
 
         /// <summary>
-        /// Configure DI to use AzureTableBasedMemebership
+        /// Configure DI to use AzureTableBasedMembership
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
-        public static ISiloHostBuilder UseAzureTableMemebership(this ISiloHostBuilder builder,
+        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
             Action<AzureTableMembershipOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableMemebership(configureOptions));
+            return builder.ConfigureServices(services => services.UseAzureTableMembership(configureOptions));
         }
 
         /// <summary>
-        /// Configure DI to use AzureTableBasedMemebership
+        /// Configure DI to use AzureTableBasedMembership
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="config"></param>
-        public static ISiloHostBuilder UseAzureTableMemebership(this ISiloHostBuilder builder, IConfiguration config)
+        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder, IConfiguration config)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableMemebership(config));
+            return builder.ConfigureServices(services => services.UseAzureTableMembership(config));
         }
     }
 }

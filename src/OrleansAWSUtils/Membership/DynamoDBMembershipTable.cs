@@ -25,9 +25,9 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
-        private readonly DynamoDBMembershipTableOptions options;
+        private readonly DynamoDBMembershipOptions options;
         private readonly string deploymentId;
-        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipTableOptions> options, GlobalConfiguration globalConfiguration)
+        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipOptions> options, GlobalConfiguration globalConfiguration)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();

@@ -7,7 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using OrleansSQLUtils.Configuration;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class SqlUtilsServiceCollectionExtensions
     {

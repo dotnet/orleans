@@ -11,8 +11,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OrleansZooKeeperUtils.Configuration;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Host;
 
-namespace Orleans.Runtime.Host
+namespace Orleans.Runtime.Membership
 {
     /// <summary>
     /// A Membership Table implementation using Apache Zookeeper 3.4.6 https://zookeeper.apache.org/doc/r3.4.6/

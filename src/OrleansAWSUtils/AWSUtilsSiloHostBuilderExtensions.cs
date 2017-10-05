@@ -3,27 +3,27 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using OrleansAWSUtils.Configuration;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class AwsUtilsSiloHostBuilderExtensions
     {
         /// <summary>
-        /// Configure SiloHostBuilder with DynamoDBMembershipTable
+        /// Configure SiloHostBuilder with DynamoDBMembership
         /// </summary>
-        public static ISiloHostBuilder UseDynamoDBMembershipTable(this ISiloHostBuilder builder,
-            Action<DynamoDBMembershipTableOptions> configureOptions)
+        public static ISiloHostBuilder UseDynamoDBMembership(this ISiloHostBuilder builder,
+            Action<DynamoDBMembershipOptions> configureOptions)
         {
-            builder.ConfigureServices(services => services.UseDynamoDBMembershipTable(configureOptions));
+            builder.ConfigureServices(services => services.UseDynamoDBMembership(configureOptions));
             return builder;
         }
 
         /// <summary>
-        /// Configure SiloHostBuilder with DynamoDBMembershipTable
+        /// Configure SiloHostBuilder with DynamoDBMembership
         /// </summary>
-        public static ISiloHostBuilder UseDynamoDBMembershipTable(this ISiloHostBuilder builder,
+        public static ISiloHostBuilder UseDynamoDBMembership(this ISiloHostBuilder builder,
              IConfiguration config)
         {
-            builder.ConfigureServices(services => services.UseDynamoDBMembershipTable(config));
+            builder.ConfigureServices(services => services.UseDynamoDBMembership(config));
             return builder;
         }
     }

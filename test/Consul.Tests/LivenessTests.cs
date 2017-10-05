@@ -2,8 +2,8 @@
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Orleans.Hosting;
+using Orleans.Runtime.Hosting;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;

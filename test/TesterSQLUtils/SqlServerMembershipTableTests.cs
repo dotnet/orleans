@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.SqlUtils;
 using OrleansSQLUtils.Configuration;

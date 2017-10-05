@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Orleans.Hosting;
 using Orleans.AzureUtils.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Hosting;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
@@ -32,7 +32,7 @@ namespace Tester
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseAzureTableMemebership(options =>
+                    .UseAzureTableMembership(options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;

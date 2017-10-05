@@ -15,9 +15,9 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Hosting;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -77,7 +77,7 @@ namespace UnitTests.Streaming.Reliability
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseAzureTableMemebership(options =>
+                    .UseAzureTableMembership(options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;

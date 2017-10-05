@@ -10,9 +10,9 @@ using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Hosting;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -76,7 +76,7 @@ namespace AWSUtils.Tests.Liveness
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseDynamoDBMembershipTable(options =>
+                    .UseDynamoDBMembership(options =>
                     {
                         options.ConnectionString = ConnectionString;
                     })

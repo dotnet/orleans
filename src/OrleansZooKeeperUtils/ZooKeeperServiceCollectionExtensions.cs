@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
+using Orleans.Runtime.Membership;
 using OrleansZooKeeperUtils.Configuration;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class ZooKeeperServiceCollectionExtensions
     {

@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 using OrleansSQLUtils.Configuration;

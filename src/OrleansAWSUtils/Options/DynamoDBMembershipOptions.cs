@@ -4,7 +4,7 @@ using System.Text;
 
 namespace OrleansAWSUtils.Configuration
 {
-    public class DynamoDBMembershipTableOptions
+    public class DynamoDBMembershipOptions
     {
         /// <summary>
         /// Connection string for DynamoDB Storage

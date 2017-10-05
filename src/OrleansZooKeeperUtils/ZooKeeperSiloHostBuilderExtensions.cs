@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using OrleansZooKeeperUtils.Configuration;
 
-namespace Microsoft.Orleans.Hosting
+namespace Orleans.Runtime.Hosting
 {
     public static class ZooKeeperSiloHostBuilderExtensions
     {

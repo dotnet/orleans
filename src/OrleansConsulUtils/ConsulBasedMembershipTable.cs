@@ -1,15 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Consul;
-using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ConsulUtils.Configuration;
+using Orleans.Runtime.Host;
 
-namespace Orleans.Runtime.Host
+namespace Orleans.Runtime.Membership
 {
     /// <summary>
     /// A Membership Table implementation using Consul 0.6.0  https://consul.io/

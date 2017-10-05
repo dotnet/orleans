@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.SqlUtils;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;

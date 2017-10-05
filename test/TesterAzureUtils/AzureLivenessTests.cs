@@ -9,7 +9,6 @@ using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Microsoft.Orleans.Hosting;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;

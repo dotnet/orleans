@@ -7,7 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 using Orleans.Runtime;
 
-namespace OrleansSQLUtils
+namespace Orleans.Runtime.Membership
 {
     public class SqlGatewayListProvider : IGatewayListProvider
     {

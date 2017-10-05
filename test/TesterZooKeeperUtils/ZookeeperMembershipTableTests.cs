@@ -6,6 +6,7 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
+using Orleans.Runtime.Membership;
 using OrleansZooKeeperUtils.Configuration;
 using TestExtensions;
 using Xunit;
