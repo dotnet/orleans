@@ -3,57 +3,6 @@ using System.Collections.Generic;
 
 namespace Orleans.Serialization
 {
-    public interface ISerializerContext
-    {
-        /// <summary>
-        /// Gets the serialization manager.
-        /// </summary>
-        SerializationManager SerializationManager { get; }
-
-        /// <summary>
-        /// Gets the service provider.
-        /// </summary>
-        IServiceProvider ServiceProvider { get; }
-        
-        /// <summary>
-        /// Gets additional context associated with this instance.
-        /// </summary>
-        object AdditionalContext { get; }
-    }
-
-    public interface ICopyContext : ISerializerContext
-    {
-        /// <summary>
-        /// Record an object-to-copy mapping into the current serialization context.
-        /// Used for maintaining the .NET object graph during serialization operations.
-        /// Used in generated code.
-        /// </summary>
-        /// <param name="original">Original object.</param>
-        /// <param name="copy">Copy object that will be the serialized form of the original.</param>
-        void RecordCopy(object original, object copy);
-
-        object CheckObjectWhileCopying(object raw);
-    }
-
-    public interface ISerializationContext : ISerializerContext
-    {
-        /// <summary>
-        /// Gets the stream writer.
-        /// </summary>
-        BinaryTokenStreamWriter StreamWriter { get; }
-        
-        /// <summary>
-        /// Records the provided object at the specified offset into <see cref="StreamWriter"/>.
-        /// </summary>
-        /// <param name="original"></param>
-        /// <param name="offset"></param>
-        void RecordObject(object original, int offset);
-
-        int CheckObjectWhileSerializing(object raw);
-
-        int CurrentOffset { get; }
-    }
-
     public static class SerializationContextExtensions
     {
         public static void RecordObject(this ISerializationContext context, object original)
