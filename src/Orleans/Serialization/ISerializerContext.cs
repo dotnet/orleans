@@ -53,7 +53,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// The stream reader.
         /// </summary>
-        BinaryTokenStreamReader StreamReader { get; }
+        IBinaryTokenStreamReader StreamReader { get; }
 
         /// <summary>
         /// The offset of the current object in <see cref="StreamReader"/>.

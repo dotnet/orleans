@@ -6,9 +6,9 @@ namespace Orleans.Serialization
 
     internal sealed class InputStream : IInputStream, ICloneable<InputStream>
     {
-        private readonly BinaryTokenStreamReader reader;
+        private readonly IBinaryTokenStreamReader reader;
 
-        private InputStream(BinaryTokenStreamReader reader)
+        private InputStream(IBinaryTokenStreamReader reader)
         {
             this.reader = reader;
         }
@@ -98,7 +98,7 @@ namespace Orleans.Serialization
             return new InputStream(this.reader.Copy());
         }
 
-        internal static InputStream Create(BinaryTokenStreamReader reader)
+        internal static InputStream Create(IBinaryTokenStreamReader reader)
         {
             if (reader == null)
             {

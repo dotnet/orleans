@@ -19,7 +19,7 @@ namespace Orleans.Serialization
             this.getTypeKey = type => new TypeKey(Encoding.UTF8.GetBytes(this.GetNameFromType(type)));
         }
 
-        public static TypeKey ReadTypeKey(BinaryTokenStreamReader reader)
+        public static TypeKey ReadTypeKey(IBinaryTokenStreamReader reader)
         {
             var hashCode = reader.ReadInt();
             var count = reader.ReadUShort();
@@ -60,7 +60,7 @@ namespace Orleans.Serialization
             }
         }
 
-        public Type ReadNamedType(BinaryTokenStreamReader reader)
+        public Type ReadNamedType(IBinaryTokenStreamReader reader)
         {
             var key = ReadTypeKey(reader);
             return this.GetTypeFromTypeKey(key, throwOnError: true);

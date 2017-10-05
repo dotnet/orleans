@@ -1361,7 +1361,7 @@ namespace Orleans.Runtime
                 return result;
             }
 
-            private static bool ReadBool(BinaryTokenStreamReader stream)
+            private static bool ReadBool(IBinaryTokenStreamReader stream)
             {
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }

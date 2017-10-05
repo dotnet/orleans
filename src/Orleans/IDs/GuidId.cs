@@ -93,7 +93,7 @@ namespace Orleans.Runtime
             stream.Write(this.Guid);
         }
 
-        internal static GuidId DeserializeFromStream(BinaryTokenStreamReader stream)
+        internal static GuidId DeserializeFromStream(IBinaryTokenStreamReader stream)
         {
             Guid guid = stream.ReadGuid();
             return GuidId.GetGuidId(guid);

@@ -34,7 +34,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         /// <inheritdoc />
-        public BinaryTokenStreamReader StreamReader { get; set; }
+        public IBinaryTokenStreamReader StreamReader { get; set; }
 
         /// <inheritdoc />
         public int CurrentObjectOffset { get; set; }
@@ -93,7 +93,7 @@ namespace Orleans.Serialization
             public SerializationManager SerializationManager => this.parent.GetSerializationManager();
             public IServiceProvider ServiceProvider => this.parent.ServiceProvider;
             public object AdditionalContext => this.parent.AdditionalContext;
-            public BinaryTokenStreamReader StreamReader { get; }
+            public IBinaryTokenStreamReader StreamReader { get; }
             public int CurrentObjectOffset { get; set; }
             public int CurrentPosition => this.position + this.StreamReader.CurrentPosition;
             public void RecordObject(object obj, int offset) => this.parent.RecordObject(obj, offset);

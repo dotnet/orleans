@@ -1236,7 +1236,7 @@ namespace Orleans.Serialization
             else throw new NotSupportedException($"Serialization of type {type.GetParseableName()} is not supported.");
         }
 
-        private static object ReadEnum(BinaryTokenStreamReader stream, Type type)
+        private static object ReadEnum(IBinaryTokenStreamReader stream, Type type)
         {
             var t = Enum.GetUnderlyingType(type).TypeHandle;
             if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) return Enum.ToObject(type, stream.ReadByte());
@@ -1430,7 +1430,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public object Deserialize(BinaryTokenStreamReader stream)
+        public object Deserialize(IBinaryTokenStreamReader stream)
         {
             return this.Deserialize(null, stream);
         }
@@ -1441,7 +1441,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">Type to return.</typeparam>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public T Deserialize<T>(BinaryTokenStreamReader stream)
+        public T Deserialize<T>(IBinaryTokenStreamReader stream)
         {
             return (T)this.Deserialize(typeof(T), stream);
         }
@@ -1452,7 +1452,7 @@ namespace Orleans.Serialization
         /// <param name="t">Type to return.</param>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public object Deserialize(Type t, BinaryTokenStreamReader stream)
+        public object Deserialize(Type t, IBinaryTokenStreamReader stream)
         {
             var context = this.deserializationContext.Value;
             context.Reset();
@@ -1721,7 +1721,7 @@ namespace Orleans.Serialization
             return array;
         }
 
-        private static int[] ReadArrayLengths(int n, BinaryTokenStreamReader stream)
+        private static int[] ReadArrayLengths(int n, IBinaryTokenStreamReader stream)
         {
             var result = new int[n];
             for (var i = 0; i < n; i++)
