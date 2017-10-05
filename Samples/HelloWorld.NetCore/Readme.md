@@ -27,11 +27,11 @@ dotnet build
 #### Running the sample
 To start the silo
 ```
-dotnet src\SiloHost\bin\Debug\netcoreapp1.1\SiloHost.dll
+dotnet src\SiloHost\bin\Debug\netcoreapp2.0\SiloHost.dll
 ```
 
 
 To start the client (you will have to use a different command window)
 ```
-dotnet src\OrleansClient\bin\Debug\netcoreapp1.1\OrleansClient.dll
+dotnet src\OrleansClient\bin\Debug\netcoreapp2.0\OrleansClient.dll
 ```

@@ -1,70 +1,85 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using HelloWorld.Interfaces;
+﻿using HelloWorld.Interfaces;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace OrleansClient
 {
-    /// <summary>
-    /// Orleans test silo client
-    /// </summary>
-    public class Program
-    {
-        static int Main(string[] args)
-        {
-            var config = ClientConfiguration.LocalhostSilo();
-            try
-            {
-                InitializeWithRetries(config, initializeAttemptsBeforeFailing: 5);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Orleans client initialization failed failed due to {ex}");
+	/// <summary>
+	/// Orleans test silo client
+	/// </summary>
+	public class Program
+	{
+		static int Main(string[] args)
+		{
+			var initializeClient = StartClient();
+			initializeClient.Wait();
+			var client = initializeClient.Result;
 
-                Console.ReadLine();
-                return 1;
-            }
+			DoClientWork(client).Wait();
+			Console.WriteLine("Press Enter to terminate...");
+			Console.ReadLine();
+			return 0;
+		}
 
-            DoClientWork().Wait();
-            Console.WriteLine("Press Enter to terminate...");
-            Console.ReadLine();
-            return 0;
-        }
+		private static Task<IClusterClient> StartClient()
+		{
+			var config = ClientConfiguration.LocalhostSilo();
 
-        private static void InitializeWithRetries(ClientConfiguration config, int initializeAttemptsBeforeFailing)
-        {
-            int attempt = 0;
-            while (true)
-            {
-                try
-                {
-                    GrainClient.Initialize(config);
-                    Console.WriteLine("Client successfully connect to silo host");
-                    break;
-                }
-                catch (SiloUnavailableException)
-                {
-                    attempt++;
-                    Console.WriteLine($"Attempt {attempt} of {initializeAttemptsBeforeFailing} failed to initialize the Orleans client.");
-                    if (attempt > initializeAttemptsBeforeFailing)
-                    {
-                        throw;
-                    }
-                    Thread.Sleep(TimeSpan.FromSeconds(2));
-                }
-            }
-        }
+			try
+			{
+				return InitializeWithRetries(config);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Orleans client initialization failed failed due to {ex}");
 
-        private static async Task DoClientWork()
-        {
-            // example of calling grains from the initialized client
-            var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
-            var response = await friend.SayHello("Good morning, my friend!");
-            Console.WriteLine("\n\n{0}\n\n", response);
-        }
+				Console.ReadLine();
+				return Task.FromException<IClusterClient>(ex);
+			}
+		}
 
-    }
+		private static async Task<IClusterClient> InitializeWithRetries(ClientConfiguration config, int initializeAttemptsBeforeFailing = 5)
+		{
+			int attempt = 0;
+			IClusterClient client;
+			while (true)
+			{
+				try
+				{
+					client = new ClientBuilder()
+						.UseConfiguration(config)
+						.Build();
+
+					await client.Connect();
+					Console.WriteLine("Client successfully connect to silo host");
+					break;
+				}
+				catch (SiloUnavailableException)
+				{
+					attempt++;
+					Console.WriteLine($"Attempt {attempt} of {initializeAttemptsBeforeFailing} failed to initialize the Orleans client.");
+					if (attempt > initializeAttemptsBeforeFailing)
+					{
+						throw;
+					}
+					Thread.Sleep(TimeSpan.FromSeconds(2));
+				}
+			}
+
+			return client;
+		}
+
+		private static async Task DoClientWork(IClusterClient client)
+		{
+			// example of calling grains from the initialized client
+			var friend = client.GetGrain<IHello>(0);
+			var response = await friend.SayHello("Good morning, my friend!");
+			Console.WriteLine("\n\n{0}\n\n", response);
+		}
+
+	}
 }
