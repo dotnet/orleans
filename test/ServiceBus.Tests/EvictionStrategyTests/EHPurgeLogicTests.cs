@@ -223,8 +223,10 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             }
             return itemCount;
         }
-        private Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
+        private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
+            await Task.Delay(10);
+            int sequenceNumber = 0;
             while (count > 0)
             {
                 count--;
@@ -235,12 +237,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 var offSet = Guid.NewGuid().ToString() + now.ToString();
                 eventData.SetOffset(offSet);
                 //set sequence number
-                eventData.SetSequenceNumber(count);
+                eventData.SetSequenceNumber(sequenceNumber++);
                 //set enqueue time
                 eventData.SetEnqueuedTimeUtc(now);
                 cache.Add(eventData, DateTime.UtcNow);
             }
-            return Task.CompletedTask;
         }
 
         private NodeConfiguration GetNodeConfiguration()
