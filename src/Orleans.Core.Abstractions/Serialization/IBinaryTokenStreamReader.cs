@@ -92,6 +92,8 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         sbyte ReadSByte();
 
+        Guid ReadGuid();
+
         /// <summary> Read an <c>IPAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         IPAddress ReadIPAddress();

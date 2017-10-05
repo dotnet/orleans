@@ -42,12 +42,6 @@ namespace Orleans.Serialization
             return UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
         }
 
-        internal static Guid ReadGuid(this IBinaryTokenStreamReader @this)
-        {
-            byte[] bytes = @this.ReadBytes(16);
-            return new Guid(bytes);
-        }
-
         internal static CorrelationId ReadCorrelationId(this IBinaryTokenStreamReader @this)
         {
             return new CorrelationId(@this.ReadBytes(CorrelationId.SIZE_BYTES));
@@ -910,6 +904,12 @@ namespace Orleans.Serialization
                 }
                 return new IPAddress(v6Bytes);
             }
+        }
+
+        public Guid ReadGuid()
+        {
+            byte[] bytes = ReadBytes(16);
+            return new Guid(bytes);
         }
 
         /// <summary> Read an <c>IPEndPoint</c> value from the stream. </summary>
