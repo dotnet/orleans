@@ -14,7 +14,6 @@ using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
-using UnitTests.Grains;
 
 namespace UnitTests.MembershipTests
 {

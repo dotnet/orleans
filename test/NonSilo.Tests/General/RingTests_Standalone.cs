@@ -3,8 +3,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
-using Tester;
-using UnitTests.Grains;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.General

@@ -10,7 +10,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
-using UnitTests.Grains;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;

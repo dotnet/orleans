@@ -10,7 +10,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using UnitTests.Grains;
+using TestExtensions;
 
 namespace UnitTests.LivenessTests
 {

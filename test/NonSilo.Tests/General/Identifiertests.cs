@@ -2,14 +2,12 @@ using System;
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
-using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
 

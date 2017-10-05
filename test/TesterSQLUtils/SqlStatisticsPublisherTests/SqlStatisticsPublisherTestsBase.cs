@@ -14,7 +14,6 @@ using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.General;
-using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.SqlStatisticsPublisherTests

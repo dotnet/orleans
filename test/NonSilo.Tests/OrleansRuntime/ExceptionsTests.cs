@@ -3,7 +3,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
-using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime

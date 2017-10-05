@@ -9,7 +9,7 @@ using Microsoft.Orleans.ServiceFabric;
 using Microsoft.Orleans.ServiceFabric.Models;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using UnitTests.Grains;
+using TestExtensions;
 using Xunit;
 
 namespace TestServiceFabric
