@@ -9,6 +9,7 @@ using Microsoft.Orleans.ServiceFabric;
 using Microsoft.Orleans.ServiceFabric.Models;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 using Xunit;
 
 namespace TestServiceFabric
@@ -29,7 +30,7 @@ namespace TestServiceFabric
             this.siloDetails = new MockSiloDetails
             {
                 Name = Guid.NewGuid().ToString("N"),
-                SiloAddress = SiloAddress.NewLocalAddress(SiloAddress.AllocateNewGeneration())
+                SiloAddress = SiloAddressUtils.NewLocalSiloAddress(SiloAddress.AllocateNewGeneration())
             };
 
             this.resolver = new MockResolver();

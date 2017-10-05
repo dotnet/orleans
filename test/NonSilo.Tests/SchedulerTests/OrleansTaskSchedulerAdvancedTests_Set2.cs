@@ -683,7 +683,7 @@ namespace UnitTests.SchedulerTests
             var grainId = GrainId.GetGrainId(0, Guid.NewGuid());
             var silo = new MockSiloDetails
             {
-                SiloAddress = SiloAddress.NewLocalAddress(23)
+                SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
             var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null, NullLoggerFactory.Instance));
             await grain.OnActivateAsync();

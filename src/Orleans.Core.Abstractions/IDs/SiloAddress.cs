@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
@@ -38,23 +40,11 @@ namespace Orleans.Runtime
 
         private static readonly Interner<SiloAddress, SiloAddress> siloAddressInterningCache;
 
-        private static readonly IPEndPoint localEndpoint = new IPEndPoint(ClusterConfiguration.GetLocalIPAddress(), 0); // non loopback local ip.
-
         static SiloAddress()
         {
             siloAddressInterningCache = new Interner<SiloAddress, SiloAddress>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
             var sa = new SiloAddress(new IPEndPoint(0, 0), 0);
             Zero = siloAddressInterningCache.Intern(sa, sa);
-        }
-
-        /// <summary>
-        /// Factory for creating new SiloAddresses for silo on this machine with specified generation number.
-        /// </summary>
-        /// <param name="gen">Generation number of the silo.</param>
-        /// <returns>SiloAddress object initialized with the non-loopback local IP address and the specified silo generation.</returns>
-        public static SiloAddress NewLocalAddress(int gen)
-        {
-            return New(localEndpoint, gen);
         }
 
         /// <summary>
@@ -177,33 +167,84 @@ namespace Orleans.Runtime
 
             // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
             string siloAddressInfoToHash = Endpoint + Generation.ToString(CultureInfo.InvariantCulture);
-            hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
+            hashCode = CalculateIdHash(siloAddressInfoToHash);
             hashCodeSet = true;
             return hashCode;
+        }
+
+        // This is the same method as Utils.CalculateIdHash
+        private static int CalculateIdHash(string text)
+        {
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
+            int hash = 0;
+            try
+            {
+                byte[] data = Encoding.Unicode.GetBytes(text);
+                byte[] result = sha.ComputeHash(data);
+                for (int i = 0; i < result.Length; i += 4)
+                {
+                    int tmp = (result[i] << 24) | (result[i + 1] << 16) | (result[i + 2] << 8) | (result[i + 3]);
+                    hash = hash ^ tmp;
+                }
+            }
+            finally
+            {
+                sha.Dispose();
+            }
+            return hash;
         }
 
         public List<uint> GetUniformHashCodes(int numHashes)
         {
             if (uniformHashCache != null) return uniformHashCache;
 
-            var hashes = new List<uint>();
-            for (int i = 0; i < numHashes; i++)
-            {
-                uint hash = GetUniformHashCode(i);
-                hashes.Add(hash);
-            }
-            uniformHashCache = hashes;
+            uniformHashCache = GetUniformHashCodesImpl(numHashes);
             return uniformHashCache;
         }
 
-        private uint GetUniformHashCode(int extraBit)
+        private List<uint> GetUniformHashCodesImpl(int numHashes)
         {
-            var writer = new BinaryTokenStreamWriter();
-            writer.Write(this);
-            writer.Write(extraBit);
-            byte[] bytes = writer.ToByteArray();
-            writer.ReleaseBuffers();
-            return JenkinsHash.ComputeHash(bytes);
+            var hashes = new List<uint>();
+            var bytes = new byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
+            var tmpInt = new int[1];
+
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = 9;
+            }
+
+            // Endpoint IP Address
+            if (this.Endpoint.AddressFamily == AddressFamily.InterNetwork) // IPv4
+            {
+                for (int i = 0; i < 12; i++)
+                {
+                    bytes[i] = 0;
+                }
+                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 12, 4);
+            }
+            else // IPv6
+            {
+                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 0, 16);
+            }
+            var offset = 16;
+            // Port
+            tmpInt[0] = this.Endpoint.Port;
+            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            offset += sizeof(int);
+            // Generation
+            tmpInt[0] = this.Generation;
+            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            offset += sizeof(int);
+
+            for (int extraBit = 0; extraBit < numHashes; extraBit++)
+            {
+                // extraBit
+                tmpInt[0] = extraBit;
+                Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+                hashes.Add(JenkinsHash.ComputeHash(bytes));
+            }
+            
+            return hashes;
         }
 
         /// <summary>

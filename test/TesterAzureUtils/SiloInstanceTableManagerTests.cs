@@ -46,7 +46,7 @@ namespace Tester.AzureUtils
             this.output = output;
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
-            siloAddress = SiloAddress.NewLocalAddress(generation);
+            siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
 
             output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
 

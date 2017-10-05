@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Grains
 {
@@ -66,7 +68,8 @@ namespace UnitTests.Grains
                 var reply = new List<Tuple<SiloAddress, ActivationId>>();
                 for (int i = 0; i < 10; i++)
                 {
-                    reply.Add(new Tuple<SiloAddress, ActivationId>(SiloAddress.NewLocalAddress(0), ActivationId.NewId()));
+                    var siloAddress = SiloAddress.New(new IPEndPoint(ClusterConfiguration.GetLocalIPAddress(),0), 0);
+                    reply.Add(new Tuple<SiloAddress, ActivationId>(siloAddress, ActivationId.NewId()));
                 }
                 list.Add(new Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>(id, 3, reply));
             }
