@@ -54,4 +54,12 @@
       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
   </Target>
+  
+  <Target Name="IncludeCodegenOutputDuringDesignTimeBuild"
+        BeforeTargets="AssignTargetPaths"
+        Condition="'$(CodeGeneratorEnabled)' != 'true' and Exists('$(OutputFileName)')">
+    <ItemGroup>
+      <Compile Include="$(OutputFileName)"/>
+    </ItemGroup>
+  </Target>
 </Project>
