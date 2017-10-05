@@ -462,8 +462,7 @@ namespace Orleans.Runtime
             genericArguments = genericArg;
 
             var serializerContext = context.Context as ISerializerContext;
-            var runtimeClient = serializerContext?.AdditionalContext as IRuntimeClient;
-            this.runtime = runtimeClient?.GrainReferenceRuntime;
+            this.runtime = serializerContext?.ServiceProvider.GetService(typeof(IGrainReferenceRuntime)) as IGrainReferenceRuntime;
         }
 #endregion
     }

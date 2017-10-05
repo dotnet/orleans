@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -25,6 +26,8 @@ namespace Orleans.Serialization
             {
                 if (serviceType == typeof(SerializationManager))
                     return this.serializationManager;
+                if (serviceType == typeof(IGrainReferenceRuntime))
+                    return this.serializationManager.RuntimeClient.GrainReferenceRuntime;
 
                 return this.serializationManager.ServiceProvider.GetService(serviceType);
             }
