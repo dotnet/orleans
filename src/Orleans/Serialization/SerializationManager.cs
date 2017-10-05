@@ -25,15 +25,6 @@ using Orleans.Configuration;
 namespace Orleans.Serialization
 {
     /// <summary>
-    /// The delegate used to set fields in value types.
-    /// </summary>
-    /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
-    /// <typeparam name="TField">The field type.</typeparam>
-    /// <param name="instance">The instance having its field set.</param>
-    /// <param name="value">The value being set.</param>
-    public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
-
-    /// <summary>
     /// Deserializer function.
     /// </summary>
     /// <param name="expected">Expected Type to receive.</param>
