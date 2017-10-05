@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Orleans.Runtime.MembershipService
 {
     //empty marker class inject into DI to see if user configure Silo to use MembershiptableGrain
-    internal class GrainBasedMembershipTableOptions
+    internal class UseGrainBasedMembershipFlag
     {
     }
 

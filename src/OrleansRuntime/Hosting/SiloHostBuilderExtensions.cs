@@ -84,13 +84,13 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use GrainBasedMembershipTable
+        /// Configure silo to use GrainBasedMembership
         /// </summary>
         /// <param name="builder"></param>
         /// <returns></returns>
-        public static ISiloHostBuilder UseGrainBasedMembershipTable(this ISiloHostBuilder builder)
+        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(services => services.TryAddSingleton<GrainBasedMembershipTableOptions>());
+            return builder.ConfigureServices(services => services.TryAddSingleton<UseGrainBasedMembershipFlag>());
         }
     }
 }

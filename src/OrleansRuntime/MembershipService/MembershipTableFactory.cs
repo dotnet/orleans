@@ -10,6 +10,18 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.MembershipService
 {
+    /// <summary>
+    /// LegacyMembershipConfigurator configure membership table in the legacy way, which is from global configuration
+    /// </summary>
+    public interface ILegacyMembershipConfigurator
+    {
+        /// <summary>
+        /// Configure the membership table in the legacy way 
+        /// </summary>
+        /// <returns></returns>
+        IMembershipTable Configure();
+    }
+
     internal class MembershipTableFactory
     {
         private readonly IServiceProvider serviceProvider;
@@ -25,26 +37,25 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<IMembershipTable> GetMembershipTableLegacy(GlobalConfiguration globalConfiguration)
         {
-            IMembershipTable result = null;
+            ILegacyMembershipConfigurator configurator = null;
             switch (globalConfiguration.LivenessType)
             {
                 case LivenessProviderType.MembershipTableGrain:
-                    result = await this.GetMembershipTableGrain();
-                    break;
+                    return await this.GetMembershipTableGrain();
                 case LivenessProviderType.SqlServer:
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
                     break;
                 case LivenessProviderType.AzureTable:
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
                     break;
                 case LivenessProviderType.ZooKeeper:
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(
                         Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
                         this.logger,
                         this.serviceProvider);
                     break;
                 case LivenessProviderType.Custom:
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(
                         globalConfiguration.MembershipTableAssembly,
                         this.logger,
                         this.serviceProvider);
@@ -53,7 +64,7 @@ namespace Orleans.Runtime.MembershipService
                     break;
             }
 
-            return result;
+            return configurator.Configure();
         }
 
         internal async Task<IMembershipTable> GetMembershipTable()
@@ -69,8 +80,8 @@ namespace Orleans.Runtime.MembershipService
                 if (result == null)
                 {
                     //if configured through UseGrainBasedMembershipTable method on ISiloHostBuilder, then this won't be null
-                    var options = this.serviceProvider.GetService<IOptions<GrainBasedMembershipTableOptions>>();
-                    if(options != null)
+                    var flag = this.serviceProvider.GetService<UseGrainBasedMembershipFlag>();
+                    if(flag != null)
                         result = await this.GetMembershipTableGrain();
                 }
                 //if nothing found still, try load membership in the legacy way
