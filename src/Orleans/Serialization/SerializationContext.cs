@@ -50,7 +50,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
-        public BinaryTokenStreamWriter StreamWriter { get; set; }
+        public IBinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
 
@@ -136,7 +136,7 @@ namespace Orleans.Serialization
             public SerializationManager SerializationManager => this.parentContext.GetSerializationManager();
             public IServiceProvider ServiceProvider => this.parentContext.ServiceProvider;
             public object AdditionalContext => this.parentContext.ServiceProvider;
-            public BinaryTokenStreamWriter StreamWriter { get; }
+            public IBinaryTokenStreamWriter StreamWriter { get; }
             public int CurrentOffset => this.initialOffset + this.StreamWriter.CurrentOffset;
             public void RecordObject(object original, int offset) => this.parentContext.RecordObject(original, offset);
             public int CheckObjectWhileSerializing(object raw) => this.parentContext.CheckObjectWhileSerializing(raw);

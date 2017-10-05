@@ -1089,7 +1089,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="raw">The input data to be serialized.</param>
         /// <param name="stream">The output stream to write to.</param>
-        public void Serialize(object raw, BinaryTokenStreamWriter stream)
+        public void Serialize(object raw, IBinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1226,7 +1226,7 @@ namespace Orleans.Serialization
                  + ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
-        private static void WriteEnum(object obj, BinaryTokenStreamWriter stream, Type type)
+        private static void WriteEnum(object obj, IBinaryTokenStreamWriter stream, Type type)
         {
             var t = Enum.GetUnderlyingType(type).TypeHandle;
             if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) stream.Write(Convert.ToByte(obj));

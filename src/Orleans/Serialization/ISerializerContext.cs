@@ -34,7 +34,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the stream writer.
         /// </summary>
-        BinaryTokenStreamWriter StreamWriter { get; }
+        IBinaryTokenStreamWriter StreamWriter { get; }
 
         /// <summary>
         /// Records the provided object at the specified offset into <see cref="StreamWriter"/>.

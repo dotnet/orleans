@@ -27,14 +27,14 @@ namespace Orleans.Serialization
             return new TypeKey(hashCode, typeName);
         }
 
-        public static void WriteTypeKey(TypeKey key, BinaryTokenStreamWriter writer)
+        public static void WriteTypeKey(TypeKey key, IBinaryTokenStreamWriter writer)
         {
             writer.Write(key.HashCode);
             writer.Write((ushort)key.TypeName.Length);
             writer.Write(key.TypeName);
         }
 
-        public void WriteType(Type actualType, Type expectedType, BinaryTokenStreamWriter writer)
+        public void WriteType(Type actualType, Type expectedType, IBinaryTokenStreamWriter writer)
         {
             if (actualType == expectedType)
             {
@@ -81,7 +81,7 @@ namespace Orleans.Serialization
             return result;
         }
 
-        public void WriteNamedType(Type type, BinaryTokenStreamWriter writer)
+        public void WriteNamedType(Type type, IBinaryTokenStreamWriter writer)
         {
             var key = this.typeCache.GetOrAdd(type, this.getTypeKey);
             WriteTypeKey(key, writer);
