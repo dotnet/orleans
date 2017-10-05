@@ -59,14 +59,6 @@ namespace Orleans.Serialization
         void SerializeInner(object obj, Type expected);
     }
 
-    public static class ISerializationContextExtensions
-    {
-        public static void SerializeInner<T>(this ISerializationContext @this, T obj)
-        {
-            @this.SerializeInner(obj, typeof(T));
-        }
-    }
-
     public static class SerializationContextExtensions
     {
         public static void RecordObject(this ISerializationContext context, object original)
@@ -80,6 +72,11 @@ namespace Orleans.Serialization
             BinaryTokenStreamWriter writer)
         {
             return new SerializationContext.NestedSerializationContext(context, position, writer);
+        }
+
+        public static void SerializeInner<T>(this ISerializationContext @this, T obj)
+        {
+            @this.SerializeInner(obj, typeof(T));
         }
     }
 
