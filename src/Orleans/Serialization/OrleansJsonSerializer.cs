@@ -116,13 +116,13 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            var serializationContext = new SerializationContext(context.SerializationManager)
+            var serializationContext = new SerializationContext(context.GetSerializationManager())
             {
                 StreamWriter = new BinaryTokenStreamWriter()
             };
             
             Serialize(source, serializationContext, source.GetType());
-            var deserializationContext = new DeserializationContext(context.SerializationManager)
+            var deserializationContext = new DeserializationContext(context.GetSerializationManager())
             {
                 StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
             };

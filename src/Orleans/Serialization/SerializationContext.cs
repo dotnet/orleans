@@ -133,7 +133,7 @@ namespace Orleans.Serialization
                 this.StreamWriter = writer;
             }
 
-            public SerializationManager SerializationManager => this.parentContext.SerializationManager;
+            public SerializationManager SerializationManager => this.parentContext.GetSerializationManager();
             public IServiceProvider ServiceProvider => this.parentContext.ServiceProvider;
             public object AdditionalContext => this.parentContext.ServiceProvider;
             public BinaryTokenStreamWriter StreamWriter { get; }

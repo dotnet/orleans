@@ -90,7 +90,7 @@ namespace Orleans.Serialization
                 this.StreamReader = reader;
             }
 
-            public SerializationManager SerializationManager => this.parent.SerializationManager;
+            public SerializationManager SerializationManager => this.parent.GetSerializationManager();
             public IServiceProvider ServiceProvider => this.parent.ServiceProvider;
             public object AdditionalContext => this.parent.AdditionalContext;
             public BinaryTokenStreamReader StreamReader { get; }

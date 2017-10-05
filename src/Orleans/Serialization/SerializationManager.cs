@@ -916,7 +916,7 @@ namespace Orleans.Serialization
         public static object DeepCopyInner(object original, ICopyContext context)
         {
             if (original == null) return null;
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
 
             var t = original.GetType();
             var shallow = t.IsOrleansShallowCopyable();
@@ -1128,7 +1128,7 @@ namespace Orleans.Serialization
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, ISerializationContext context, Type expected)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             var writer = context.StreamWriter;
 
             // Nulls get special handling
@@ -1496,7 +1496,7 @@ namespace Orleans.Serialization
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
         public static object DeserializeInner(Type expected, IDeserializationContext context)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             var previousOffset = context.CurrentObjectOffset;
             var reader = context.StreamReader;
             context.CurrentObjectOffset = context.CurrentPosition;
@@ -1795,7 +1795,7 @@ namespace Orleans.Serialization
 
         internal static Message.HeadersContainer DeserializeMessageHeaders(IDeserializationContext context)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
             {

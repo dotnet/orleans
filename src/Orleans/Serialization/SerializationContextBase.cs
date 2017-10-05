@@ -2,6 +2,14 @@ using System;
 
 namespace Orleans.Serialization
 {
+    public static class SerializerContextExtensions
+    {
+        public static SerializationManager GetSerializationManager(this ISerializerContext context)
+        {
+            return (SerializationManager)context.ServiceProvider.GetService(typeof(SerializationManager));
+        }
+    }
+
     public abstract class SerializationContextBase : ISerializerContext
     {
         private class StreamlineServiceProvider : IServiceProvider

@@ -27,7 +27,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -35,7 +35,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericReadOnlyCollection(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -44,7 +44,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeReadOnlyCollection), nameof(DeserializeReadOnlyCollection), nameof(DeepCopyReadOnlyCollection), generics);
 
             return concretes.Item3(original, context);
         }
@@ -98,7 +98,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -106,7 +106,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericList(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -115,7 +115,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeList), nameof(DeserializeList), nameof(DeepCopyList), generics);
 
             return concretes.Item3(original, context);
         }
@@ -173,7 +173,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -181,7 +181,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericLinkedList(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -190,7 +190,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeLinkedList), nameof(DeserializeLinkedList), nameof(DeepCopyLinkedList), generics);
 
             return concretes.Item3(original, context);
         }
@@ -243,7 +243,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -251,7 +251,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericHashSet(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -260,7 +260,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeHashSet), nameof(DeserializeHashSet), nameof(DeepCopyHashSet), generics);
 
             return concretes.Item3(original, context);
         }
@@ -313,7 +313,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -321,7 +321,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericSortedSet(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -330,7 +330,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedSet), nameof(DeserializeSortedSet), nameof(DeepCopySortedSet), generics);
 
             return concretes.Item3(original, context);
         }
@@ -386,7 +386,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -394,7 +394,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericQueue(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -403,7 +403,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeQueue), nameof(DeserializeQueue), nameof(DeepCopyQueue), generics);
 
             return concretes.Item3(original, context);
         }
@@ -456,7 +456,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
 
             concretes.Item1(original, context, expected);
         }
@@ -464,7 +464,7 @@ namespace Orleans.Serialization
         internal static object DeserializeGenericStack(Type expected, IDeserializationContext context)
         {
             var generics = expected.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
 
             return concretes.Item2(expected, context);
         }
@@ -473,7 +473,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeStack), nameof(DeserializeStack), nameof(DeepCopyStack), generics);
 
             return concretes.Item3(original, context);
         }
@@ -533,20 +533,20 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
 
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericDictionary(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericDictionary(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeDictionary), nameof(DeserializeDictionary), nameof(CopyDictionary));
             return concreteMethods.Item3(original, context);
         }
 
@@ -599,20 +599,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericReadOnlyDictionary(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericReadOnlyDictionary(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericReadOnlyDictionary(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeReadOnlyDictionary), nameof(DeserializeReadOnlyDictionary), nameof(CopyReadOnlyDictionary));
             return concreteMethods.Item3(original, context);
         }
 
@@ -712,20 +712,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericSortedDictionary(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericSortedDictionary(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericSortedDictionary(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedDictionary), nameof(DeserializeSortedDictionary), nameof(CopySortedDictionary));
             return concreteMethods.Item3(original, context);
         }
 
@@ -781,20 +781,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericSortedList(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericSortedList(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericSortedList(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeSortedList), nameof(DeserializeSortedList), nameof(CopySortedList));
             return concreteMethods.Item3(original, context);
         }
 
@@ -852,20 +852,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericImmutableDictionary(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericImmutableDictionary(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericImmutableDictionary(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
             return concreteMethods.Item3(original, context);
         }
 
@@ -909,20 +909,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericImmutableList(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericImmutableList(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericImmutableList(object original, ICopyContext context)
         {
             var t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
             return concreteMethods.Item3(original, context);
         }
 
@@ -958,20 +958,20 @@ namespace Orleans.Serialization
         internal static object CopyGenericImmutableHashSet(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
             return concreteMethods.Item3(original, context);
         }
 
         internal static void SerializeGenericImmutableHashSet(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericImmutableHashSet(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
             return concreteMethods.Item2(expected, context);
         }
         
@@ -1011,20 +1011,20 @@ namespace Orleans.Serialization
         internal static object CopyGenericImmutableSortedSet(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
             return concreteMethods.Item3(original, context);
         }
 
         internal static object DeserializeGenericImmutableSortedSet(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static void SerializeGenericImmutableSortedSet(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
             concreteMethods.Item1(original, context, expected);
         }
 
@@ -1064,20 +1064,20 @@ namespace Orleans.Serialization
         internal static object CopyGenericImmutableSortedDictionary(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
             return concreteMethods.Item3(original, context);
         }
 
         internal static object DeserializeGenericImmutableSortedDictionary(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static void SerializeGenericImmutableSortedDictionary(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
             concreteMethods.Item1(original, context, expected);
         }
 
@@ -1121,20 +1121,20 @@ namespace Orleans.Serialization
         internal static object CopyGenericImmutableArray(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
             return concreteMethods.Item3(original, context);
         }
 
         internal static object DeserializeGenericImmutableArray(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static void SerializeGenericImmutableArray(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
             concreteMethods.Item1(original, context, expected);
         }
 
@@ -1171,20 +1171,20 @@ namespace Orleans.Serialization
         internal static object CopyGenericImmutableQueue(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
             return concreteMethods.Item3(original, context);
         }
 
         internal static object DeserializeGenericImmutableQueue(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static void SerializeGenericImmutableQueue(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
             concreteMethods.Item1(original, context, expected);
         }
 
@@ -1229,7 +1229,7 @@ namespace Orleans.Serialization
         {
             Type t = raw.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
 
             concretes.Item1(raw, context, expected);
         }
@@ -1237,7 +1237,7 @@ namespace Orleans.Serialization
         internal static object DeserializeTuple(Type t, IDeserializationContext context)
         {
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
 
             return concretes.Item2(t, context);
         }
@@ -1246,7 +1246,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
+            var concretes= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeTuple) + generics.Length, nameof(DeserializeTuple) + generics.Length, nameof(DeepCopyTuple) + generics.Length, generics);
 
             return concretes.Item3(original, context);
         }
@@ -1456,7 +1456,7 @@ namespace Orleans.Serialization
         {
             Type t = raw.GetType();
             var generics = t.GetGenericArguments();
-            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+            var concretes = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
 
             concretes.Item1(raw, context, expected);
         }
@@ -1464,7 +1464,7 @@ namespace Orleans.Serialization
         internal static object DeserializeValueTuple(Type t, IDeserializationContext context)
         {
             var generics = t.GetGenericArguments();
-            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+            var concretes = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
 
             return concretes.Item2(t, context);
         }
@@ -1473,7 +1473,7 @@ namespace Orleans.Serialization
         {
             Type t = original.GetType();
             var generics = t.GetGenericArguments();
-            var concretes = RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
+            var concretes = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeValueTuple) + generics.Length, nameof(DeserializeValueTuple) + generics.Length, nameof(DeepCopyValueTuple) + generics.Length, generics);
 
             return concretes.Item3(original, context);
         }
@@ -1736,20 +1736,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericKeyValuePair(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericKeyValuePair(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericKeyValuePair(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeKeyValuePair), nameof(DeserializeKeyValuePair), nameof(CopyKeyValuePair));
             return concreteMethods.Item3(original, context);
         }
 
@@ -1787,20 +1787,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericNullable(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericNullable(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericNullable(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeNullable), nameof(DeserializeNullable), nameof(CopyNullable));
             return concreteMethods.Item3(original, context);
         }
 
@@ -1841,20 +1841,20 @@ namespace Orleans.Serialization
         internal static void SerializeGenericImmutable(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
             concreteMethods.Item1(original, context, expected);
         }
 
         internal static object DeserializeGenericImmutable(Type expected, IDeserializationContext context)
         {
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, expected, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
             return concreteMethods.Item2(expected, context);
         }
 
         internal static object CopyGenericImmutable(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods= RegisterConcreteMethods(context.SerializationManager, t, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
+            var concreteMethods= RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeImmutable), nameof(DeserializeImmutable), nameof(CopyImmutable));
             return concreteMethods.Item3(original, context);
         }
 

@@ -57,7 +57,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            _serializationManager = context.SerializationManager;
+            _serializationManager = context.GetSerializationManager();
         }
     }
 }
