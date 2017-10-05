@@ -22,19 +22,17 @@ namespace Orleans.Serialization
         }
     }
 
-    public class DeserializationContext : IDeserializationContext
+    public class DeserializationContext : SerializationContextBase, IDeserializationContext
     {
         private readonly Dictionary<int, object> taggedObjects;
 
         public DeserializationContext(SerializationManager serializationManager)
+            : base(serializationManager)
         {
-            this.SerializationManager = serializationManager;
             this.taggedObjects = new Dictionary<int, object>();
         }
 
         /// <inheritdoc />
-        public SerializationManager SerializationManager { get; }
-        
         /// <inheritdoc />
         public BinaryTokenStreamReader StreamReader { get; set; }
 
@@ -72,9 +70,7 @@ namespace Orleans.Serialization
             this.CurrentObjectOffset = 0;
         }
 
-        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
-
-        public object AdditionalContext => this.SerializationManager.RuntimeClient;
+        public override object AdditionalContext => this.SerializationManager.RuntimeClient;
 
         internal class NestedDeserializationContext : IDeserializationContext
         {

@@ -27,7 +27,7 @@ namespace Orleans.Serialization
     /// record the mapping of original object to the copied instance of that object
     /// so that object identity can be preserved when serializing .NET object graphs.
     /// </remarks>
-    public class SerializationContext : ICopyContext, ISerializationContext
+    public class SerializationContext : SerializationContextBase, ICopyContext, ISerializationContext
     {
         private struct Record
         {
@@ -50,15 +50,13 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
-        public SerializationManager SerializationManager { get; }
-
         public BinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
 
-        public SerializationContext(SerializationManager serializationManager)
+        public SerializationContext(SerializationManager serializationManager) : 
+            base(serializationManager)
         {
-            this.SerializationManager = serializationManager;
             processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
         }
 
@@ -115,9 +113,7 @@ namespace Orleans.Serialization
 
         public int CurrentOffset => this.StreamWriter.CurrentOffset;
 
-        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
-
-        public object AdditionalContext => this.SerializationManager.RuntimeClient;
+        public override object AdditionalContext => this.SerializationManager.RuntimeClient;
 
         internal class NestedSerializationContext : ISerializationContext
         {
