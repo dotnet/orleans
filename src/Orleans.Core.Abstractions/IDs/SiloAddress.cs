@@ -167,27 +167,31 @@ namespace Orleans.Runtime
 
             // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
             string siloAddressInfoToHash = Endpoint + Generation.ToString(CultureInfo.InvariantCulture);
-            // TODO: the following is the equivalent to:
-            // hashCode = Utils.CalculateIdHash(siloAddressInfoToHash);
+            hashCode = CalculateIdHash(siloAddressInfoToHash);
+            hashCodeSet = true;
+            return hashCode;
+        }
+
+        // This is the same method as Utils.CalculateIdHash
+        private static int CalculateIdHash(string text)
+        {
             SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
-            int tmpHash = 0;
+            int hash = 0;
             try
             {
-                byte[] data = Encoding.Unicode.GetBytes(siloAddressInfoToHash);
+                byte[] data = Encoding.Unicode.GetBytes(text);
                 byte[] result = sha.ComputeHash(data);
                 for (int i = 0; i < result.Length; i += 4)
                 {
                     int tmp = (result[i] << 24) | (result[i + 1] << 16) | (result[i + 2] << 8) | (result[i + 3]);
-                    tmpHash = tmpHash ^ tmp;
+                    hash = hash ^ tmp;
                 }
             }
             finally
             {
                 sha.Dispose();
             }
-            hashCode = tmpHash;
-            hashCodeSet = true;
-            return hashCode;
+            return hash;
         }
 
         public List<uint> GetUniformHashCodes(int numHashes)
