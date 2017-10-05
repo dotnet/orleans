@@ -20,7 +20,7 @@ namespace Orleans.Serialization
 
         private static readonly ReflectedSerializationMethodInfo SerializationMethodInfos = new ReflectedSerializationMethodInfo();
 
-        private static readonly SerializationManager.DeepCopier ImmutableTypeCopier = (obj, context) => obj;
+        private static readonly DeepCopier ImmutableTypeCopier = (obj, context) => obj;
 
         private static readonly ILFieldBuilder FieldBuilder = new ILFieldBuilder();
 
@@ -96,7 +96,7 @@ namespace Orleans.Serialization
                     copyFields = this.GetFields(type, copyFieldsFilter, fieldComparer);
                 }
                 
-                SerializationManager.DeepCopier copier;
+                DeepCopier copier;
                 if (type.IsOrleansShallowCopyable()) copier = ImmutableTypeCopier;
                 else copier = this.EmitCopier(type, copyFields).CreateDelegate();
 
@@ -113,9 +113,9 @@ namespace Orleans.Serialization
             }
         }
 
-        private ILDelegateBuilder<SerializationManager.DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
         {
-            var il = new ILDelegateBuilder<SerializationManager.DeepCopier>(
+            var il = new ILDelegateBuilder<DeepCopier>(
                 FieldBuilder,
                 type.Name + "DeepCopier",
                 SerializationMethodInfos.DeepCopierDelegate);
@@ -168,9 +168,9 @@ namespace Orleans.Serialization
             return il;
         }
 
-        private ILDelegateBuilder<SerializationManager.Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
         {
-            var il = new ILDelegateBuilder<SerializationManager.Serializer>(
+            var il = new ILDelegateBuilder<Serializer>(
                 FieldBuilder,
                 type.Name + "Serializer",
                 SerializationMethodInfos.SerializerDelegate);
@@ -224,9 +224,9 @@ namespace Orleans.Serialization
             return il;
         }
 
-        private ILDelegateBuilder<SerializationManager.Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
         {
-            var il = new ILDelegateBuilder<SerializationManager.Deserializer>(
+            var il = new ILDelegateBuilder<Deserializer>(
                 FieldBuilder,
                 type.Name + "Deserializer",
                 SerializationMethodInfos.DeserializerDelegate);
