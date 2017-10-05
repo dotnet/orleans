@@ -351,7 +351,7 @@ namespace Orleans.CodeGenerator
                     if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.GetTypeInfo().IsValueType)
                     {
                         var setterType =
-                            typeof(FieldUtils.ValueTypeSetter<,>).MakeGenericType(
+                            typeof(ValueTypeSetter<,>).MakeGenericType(
                                 field.FieldInfo.DeclaringType,
                                 field.FieldInfo.FieldType).GetTypeSyntax();
 
