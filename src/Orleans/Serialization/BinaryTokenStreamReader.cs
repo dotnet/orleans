@@ -437,6 +437,7 @@ namespace Orleans.Serialization
             throw new SerializationException("Unexpected '" + token + "' found when expecting a type reference");
         }
         /// <summary> Read a <c>Type</c> value from the stream. </summary>
+        /// <param name="this">The IBinaryTokenStreamReader to read from</param>
         /// <param name="serializationManager">The serialization manager used to resolve type names.</param>
         /// <param name="expected">Expected Type, if known.</param>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
