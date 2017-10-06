@@ -4,54 +4,6 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    public interface IDeserializationContext : ISerializerContext
-    {
-        /// <summary>
-        /// The stream reader.
-        /// </summary>
-        BinaryTokenStreamReader StreamReader { get; }
-        
-        /// <summary>
-        /// The offset of the current object in <see cref="StreamReader"/>.
-        /// </summary>
-        int CurrentObjectOffset { get; set; }
-
-        /// <summary>
-        /// Gets the current position in the stream.
-        /// </summary>
-        int CurrentPosition { get; }
-
-        /// <summary>
-        /// Records deserialization of the provided object.
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
-        void RecordObject(object obj, int offset);
-
-        /// <summary>
-        /// Records deserialization of the provided object at the current object offset.
-        /// </summary>
-        /// <param name="obj"></param>
-        void RecordObject(object obj);
-
-        /// <summary>
-        /// Returns the object from the specified offset.
-        /// </summary>
-        /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
-        /// <returns>The object from the specified offset.</returns>
-        object FetchReferencedObject(int offset);
-
-        object DeserializeInner(Type expected);
-    }
-
-    public static class IDeserializationContextExtensions
-    {
-        public static T DeserializeInner<T>(this IDeserializationContext @this)
-        {
-            return (T) @this.DeserializeInner(typeof(T));
-        }
-    }
-
     public static class DeserializationContextExtensions
     {
         /// <summary>
@@ -70,21 +22,19 @@ namespace Orleans.Serialization
         }
     }
 
-    public class DeserializationContext : IDeserializationContext
+    public class DeserializationContext : SerializationContextBase, IDeserializationContext
     {
         private readonly Dictionary<int, object> taggedObjects;
 
         public DeserializationContext(SerializationManager serializationManager)
+            : base(serializationManager)
         {
-            this.SerializationManager = serializationManager;
             this.taggedObjects = new Dictionary<int, object>();
         }
 
         /// <inheritdoc />
-        public SerializationManager SerializationManager { get; }
-        
         /// <inheritdoc />
-        public BinaryTokenStreamReader StreamReader { get; set; }
+        public IBinaryTokenStreamReader StreamReader { get; set; }
 
         /// <inheritdoc />
         public int CurrentObjectOffset { get; set; }
@@ -120,9 +70,7 @@ namespace Orleans.Serialization
             this.CurrentObjectOffset = 0;
         }
 
-        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
-
-        public object AdditionalContext => this.SerializationManager.RuntimeClient;
+        public override object AdditionalContext => this.SerializationManager.RuntimeClient;
 
         public object DeserializeInner(Type expected)
         {
@@ -147,10 +95,10 @@ namespace Orleans.Serialization
                 this.StreamReader = reader;
             }
 
-            public SerializationManager SerializationManager => this.parent.SerializationManager;
+            public SerializationManager SerializationManager => this.parent.GetSerializationManager();
             public IServiceProvider ServiceProvider => this.parent.ServiceProvider;
             public object AdditionalContext => this.parent.AdditionalContext;
-            public BinaryTokenStreamReader StreamReader { get; }
+            public IBinaryTokenStreamReader StreamReader { get; }
             public int CurrentObjectOffset { get; set; }
             public int CurrentPosition => this.position + this.StreamReader.CurrentPosition;
             public void RecordObject(object obj, int offset) => this.parent.RecordObject(obj, offset);

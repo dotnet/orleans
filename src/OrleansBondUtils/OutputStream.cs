@@ -6,9 +6,9 @@ namespace Orleans.Serialization
 
     internal sealed class OutputStream : IOutputStream
     {
-        private readonly BinaryTokenStreamWriter writer;
+        private readonly IBinaryTokenStreamWriter writer;
 
-        private OutputStream(BinaryTokenStreamWriter writer)
+        private OutputStream(IBinaryTokenStreamWriter writer)
         {
             this.writer = writer;
         }
@@ -86,7 +86,7 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static OutputStream Create(BinaryTokenStreamWriter writer)
+        internal static OutputStream Create(IBinaryTokenStreamWriter writer)
         {
             if (writer == null)
             {

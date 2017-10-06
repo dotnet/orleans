@@ -11,10 +11,77 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+    internal static class BinaryTokenStreamWriterExtensions
+    {
+        internal static void Write(this IBinaryTokenStreamWriter @this, SerializationTokenType t)
+        {
+            @this.Write((byte)t);
+        }
+
+        /// <summary> Write a <c>CorrelationId</c> value to the stream. </summary>
+        internal static void Write(this IBinaryTokenStreamWriter @this, CorrelationId id)
+        {
+            @this.Write(id.ToByteArray());
+        }
+
+        /// <summary> Write a <c>ActivationAddress</c> value to the stream. </summary>
+        internal static void Write(this IBinaryTokenStreamWriter @this, ActivationAddress addr)
+        {
+            @this.Write(addr.Silo ?? SiloAddress.Zero);
+
+            // GrainId must not be null
+            @this.Write(addr.Grain);
+            @this.Write(addr.Activation ?? ActivationId.Zero);
+        }
+
+        internal static void Write(this IBinaryTokenStreamWriter @this, UniqueKey key)
+        {
+            @this.Write(key.N0);
+            @this.Write(key.N1);
+            @this.Write(key.TypeCodeData);
+            @this.Write(key.KeyExt);
+        }
+
+        /// <summary> Write a <c>ActivationId</c> value to the stream. </summary>
+        internal static void Write(this IBinaryTokenStreamWriter @this, ActivationId id)
+        {
+            @this.Write(id.Key);
+        }
+
+        /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
+        internal static void Write(this IBinaryTokenStreamWriter @this, GrainId id)
+        {
+            @this.Write(id.Key);
+        }
+
+        /// <summary>
+        /// Write header for an <c>Array</c> to the output stream.
+        /// </summary>
+        /// <param name="this">The IBinaryTokenStreamReader to read from</param>
+        /// <param name="a">Data object for which header should be written.</param>
+        /// <param name="expected">The most recent Expected Type currently active for this stream.</param>
+        internal static void WriteArrayHeader(this IBinaryTokenStreamWriter @this, Array a, Type expected = null)
+        {
+            @this.WriteTypeHeader(a.GetType(), expected);
+            for (var i = 0; i < a.Rank; i++)
+            {
+                @this.Write(a.GetLength(i));
+            }
+        }
+
+        // Back-references
+        internal static void WriteReference(this IBinaryTokenStreamWriter @this, int offset)
+        {
+            @this.Write((byte)SerializationTokenType.Reference);
+            @this.Write(offset);
+        }
+    }
+
     /// <summary>
     /// Writer for Orleans binary token streams
     /// </summary>
-    public class BinaryTokenStreamWriter
+    public class BinaryTokenStreamWriter : IBinaryTokenStreamWriter
     {
         private readonly ByteArrayBuilder ab;
 
@@ -248,12 +315,6 @@ namespace Orleans.Serialization
             ab.Append((byte)SerializationTokenType.Null);
         }
 
-        internal void Write(SerializationTokenType t)
-        {
-            Trace("--Wrote token {0}", t);
-            ab.Append((byte)t);
-        }
-
         // Types
 
         /// <summary> Write a type header for the specified Type to the stream. </summary>
@@ -420,12 +481,6 @@ namespace Orleans.Serialization
 
         // Other simple types
 
-        /// <summary> Write a <c>CorrelationId</c> value to the stream. </summary>
-        internal void Write(CorrelationId id)
-        {
-            Write(id.ToByteArray());
-        }
-
         /// <summary> Write a <c>IPEndPoint</c> value to the stream. </summary>
         public void Write(IPEndPoint ep)
         {
@@ -450,42 +505,11 @@ namespace Orleans.Serialization
             }
         }
 
-        /// <summary> Write a <c>ActivationAddress</c> value to the stream. </summary>
-        internal void Write(ActivationAddress addr)
-        {
-            Write(addr.Silo ?? SiloAddress.Zero);
-
-            // GrainId must not be null
-            Write(addr.Grain);
-            Write(addr.Activation ?? ActivationId.Zero);
-        }
-
         /// <summary> Write a <c>SiloAddress</c> value to the stream. </summary>
         public void Write(SiloAddress addr)
         {
             Write(addr.Endpoint);
             Write(addr.Generation);
-        }
-
-        internal void Write(UniqueKey key)
-        {
-            Write(key.N0);
-            Write(key.N1);
-            Write(key.TypeCodeData);
-            Write(key.KeyExt);
-        }
-
-        /// <summary> Write a <c>ActivationId</c> value to the stream. </summary>
-        internal void Write(ActivationId id)
-        {
-            Write(id.Key);
-        }
-
-        /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        internal void Write(GrainId id)
-        {
-            Write(id.Key);
         }
 
         /// <summary> Write a <c>TimeSpan</c> value to the stream. </summary>
@@ -528,29 +552,6 @@ namespace Orleans.Serialization
         }
 
         // General containers
-
-        /// <summary>
-        /// Write header for an <c>Array</c> to the output stream.
-        /// </summary>
-        /// <param name="a">Data object for which header should be written.</param>
-        /// <param name="expected">The most recent Expected Type currently active for this stream.</param>
-        internal void WriteArrayHeader(Array a, Type expected = null)
-        {
-            WriteTypeHeader(a.GetType(), expected);
-            for (var i = 0; i < a.Rank; i++)
-            {
-                ab.Append(a.GetLength(i));
-            }
-        }
-
-        // Back-references
-
-        internal void WriteReference(int offset)
-        {
-            Trace("Writing a reference to the object at offset {0}", offset);
-            ab.Append((byte) SerializationTokenType.Reference);
-            ab.Append(offset);
-        }
 
         private StreamWriter trace;
 

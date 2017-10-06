@@ -475,7 +475,7 @@ namespace UnitTests.Serialization
             Assert.Equal(input.Int, result.Int);
             Assert.Null(input.Context);
             Assert.NotNull(result.Context);
-            Assert.Equal(environment.SerializationManager, result.Context.SerializationManager);
+            Assert.Equal(environment.SerializationManager, result.Context.GetSerializationManager());
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

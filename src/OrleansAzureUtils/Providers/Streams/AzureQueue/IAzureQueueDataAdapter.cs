@@ -66,7 +66,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            this.serializationManager = context.SerializationManager;
+            this.serializationManager = context.GetSerializationManager();
         }
     }
 
@@ -112,7 +112,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            this.serializationManager = context.SerializationManager;
+            this.serializationManager = context.GetSerializationManager();
         }
     }
 }

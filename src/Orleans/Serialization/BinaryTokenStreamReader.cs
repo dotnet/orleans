@@ -15,10 +15,476 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+    internal static class BinaryTokenStreamReaderExtensinons
+    {
+        /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        internal static GrainId ReadGrainId(this IBinaryTokenStreamReader @this)
+        {
+            UniqueKey key = @this.ReadUniqueKey();
+            return GrainId.GetGrainId(key);
+        }
+
+        /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        internal static ActivationId ReadActivationId(this IBinaryTokenStreamReader @this)
+        {
+            UniqueKey key = @this.ReadUniqueKey();
+            return ActivationId.GetActivationId(key);
+        }
+
+        internal static UniqueKey ReadUniqueKey(this IBinaryTokenStreamReader @this)
+        {
+            ulong n0 = @this.ReadULong();
+            ulong n1 = @this.ReadULong();
+            ulong typeCodeData = @this.ReadULong();
+            string keyExt = @this.ReadString();
+            return UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
+        }
+
+        internal static Guid ReadGuid(this IBinaryTokenStreamReader @this)
+        {
+            byte[] bytes = @this.ReadBytes(16);
+            return new Guid(bytes);
+        }
+
+        internal static CorrelationId ReadCorrelationId(this IBinaryTokenStreamReader @this)
+        {
+            return new CorrelationId(@this.ReadBytes(CorrelationId.SIZE_BYTES));
+        }
+
+        internal static GrainDirectoryEntryStatus ReadMultiClusterStatus(this IBinaryTokenStreamReader @this)
+        {
+            byte val = @this.ReadByte();
+            return (GrainDirectoryEntryStatus)val;
+        }
+
+        /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        internal static ActivationAddress ReadActivationAddress(this IBinaryTokenStreamReader @this)
+        {
+            var silo = @this.ReadSiloAddress();
+            var grain = @this.ReadGrainId();
+            var act = @this.ReadActivationId();
+
+            if (silo.Equals(SiloAddress.Zero))
+                silo = null;
+
+            if (act.Equals(ActivationId.Zero))
+                act = null;
+
+            return ActivationAddress.GetAddress(silo, grain, act);
+        }
+
+        /// <summary>
+        /// Peek at the next token in this input stream.
+        /// </summary>
+        /// <returns>Next token thatr will be read from the stream.</returns>
+        internal static SerializationTokenType PeekToken(this IBinaryTokenStreamReader @this)
+        {
+            // TODO try to avoid that
+            return ((BinaryTokenStreamReader) @this).PeekToken();
+        }
+
+        /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        internal static SerializationTokenType ReadToken(this IBinaryTokenStreamReader @this)
+        {
+            // TODO try to avoid that
+            return ((BinaryTokenStreamReader) @this).ReadToken();
+        }
+
+        internal static bool TryReadSimpleType(this IBinaryTokenStreamReader @this, out object result, out SerializationTokenType token)
+        {
+            token = @this.ReadToken();
+            byte[] bytes;
+            switch (token)
+            {
+                case SerializationTokenType.True:
+                    result = true;
+                    break;
+                case SerializationTokenType.False:
+                    result = false;
+                    break;
+                case SerializationTokenType.Null:
+                    result = null;
+                    break;
+                case SerializationTokenType.Object:
+                    result = new object();
+                    break;
+                case SerializationTokenType.Int:
+                    result = @this.ReadInt();
+                    break;
+                case SerializationTokenType.Uint:
+                    result = @this.ReadUInt();
+                    break;
+                case SerializationTokenType.Short:
+                    result = @this.ReadShort();
+                    break;
+                case SerializationTokenType.Ushort:
+                    result = @this.ReadUShort();
+                    break;
+                case SerializationTokenType.Long:
+                    result = @this.ReadLong();
+                    break;
+                case SerializationTokenType.Ulong:
+                    result = @this.ReadULong();
+                    break;
+                case SerializationTokenType.Byte:
+                    result = @this.ReadByte();
+                    break;
+                case SerializationTokenType.Sbyte:
+                    result = @this.ReadSByte();
+                    break;
+                case SerializationTokenType.Float:
+                    result = @this.ReadFloat();
+                    break;
+                case SerializationTokenType.Double:
+                    result = @this.ReadDouble();
+                    break;
+                case SerializationTokenType.Decimal:
+                    result = @this.ReadDecimal();
+                    break;
+                case SerializationTokenType.String:
+                    result = @this.ReadString();
+                    break;
+                case SerializationTokenType.Character:
+                    result = @this.ReadChar();
+                    break;
+                case SerializationTokenType.Guid:
+                    bytes = @this.ReadBytes(16);
+                    result = new Guid(bytes);
+                    break;
+                case SerializationTokenType.Date:
+                    result = DateTime.FromBinary(@this.ReadLong());
+                    break;
+                case SerializationTokenType.TimeSpan:
+                    result = new TimeSpan(@this.ReadLong());
+                    break;
+                case SerializationTokenType.GrainId:
+                    result = @this.ReadGrainId();
+                    break;
+                case SerializationTokenType.ActivationId:
+                    result = @this.ReadActivationId();
+                    break;
+                case SerializationTokenType.SiloAddress:
+                    result = @this.ReadSiloAddress();
+                    break;
+                case SerializationTokenType.ActivationAddress:
+                    result = @this.ReadActivationAddress();
+                    break;
+                case SerializationTokenType.IpAddress:
+                    result = @this.ReadIPAddress();
+                    break;
+                case SerializationTokenType.IpEndPoint:
+                    result = @this.ReadIPEndPoint();
+                    break;
+                case SerializationTokenType.CorrelationId:
+                    result = new CorrelationId(@this.ReadBytes(CorrelationId.SIZE_BYTES));
+                    break;
+                default:
+                    result = null;
+                    return false;
+            }
+            return true;
+        }
+
+        internal static Type CheckSpecialTypeCode(SerializationTokenType token)
+        {
+            switch (token)
+            {
+                case SerializationTokenType.Boolean:
+                    return typeof(bool);
+                case SerializationTokenType.Int:
+                    return typeof(int);
+                case SerializationTokenType.Short:
+                    return typeof(short);
+                case SerializationTokenType.Long:
+                    return typeof(long);
+                case SerializationTokenType.Sbyte:
+                    return typeof(sbyte);
+                case SerializationTokenType.Uint:
+                    return typeof(uint);
+                case SerializationTokenType.Ushort:
+                    return typeof(ushort);
+                case SerializationTokenType.Ulong:
+                    return typeof(ulong);
+                case SerializationTokenType.Byte:
+                    return typeof(byte);
+                case SerializationTokenType.Float:
+                    return typeof(float);
+                case SerializationTokenType.Double:
+                    return typeof(double);
+                case SerializationTokenType.Decimal:
+                    return typeof(decimal);
+                case SerializationTokenType.String:
+                    return typeof(string);
+                case SerializationTokenType.Character:
+                    return typeof(char);
+                case SerializationTokenType.Guid:
+                    return typeof(Guid);
+                case SerializationTokenType.Date:
+                    return typeof(DateTime);
+                case SerializationTokenType.TimeSpan:
+                    return typeof(TimeSpan);
+                case SerializationTokenType.IpAddress:
+                    return typeof(IPAddress);
+                case SerializationTokenType.IpEndPoint:
+                    return typeof(IPEndPoint);
+                case SerializationTokenType.GrainId:
+                    return typeof(GrainId);
+                case SerializationTokenType.ActivationId:
+                    return typeof(ActivationId);
+                case SerializationTokenType.SiloAddress:
+                    return typeof(SiloAddress);
+                case SerializationTokenType.ActivationAddress:
+                    return typeof(ActivationAddress);
+                case SerializationTokenType.CorrelationId:
+                    return typeof(CorrelationId);
+#if false // Note: not yet implemented as simple types on the Writer side
+                case SerializationTokenType.Object:
+                    return typeof(Object);
+                case SerializationTokenType.ByteArray:
+                    return typeof(byte[]);
+                case SerializationTokenType.ShortArray:
+                    return typeof(short[]);
+                case SerializationTokenType.IntArray:
+                    return typeof(int[]);
+                case SerializationTokenType.LongArray:
+                    return typeof(long[]);
+                case SerializationTokenType.UShortArray:
+                    return typeof(ushort[]);
+                case SerializationTokenType.UIntArray:
+                    return typeof(uint[]);
+                case SerializationTokenType.ULongArray:
+                    return typeof(ulong[]);
+                case SerializationTokenType.FloatArray:
+                    return typeof(float[]);
+                case SerializationTokenType.DoubleArray:
+                    return typeof(double[]);
+                case SerializationTokenType.CharArray:
+                    return typeof(char[]);
+                case SerializationTokenType.BoolArray:
+                    return typeof(bool[]);
+#endif
+                default:
+                    break;
+            }
+
+            return null;
+        }
+
+        /// <summary> Read a <c>Type</c> value from the stream. </summary>
+        internal static Type ReadSpecifiedTypeHeader(this IBinaryTokenStreamReader @this, SerializationManager serializationManager)
+        {
+            // Assumes that the SpecifiedType token has already been read
+
+            var token = @this.ReadToken();
+            switch (token)
+            {
+                case SerializationTokenType.Boolean:
+                    return typeof(bool);
+                case SerializationTokenType.Int:
+                    return typeof(int);
+                case SerializationTokenType.Short:
+                    return typeof(short);
+                case SerializationTokenType.Long:
+                    return typeof(long);
+                case SerializationTokenType.Sbyte:
+                    return typeof(sbyte);
+                case SerializationTokenType.Uint:
+                    return typeof(uint);
+                case SerializationTokenType.Ushort:
+                    return typeof(ushort);
+                case SerializationTokenType.Ulong:
+                    return typeof(ulong);
+                case SerializationTokenType.Byte:
+                    return typeof(byte);
+                case SerializationTokenType.Float:
+                    return typeof(float);
+                case SerializationTokenType.Double:
+                    return typeof(double);
+                case SerializationTokenType.Decimal:
+                    return typeof(decimal);
+                case SerializationTokenType.String:
+                    return typeof(string);
+                case SerializationTokenType.Character:
+                    return typeof(char);
+                case SerializationTokenType.Guid:
+                    return typeof(Guid);
+                case SerializationTokenType.Date:
+                    return typeof(DateTime);
+                case SerializationTokenType.TimeSpan:
+                    return typeof(TimeSpan);
+                case SerializationTokenType.IpAddress:
+                    return typeof(IPAddress);
+                case SerializationTokenType.IpEndPoint:
+                    return typeof(IPEndPoint);
+                case SerializationTokenType.GrainId:
+                    return typeof(GrainId);
+                case SerializationTokenType.ActivationId:
+                    return typeof(ActivationId);
+                case SerializationTokenType.SiloAddress:
+                    return typeof(SiloAddress);
+                case SerializationTokenType.ActivationAddress:
+                    return typeof(ActivationAddress);
+                case SerializationTokenType.CorrelationId:
+                    return typeof(CorrelationId);
+                case SerializationTokenType.Request:
+                    return typeof(InvokeMethodRequest);
+                case SerializationTokenType.Response:
+                    return typeof(Response);
+                case SerializationTokenType.StringObjDict:
+                    return typeof(Dictionary<string, object>);
+                case SerializationTokenType.Object:
+                    return typeof(Object);
+                case SerializationTokenType.Tuple + 1:
+                    return typeof(Tuple<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.Tuple + 2:
+                    return typeof(Tuple<,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 2));
+                case SerializationTokenType.Tuple + 3:
+                    return typeof(Tuple<,,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 3));
+                case SerializationTokenType.Tuple + 4:
+                    return typeof(Tuple<,,,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 4));
+                case SerializationTokenType.Tuple + 5:
+                    return typeof(Tuple<,,,,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 5));
+                case SerializationTokenType.Tuple + 6:
+                    return typeof(Tuple<,,,,,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 6));
+                case SerializationTokenType.Tuple + 7:
+                    return typeof(Tuple<,,,,,,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 7));
+                case SerializationTokenType.Array + 1:
+                    var et1 = @this.ReadFullTypeHeader(serializationManager);
+                    return et1.MakeArrayType();
+                case SerializationTokenType.Array + 2:
+                    var et2 = @this.ReadFullTypeHeader(serializationManager);
+                    return et2.MakeArrayType(2);
+                case SerializationTokenType.Array + 3:
+                    var et3 = @this.ReadFullTypeHeader(serializationManager);
+                    return et3.MakeArrayType(3);
+                case SerializationTokenType.Array + 4:
+                    var et4 = @this.ReadFullTypeHeader(serializationManager);
+                    return et4.MakeArrayType(4);
+                case SerializationTokenType.Array + 5:
+                    var et5 = @this.ReadFullTypeHeader(serializationManager);
+                    return et5.MakeArrayType(5);
+                case SerializationTokenType.Array + 6:
+                    var et6 = @this.ReadFullTypeHeader(serializationManager);
+                    return et6.MakeArrayType(6);
+                case SerializationTokenType.Array + 7:
+                    var et7 = @this.ReadFullTypeHeader(serializationManager);
+                    return et7.MakeArrayType(7);
+                case SerializationTokenType.Array + 8:
+                    var et8 = @this.ReadFullTypeHeader(serializationManager);
+                    return et8.MakeArrayType(8);
+                case SerializationTokenType.List:
+                    return typeof(List<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.Dictionary:
+                    return typeof(Dictionary<,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 2));
+                case SerializationTokenType.KeyValuePair:
+                    return typeof(KeyValuePair<,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 2));
+                case SerializationTokenType.Set:
+                    return typeof(HashSet<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.SortedList:
+                    return typeof(SortedList<,>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 2));
+                case SerializationTokenType.SortedSet:
+                    return typeof(SortedSet<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.Stack:
+                    return typeof(Stack<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.Queue:
+                    return typeof(Queue<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.LinkedList:
+                    return typeof(LinkedList<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.Nullable:
+                    return typeof(Nullable<>).MakeGenericType(@this.ReadGenericArguments(serializationManager, 1));
+                case SerializationTokenType.ByteArray:
+                    return typeof(byte[]);
+                case SerializationTokenType.ShortArray:
+                    return typeof(short[]);
+                case SerializationTokenType.IntArray:
+                    return typeof(int[]);
+                case SerializationTokenType.LongArray:
+                    return typeof(long[]);
+                case SerializationTokenType.UShortArray:
+                    return typeof(ushort[]);
+                case SerializationTokenType.UIntArray:
+                    return typeof(uint[]);
+                case SerializationTokenType.ULongArray:
+                    return typeof(ulong[]);
+                case SerializationTokenType.FloatArray:
+                    return typeof(float[]);
+                case SerializationTokenType.DoubleArray:
+                    return typeof(double[]);
+                case SerializationTokenType.CharArray:
+                    return typeof(char[]);
+                case SerializationTokenType.BoolArray:
+                    return typeof(bool[]);
+                case SerializationTokenType.SByteArray:
+                    return typeof(sbyte[]);
+                case SerializationTokenType.NamedType:
+                    var typeName = @this.ReadString();
+                    try
+                    {
+                        return serializationManager.ResolveTypeName(typeName);
+                    }
+                    catch (TypeAccessException ex)
+                    {
+                        throw new TypeAccessException("Named type \"" + typeName + "\" is invalid: " + ex.Message);
+                    }
+                default:
+                    break;
+            }
+
+            throw new SerializationException("Unexpected '" + token + "' found when expecting a type reference");
+        }
+        /// <summary> Read a <c>Type</c> value from the stream. </summary>
+        /// <param name="this">The IBinaryTokenStreamReader to read from</param>
+        /// <param name="serializationManager">The serialization manager used to resolve type names.</param>
+        /// <param name="expected">Expected Type, if known.</param>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        private static Type ReadFullTypeHeader(this IBinaryTokenStreamReader @this, SerializationManager serializationManager, Type expected = null)
+        {
+            var token = @this.ReadToken();
+
+            if (token == SerializationTokenType.ExpectedType)
+            {
+                return expected;
+            }
+
+            var t = CheckSpecialTypeCode(token);
+            if (t != null)
+            {
+                return t;
+            }
+
+            if (token == SerializationTokenType.SpecifiedType)
+            {
+#if TRACE_SERIALIZATION
+                var tt = ReadSpecifiedTypeHeader();
+                Trace("--Read specified type header for type {0}", tt);
+                return tt;
+#else
+                return @this.ReadSpecifiedTypeHeader(serializationManager);
+#endif
+            }
+
+            throw new SerializationException("Invalid '" + token + "'token in input stream where full type header is expected");
+        }
+
+        private static Type[] ReadGenericArguments(this IBinaryTokenStreamReader @this, SerializationManager serializationManager, int n)
+        {
+            var args = new Type[n];
+            for (var i = 0; i < n; i++)
+            {
+                args[i] = @this.ReadFullTypeHeader(serializationManager);
+            }
+            return args;
+        }
+    }
+
     /// <summary>
     /// Reader for Orleans binary token streams
     /// </summary>
-    public class BinaryTokenStreamReader
+    public class BinaryTokenStreamReader : IBinaryTokenStreamReader
     {
         private IList<ArraySegment<byte>> buffers;
         private int buffersCount;
@@ -99,7 +565,7 @@ namespace Orleans.Serialization
         /// Creates a copy of the current stream reader.
         /// </summary>
         /// <returns>The new copy</returns>
-        public BinaryTokenStreamReader Copy()
+        public IBinaryTokenStreamReader Copy()
         {
             return new BinaryTokenStreamReader(this.buffers);
         }
@@ -464,68 +930,9 @@ namespace Orleans.Serialization
             return SiloAddress.New(ep, gen);
         }
 
-        /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal GrainId ReadGrainId()
-        {
-            UniqueKey key = ReadUniqueKey();
-            return GrainId.GetGrainId(key);
-        }
-
-        /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal ActivationId ReadActivationId()
-        {
-            UniqueKey key = ReadUniqueKey();
-            return ActivationId.GetActivationId(key);
-        }
-
-        internal UniqueKey ReadUniqueKey()
-        {
-            ulong n0 = ReadULong();
-            ulong n1 = ReadULong();
-            ulong typeCodeData = ReadULong();
-            string keyExt = ReadString();
-            return UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
-        }
-
-        internal Guid ReadGuid()
-        {
-            byte[] bytes = ReadBytes(16);
-            return new Guid(bytes);
-        }
-
         public TimeSpan ReadTimeSpan()
         {
             return new TimeSpan(ReadLong());
-        }
-
-        internal CorrelationId ReadCorrelationId()
-        {
-            return new CorrelationId(ReadBytes(CorrelationId.SIZE_BYTES));
-        }
-
-        internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
-        {
-            byte val = ReadByte();
-            return (GrainDirectoryEntryStatus)val;
-        }
-
-        /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal ActivationAddress ReadActivationAddress()
-        {
-            var silo = ReadSiloAddress();
-            var grain = ReadGrainId();
-            var act = ReadActivationId();
-
-            if (silo.Equals(SiloAddress.Zero))
-                silo = null;
-
-            if (act.Equals(ActivationId.Zero))
-                act = null;
-
-            return ActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>
@@ -539,6 +946,22 @@ namespace Orleans.Serialization
             var buff = CheckLength(n, out offset);
             Buffer.BlockCopy(buff, offset, array, 0, n);
             Trace("--Read block of {0} bytes", n);
+        }
+
+        private StreamWriter trace;
+
+        [Conditional("TRACE_SERIALIZATION")]
+        private void Trace(string format, params object[] args)
+        {
+            if (trace == null)
+            {
+                var path = String.Format("d:\\Trace-{0}.{1}.{2}.txt", DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, DateTime.UtcNow.Ticks);
+                Console.WriteLine("Opening trace file at '{0}'", path);
+                trace = File.CreateText(path);
+            }
+            trace.Write(format, args);
+            trace.WriteLine(" at offset {0}", CurrentPosition);
+            trace.Flush();
         }
 
         /// <summary>
@@ -559,419 +982,7 @@ namespace Orleans.Serialization
         {
             int offset;
             var buff = CheckLength(1, out offset);
-            Trace("--Read token {0}", (SerializationTokenType)buff[offset]);
             return (SerializationTokenType)buff[offset];
-        }
-
-        internal bool TryReadSimpleType(out object result, out SerializationTokenType token)
-        {
-            token = ReadToken();
-            byte[] bytes;
-            switch (token)
-            {
-                case SerializationTokenType.True:
-                    result = true;
-                    break;
-                case SerializationTokenType.False:
-                    result = false;
-                    break;
-                case SerializationTokenType.Null:
-                    result = null;
-                    break;
-                case SerializationTokenType.Object:
-                    result = new object();
-                    break;
-                case SerializationTokenType.Int:
-                    result = ReadInt();
-                    break;
-                case SerializationTokenType.Uint:
-                    result = ReadUInt();
-                    break;
-                case SerializationTokenType.Short:
-                    result = ReadShort();
-                    break;
-                case SerializationTokenType.Ushort:
-                    result = ReadUShort();
-                    break;
-                case SerializationTokenType.Long:
-                    result = ReadLong();
-                    break;
-                case SerializationTokenType.Ulong:
-                    result = ReadULong();
-                    break;
-                case SerializationTokenType.Byte:
-                    result = ReadByte();
-                    break;
-                case SerializationTokenType.Sbyte:
-                    result = ReadSByte();
-                    break;
-                case SerializationTokenType.Float:
-                    result = ReadFloat();
-                    break;
-                case SerializationTokenType.Double:
-                    result = ReadDouble();
-                    break;
-                case SerializationTokenType.Decimal:
-                    result = ReadDecimal();
-                    break;
-                case SerializationTokenType.String:
-                    result = ReadString();
-                    break;
-                case SerializationTokenType.Character:
-                    result = ReadChar();
-                    break;
-                case SerializationTokenType.Guid:
-                    bytes = ReadBytes(16);
-                    result = new Guid(bytes);
-                    break;
-                case SerializationTokenType.Date:
-                    result = DateTime.FromBinary(ReadLong());
-                    break;
-                case SerializationTokenType.TimeSpan:
-                    result = new TimeSpan(ReadLong());
-                    break;
-                case SerializationTokenType.GrainId:
-                    result = ReadGrainId();
-                    break;
-                case SerializationTokenType.ActivationId:
-                    result = ReadActivationId();
-                    break;
-                case SerializationTokenType.SiloAddress:
-                    result = ReadSiloAddress();
-                    break;
-                case SerializationTokenType.ActivationAddress:
-                    result = ReadActivationAddress();
-                    break;
-                case SerializationTokenType.IpAddress:
-                    result = ReadIPAddress();
-                    break;
-                case SerializationTokenType.IpEndPoint:
-                    result = ReadIPEndPoint();
-                    break;
-                case SerializationTokenType.CorrelationId:
-                    result = new CorrelationId(ReadBytes(CorrelationId.SIZE_BYTES));
-                    break;
-                default:
-                    result = null;
-                    return false;
-            }
-            return true;
-        }
-
-        /// <summary> Read a <c>Type</c> value from the stream. </summary>
-        /// <param name="serializationManager">The serialization manager used to resolve type names.</param>
-        /// <param name="expected">Expected Type, if known.</param>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        private Type ReadFullTypeHeader(SerializationManager serializationManager, Type expected = null)
-        {
-            var token = ReadToken();
-
-            if (token == SerializationTokenType.ExpectedType)
-            {
-                return expected;
-            }
-
-            var t = CheckSpecialTypeCode(token);
-            if (t != null)
-            {
-                return t;
-            }
-
-            if (token == SerializationTokenType.SpecifiedType)
-            {
-#if TRACE_SERIALIZATION
-                var tt = ReadSpecifiedTypeHeader();
-                Trace("--Read specified type header for type {0}", tt);
-                return tt;
-#else
-                return ReadSpecifiedTypeHeader(serializationManager);
-#endif
-            }
-
-            throw new SerializationException("Invalid '" + token + "'token in input stream where full type header is expected");
-        }
-
-        internal static Type CheckSpecialTypeCode(SerializationTokenType token)
-        {
-            switch (token)
-            {
-                case SerializationTokenType.Boolean:
-                    return typeof(bool);
-                case SerializationTokenType.Int:
-                    return typeof(int);
-                case SerializationTokenType.Short:
-                    return typeof(short);
-                case SerializationTokenType.Long:
-                    return typeof(long);
-                case SerializationTokenType.Sbyte:
-                    return typeof(sbyte);
-                case SerializationTokenType.Uint:
-                    return typeof(uint);
-                case SerializationTokenType.Ushort:
-                    return typeof(ushort);
-                case SerializationTokenType.Ulong:
-                    return typeof(ulong);
-                case SerializationTokenType.Byte:
-                    return typeof(byte);
-                case SerializationTokenType.Float:
-                    return typeof(float);
-                case SerializationTokenType.Double:
-                    return typeof(double);
-                case SerializationTokenType.Decimal:
-                    return typeof(decimal);
-                case SerializationTokenType.String:
-                    return typeof(string);
-                case SerializationTokenType.Character:
-                    return typeof(char);
-                case SerializationTokenType.Guid:
-                    return typeof(Guid);
-                case SerializationTokenType.Date:
-                    return typeof(DateTime);
-                case SerializationTokenType.TimeSpan:
-                    return typeof(TimeSpan);
-                case SerializationTokenType.IpAddress:
-                    return typeof(IPAddress);
-                case SerializationTokenType.IpEndPoint:
-                    return typeof(IPEndPoint);
-                case SerializationTokenType.GrainId:
-                    return typeof(GrainId);
-                case SerializationTokenType.ActivationId:
-                    return typeof(ActivationId);
-                case SerializationTokenType.SiloAddress:
-                    return typeof(SiloAddress);
-                case SerializationTokenType.ActivationAddress:
-                    return typeof(ActivationAddress);
-                case SerializationTokenType.CorrelationId:
-                    return typeof(CorrelationId);
-#if false // Note: not yet implemented as simple types on the Writer side
-                case SerializationTokenType.Object:
-                    return typeof(Object);
-                case SerializationTokenType.ByteArray:
-                    return typeof(byte[]);
-                case SerializationTokenType.ShortArray:
-                    return typeof(short[]);
-                case SerializationTokenType.IntArray:
-                    return typeof(int[]);
-                case SerializationTokenType.LongArray:
-                    return typeof(long[]);
-                case SerializationTokenType.UShortArray:
-                    return typeof(ushort[]);
-                case SerializationTokenType.UIntArray:
-                    return typeof(uint[]);
-                case SerializationTokenType.ULongArray:
-                    return typeof(ulong[]);
-                case SerializationTokenType.FloatArray:
-                    return typeof(float[]);
-                case SerializationTokenType.DoubleArray:
-                    return typeof(double[]);
-                case SerializationTokenType.CharArray:
-                    return typeof(char[]);
-                case SerializationTokenType.BoolArray:
-                    return typeof(bool[]);
-#endif
-                default:
-                    break;
-            }
-
-            return null;
-        }
-
-        /// <summary> Read a <c>Type</c> value from the stream. </summary>
-        internal Type ReadSpecifiedTypeHeader(SerializationManager serializationManager)
-        {
-            // Assumes that the SpecifiedType token has already been read
-
-            var token = ReadToken();
-            switch (token)
-            {
-                case SerializationTokenType.Boolean:
-                    return typeof(bool);
-                case SerializationTokenType.Int:
-                    return typeof(int);
-                case SerializationTokenType.Short:
-                    return typeof(short);
-                case SerializationTokenType.Long:
-                    return typeof(long);
-                case SerializationTokenType.Sbyte:
-                    return typeof(sbyte);
-                case SerializationTokenType.Uint:
-                    return typeof(uint);
-                case SerializationTokenType.Ushort:
-                    return typeof(ushort);
-                case SerializationTokenType.Ulong:
-                    return typeof(ulong);
-                case SerializationTokenType.Byte:
-                    return typeof(byte);
-                case SerializationTokenType.Float:
-                    return typeof(float);
-                case SerializationTokenType.Double:
-                    return typeof(double);
-                case SerializationTokenType.Decimal:
-                    return typeof(decimal);
-                case SerializationTokenType.String:
-                    return typeof(string);
-                case SerializationTokenType.Character:
-                    return typeof(char);
-                case SerializationTokenType.Guid:
-                    return typeof(Guid);
-                case SerializationTokenType.Date:
-                    return typeof(DateTime);
-                case SerializationTokenType.TimeSpan:
-                    return typeof(TimeSpan);
-                case SerializationTokenType.IpAddress:
-                    return typeof(IPAddress);
-                case SerializationTokenType.IpEndPoint:
-                    return typeof(IPEndPoint);
-                case SerializationTokenType.GrainId:
-                    return typeof(GrainId);
-                case SerializationTokenType.ActivationId:
-                    return typeof(ActivationId);
-                case SerializationTokenType.SiloAddress:
-                    return typeof(SiloAddress);
-                case SerializationTokenType.ActivationAddress:
-                    return typeof(ActivationAddress);
-                case SerializationTokenType.CorrelationId:
-                    return typeof(CorrelationId);
-                case SerializationTokenType.Request:
-                    return typeof(InvokeMethodRequest);
-                case SerializationTokenType.Response:
-                    return typeof(Response);
-                case SerializationTokenType.StringObjDict:
-                    return typeof(Dictionary<string, object>);
-                case SerializationTokenType.Object:
-                    return typeof(Object);
-                case SerializationTokenType.Tuple + 1:
-                    Trace("----Reading type info for a Tuple'1");
-                    return typeof(Tuple<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.Tuple + 2:
-                    Trace("----Reading type info for a Tuple'2");
-                    return typeof(Tuple<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
-                case SerializationTokenType.Tuple + 3:
-                    Trace("----Reading type info for a Tuple'3");
-                    return typeof(Tuple<,,>).MakeGenericType(ReadGenericArguments(serializationManager, 3));
-                case SerializationTokenType.Tuple + 4:
-                    Trace("----Reading type info for a Tuple'4");
-                    return typeof(Tuple<,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 4));
-                case SerializationTokenType.Tuple + 5:
-                    Trace("----Reading type info for a Tuple'5");
-                    return typeof(Tuple<,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 5));
-                case SerializationTokenType.Tuple + 6:
-                    Trace("----Reading type info for a Tuple'6");
-                    return typeof(Tuple<,,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 6));
-                case SerializationTokenType.Tuple + 7:
-                    Trace("----Reading type info for a Tuple'7");
-                    return typeof(Tuple<,,,,,,>).MakeGenericType(ReadGenericArguments(serializationManager, 7));
-                case SerializationTokenType.Array + 1:
-                    var et1 = ReadFullTypeHeader(serializationManager);
-                    return et1.MakeArrayType();
-                case SerializationTokenType.Array + 2:
-                    var et2 = ReadFullTypeHeader(serializationManager);
-                    return et2.MakeArrayType(2);
-                case SerializationTokenType.Array + 3:
-                    var et3 = ReadFullTypeHeader(serializationManager);
-                    return et3.MakeArrayType(3);
-                case SerializationTokenType.Array + 4:
-                    var et4 = ReadFullTypeHeader(serializationManager);
-                    return et4.MakeArrayType(4);
-                case SerializationTokenType.Array + 5:
-                    var et5 = ReadFullTypeHeader(serializationManager);
-                    return et5.MakeArrayType(5);
-                case SerializationTokenType.Array + 6:
-                    var et6 = ReadFullTypeHeader(serializationManager);
-                    return et6.MakeArrayType(6);
-                case SerializationTokenType.Array + 7:
-                    var et7 = ReadFullTypeHeader(serializationManager);
-                    return et7.MakeArrayType(7);
-                case SerializationTokenType.Array + 8:
-                    var et8 = ReadFullTypeHeader(serializationManager);
-                    return et8.MakeArrayType(8);
-                case SerializationTokenType.List:
-                    return typeof(List<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.Dictionary:
-                    return typeof(Dictionary<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
-                case SerializationTokenType.KeyValuePair:
-                    return typeof(KeyValuePair<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
-                case SerializationTokenType.Set:
-                    return typeof(HashSet<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.SortedList:
-                    return typeof(SortedList<,>).MakeGenericType(ReadGenericArguments(serializationManager, 2));
-                case SerializationTokenType.SortedSet:
-                    return typeof(SortedSet<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.Stack:
-                    return typeof(Stack<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.Queue:
-                    return typeof(Queue<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.LinkedList:
-                    return typeof(LinkedList<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.Nullable:
-                    return typeof(Nullable<>).MakeGenericType(ReadGenericArguments(serializationManager, 1));
-                case SerializationTokenType.ByteArray:
-                    return typeof(byte[]);
-                case SerializationTokenType.ShortArray:
-                    return typeof(short[]);
-                case SerializationTokenType.IntArray:
-                    return typeof(int[]);
-                case SerializationTokenType.LongArray:
-                    return typeof(long[]);
-                case SerializationTokenType.UShortArray:
-                    return typeof(ushort[]);
-                case SerializationTokenType.UIntArray:
-                    return typeof(uint[]);
-                case SerializationTokenType.ULongArray:
-                    return typeof(ulong[]);
-                case SerializationTokenType.FloatArray:
-                    return typeof(float[]);
-                case SerializationTokenType.DoubleArray:
-                    return typeof(double[]);
-                case SerializationTokenType.CharArray:
-                    return typeof(char[]);
-                case SerializationTokenType.BoolArray:
-                    return typeof(bool[]);
-                case SerializationTokenType.SByteArray:
-                    return typeof(sbyte[]);
-                case SerializationTokenType.NamedType:
-                    var typeName = ReadString();
-                    try
-                    {
-                        return serializationManager.ResolveTypeName(typeName);
-                    }
-                    catch (TypeAccessException ex)
-                    {
-                        throw new TypeAccessException("Named type \"" + typeName + "\" is invalid: " + ex.Message);
-                    }
-                default:
-                    break;
-            }
-
-            throw new SerializationException("Unexpected '" + token + "' found when expecting a type reference");
-        }
-
-        private Type[] ReadGenericArguments(SerializationManager serializationManager, int n)
-        {
-            Trace("About to read {0} generic arguments", n);
-            var args = new Type[n];
-            for (var i = 0; i < n; i++)
-            {
-                args[i] = ReadFullTypeHeader(serializationManager);
-            }
-            Trace("Finished reading {0} generic arguments", n);
-            return args;
-        }
-
-        private StreamWriter trace;
-
-        [Conditional("TRACE_SERIALIZATION")]
-        private void Trace(string format, params object[] args)
-        {
-            if (trace == null)
-            {
-                var path = String.Format("d:\\Trace-{0}.{1}.{2}.txt", DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, DateTime.UtcNow.Ticks);
-                Console.WriteLine("Opening trace file at '{0}'", path);
-                trace = File.CreateText(path);
-            }
-            trace.Write(format, args);
-            trace.WriteLine(" at offset {0}", CurrentPosition);
-            trace.Flush();
         }
     }
 }

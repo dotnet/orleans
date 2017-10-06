@@ -1361,20 +1361,20 @@ namespace Orleans.Runtime
                 return result;
             }
 
-            private static bool ReadBool(BinaryTokenStreamReader stream)
+            private static bool ReadBool(IBinaryTokenStreamReader stream)
             {
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
             private static void WriteObj(ISerializationContext context, Type type, object input)
             {
-                var ser = context.SerializationManager.GetSerializer(type);
+                var ser = context.GetSerializationManager().GetSerializer(type);
                 ser.Invoke(input, context, type);
             }
 
             private static object ReadObj(Type t, IDeserializationContext context)
             {
-                var des = context.SerializationManager.GetDeserializer(t);
+                var des = context.GetSerializationManager().GetDeserializer(t);
                 return des.Invoke(t, context);
             }
         }

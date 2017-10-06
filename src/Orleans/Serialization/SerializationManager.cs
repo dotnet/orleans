@@ -907,7 +907,7 @@ namespace Orleans.Serialization
         public static object DeepCopyInner(object original, ICopyContext context)
         {
             if (original == null) return null;
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
 
             var t = original.GetType();
             var shallow = t.IsOrleansShallowCopyable();
@@ -1080,7 +1080,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="raw">The input data to be serialized.</param>
         /// <param name="stream">The output stream to write to.</param>
-        public void Serialize(object raw, BinaryTokenStreamWriter stream)
+        public void Serialize(object raw, IBinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1119,7 +1119,7 @@ namespace Orleans.Serialization
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, ISerializationContext context, Type expected)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             var writer = context.StreamWriter;
 
             // Nulls get special handling
@@ -1217,7 +1217,7 @@ namespace Orleans.Serialization
                  + ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
-        private static void WriteEnum(object obj, BinaryTokenStreamWriter stream, Type type)
+        private static void WriteEnum(object obj, IBinaryTokenStreamWriter stream, Type type)
         {
             var t = Enum.GetUnderlyingType(type).TypeHandle;
             if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) stream.Write(Convert.ToByte(obj));
@@ -1227,7 +1227,7 @@ namespace Orleans.Serialization
             else throw new NotSupportedException($"Serialization of type {type.GetParseableName()} is not supported.");
         }
 
-        private static object ReadEnum(BinaryTokenStreamReader stream, Type type)
+        private static object ReadEnum(IBinaryTokenStreamReader stream, Type type)
         {
             var t = Enum.GetUnderlyingType(type).TypeHandle;
             if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) return Enum.ToObject(type, stream.ReadByte());
@@ -1421,7 +1421,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public object Deserialize(BinaryTokenStreamReader stream)
+        public object Deserialize(IBinaryTokenStreamReader stream)
         {
             return this.Deserialize(null, stream);
         }
@@ -1432,7 +1432,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">Type to return.</typeparam>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public T Deserialize<T>(BinaryTokenStreamReader stream)
+        public T Deserialize<T>(IBinaryTokenStreamReader stream)
         {
             return (T)this.Deserialize(typeof(T), stream);
         }
@@ -1443,7 +1443,7 @@ namespace Orleans.Serialization
         /// <param name="t">Type to return.</param>
         /// <param name="stream">Input stream.</param>
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
-        public object Deserialize(Type t, BinaryTokenStreamReader stream)
+        public object Deserialize(Type t, IBinaryTokenStreamReader stream)
         {
             var context = this.deserializationContext.Value;
             context.Reset();
@@ -1487,7 +1487,7 @@ namespace Orleans.Serialization
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
         public static object DeserializeInner(Type expected, IDeserializationContext context)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             var previousOffset = context.CurrentObjectOffset;
             var reader = context.StreamReader;
             context.CurrentObjectOffset = context.CurrentPosition;
@@ -1712,7 +1712,7 @@ namespace Orleans.Serialization
             return array;
         }
 
-        private static int[] ReadArrayLengths(int n, BinaryTokenStreamReader stream)
+        private static int[] ReadArrayLengths(int n, IBinaryTokenStreamReader stream)
         {
             var result = new int[n];
             for (var i = 0; i < n; i++)
@@ -1786,7 +1786,7 @@ namespace Orleans.Serialization
 
         internal static Message.HeadersContainer DeserializeMessageHeaders(IDeserializationContext context)
         {
-            var sm = context.SerializationManager;
+            var sm = context.GetSerializationManager();
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
             {
