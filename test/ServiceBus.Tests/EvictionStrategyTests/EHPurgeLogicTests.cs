@@ -59,8 +59,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.telemetryProducer = new NullTelemetryProducer();
         }
 
-        //Disable tests if in netstandard, because Eventhub framework doesn't provide proper hooks for tests to generate proper EventData in netstandard
-#if BUILD_FLAVOR_LEGACY
         [Fact, TestCategory("BVT")]
         public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
         {
@@ -175,7 +173,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out ignore);
 
             //Each cache should have all buffers purged, except for current buffer
-            this.evictionStrategyList.ForEach(strategy => Assert.Equal(1, strategy.InUseBuffers.Count));
+            this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
             var oldBuffersInCaches = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy => {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
@@ -195,9 +193,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //remove old buffer in cache, to get newly allocated buffers after purge
             newBufferAllocated.RemoveAll(buffer => oldBuffersInCaches.Contains(buffer));
             //purged buffer should return to the pool after purge, and used to allocate new buffer
-            expectedPurgedBuffers.ForEach(buffer => Assert.True(newBufferAllocated.Contains(buffer)));
+            expectedPurgedBuffers.ForEach(buffer => Assert.Contains(buffer, newBufferAllocated));
         }
-#endif
 
         private void InitForTesting()
         {
@@ -226,16 +223,25 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             }
             return itemCount;
         }
-        private Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
+        private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
+            await Task.Delay(10);
+            int sequenceNumber = 0;
             while (count > 0)
             {
                 count--;
                 //just to make compiler happy
                 byte[] ignore = { 12, 23 };
-                cache.Add(new EventData(ignore), DateTime.UtcNow);
+                var eventData = new EventData(ignore);
+                DateTime now = DateTime.UtcNow;
+                var offSet = Guid.NewGuid().ToString() + now.ToString();
+                eventData.SetOffset(offSet);
+                //set sequence number
+                eventData.SetSequenceNumber(sequenceNumber++);
+                //set enqueue time
+                eventData.SetEnqueuedTimeUtc(now);
+                cache.Add(eventData, DateTime.UtcNow);
             }
-            return Task.CompletedTask;
         }
 
         private NodeConfiguration GetNodeConfiguration()
