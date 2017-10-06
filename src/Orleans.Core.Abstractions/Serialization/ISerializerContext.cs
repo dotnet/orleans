@@ -27,6 +27,8 @@ namespace Orleans.Serialization
         void RecordCopy(object original, object copy);
 
         object CheckObjectWhileCopying(object raw);
+
+        object DeepCopyInner(object original);
     }
 
     public interface ISerializationContext : ISerializerContext
@@ -46,6 +48,8 @@ namespace Orleans.Serialization
         int CheckObjectWhileSerializing(object raw);
 
         int CurrentOffset { get; }
+
+        void SerializeInner(object obj, Type expected);
     }
 
     public interface IDeserializationContext : ISerializerContext
@@ -84,5 +88,7 @@ namespace Orleans.Serialization
         /// <param name="offset">The offset within <see cref="StreamReader"/>.</param>
         /// <returns>The object from the specified offset.</returns>
         object FetchReferencedObject(int offset);
+
+        object DeserializeInner(Type expected);
     }
 }
