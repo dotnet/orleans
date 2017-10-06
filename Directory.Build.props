@@ -23,7 +23,6 @@
   <!-- Common compile parameters -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <GenerateDocumentationFile Condition="'$(Configuration)'=='Release'">true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
