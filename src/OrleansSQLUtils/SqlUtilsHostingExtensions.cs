@@ -1,16 +1,37 @@
 ﻿using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using OrleansSQLUtils.Configuration;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
-    public static class SqlUtilsServiceCollectionExtensions
+    public static class SqlUtilsHostingExtensions
     {
+        /// <summary>
+        /// Configure SiloHostBuilder with SqlMembership
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseSqlMembership(this ISiloHostBuilder builder,
+            Action<SqlMembershipOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseSqlMembership(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure SiloHostBuilder with SqlMembership
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configuration"></param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseSqlMembership(this ISiloHostBuilder builder,
+            IConfiguration configuration)
+        {
+            return builder.ConfigureServices(services => services.UseSqlMembership(configuration));
+        }
+
         /// <summary>
         /// Configure DI container with SqlMemebership
         /// </summary>

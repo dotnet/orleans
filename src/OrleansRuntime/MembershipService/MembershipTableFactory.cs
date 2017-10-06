@@ -35,36 +35,41 @@ namespace Orleans.Runtime.MembershipService
             this.logger = logger;
         }
 
-        private async Task<IMembershipTable> GetMembershipTableLegacy(GlobalConfiguration globalConfiguration)
+        /// <summary>
+        /// Legacy way to create membership table. Will need to move to a legacy package in the future
+        /// </summary>
+        /// <param name="serviceProvider"></param>
+        /// <returns></returns>
+        internal static IMembershipTable GetMembershipTableLegacy(IServiceProvider serviceProvider)
         {
+            var globalConfiguration = serviceProvider.GetService<GlobalConfiguration>();
+            var logger = serviceProvider.GetService<LoggerWrapper<MembershipTableFactory>>();
             ILegacyMembershipConfigurator configurator = null;
             switch (globalConfiguration.LivenessType)
             {
-                case LivenessProviderType.MembershipTableGrain:
-                    return await this.GetMembershipTableGrain();
                 case LivenessProviderType.SqlServer:
-                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger, this.serviceProvider);
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL, logger, serviceProvider);
                     break;
                 case LivenessProviderType.AzureTable:
-                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger, this.serviceProvider);
+                    configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, serviceProvider);
                     break;
                 case LivenessProviderType.ZooKeeper:
                     configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(
                         Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
-                        this.logger,
-                        this.serviceProvider);
+                        logger,
+                        serviceProvider);
                     break;
                 case LivenessProviderType.Custom:
                     configurator = AssemblyLoader.LoadAndCreateInstance<ILegacyMembershipConfigurator>(
                         globalConfiguration.MembershipTableAssembly,
-                        this.logger,
-                        this.serviceProvider);
+                        logger,
+                        serviceProvider);
                     break;
                 default:
                     break;
             }
 
-            return configurator.Configure();
+            return configurator?.Configure();
         }
 
         internal async Task<IMembershipTable> GetMembershipTable()
@@ -81,14 +86,10 @@ namespace Orleans.Runtime.MembershipService
                 {
                     //if configured through UseGrainBasedMembershipTable method on ISiloHostBuilder, then this won't be null
                     var flag = this.serviceProvider.GetService<UseGrainBasedMembershipFlag>();
-                    if(flag != null)
+                    //if configured through legacy way, then Liveness type will be MembershipTableGrain
+                    var globalConfig = this.serviceProvider.GetService<GlobalConfiguration>();
+                    if(flag != null || globalConfig?.LivenessType == LivenessProviderType.MembershipTableGrain)
                         result = await this.GetMembershipTableGrain();
-                }
-                //if nothing found still, try load membership in the legacy way
-                if (result == null)
-                {
-                    var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                    result = await GetMembershipTableLegacy(globalConfig);
                 }
                 //if still null, throw exception
                 if (result == null)

@@ -1,14 +1,37 @@
 ﻿using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime.Membership;
 using OrleansZooKeeperUtils.Configuration;
 
-namespace Orleans.Runtime.Hosting
+namespace Orleans.Hosting
 {
-    public static class ZooKeeperServiceCollectionExtensions
+    public static class ZooKeeperHostingExtensions
     {
+        /// <summary>
+        /// Configure siloHostBuilder with ZooKeeperMembershipTable
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
+            Action<ZooKeeperMembershipOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseZooKeeperMembership(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure siloHostBuilder with ZooKeeperMembershipTable
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configuration"></param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
+            IConfiguration configuration)
+        {
+            return builder.ConfigureServices(services => services.UseZooKeeperMembership(configuration));
+        }
+
         /// <summary>
         /// Configure DI container with ZooKeeperMemebership
         /// </summary>

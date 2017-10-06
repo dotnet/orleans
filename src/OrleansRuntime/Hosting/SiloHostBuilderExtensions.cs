@@ -1,10 +1,7 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
 {
@@ -81,16 +78,6 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
-        }
-
-        /// <summary>
-        /// Configure silo to use GrainBasedMembership
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <returns></returns>
-        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder)
-        {
-            return builder.ConfigureServices(services => services.TryAddSingleton<UseGrainBasedMembershipFlag>());
         }
     }
 }

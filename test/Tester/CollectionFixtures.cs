@@ -2,7 +2,6 @@
 using Orleans.AzureUtils.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Hosting;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;

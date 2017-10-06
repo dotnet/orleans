@@ -2,7 +2,6 @@
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Orleans.Hosting;
-using Orleans.Runtime.Hosting;
 using Orleans.TestingHost.Utils;
 using UnitTests.MembershipTests;
 using Xunit;
