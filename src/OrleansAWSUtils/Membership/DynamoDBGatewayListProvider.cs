@@ -9,6 +9,8 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using OrleansAWSUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
@@ -17,23 +19,22 @@ namespace Orleans.Runtime.Membership
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansSiloInstances";
 
         private DynamoDBStorage storage;
-        private TimeSpan gatewayListRefreshPeriod;
         private string deploymentId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILoggerFactory loggerFactory;
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory)
+        private readonly DynamoDBGatewayProviderOptions options;
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBGatewayProviderOptions> options)
         {
             this.loggerFactory = loggerFactory;
+            this.options = options.Value;
+            this.deploymentId = clientConfiguration.DeploymentId;
         }
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider(ClientConfiguration conf)
+        public Task InitializeGatewayListProvider()
         {
-            gatewayListRefreshPeriod = conf.GatewayListRefreshPeriod;
-            deploymentId = conf.DeploymentId;
-
-            storage = new DynamoDBStorage(conf.DataConnectionString, loggerFactory);
+            storage = new DynamoDBStorage(options.ConnectionString, loggerFactory);
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
                 {
@@ -76,7 +77,7 @@ namespace Orleans.Runtime.Membership
 
         public TimeSpan MaxStaleness
         {
-            get { return gatewayListRefreshPeriod; }
+            get { return this.options.GatewayListRefreshPeriod; }
         }
 
         public bool IsUpdatable

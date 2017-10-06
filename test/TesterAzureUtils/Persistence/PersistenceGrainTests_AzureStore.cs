@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
@@ -18,6 +19,8 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -39,6 +42,30 @@ namespace Tester.AzureUtils.Persistence
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
+        }
+
+        public static Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseAzureTableGatewayProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                gatewayOptions.GatewayListRefreshPeriod = TimeSpan.FromMinutes(1);
+            })
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
 
         public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
         {

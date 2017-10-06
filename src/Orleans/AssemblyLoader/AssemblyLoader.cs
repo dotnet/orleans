@@ -124,6 +124,20 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Create instance for type T in certain assembly, using its parameterless constructor
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="assemblyName"></param>
+        /// <returns></returns>
+        internal static T CreateInstance<T>(string assemblyName)
+        {
+            var assembly = Assembly.Load(new AssemblyName(assemblyName));
+            var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), null).First();
+
+            return (T)Activator.CreateInstance(foundType, true);
+        }
+
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(

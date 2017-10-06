@@ -73,8 +73,8 @@ namespace Tester.AzureUtils.Persistence
                     providerConfig.AddChildConfiguration(provider2);
                     providerConfig.AddChildConfiguration(provider3);
                 }
-                options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
-                return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+                return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
+                    .UseClientBuilderFactory(ClientBuilderFactory);
             }
         }
 

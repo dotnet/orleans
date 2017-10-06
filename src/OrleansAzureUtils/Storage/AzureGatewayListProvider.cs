@@ -5,25 +5,29 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OrleansAzureUtils.Options;
 
 namespace Orleans.AzureUtils
 {
     internal class AzureGatewayListProvider : IGatewayListProvider
     {
         private OrleansSiloInstanceManager siloInstanceManager;
-        private ClientConfiguration config;
+        private readonly string deploymentId;
+        private readonly AzureTableGatewayProviderOptions options;
         private readonly ILoggerFactory loggerFactory;
-        public AzureGatewayListProvider(ILoggerFactory loggerFactory)
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayProviderOptions> options, ClientConfiguration clientConfiguration)
         {
             this.loggerFactory = loggerFactory;
+            this.deploymentId = clientConfiguration.DeploymentId;
+            this.options = options.Value;
         }
 
         #region Implementation of IGatewayListProvider
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration conf)
+        public async Task InitializeGatewayListProvider()
         {
-            config = conf;
-            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString, this.loggerFactory);
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(this.deploymentId, this.options.ConnectionString, this.loggerFactory);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()
@@ -34,7 +38,7 @@ namespace Orleans.AzureUtils
 
         public TimeSpan MaxStaleness 
         {
-            get { return config.GatewayListRefreshPeriod; }
+            get { return options.GatewayListRefreshPeriod; }
         }
 
         public bool IsUpdatable
