@@ -12,19 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="BondSerializerInstall.ps1">
-      <Pack>true</Pack>
-      <PackagePath>tools\Install.ps1</PackagePath>
-      <Visible>false</Visible>
-    </Content>
-    <Content Include="BondSerializerUninstall.ps1">
-      <Pack>true</Pack>
-      <PackagePath>tools\Uninstall.ps1</PackagePath>
-      <Visible>false</Visible>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Bond.Core.CSharp" Version="$(BondCoreCSharpVersion)" />
   </ItemGroup>
 
