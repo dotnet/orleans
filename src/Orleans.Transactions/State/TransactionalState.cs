@@ -483,7 +483,6 @@ namespace Orleans.Transactions
             return $"{this.context.GrainInstance}.{this.config.StateName}";
         }
 
-        [Serializable]
         private class Metadata
         {
             private static readonly JsonSerializerSettings settings = new JsonSerializerSettings
