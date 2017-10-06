@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Orleans.Serialization
 {
@@ -16,6 +17,11 @@ namespace Orleans.Serialization
             BinaryTokenStreamWriter writer)
         {
             return new SerializationContext.NestedSerializationContext(context, position, writer);
+        }
+
+        public static void SerializeInner<T>(this ISerializationContext @this, T obj)
+        {
+            @this.SerializeInner(obj, typeof(T));
         }
     }
 
@@ -115,6 +121,16 @@ namespace Orleans.Serialization
 
         public override object AdditionalContext => this.SerializationManager.RuntimeClient;
 
+        public object DeepCopyInner(object original)
+        {
+            return SerializationManager.DeepCopyInner(original, this);
+        }
+
+        public void SerializeInner(object obj, Type expected)
+        {
+            SerializationManager.SerializeInner(obj, this, expected);
+        }
+
         internal class NestedSerializationContext : ISerializationContext
         {
             private readonly int initialOffset;
@@ -138,6 +154,7 @@ namespace Orleans.Serialization
             public object AdditionalContext => this.parentContext.ServiceProvider;
             public IBinaryTokenStreamWriter StreamWriter { get; }
             public int CurrentOffset => this.initialOffset + this.StreamWriter.CurrentOffset;
+            public void SerializeInner(object obj, Type expected) => this.parentContext.SerializeInner(obj, expected);
             public void RecordObject(object original, int offset) => this.parentContext.RecordObject(original, offset);
             public int CheckObjectWhileSerializing(object raw) => this.parentContext.CheckObjectWhileSerializing(raw);
         }

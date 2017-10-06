@@ -2229,7 +2229,7 @@ namespace Orleans.Serialization
 
         #region Utilities
 
-        private static Tuple<SerializationManager.Serializer, SerializationManager.Deserializer, SerializationManager.DeepCopier>
+        private static Tuple<Serializer, Deserializer, DeepCopier>
             RegisterConcreteMethods(SerializationManager serializationManager, Type t, string serializerName, string deserializerName, string copierName, Type[] genericArgs = null)
         {
             if (genericArgs == null)
@@ -2239,23 +2239,23 @@ namespace Orleans.Serialization
 
             var genericCopier = typeof(BuiltInTypes).GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == copierName);
             var concreteCopier = genericCopier.MakeGenericMethod(genericArgs);
-            var copier = (SerializationManager.DeepCopier)concreteCopier.CreateDelegate(typeof(SerializationManager.DeepCopier));
+            var copier = (DeepCopier)concreteCopier.CreateDelegate(typeof(DeepCopier));
 
             var genericSerializer = typeof(BuiltInTypes).GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == serializerName);
             var concreteSerializer = genericSerializer.MakeGenericMethod(genericArgs);
-            var serializer = (SerializationManager.Serializer)concreteSerializer.CreateDelegate(typeof(SerializationManager.Serializer));
+            var serializer = (Serializer)concreteSerializer.CreateDelegate(typeof(Serializer));
 
             var genericDeserializer = typeof(BuiltInTypes).GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == deserializerName);
             var concreteDeserializer = genericDeserializer.MakeGenericMethod(genericArgs);
             var deserializer =
-                (SerializationManager.Deserializer)concreteDeserializer.CreateDelegate(typeof(SerializationManager.Deserializer));
+                (Deserializer)concreteDeserializer.CreateDelegate(typeof(Deserializer));
 
             serializationManager.Register(t, copier, serializer, deserializer);
 
-            return new Tuple<SerializationManager.Serializer, SerializationManager.Deserializer, SerializationManager.DeepCopier>(serializer, deserializer, copier);
+            return new Tuple<Serializer, Deserializer, DeepCopier>(serializer, deserializer, copier);
         }
 
-        public static Tuple<SerializationManager.Serializer, SerializationManager.Deserializer, SerializationManager.DeepCopier>
+        public static Tuple<Serializer, Deserializer, DeepCopier>
             RegisterConcreteMethods(SerializationManager serializationManager, Type concreteType, Type definingType, string copierName, string serializerName, string deserializerName, Type[] genericArgs = null)
         {
             if (genericArgs == null)
@@ -2265,20 +2265,20 @@ namespace Orleans.Serialization
 
             var genericCopier = definingType.GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == copierName);
             var concreteCopier = genericCopier.MakeGenericMethod(genericArgs);
-            var copier = (SerializationManager.DeepCopier)concreteCopier.CreateDelegate(typeof(SerializationManager.DeepCopier));
+            var copier = (DeepCopier)concreteCopier.CreateDelegate(typeof(DeepCopier));
 
             var genericSerializer = definingType.GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == serializerName);
             var concreteSerializer = genericSerializer.MakeGenericMethod(genericArgs);
-            var serializer = (SerializationManager.Serializer)concreteSerializer.CreateDelegate(typeof(SerializationManager.Serializer));
+            var serializer = (Serializer)concreteSerializer.CreateDelegate(typeof(Serializer));
 
             var genericDeserializer = definingType.GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == deserializerName);
             var concreteDeserializer = genericDeserializer.MakeGenericMethod(genericArgs);
             var deserializer =
-                (SerializationManager.Deserializer)concreteDeserializer.CreateDelegate(typeof(SerializationManager.Deserializer));
+                (Deserializer)concreteDeserializer.CreateDelegate(typeof(Deserializer));
 
             serializationManager.Register(concreteType, copier, serializer, deserializer);
 
-            return new Tuple<SerializationManager.Serializer, SerializationManager.Deserializer, SerializationManager.DeepCopier>(serializer, deserializer, copier);
+            return new Tuple<Serializer, Deserializer, DeepCopier>(serializer, deserializer, copier);
         }
 
         #endregion
