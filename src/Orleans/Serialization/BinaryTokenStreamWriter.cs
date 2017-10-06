@@ -58,6 +58,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Write header for an <c>Array</c> to the output stream.
         /// </summary>
+        /// <param name="this">The IBinaryTokenStreamReader to read from</param>
         /// <param name="a">Data object for which header should be written.</param>
         /// <param name="expected">The most recent Expected Type currently active for this stream.</param>
         internal static void WriteArrayHeader(this IBinaryTokenStreamWriter @this, Array a, Type expected = null)
