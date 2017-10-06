@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 using Orleans.Runtime;
+using OrleansSQLUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
@@ -13,34 +15,34 @@ namespace Orleans.Runtime.Membership
     {
         private readonly ILogger logger;
         private string deploymentId;
-        private TimeSpan maxStaleness;
+        private readonly SqlGatewayProviderOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
-
-        public SqlGatewayListProvider(ILogger<SqlGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter)
+        private readonly TimeSpan maxStaleness;
+        public SqlGatewayListProvider(ILogger<SqlGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter, ClientConfiguration clientConfiguration,
+            IOptions<SqlGatewayProviderOptions> options)
         {
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
+            this.options = options.Value;
+            deploymentId = clientConfiguration.DeploymentId;
+            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 
         public TimeSpan MaxStaleness
         {
-            get { return maxStaleness; }
+            get { return this.maxStaleness; }
         }
-
 
         public bool IsUpdatable
         {
             get { return true; }
         }
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration config)
+        public async Task InitializeGatewayListProvider()
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.InitializeGatewayListProvider called.");
-
-            deploymentId = config.DeploymentId;
-            maxStaleness = config.GatewayListRefreshPeriod;
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.AdoInvariant, options.ConnectionString, this.grainReferenceConverter);
         }
 
         public async Task<IList<Uri>> GetGateways()

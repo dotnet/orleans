@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,7 @@ using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
 using OrleansAWSUtils;
+using OrleansAWSUtils.Options;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -49,7 +51,11 @@ namespace AWSUtils.Tests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new DynamoDBGatewayListProvider(this.loggerFactory);
+            var options = new DynamoDBGatewayProviderOptions()
+            {
+                ConnectionString = this.connectionString
+            };
+            return new DynamoDBGatewayListProvider(this.loggerFactory, this.clientConfiguration, Options.Create<DynamoDBGatewayProviderOptions>(options));
         }
 
         protected override Task<string> GetConnectionString()

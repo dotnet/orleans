@@ -103,8 +103,6 @@ namespace Orleans
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
-            services.TryAddSingleton<IGatewayListProvider>(
-                sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<StreamProviderManager>();

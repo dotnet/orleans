@@ -143,7 +143,7 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
-            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
+            public Task InitializeGatewayListProvider()
             {
                 return Task.CompletedTask;
             }
