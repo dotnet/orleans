@@ -60,6 +60,7 @@
         Condition="'$(CodeGeneratorEnabled)' != 'true' and Exists('$(OutputFileName)')">
     <ItemGroup>
       <Compile Include="$(OutputFileName)"/>
+      <FileWrites Include="$(OutputFileName)"/>
     </ItemGroup>
   </Target>
 </Project>
