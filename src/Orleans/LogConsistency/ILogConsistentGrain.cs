@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Core;
 
 namespace Orleans.LogConsistency
 {
@@ -42,5 +43,17 @@ namespace Orleans.LogConsistency
     /// <typeparam name="TView">The type of the view</typeparam>
     public class LogConsistentGrainBase<TView> : Grain
     {
+        public LogConsistentGrainBase()
+        {
+        }
+
+        /// <summary>
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        protected LogConsistentGrainBase(IGrainIdentity identity, IGrainRuntime runtime)
+            :base(identity,runtime)
+        {
+        }
     }
 }

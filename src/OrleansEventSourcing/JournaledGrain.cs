@@ -6,6 +6,8 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Storage;
+using Orleans.Core;
+using Orleans.Runtime;
 
 namespace Orleans.EventSourcing
 {
@@ -16,7 +18,16 @@ namespace Orleans.EventSourcing
     /// </summary>
     public abstract class JournaledGrain<TGrainState> : JournaledGrain<TGrainState, object>
         where TGrainState : class, new()
-    { }
+    {
+        protected JournaledGrain() { }
+
+        /// <summary>
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        protected JournaledGrain(IGrainIdentity identity, IGrainRuntime runtime)
+            : base(identity, runtime);
+    }
 
 
     /// <summary>
@@ -34,6 +45,13 @@ namespace Orleans.EventSourcing
         where TEventBase: class
     {
         protected JournaledGrain() { }
+
+        /// <summary>
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        protected JournaledGrain(IGrainIdentity identity, IGrainRuntime runtime)
+            : base(identity, runtime);
 
         /// <summary>
         /// Raise an event.
