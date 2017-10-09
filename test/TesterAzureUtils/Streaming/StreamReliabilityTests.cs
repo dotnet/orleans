@@ -62,7 +62,7 @@ namespace UnitTests.Streaming.Reliability
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
-
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
             return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 

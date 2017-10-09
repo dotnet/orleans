@@ -65,6 +65,8 @@ namespace AWSUtils.Tests.Liveness
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
+            options.ClientConfiguration.CustomGatewayProviderAssemblyName = "OrleansAWSUtils";
             return new TestCluster(options);
         }
 

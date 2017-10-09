@@ -25,6 +25,8 @@ namespace Consul.Tests
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
+            options.ClientConfiguration.CustomGatewayProviderAssemblyName = "OrleansConsulUtils";
             return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 

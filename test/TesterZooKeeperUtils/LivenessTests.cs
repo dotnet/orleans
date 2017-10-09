@@ -24,6 +24,7 @@ namespace Tester.ZooKeeperUtils
             options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
             return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
         }
 
