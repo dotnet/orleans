@@ -92,7 +92,7 @@
     <BenchmarkDotNetVersion>0.10.9</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
-    <xUnitVersion>2.3.0-rc3-build3818</xUnitVersion>
+    <xUnitVersion>2.3.0</xUnitVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
