@@ -173,18 +173,12 @@ namespace Orleans
             return Runtime.ReminderRegistry.GetReminders();
         }
 
-        protected virtual IEnumerable<IStreamProvider> GetStreamProviders()
-        {
-            EnsureRuntime();
-            return Runtime.StreamProviderManager.GetStreamProviders();
-        }
-
         protected virtual IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
             EnsureRuntime();
-            return Runtime.StreamProviderManager.GetProvider(name) as IStreamProvider;
+            return this.ServiceProvider.GetServiceByName<IStreamProvider>(name);
         }
 
         /// <summary>
