@@ -111,7 +111,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
+            services.TryAddSingleton<StreamProviderManager>();
+            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
+            services.TryAddFromExisting<IKeyedServiceCollection<string, IStreamProvider>, StreamProviderManager>(); // as named services
             services.AddFromExisting<IProviderManager, IStreamProviderManager>();
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
