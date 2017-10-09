@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.GrainDirectory;
@@ -21,6 +22,19 @@ namespace Orleans.LogConsistency
     public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<IGrainLifecycle>
 
     {
+        protected LogConsistentGrain()
+        {
+        }
+
+        /// <summary>
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        protected LogConsistentGrain(IGrainIdentity identity, IGrainRuntime runtime)
+            : base(identity, runtime)
+        {
+        }
+
         /// <summary>
         /// called right after grain construction to install the log view adaptor 
         /// </summary>
