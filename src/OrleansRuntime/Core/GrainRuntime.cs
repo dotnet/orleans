@@ -1,8 +1,10 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Core;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Timers;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
@@ -62,6 +64,13 @@ namespace Orleans.Runtime
         public void DelayDeactivation(Grain grain, TimeSpan timeSpan)
         {
             grain.Data.DelayDeactivation(timeSpan);
+        }
+
+        public IStorage<TGrainState> GetStateStorageBridge<TGrainState>(Grain<TGrainState> grain) where TGrainState : new()
+        {
+            IStorageProvider storageProvider = grain.GetStorageProvider(ServiceProvider);
+            string grainTypeName = this.GetType().FullName;
+            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, storageProvider);
         }
     }
 }
