@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
-using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -20,8 +19,8 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
         private FixedSizeBuffer currentBuffer;
-        private ICacheMonitor cacheMonitor;
-        private Timer timer;
+        private readonly ICacheMonitor cacheMonitor;
+        private readonly PeriodicAction periodicMonitoring;
         private long cacheSizeInByte;
 
         /// <summary>
@@ -38,18 +37,22 @@ namespace Orleans.Providers.Streams.Common
             this.logger = logger;
             this.timePurge = timePurage;
             this.inUseBuffers = new Queue<FixedSizeBuffer>();
+
+            // monitoring
             this.cacheMonitor = cacheMonitor;
-            if (cacheMonitor != null && monitorWriteInterval.HasValue)
+            if (this.cacheMonitor != null && monitorWriteInterval.HasValue)
             {
-                this.timer = new Timer(this.ReportCacheSize, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
+                this.periodicMonitoring = new PeriodicAction(monitorWriteInterval.Value, this.ReportCacheSize);
             }
+
             this.cacheSizeInByte = 0;
         }
 
-        private void ReportCacheSize(object state)
+        private void ReportCacheSize()
         {
             this.cacheMonitor.ReportCacheSize(this.cacheSizeInByte);
         }
+
         /// <summary>
         /// Get block pool block id for message
         /// </summary>
@@ -96,8 +99,14 @@ namespace Orleans.Providers.Streams.Common
             this.cacheMonitor?.TrackMemoryAllocated(newBlock.SizeInByte);
         }
 
-        /// <inheritdoc />
         public void PerformPurge(DateTime nowUtc)
+        {
+            PerformPurgeInternal(nowUtc);
+            this.periodicMonitoring?.TryAction(nowUtc);
+        }
+
+        /// <inheritdoc />
+        public void PerformPurgeInternal(DateTime nowUtc)
         {
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.IsEmpty)

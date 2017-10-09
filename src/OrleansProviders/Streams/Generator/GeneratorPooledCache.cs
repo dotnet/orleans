@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using static System.String;
+using System.Linq;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -230,11 +231,10 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime dequeueTimeUtc = DateTime.UtcNow;
-            foreach (IBatchContainer container in messages)
-            {
-                cache.Add(container as GeneratedBatchContainer, dequeueTimeUtc);
-            }
+            List<GeneratedBatchContainer> generatedMessages = messages
+                .Cast<GeneratedBatchContainer>()
+                .ToList();
+            cache.Add(generatedMessages, DateTime.UtcNow);
         }
 
         /// <summary>

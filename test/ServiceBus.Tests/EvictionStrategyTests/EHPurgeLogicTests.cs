@@ -223,25 +223,28 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             }
             return itemCount;
         }
+
         private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
             await Task.Delay(10);
-            int sequenceNumber = 0;
-            while (count > 0)
-            {
-                count--;
-                //just to make compiler happy
-                byte[] ignore = { 12, 23 };
-                var eventData = new EventData(ignore);
-                DateTime now = DateTime.UtcNow;
-                var offSet = Guid.NewGuid().ToString() + now.ToString();
-                eventData.SetOffset(offSet);
-                //set sequence number
-                eventData.SetSequenceNumber(sequenceNumber++);
-                //set enqueue time
-                eventData.SetEnqueuedTimeUtc(now);
-                cache.Add(eventData, DateTime.UtcNow);
-            }
+            List<EventData> messages = Enumerable.Range(0, count)
+                .Select(i => MakeEventData(i))
+                .ToList();
+            cache.Add(messages, DateTime.UtcNow);
+        }
+
+        private EventData MakeEventData(long sequenceNumber)
+        {
+            byte[] ignore = { 12, 23 };
+            var eventData = new EventData(ignore);
+            DateTime now = DateTime.UtcNow;
+            var offSet = Guid.NewGuid().ToString() + now.ToString();
+            eventData.SetOffset(offSet);
+            //set sequence number
+            eventData.SetSequenceNumber(sequenceNumber);
+            //set enqueue time
+            eventData.SetEnqueuedTimeUtc(now);
+            return eventData;
         }
 
         private NodeConfiguration GetNodeConfiguration()

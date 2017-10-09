@@ -219,12 +219,11 @@ namespace Orleans.Providers
         /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime dequeueTimeUtc = DateTime.UtcNow;
-            foreach (IBatchContainer container in messages)
-            {
-                MemoryBatchContainer<TSerializer> memoryBatchContainer = (MemoryBatchContainer<TSerializer>) container;
-                cache.Add(memoryBatchContainer.MessageData, dequeueTimeUtc);
-            }
+            List<MemoryMessageData> memoryMessages = messages
+                .Cast<MemoryBatchContainer<TSerializer>>()
+                .Select(container => container.MessageData)
+                .ToList();
+            cache.Add(memoryMessages, DateTime.UtcNow);
         }
 
         /// <summary>
