@@ -1,47 +1,34 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+﻿using System;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime.Configuration;
-using System;
 
 namespace Orleans.Configuration
 {
-    public static class LegacyConfigurationExtensions
+    internal static class LegacyConfigurationExtensions
     {
-        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services)
+        public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration)
         {
-            // Global configuration
-
-            services.Configure<ClusterConfiguration, SiloMessagingOptions>((configuration, options) =>
+            if (services.Any(service => service.ServiceType == typeof(ClientConfiguration)))
             {
-                CopyCommonMessagingOptions(configuration.Globals, options);
+                throw new InvalidOperationException("Cannot configure legacy ClientConfiguration support twice");
+            }
 
-                options.SiloSenderQueues = configuration.Globals.SiloSenderQueues;
-                options.GatewaySenderQueues = configuration.Globals.GatewaySenderQueues;
-                options.MaxForwardCount = configuration.Globals.MaxForwardCount;
-                options.ClientDropTimeout = configuration.Globals.ClientDropTimeout;
-            });
+            // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
+            services.TryAddSingleton(configuration);
+            services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+            services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
 
-            services.Configure<ClusterConfiguration, SerializationProviderOptions>((configuration, options) =>
-            {
-                options.SerializationProviders = configuration.Globals.SerializationProviders;
-                options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
-            });
-
-            return services;
-        }
-
-        public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services)
-        {
-            // Global configuration
-
-            services.Configure<ClientConfiguration, ClientMessagingOptions>((configuration, options) =>
+            // Translate legacy configuration to new Options
+            services.Configure<ClientMessagingOptions>(options =>
             {
                 CopyCommonMessagingOptions(configuration, options);
 
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
 
-            services.Configure<ClientConfiguration, SerializationProviderOptions>((configuration, options) =>
+            services.Configure<SerializationProviderOptions>(options =>
             {
                 options.SerializationProviders = configuration.SerializationProviders;
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
@@ -50,7 +37,7 @@ namespace Orleans.Configuration
             return services;
         }
 
-        private static void CopyCommonMessagingOptions(IMessagingConfiguration configuration, MessagingOptions options)
+        internal static void CopyCommonMessagingOptions(IMessagingConfiguration configuration, MessagingOptions options)
         {
             options.OpenConnectionTimeout = configuration.OpenConnectionTimeout;
             options.ResponseTimeout = configuration.ResponseTimeout;
@@ -61,16 +48,6 @@ namespace Orleans.Configuration
             options.BufferPoolBufferSize = configuration.BufferPoolBufferSize;
             options.BufferPoolMaxSize = configuration.BufferPoolMaxSize;
             options.BufferPoolPreallocationSize = configuration.BufferPoolPreallocationSize;
-        }
-
-        private static void Configure<TConfiguration, TOptions>(this IServiceCollection services, Action<TConfiguration, TOptions> configureOptions) where TOptions : class
-        {
-            services.AddSingleton<IConfigureOptions<TOptions>>(serviceProvider =>
-            {
-                var configuration = serviceProvider.GetRequiredService<TConfiguration>();
-
-                return new ConfigureOptions<TOptions>(options => configureOptions(configuration, options));
-            });
         }
     }
 }

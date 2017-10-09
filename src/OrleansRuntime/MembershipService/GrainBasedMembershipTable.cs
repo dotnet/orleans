@@ -1,28 +1,113 @@
+using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.MultiCluster;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
-    //empty marker class inject into DI to see if user configure Silo to use MembershiptableGrain
-    internal class UseGrainBasedMembershipFlag
+    internal class GrainBasedMembershipTable : IMembershipTable
     {
+        private readonly IServiceProvider serviceProvider;
+        private readonly Logger logger;
+        private IMembershipTableGrain grain;
+
+        public GrainBasedMembershipTable(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
+        {
+            this.serviceProvider = serviceProvider;
+            this.logger = logger;
+        }
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        {
+            this.grain = await GetMembershipTableGrain();
+        }
+
+        private async Task<IMembershipTableGrain> GetMembershipTableGrain()
+        {
+            // TODO: this could be replaced with strongly typed options for configuring grain based membership
+            var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();
+            var isPrimarySilo = siloDetails.Type == Silo.SiloType.Primary;
+            if (isPrimarySilo)
+            {
+                this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
+                var catalog = this.serviceProvider.GetRequiredService<Catalog>();
+                await catalog.CreateSystemGrain(
+                    Constants.SystemMembershipTableId,
+                    typeof(GrainBasedMembershipTableGrain).FullName);
+            }
+
+            var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
+            var result = grainFactory.GetGrain<IMembershipTableGrain>(Constants.SystemMembershipTableId);
+
+            if (isPrimarySilo)
+            {
+                await this.WaitForTableGrainToInit(result);
+            }
+
+            return result;
+        }
+
+        // Only used with MembershipTableGrain to wait for primary to start.
+        private async Task WaitForTableGrainToInit(IMembershipTableGrain membershipTableGrain)
+        {
+            var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
+            // This is a quick temporary solution to enable primary node to start fully before secondaries.
+            // Secondary silos waits untill GrainBasedMembershipTable is created. 
+            for (int i = 0; i < 100; i++)
+            {
+                try
+                {
+                    await membershipTableGrain.ReadAll().WithTimeout(timespan);
+                    logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
+                    return;
+                }
+                catch (Exception exc)
+                {
+                    var type = exc.GetBaseException().GetType();
+                    if (type == typeof(TimeoutException) || type == typeof(OrleansException))
+                    {
+                        logger.Info(
+                            ErrorCode.MembershipTableGrainInit3,
+                            "-Waiting for membership table provider to initialize. Going to sleep for {0} and re-try to reconnect.",
+                            timespan);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.MembershipTableGrainInit4, "-Membership table provider failed to initialize. Giving up.");
+                        throw;
+                    }
+                }
+
+                await Task.Delay(timespan);
+            }
+        }
+
+        public Task DeleteMembershipTableEntries(string deploymentId) => this.grain.DeleteMembershipTableEntries(deploymentId);
+
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key);
+
+        public Task<MembershipTableData> ReadAll() => this.grain.ReadAll();
+
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => this.grain.InsertRow(entry, tableVersion);
+
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => this.grain.UpdateRow(entry, etag, tableVersion);
+
+        public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
     }
 
     [Reentrant]
     [OneInstancePerCluster]
-    internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
+    internal class GrainBasedMembershipTableGrain : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;
         private ILogger logger;
 
         public override Task OnActivateAsync()
         {
-            logger = this.ServiceProvider.GetRequiredService<ILogger<GrainBasedMembershipTable>>();
+            logger = this.ServiceProvider.GetRequiredService<ILogger<GrainBasedMembershipTableGrain>>();
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
             table = new InMemoryMembershipTable(this.ServiceProvider.GetRequiredService<SerializationManager>());
             return Task.CompletedTask;

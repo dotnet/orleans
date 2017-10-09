@@ -35,7 +35,6 @@ namespace Orleans.Hosting
             this.serviceProviderBuilder.ConfigureServices(
                 (context, services) =>
                 {
-                    services.TryAddSingleton<SiloInitializationParameters>();
                     services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
                 });
             this.serviceProviderBuilder.ConfigureServices(DefaultSiloServices.AddDefaultServices);
