@@ -23,7 +23,7 @@ namespace Orleans
     {
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
-        private ClientConfiguration clientConfiguration;
+        private bool clientConfigurationRegistered;
 
         /// <inheritdoc />
         public IClusterClient Build()
@@ -32,15 +32,11 @@ namespace Orleans
             this.built = true;
             
             // Configure default services and build the container.
-            this.serviceProviderBuilder.ConfigureServices(
-                (context, services) =>
-                {
-                    services.TryAddSingleton(this.clientConfiguration ?? ClientConfiguration.StandardLoad());
-                    services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
-                    // register legacy configuration to new options mapping for Client options
-                    services.AddLegacyClientConfigurationSupport();
-                    services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
-                });
+            if (!this.clientConfigurationRegistered)
+            {
+                this.UseConfiguration(ClientConfiguration.StandardLoad());
+            }
+
             this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
 
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(null);
@@ -55,8 +51,10 @@ namespace Orleans
         public IClientBuilder UseConfiguration(ClientConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            if (this.clientConfiguration != null) throw new InvalidOperationException("Base configuration has already been specified and cannot be overridden.");
-            this.clientConfiguration = configuration;
+            if (this.clientConfigurationRegistered) throw new InvalidOperationException("Base configuration has already been specified and cannot be overridden.");
+            this.clientConfigurationRegistered = true;
+
+            this.serviceProviderBuilder.ConfigureServices((context, services) => services.AddLegacyClientConfigurationSupport(configuration));
             return this;
         }
 

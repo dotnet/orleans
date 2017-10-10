@@ -45,19 +45,7 @@ namespace Orleans.Hosting
 
             // Register system services.
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
-            services.TryAddFromExisting<ILocalSiloDetails, SiloInitializationParameters>();
-            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
-            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
-            services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
-            services.TryAddSingleton<Factory<NodeConfiguration>>(
-                sp =>
-                {
-                    var initializationParams = sp.GetRequiredService<SiloInitializationParameters>();
-                    return () => initializationParams.NodeConfig;
-                });
-            services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
-            // register legacy configuration to new options mapping for Silo options
-            services.AddLegacyClusterConfigurationSupport();
+
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
                 //
@@ -74,7 +62,6 @@ namespace Orleans.Hosting
                     options.GatewaySenderQueues = Environment.ProcessorCount;
                 }
             });
-            services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 

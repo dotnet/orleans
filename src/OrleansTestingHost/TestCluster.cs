@@ -96,9 +96,10 @@ namespace Orleans.TestingHost
 
         internal Type siloBuilderFactoryType;
 
-        public void UseSiloBuilderFactory<TSiloBuilderFactory>() where TSiloBuilderFactory : ISiloBuilderFactory, new()
+        public TestCluster UseSiloBuilderFactory<TSiloBuilderFactory>() where TSiloBuilderFactory : ISiloBuilderFactory, new()
         {
             this.siloBuilderFactoryType = typeof(TSiloBuilderFactory);
+            return this;
         }
 
         /// <summary>

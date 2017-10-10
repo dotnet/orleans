@@ -36,10 +36,11 @@ namespace UnitTests.MembershipTests
         private readonly Logger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
-        private readonly string deploymentId;
+        protected readonly string deploymentId;
+        protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
+        protected GlobalConfiguration globalConfiguration;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
-
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
@@ -51,8 +52,8 @@ namespace UnitTests.MembershipTests
             logger.Info("DeploymentId={0}", deploymentId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
-
-            var globalConfiguration = new GlobalConfiguration
+            this.connectionString = fixture.ConnectionString;
+            globalConfiguration = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
                 AdoInvariant = GetAdoInvariant(),
@@ -60,7 +61,7 @@ namespace UnitTests.MembershipTests
             };
 
             membershipTable = CreateMembershipTable(logger);
-            membershipTable.InitializeMembershipTable(globalConfiguration, true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
             var clientConfiguration = new ClientConfiguration
             {

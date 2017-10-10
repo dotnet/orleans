@@ -6,14 +6,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -47,7 +47,6 @@ namespace UnitTests.Streaming.Reliability
 
             this.numExpectedSilos = 2;
             var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
@@ -63,8 +62,24 @@ namespace UnitTests.Streaming.Reliability
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
 
-            return new TestCluster(options);
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         public StreamReliabilityTests(ITestOutputHelper output)

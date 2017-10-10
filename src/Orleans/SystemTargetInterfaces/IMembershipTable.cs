@@ -17,9 +17,8 @@ namespace Orleans
         /// <summary>
         /// Initializes the membership table, will be called before all other methods
         /// </summary>
-        /// <param name="globalConfiguration">the give global configuration</param>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
-        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion);
+        Task InitializeMembershipTable(bool tryInitTableVersion);
 
         /// <summary>
         /// Deletes all table entries of the given deploymentId

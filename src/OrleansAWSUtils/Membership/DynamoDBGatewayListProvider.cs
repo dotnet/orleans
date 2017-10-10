@@ -3,13 +3,14 @@ using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime.Membership
 {
     internal class DynamoDBGatewayListProvider : IGatewayListProvider
     {

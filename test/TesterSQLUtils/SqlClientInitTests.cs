@@ -38,7 +38,6 @@ namespace Tester.SQLUtils
 
                 return new TestCluster(options);
             }
-
         }
 
         static string statisticProviderName = "SQL";

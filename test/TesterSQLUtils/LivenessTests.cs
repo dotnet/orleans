@@ -2,9 +2,13 @@
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
+using OrleansSQLUtils.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -22,7 +26,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster();
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]

@@ -1,6 +1,8 @@
 ﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -20,12 +22,27 @@ namespace Consul.Tests
 
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansConsulUtils";
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
+            options.ClientConfiguration.CustomGatewayProviderAssemblyName = "OrleansConsulUtils";
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseConsulMembership(options =>
+                    {
+                        options.ConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

@@ -1,13 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
 {
     /// <summary>
     /// Extensions for <see cref="ISiloHostBuilder"/> instances.
     /// </summary>
-    public static class SiloBuilderExtensions
+    public static class CoreHostingExtensions
     {
         /// <summary>
         /// Configures the name of this silo.
@@ -30,7 +31,10 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
-            return builder.ConfigureServices(services => services.AddSingleton(configuration));
+            return builder.ConfigureServices((context, services) =>
+            {
+                services.AddLegacyClusterConfigurationSupport(configuration);
+            });
         }
 
         /// <summary>
@@ -56,6 +60,22 @@ namespace Orleans.Hosting
         {
             builder.ConfigureSiloName(Silo.PrimarySiloName);
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
+        }
+
+        /// <summary>
+        /// Configure silo to use GrainBasedMembership
+        /// </summary>
+        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices(services => services.UseGrainBasedMembership());
+        }
+
+        /// <summary>
+        /// Configure silo to use Grain-based membership
+        /// </summary>
+        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services)
+        {
+            return services.AddSingleton<IMembershipTable, GrainBasedMembershipTable>();
         }
     }
 }

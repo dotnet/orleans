@@ -1,4 +1,10 @@
-﻿using TestExtensions;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.AzureUtils.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 
 namespace Tester
@@ -16,6 +22,22 @@ namespace Tester
         {
             base.CheckPreconditionsOrThrow();
             TestUtils.CheckForAzureStorage();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+            }
         }
     }
 }

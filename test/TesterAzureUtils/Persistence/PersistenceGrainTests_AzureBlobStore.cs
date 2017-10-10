@@ -32,7 +32,6 @@ namespace Tester.AzureUtils.Persistence
                 Guid serviceId = Guid.NewGuid();
                 var options = new TestClusterOptions(initialSilosCount: 4);
                 options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
                 options.ClusterConfiguration.Globals.ServiceId = serviceId;
 
@@ -64,8 +63,8 @@ namespace Tester.AzureUtils.Persistence
                     providerConfig.AddChildConfiguration(provider2);
                     providerConfig.AddChildConfiguration(provider3);
                 }
-
-                return new TestCluster(options);
+                options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
+                return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
             }
         }
 

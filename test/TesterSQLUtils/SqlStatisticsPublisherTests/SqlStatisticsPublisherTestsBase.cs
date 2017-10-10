@@ -6,12 +6,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Providers.SqlServer;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost.Utils;
+using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
@@ -70,15 +72,17 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
         {
-            GlobalConfiguration config = new GlobalConfiguration
+
+            var options = new SqlMembershipOptions()
             {
-                DeploymentId = "statisticsDeployment",
                 AdoInvariant = AdoInvariant,
-                DataConnectionString = ConnectionString
+                ConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory.CreateLogger<SqlMembershipTable>());
-            await mbr.InitializeMembershipTable(config, true).WithTimeout(TimeSpan.FromMinutes(1));
+            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
+                this.environment.Services.GetRequiredService<GlobalConfiguration>(), Options.Create<SqlMembershipOptions>(options), 
+                this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));
         }

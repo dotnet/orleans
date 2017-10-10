@@ -34,7 +34,7 @@ namespace Tester
                 // Try initializing the cluster, verify that it fails.
                 config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
                 config.Globals.MembershipTableAssembly = "NonExistentAssembly.jpg";
-
+                
                 var siloHost = CreateSiloHost(appDomain, config);
                 siloHost.InitializeOrleansSilo();
 
