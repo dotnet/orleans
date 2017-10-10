@@ -771,7 +771,7 @@ namespace Orleans.Runtime
                 // 9:
                 SafeExecute(() =>
                 {                
-                    var siloStreamProviderManager = (StreamProviderManager) runtimeClient.CurrentStreamProviderManager;
+                    var siloStreamProviderManager = (StreamProviderManager) StreamProviderManager;
                     scheduler.QueueTask(() => siloStreamProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
                 });
