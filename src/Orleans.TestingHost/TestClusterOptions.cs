@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -148,7 +149,21 @@ namespace Orleans.TestingHost
         {
             this.SiloBuilderFactoryType = typeof(TSiloBuilderFactory);
         }
-        
+
+        /// <summary>
+        /// Default client builder factory
+        /// </summary>
+        public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config)
+			.AddApplicationPartsFromAppDomain()
+            .AddApplicationPartsFromBasePath()
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
+
+        /// <summary>
+        /// Factory delegate to create a client builder which will be used to build the <see cref="TestCluster"/> client. 
+        /// </summary>
+        public Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory { get; set; } = DefaultClientBuilderFactory;
+
         /// <summary>Build a cluster configuration.</summary>
         /// <param name="baseSiloPort">Base port number to use for silos</param>
         /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>
