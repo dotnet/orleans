@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval"></param>
+        /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
         public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);

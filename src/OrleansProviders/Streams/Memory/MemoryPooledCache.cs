@@ -25,7 +25,7 @@ namespace Orleans.Providers
         /// <param name="logger"></param>
         /// <param name="serializer"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval"></param>
+        /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
         public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, Logger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);

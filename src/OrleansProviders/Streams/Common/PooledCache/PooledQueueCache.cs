@@ -74,7 +74,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="comparer"></param>
         /// <param name="logger"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="cacheMonitorWriteInterval">cache monitor write interval</param>
+        /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
         public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             if (cacheDataAdapter == null)

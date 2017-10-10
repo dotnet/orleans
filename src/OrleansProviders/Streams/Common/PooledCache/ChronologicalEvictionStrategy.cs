@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger"></param>
         /// <param name="timePurage"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval"></param>
+        /// <param name="monitorWriteInterval">"Interval to write periodic statistics.  Only triggered for active caches.</param>
         protected ChronologicalEvictionStrategy(Logger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             if (logger == null) throw new ArgumentException(nameof(logger));
@@ -99,14 +99,14 @@ namespace Orleans.Providers.Streams.Common
             this.cacheMonitor?.TrackMemoryAllocated(newBlock.SizeInByte);
         }
 
+        /// <inheritdoc />
         public void PerformPurge(DateTime nowUtc)
         {
             PerformPurgeInternal(nowUtc);
             this.periodicMonitoring?.TryAction(nowUtc);
         }
 
-        /// <inheritdoc />
-        public void PerformPurgeInternal(DateTime nowUtc)
+        private void PerformPurgeInternal(DateTime nowUtc)
         {
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.IsEmpty)

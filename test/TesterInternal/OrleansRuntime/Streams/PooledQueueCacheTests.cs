@@ -286,7 +286,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     SequenceNumber = sequenceNumber + i
                 })
                 .ToList();
-                cache.Add(messages, DateTime.UtcNow);
+                cache.Add(moreMessages, DateTime.UtcNow);
                 sequenceNumber += MessagesPerBuffer;
 
                 // walk all the events in the stream using the cursor
