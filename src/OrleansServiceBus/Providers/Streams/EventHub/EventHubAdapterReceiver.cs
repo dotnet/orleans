@@ -107,13 +107,18 @@ namespace Orleans.ServiceBus.Providers
             var watch = Stopwatch.StartNew();
             try
             {
-                checkpointer = await checkpointerFactory(settings.Partition);
-                cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
-                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
-                string offset = await checkpointer.Load();
+                this.checkpointer = await checkpointerFactory(settings.Partition);
+                if (this.cache != null)
+                {
+                    this.cache.Dispose();
+                    this.cache = null;
+                }
+                this.cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
+                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.getNodeConfig) };
+                string offset = await this.checkpointer.Load();
                 receiver = await this.eventHubReceiverFactory(settings, offset, logger);
                 watch.Stop();
-                monitor?.TrackInitialization(true, watch.Elapsed, null);
+                this.monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {

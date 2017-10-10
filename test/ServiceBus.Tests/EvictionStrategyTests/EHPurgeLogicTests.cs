@@ -226,16 +226,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             }
             return itemCount;
         }
-        private Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
+
+        private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
-            while (count > 0) 
-            { 
-                count--;
-                //just to make compiler happy
-                byte[] ignore = { 12, 23 };
-                cache.Add(new EventData(ignore), DateTime.UtcNow);
-            }
-            return Task.CompletedTask;
+            await Task.Delay(10);
+            byte[] ignore = { 12, 23 };
+            List<EventData> messages = Enumerable.Range(1, count)
+                .Select(i => new EventData(ignore))
+                .ToList();
+            cache.Add(messages, DateTime.UtcNow);
         }
 
         private NodeConfiguration GetNodeConfiguration()
