@@ -125,16 +125,6 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Add an Eventhub EventData to the cache
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="dequeueTimeUtc"></param>
-        /// <returns></returns>
-        public StreamPosition Add(EventData message, DateTime dequeueTimeUtc)
-        {
-            return cache.Add(message, dequeueTimeUtc);
-        }
-        /// <summary>
         /// Add a list of EventHub EventData to the cache.
         /// </summary>
         /// <param name="messages"></param>

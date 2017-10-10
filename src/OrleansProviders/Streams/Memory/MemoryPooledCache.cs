@@ -25,7 +25,7 @@ namespace Orleans.Providers
         /// <param name="logger"></param>
         /// <param name="serializer"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval"></param>
+        /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
         public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, Logger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
@@ -219,12 +219,11 @@ namespace Orleans.Providers
         /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime dequeueTimeUtc = DateTime.UtcNow;
-            foreach (IBatchContainer container in messages)
-            {
-                MemoryBatchContainer<TSerializer> memoryBatchContainer = (MemoryBatchContainer<TSerializer>) container;
-                cache.Add(memoryBatchContainer.MessageData, dequeueTimeUtc);
-            }
+            List<MemoryMessageData> memoryMessages = messages
+                .Cast<MemoryBatchContainer<TSerializer>>()
+                .Select(container => container.MessageData)
+                .ToList();
+            cache.Add(memoryMessages, DateTime.UtcNow);
         }
 
         /// <summary>
