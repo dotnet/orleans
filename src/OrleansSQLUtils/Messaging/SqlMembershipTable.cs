@@ -14,12 +14,12 @@ namespace Orleans.Runtime.MembershipService
         private string deploymentId;        
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
-        private readonly SqlMembershipOptions membershipTableoptions;
+        private readonly SqlMembershipOptions membershipTableOptions;
         public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter, GlobalConfiguration globalConfig, IOptions<SqlMembershipOptions> membershipTableoptions, ILogger<SqlMembershipTable> logger)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;
-            this.membershipTableoptions = membershipTableoptions.Value;
+            this.membershipTableOptions = membershipTableoptions.Value;
             deploymentId = globalConfig.DeploymentId;
         }
 
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.MembershipService
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(membershipTableoptions.AdoInvariant, membershipTableoptions.ConnectionString, this.grainReferenceConverter);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(membershipTableOptions.AdoInvariant, membershipTableOptions.ConnectionString, this.grainReferenceConverter);
             
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,

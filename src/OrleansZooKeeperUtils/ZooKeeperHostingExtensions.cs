@@ -9,24 +9,24 @@ namespace Orleans.Hosting
     public static class ZooKeeperHostingExtensions
     {
         /// <summary>
-        /// Configure siloHostBuilder with ZooKeeperMembershipTable
+        /// Configure siloHostBuilder with ZooKeeperMembership
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
+        public static ISiloHostBuilder UseZooKeeperMembership(this ISiloHostBuilder builder,
             Action<ZooKeeperMembershipOptions> configureOptions)
         {
             return builder.ConfigureServices(services => services.UseZooKeeperMembership(configureOptions));
         }
 
         /// <summary>
-        /// Configure siloHostBuilder with ZooKeeperMembershipTable
+        /// Configure siloHostBuilder with ZooKeeperMembership
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static ISiloHostBuilder UseZooKeeperMembershipTable(this ISiloHostBuilder builder,
+        public static ISiloHostBuilder UseZooKeeperMembership(this ISiloHostBuilder builder,
             IConfiguration configuration)
         {
             return builder.ConfigureServices(services => services.UseZooKeeperMembership(configuration));

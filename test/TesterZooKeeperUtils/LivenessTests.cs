@@ -35,7 +35,7 @@ namespace Tester.ZooKeeperUtils
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseZooKeeperMembershipTable(options =>
+                    .UseZooKeeperMembership(options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
