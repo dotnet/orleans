@@ -102,6 +102,16 @@ namespace Orleans.TestingHost
             return this;
         }
 
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory;
+        /// <summary>
+        /// Set client builder factory, which would create a client builder to build the <see cref="TestCluster"/> client.
+        /// </summary>
+        public TestCluster UseClientBuilderFactory(Func<ClientConfiguration, IClientBuilder> clientBuilderFactory)
+        {
+            this.clientBuilderFactory = clientBuilderFactory;
+            return this;
+        }
+
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -117,6 +127,7 @@ namespace Orleans.TestingHost
             : this(options.ClusterConfiguration, options.ClientConfiguration)
         {
             this.siloBuilderFactoryType = options.SiloBuilderFactoryType;
+            this.clientBuilderFactory = options.ClientBuilderFactory;
         }
 
         /// <summary>
@@ -458,9 +469,7 @@ namespace Orleans.TestingHost
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
 
-            this.InternalClient = (IInternalClusterClient)new ClientBuilder()
-                .UseConfiguration(clientConfig)
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clientConfig.TraceFileName)).Build();
+            this.InternalClient = (IInternalClusterClient)this.clientBuilderFactory(clientConfig).Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
