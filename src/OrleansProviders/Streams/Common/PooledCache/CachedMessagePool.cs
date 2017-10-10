@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.Common
         public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage, DateTime dequeueTimeUtc, out StreamPosition streamPosition)
         {
             streamPosition = default(StreamPosition);
-            if (queueMessage == null) throw new ArgumentNullException("queueMessage");
+            if (queueMessage == null) throw new ArgumentNullException(nameof(queueMessage));
 
             CachedMessageBlock<TCachedMessage> returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
             streamPosition = returnBlock.Add(queueMessage, dequeueTimeUtc, dataAdapter);
