@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Orleans.ServiceFabric.Utilities
@@ -23,6 +26,21 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
             try
             {
                 this.host?.StopOrleansSilo();
+            }
+            catch
+            {
+                // Ignore.
+            }
+
+            this.host?.UnInitializeOrleansSilo();
+        }
+
+        public async Task ShutdownAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (this.host != null)
+                    await this.host.ShutdownOrleansSiloAsync(cancellationToken);
             }
             catch
             {
