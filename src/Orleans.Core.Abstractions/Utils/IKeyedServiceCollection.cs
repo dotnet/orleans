@@ -13,12 +13,7 @@ namespace Orleans.Runtime
         TService GetService(IServiceProvider services, TKey key);
     }
 
-    public interface IKeyedService<TKey, out TService> : IEquatable<TKey>
-    {
-        TService GetService(IServiceProvider services);
-    }
-
-    public static class KeyedServiceExtensions
+    public static class KeyedServiceCollectionExtensions
     {
         /// <summary>
         /// Acquire a service by key.
@@ -29,7 +24,6 @@ namespace Orleans.Runtime
             IKeyedServiceCollection<TKey, TService> collection = (IKeyedServiceCollection<TKey, TService>) services.GetService(typeof(IKeyedServiceCollection<TKey, TService>));
             return collection?.GetService(services, key);
         }
-
 
         /// <summary>
         /// Acquire a service by name.

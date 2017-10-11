@@ -6,6 +6,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Runtime
 {
+    public interface IKeyedService<TKey, out TService> : IEquatable<TKey>
+    {
+        TService GetService(IServiceProvider services);
+    }
+
     public class KeyedService<TKey, TService, TInstance> : IKeyedService<TKey, TService>
             where TInstance : TService
     {
