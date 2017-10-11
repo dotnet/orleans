@@ -69,7 +69,7 @@ namespace Orleans.Runtime
         public IStorage<TGrainState> GetStateStorageBridge<TGrainState>(Grain<TGrainState> grain) where TGrainState : new()
         {
             IStorageProvider storageProvider = grain.GetStorageProvider(ServiceProvider);
-            string grainTypeName = this.GetType().FullName;
+            string grainTypeName = grain.GetType().FullName;
             return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, storageProvider);
         }
     }
