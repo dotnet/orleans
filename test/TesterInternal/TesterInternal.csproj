@@ -22,18 +22,18 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
-    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
     <ProjectReference Include="..\..\src\OrleansCounterControl\OrleansCounterControl.csproj" />
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="App.config" />
-    <Content Include="..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml" Link="ClientConfigurationForTesting.xml">
+    <Content Include="..\..\src\Orleans.TestingHost\ClientConfigurationForTesting.xml" Link="ClientConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml" Link="OrleansConfigurationForTesting.xml">
+    <Content Include="..\..\src\Orleans.TestingHost\OrleansConfigurationForTesting.xml" Link="OrleansConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="TesterInternal.xunit.runner.json">

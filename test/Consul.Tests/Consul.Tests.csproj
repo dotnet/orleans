@@ -11,8 +11,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\OrleansConsulUtils\OrleansConsulUtils.csproj" />
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Membership.Consul\Orleans.Membership.Consul.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
   </ItemGroup>
