@@ -6,7 +6,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Pool of tightly packed cached messages that are kept in large blocks to reduce GC pressure.
     /// </summary>
-    /// <typeparam name="TQueueMessage"></typeparam>
+    /// <typeparam name="TQueueMessage">Type of message read from the queue</typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed structure.  Struct should contain only value types.</typeparam>
     internal class CachedMessagePool<TQueueMessage, TCachedMessage>
         where TCachedMessage : struct
@@ -21,11 +21,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cacheDataAdapter"></param>
         public CachedMessagePool(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter)
         {
-            if (cacheDataAdapter == null)
-            {
-                throw new ArgumentNullException(nameof(cacheDataAdapter));
-            }
-            dataAdapter = cacheDataAdapter;
+            dataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
             messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(
                 () => new CachedMessageBlock<TCachedMessage>());
         }
@@ -40,20 +36,18 @@ namespace Orleans.Providers.Streams.Common
         public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage, DateTime dequeueTimeUtc, out StreamPosition streamPosition)
         {
             streamPosition = default(StreamPosition);
-            if (queueMessage == null)
-            {
-                throw new ArgumentNullException("queueMessage");
-            }
+            if (queueMessage == null) throw new ArgumentNullException(nameof(queueMessage));
 
-            // allocate new cached message block if needed
-            if (currentMessageBlock == null || !currentMessageBlock.HasCapacity)
+            CachedMessageBlock<TCachedMessage> returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
+            streamPosition = returnBlock.Add(queueMessage, dequeueTimeUtc, dataAdapter);
+
+            // blocks at capacity are eligable for purge, so we don't want to be holding on to them.
+            if (!currentMessageBlock.HasCapacity)
             {
                 currentMessageBlock = messagePool.Allocate();
             }
 
-            streamPosition = currentMessageBlock.Add(queueMessage, dequeueTimeUtc, dataAdapter);
-
-            return currentMessageBlock;
+            return returnBlock;
         }
     }
 }
