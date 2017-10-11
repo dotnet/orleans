@@ -16,7 +16,6 @@ namespace Orleans.Runtime
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
             IReminderRegistry reminderRegistry,
-            IStreamProviderManager streamProviderManager,
             IServiceProvider serviceProvider,
             ISiloRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
@@ -28,7 +27,6 @@ namespace Orleans.Runtime
             GrainFactory = grainFactory;
             TimerRegistry = timerRegistry;
             ReminderRegistry = reminderRegistry;
-            StreamProviderManager = streamProviderManager;
             ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
         }
@@ -44,8 +42,6 @@ namespace Orleans.Runtime
         public ITimerRegistry TimerRegistry { get; }
         
         public IReminderRegistry ReminderRegistry { get; }
-        
-        public IStreamProviderManager StreamProviderManager { get; }
 
         public IServiceProvider ServiceProvider { get; }
 

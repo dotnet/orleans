@@ -5,10 +5,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal class StreamProviderManager : IStreamProviderManager
+    internal class StreamProviderManager : IStreamProviderManager, IKeyedServiceCollection<string, IStreamProvider>
     {
         private ProviderLoader<IStreamProviderImpl> appStreamProviders;
         public StreamProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
@@ -89,6 +90,11 @@ namespace Orleans.Streams
         public IProvider GetProvider(string name)
         {
             return appStreamProviders.GetProvider(name);
+        }
+
+        public IStreamProvider GetService(IServiceProvider services, string key)
+        {
+            return GetProvider(key) as IStreamProvider;
         }
     }
 }

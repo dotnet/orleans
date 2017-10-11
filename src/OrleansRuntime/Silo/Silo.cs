@@ -109,7 +109,7 @@ namespace Orleans.Runtime
         internal ILogConsistencyProviderManager LogConsistencyProviderManager { get { return logConsistencyProviderManager; } }
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
-        internal IStreamProviderManager StreamProviderManager { get { return grainRuntime.StreamProviderManager; } }
+        internal IStreamProviderManager StreamProviderManager { get; private set; }
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal ICatalog Catalog => catalog;
@@ -245,6 +245,7 @@ namespace Orleans.Runtime
 
             // GrainRuntime can be created only here, after messageCenter was created.
             grainRuntime = Services.GetRequiredService<IGrainRuntime>();
+            StreamProviderManager = Services.GetRequiredService<IStreamProviderManager>();
 
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
@@ -478,7 +479,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Log consistency provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
-            var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
+            var siloStreamProviderManager = (StreamProviderManager) this.Services.GetRequiredService<IStreamProviderManager>();
             scheduler.QueueTask(
                 () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, siloProviderRuntime),
                     providerManagerSystemTarget.SchedulingContext)
@@ -771,7 +772,7 @@ namespace Orleans.Runtime
                 // 9:
                 SafeExecute(() =>
                 {                
-                    var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
+                    var siloStreamProviderManager = (StreamProviderManager) StreamProviderManager;
                     scheduler.QueueTask(() => siloStreamProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
                 });

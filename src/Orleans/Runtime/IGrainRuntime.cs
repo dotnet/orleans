@@ -31,8 +31,6 @@ namespace Orleans.Runtime
 
         IReminderRegistry ReminderRegistry { get; }
 
-        IStreamProviderManager StreamProviderManager { get; }
-
         IServiceProvider ServiceProvider { get; }
 
         //TODO: Mark it as [Obsolete] after all runtime has migrated
