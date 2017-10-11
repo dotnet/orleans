@@ -8,6 +8,7 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -65,11 +66,17 @@ namespace AWSUtils.Tests.Liveness
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
-            options.ClientConfiguration.CustomGatewayProviderAssemblyName = "OrleansAWSUtils";
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
+                .UseClientBuilderFactory(clientBuilderFactory);
         }
 
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseDynamoDBGatewayProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = ConnectionString;
+                gatewayOptions.GatewayListRefreshPeriod = TimeSpan.FromMinutes(1);
+            })
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
         public class SiloBuilderFactory : ISiloBuilderFactory
         {
             public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)

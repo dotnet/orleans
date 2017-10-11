@@ -3,8 +3,12 @@ using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
+using Orleans.Configuration.Options;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace Orleans
 {
@@ -128,6 +132,30 @@ namespace Orleans
         public static IClientBuilder ConfigureLogging(this IClientBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
+        }
+
+        /// <summary>
+        /// Configure the client to use StaticGatewayProvider
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static IClientBuilder UseStaticGatewayProvider(this IClientBuilder builder, Action<StaticGatewayProviderOptions> configureOptions)
+        {
+            return builder.ConfigureServices(collection =>
+                collection.UseStaticGatewayProvider(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure the client to use StaticGatewayProvider
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configuration"></param>
+        /// <returns></returns>
+        public static IClientBuilder UseStaticGatewayProvider(this IClientBuilder builder, IConfiguration configuration)
+        {
+            return builder.ConfigureServices(collection =>
+                collection.UseStaticGatewayProvider(configuration));
         }
     }
 }

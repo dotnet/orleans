@@ -34,16 +34,16 @@ namespace Orleans.Runtime.MembershipService
                     configurator = new LegacyGrainBasedMembershipConfigurator();
                     break;
                 case LivenessProviderType.SqlServer:
-                    configurator = GetConfigurator(Constants.ORLEANS_SQL_UTILS_DLL);
+                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
                     break;
                 case LivenessProviderType.AzureTable:
-                    configurator = GetConfigurator(Constants.ORLEANS_AZURE_UTILS_DLL);
+                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL);
                     break;
                 case LivenessProviderType.ZooKeeper:
-                    configurator = GetConfigurator(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
+                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
                     break;
                 case LivenessProviderType.Custom:
-                    configurator = GetConfigurator(configuration.MembershipTableAssembly);
+                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(configuration.MembershipTableAssembly);
                     break;
                 default:
                     break;
@@ -51,15 +51,6 @@ namespace Orleans.Runtime.MembershipService
 
             configurator?.ConfigureServices(configuration, services);
         }
-
-        private static ILegacyMembershipConfigurator GetConfigurator(string assemblyName)
-        {
-            var assembly = Assembly.Load(new AssemblyName(assemblyName));
-            var foundType = TypeUtils.GetTypes(assembly, type => typeof(ILegacyMembershipConfigurator).IsAssignableFrom(type), null).First();
-
-            return (ILegacyMembershipConfigurator)Activator.CreateInstance(foundType, true);
-        }
-
         private class LegacyGrainBasedMembershipConfigurator : ILegacyMembershipConfigurator
         {
             public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)

@@ -41,6 +41,7 @@ namespace UnitTests.MembershipTests
         protected ILoggerFactory loggerFactory;
         protected GlobalConfiguration globalConfiguration;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
+        protected readonly ClientConfiguration clientConfiguration;
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
@@ -63,7 +64,7 @@ namespace UnitTests.MembershipTests
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
-            var clientConfiguration = new ClientConfiguration
+            clientConfiguration = new ClientConfiguration
             {
                 DeploymentId = globalConfiguration.DeploymentId,
                 AdoInvariant = globalConfiguration.AdoInvariant,
@@ -71,7 +72,7 @@ namespace UnitTests.MembershipTests
             };
 
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
