@@ -6,20 +6,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Runtime
 {
-    /// <summary>
-    /// Collection of services that can be disambiguated by key
-    /// </summary>
-    public interface IKeyedServiceCollection<in TKey, out TService>
-        where TService : class
-    {
-        TService GetService(IServiceProvider services, TKey key);
-    }
-
-    public interface IKeyedService<TKey, out TService> : IEquatable<TKey>
-    {
-        TService GetService(IServiceProvider services);
-    }
-
     public class KeyedService<TKey, TService, TInstance> : IKeyedService<TKey, TService>
             where TInstance : TService
     {
@@ -48,19 +34,8 @@ namespace Orleans.Runtime
         }
     }
 
-    public static class KeyedServiceExtensions
+    public static class TransientKeyedServiceExtensions
     {
-        /// <summary>
-        /// Acquire a service by key.
-        /// </summary>
-        public static TService GetServiceByKey<TKey, TService>(this IServiceProvider services, TKey key)
-            where TService : class
-        {
-            IKeyedServiceCollection<TKey, TService> collection = services.GetService<IKeyedServiceCollection<TKey, TService>>();
-            return collection?.GetService(services, key);
-        }
-
-
         /// <summary>
         /// Register a transient keyed service
         /// </summary>
@@ -70,16 +45,6 @@ namespace Orleans.Runtime
             collection.TryAddTransient<TInstance>();
             collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key));
         }
-
-        /// <summary>
-        /// Acquire a service by name.
-        /// </summary>
-        public static TService GetServiceByName<TService>(this IServiceProvider services, string name)
-            where TService : class
-        {
-            return services.GetServiceByKey<string,TService>(name);
-        }
-
 
         /// <summary>
         /// Register a transient named service
