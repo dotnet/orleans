@@ -328,7 +328,7 @@ namespace Orleans
         {
             if (ct.IsCancellationRequested)
                 return;
-            this.storage = this.Runtime.GetStateStorageBridge(this);
+            this.storage = this.Runtime.GetStateStorageBridge<TGrainState>(this);
             Stopwatch sw = Stopwatch.StartNew();
             try
             {

@@ -43,6 +43,6 @@ namespace Orleans.Runtime
 
         void DelayDeactivation(Grain grain, TimeSpan timeSpan);
 
-        IStorage<TGrainState> GetStateStorageBridge<TGrainState>(Grain<TGrainState> grain) where TGrainState : new();
+        IStorage<TGrainState> GetStateStorageBridge<TGrainState>(Grain grain) where TGrainState : new();
     }
 }
