@@ -322,20 +322,20 @@ namespace Orleans
         {
             if (ct.IsCancellationRequested)
                 return;
-            IStorageProvider storageProvider = this.GetStorageProvider(this.ServiceProvider);
-            string grainTypeName = this.GetType().FullName;
-            this.storage = new StateStorageBridge<TGrainState>(grainTypeName, this.GrainReference, storageProvider);
+            this.storage = this.Runtime.GetStorage<TGrainState>(this);
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
                 await this.ReadStateAsync();
                 sw.Stop();
-                StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
+                // TODO: find a way to reenable StorageStatisticsGroup here
+                //StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
             }
             catch (Exception)
             {
                 sw.Stop();
-                StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
+                // TODO: find a way to reenable StorageStatisticsGroup here
+                //StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
                 throw;
             }
         }
