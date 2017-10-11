@@ -1,9 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
 using Orleans.CodeGeneration;
 
-[assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("UnitTests")]
 
 [assembly: SkipCodeGeneration]

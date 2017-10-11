@@ -1,3 +1,0 @@
-namespace Orleans.Runtime.Messaging
-{
-}
