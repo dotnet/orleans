@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.TelemetryConsumers.Counters</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Performance Counters</Title>
     <Description>Microsoft Windows Performance Counters implementation of Orleans Telemetry API.</Description>
   </PropertyGroup>

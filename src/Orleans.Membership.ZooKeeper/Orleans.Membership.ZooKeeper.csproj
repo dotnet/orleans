@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Membership.ZooKeeper</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansZooKeeperUtils</PackageId>
     <Title>Microsoft Orleans ZooKeeper Utilities</Title>
     <Description>Library of utility types for ZooKeeper of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) ZooKeeper</PackageTags>

@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Streaming.EventHubs</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
     <Title>Microsoft Orleans EventHubs Provider</Title>
     <Description>Library of utility types for Microsoft Azure EventHubs of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>

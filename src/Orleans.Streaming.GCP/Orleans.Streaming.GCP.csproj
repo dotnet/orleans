@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Streaming.GCP</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansGCPUtils</PackageId>
     <Title>Microsoft Orleans Google Cloud Platform Utilities</Title>
     <Description>Library of utility types for Google Cloud Platform of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags)</PackageTags>

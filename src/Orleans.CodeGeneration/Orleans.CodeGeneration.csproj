@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansCodeGeneration</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansCodeGenerator</PackageId>
     <Title>Microsoft Orleans Code Generation</Title>
     <Description>Runtime and compile-time code generation support for Microsoft Orleans.</Description>
   </PropertyGroup>

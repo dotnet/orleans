@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.CodeGeneration.Build</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansCodeGenerator.Build</PackageId>
     <Title>Microsoft Orleans Build-time Code Generator</Title>
     <Description>Microsoft Orleans build-time code generator to install in all grain interface &amp; implementation projects.</Description>
   </PropertyGroup>
@@ -23,12 +23,12 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <Content Include="build\Microsoft.Orleans.CodeGeneration.Build.targets">
+    <Content Include="build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets">
       <Pack>true</Pack>
       <PackagePath>%(Identity)</PackagePath>
       <Visible>true</Visible>
     </Content>
-    <Content Include="buildMultiTargeting\Microsoft.Orleans.CodeGeneration.Build.targets">
+    <Content Include="buildMultiTargeting\Microsoft.Orleans.OrleansCodeGenerator.Build.targets">
       <Pack>true</Pack>
       <PackagePath>%(Identity)</PackagePath>
       <Visible>true</Visible>

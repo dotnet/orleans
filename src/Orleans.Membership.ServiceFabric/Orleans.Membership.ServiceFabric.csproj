@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Membership.ServiceFabric</PackageId>
+    <PackageId>Microsoft.Orleans.ServiceFabric</PackageId>
     <Title>Microsoft Orleans Service Fabric Support</Title>
     <Description>Support for hosting Microsoft Orleans on Service Fabric.</Description>
     <PackageTags>$(PackageTags) Azure ServiceFabric</PackageTags>

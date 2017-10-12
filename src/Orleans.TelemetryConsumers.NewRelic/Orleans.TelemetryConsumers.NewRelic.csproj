@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.TelemetryConsumers.NewRelic</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
     <Description>NewRelic implementation of Orleans Telemetry API.</Description>
     <PackageTags>$(PackageTags) NewRelic</PackageTags>

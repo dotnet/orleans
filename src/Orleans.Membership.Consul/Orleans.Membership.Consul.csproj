@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Membership.Consul</PackageId>
+    <PackageId>Microsoft.Orleans.OrleansConsulUtils</PackageId>
     <Title>Microsoft Orleans Membership Consul</Title>
     <Description>Library of utility types for Consul of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Consul</PackageTags>
