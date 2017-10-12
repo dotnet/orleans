@@ -103,7 +103,7 @@ namespace Orleans
         {
             var runtime = context.ServiceProvider.GetService(typeof(IGrainCancellationTokenRuntime)) as IGrainCancellationTokenRuntime;
             var reader = context.StreamReader;
-            var cancellationRequested = reader.ReadToken() == SerializationTokenType.True;
+            var cancellationRequested = reader.ReadBoolean();
             var tokenId = reader.ReadGuid();
             return new GrainCancellationToken(tokenId, cancellationRequested, runtime);
         }
