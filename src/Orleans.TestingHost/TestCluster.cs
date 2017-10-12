@@ -146,6 +146,7 @@ namespace Orleans.TestingHost
             this.ClusterConfiguration = clusterConfiguration;
             this.ClientConfiguration = clientConfiguration;
             this.UseSiloBuilderFactory<DefaultSiloBuilderFactory>();
+            this.UseClientBuilderFactory(TestClusterOptions.DefaultClientBuilderFactory);
         }
 
         /// <summary>
