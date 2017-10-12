@@ -16,8 +16,8 @@
     <ProjectReference Include="..\..\src\Orleans.Transactions.Azure\Orleans.Transactions.Azure.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
-    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>

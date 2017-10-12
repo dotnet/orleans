@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Microsoft.Orleans.Transactions.Azure</AssemblyName>
+    <AssemblyName>Orleans.Transactions.Azure</AssemblyName>
     <RootNamespace>Orleans.Transactions.Azure</RootNamespace>
   </PropertyGroup>
 
