@@ -15,14 +15,6 @@ namespace Orleans
     [Serializable]
     public sealed class GrainCancellationToken : IDisposable
     {
-#region cancelCallProperties
-        private const int MaxNumCancelErrorTries = 3;
-        private readonly TimeSpan _cancelCallMaxWaitTime = TimeSpan.FromSeconds(30);
-        private readonly IBackoffProvider _cancelCallBackoffProvider = new FixedBackoff(TimeSpan.FromSeconds(1));
-        private readonly Func<Exception, int, bool> _cancelCallRetryExceptionFilter =
-            (exception, i) => exception is GrainExtensionNotInstalledException;
-#endregion
-
         [NonSerialized]
         private readonly CancellationTokenSource _cancellationTokenSource;
 
@@ -31,6 +23,8 @@ namespace Orleans
         /// </summary>
         [NonSerialized]
         private readonly ConcurrentDictionary<GrainId, GrainReference> _targetGrainReferences;
+
+        private IGrainCancellationTokenRuntime _cancellationTokenRuntime;
 
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
@@ -46,8 +40,9 @@ namespace Orleans
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
         /// </summary>
-        internal GrainCancellationToken(Guid id, bool canceled) : this(id)
+        internal GrainCancellationToken(Guid id, bool canceled, IGrainCancellationTokenRuntime runtime = null) : this(id)
         {
+            _cancellationTokenRuntime = runtime;
             if (canceled)
             {
                 // we Cancel _cancellationTokenSource just "to store" the cancelled state.
@@ -69,41 +64,20 @@ namespace Orleans
 
         internal Task Cancel()
         {
-            // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
-            // but also cancel _targetGrainReferences. 
-            Task task = OrleansTaskExtentions.WrapInTask(_cancellationTokenSource.Cancel);
-
-            if (_targetGrainReferences.IsEmpty)
+            if (_cancellationTokenRuntime == null)
             {
-                return task;
+                _cancellationTokenSource.Cancel();
+                return Task.CompletedTask;
             }
 
-            var cancellationTasks = _targetGrainReferences
-                 .Select(pair => pair.Value.AsReference<ICancellationSourcesExtension>())
-                 .Select(CancelTokenWithRetries)
-                 .ToList();
-            cancellationTasks.Add(task);
-
-            return Task.WhenAll(cancellationTasks);
+            return _cancellationTokenRuntime.Cancel(Id, _cancellationTokenSource, _targetGrainReferences);
         }
 
-        internal void AddGrainReference(GrainReference grainReference)
+        internal void AddGrainReference(IGrainCancellationTokenRuntime runtime, GrainReference grainReference)
         {
+            if (_cancellationTokenRuntime == null)
+                _cancellationTokenRuntime = runtime;
             _targetGrainReferences.TryAdd(grainReference.GrainId, grainReference);
-        }
-
-        // There might be races between cancelling of the token and it's actual arriving to the target grain
-        // as token on arriving causes installing of GCT extension, and without such extension the cancelling 
-        // attempt will result in GrainExtensionNotInstalledException exception which shows
-        // existence of race condition, so just retry in that case. 
-        private Task CancelTokenWithRetries(ICancellationSourcesExtension tokenExtension)
-        {
-            return AsyncExecutorWithRetries.ExecuteWithRetries(
-                i => tokenExtension.CancelRemoteToken(Id),
-                MaxNumCancelErrorTries,
-                _cancelCallRetryExceptionFilter,
-                _cancelCallMaxWaitTime,
-                _cancelCallBackoffProvider);
         }
 
         /// <inheritdoc />
@@ -127,17 +101,19 @@ namespace Orleans
         [DeserializerMethod]
         internal static object DeserializeGrainCancellationToken(Type expected, IDeserializationContext context)
         {
+            var runtime = context.ServiceProvider.GetService(typeof(IGrainCancellationTokenRuntime)) as IGrainCancellationTokenRuntime;
             var reader = context.StreamReader;
             var cancellationRequested = reader.ReadToken() == SerializationTokenType.True;
             var tokenId = reader.ReadGuid();
-            return new GrainCancellationToken(tokenId, cancellationRequested);
+            return new GrainCancellationToken(tokenId, cancellationRequested, runtime);
         }
 
         [CopierMethod]
         internal static object CopyGrainCancellationToken(object obj, ICopyContext context)
         {
+            var runtime = context.ServiceProvider.GetService(typeof(IGrainCancellationTokenRuntime)) as IGrainCancellationTokenRuntime;
             var gct = (GrainCancellationToken) obj;
-            return new GrainCancellationToken(gct.Id, gct.IsCancellationRequested);
+            return new GrainCancellationToken(gct.Id, gct.IsCancellationRequested, runtime);
         }
 
         #endregion

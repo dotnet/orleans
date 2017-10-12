@@ -18,6 +18,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime = new GrainCancellationTokenRuntime();
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
@@ -224,12 +225,12 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="arguments"> Grain method arguments list</param>
         /// <param name="target"> Target grain reference</param>
-        private static void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
+        private void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
         {
             if (arguments == null) return;
             foreach (var argument in arguments)
             {
-                (argument as GrainCancellationToken)?.AddGrainReference(target);
+                (argument as GrainCancellationToken)?.AddGrainReference(this.cancellationTokenRuntime, target);
             }
         }
 
