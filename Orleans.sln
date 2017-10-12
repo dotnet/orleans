@@ -10,47 +10,47 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Versions", "Versions", "{91
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Benchmarks", "Benchmarks", "{2CAB7894-777C-42B1-8B1E-322868CE92C7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans", "src\Orleans\Orleans.csproj", "{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core", "src\Orleans.Core\Orleans.Core.csproj", "{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCodeGenerator", "src\OrleansCodeGenerator\OrleansCodeGenerator.csproj", "{8D937706-F6DA-4D33-B0A9-24A260BD3080}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGeneration", "src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj", "{8D937706-F6DA-4D33-B0A9-24A260BD3080}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansRuntime", "src\OrleansRuntime\OrleansRuntime.csproj", "{8D33951F-683E-4513-8D7D-FB45206C9607}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Runtime", "src\Orleans.Runtime\Orleans.Runtime.csproj", "{8D33951F-683E-4513-8D7D-FB45206C9607}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansProviders", "src\OrleansProviders\OrleansProviders.csproj", "{5BF79424-C1FB-4583-8295-5F86C3150431}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansClientMetaPackage", "src\OrleansClientMetaPackage\OrleansClientMetaPackage.csproj", "{41455AD4-0448-4BA0-B3E3-B115C1D68B0F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Client", "src\Orleans.Client\Orleans.Client.csproj", "{41455AD4-0448-4BA0-B3E3-B115C1D68B0F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansServerMetaPackage", "src\OrleansServerMetaPackage\OrleansServerMetaPackage.csproj", "{F44C4499-AF49-4746-9702-1EB7D3C9B773}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Server", "src\Orleans.Server\Orleans.Server.csproj", "{F44C4499-AF49-4746-9702-1EB7D3C9B773}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAWSUtils", "src\OrleansAWSUtils\OrleansAWSUtils.csproj", "{96AA7AEE-BDD9-4B12-9F15-D2BCCCFE1580}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "src\OrleansAzureUtils\OrleansAzureUtils.csproj", "{549F3A9B-582F-4AAB-8CD9-425F1A3CCDDE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansBondUtils", "src\OrleansBondUtils\OrleansBondUtils.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Bond", "src\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansConsulUtils", "src\OrleansConsulUtils\OrleansConsulUtils.csproj", "{2C8AAE89-C0E3-4FD3-89DA-BA0593EDBE06}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.Consul", "src\Orleans.Membership.Consul\Orleans.Membership.Consul.csproj", "{2C8AAE89-C0E3-4FD3-89DA-BA0593EDBE06}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansEventSourcing", "src\OrleansEventSourcing\OrleansEventSourcing.csproj", "{187AB6FA-B34B-482B-AF4F-E0A82C196BEE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.EventSourcing", "src\Orleans.EventSourcing\Orleans.EventSourcing.csproj", "{187AB6FA-B34B-482B-AF4F-E0A82C196BEE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansGoogleUtils", "src\OrleansGoogleUtils\OrleansGoogleUtils.csproj", "{CD7707C0-F70A-4121-B980-D4ABD410C5E2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{CD7707C0-F70A-4121-B980-D4ABD410C5E2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansPSUtils", "src\OrleansPSUtils\OrleansPSUtils.csproj", "{E9F3FF2F-E3B6-4227-A91E-3E65BD8AB894}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.PowerShell", "src\Orleans.PowerShell\Orleans.PowerShell.csproj", "{E9F3FF2F-E3B6-4227-A91E-3E65BD8AB894}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansServiceBus", "src\OrleansServiceBus\OrleansServiceBus.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansServiceFabricUtils", "src\OrleansServiceFabricUtils\OrleansServiceFabricUtils.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.ServiceFabric", "src\Orleans.Membership.ServiceFabric\Orleans.Membership.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansSQLUtils", "src\OrleansSQLUtils\OrleansSQLUtils.csproj", "{3CBF459A-C43F-40B7-8F96-2B44D55840C5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTelemetryConsumers.AI", "src\OrleansTelemetryConsumers.AI\OrleansTelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTelemetryConsumers.Counters", "src\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj", "{2EA4E3CD-60AF-499B-86A5-A2C102C33893}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.Counters", "src\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj", "{2EA4E3CD-60AF-499B-86A5-A2C102C33893}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTelemetryConsumers.NewRelic", "src\OrleansTelemetryConsumers.NewRelic\OrleansTelemetryConsumers.NewRelic.csproj", "{F409A36D-3571-470E-980A-3229FC252781}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.NewRelic", "src\Orleans.TelemetryConsumers.NewRelic\Orleans.TelemetryConsumers.NewRelic.csproj", "{F409A36D-3571-470E-980A-3229FC252781}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTestingHost", "src\OrleansTestingHost\OrleansTestingHost.csproj", "{9BCF7A12-6A5B-43FF-828A-A804F9B9DBB4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost", "src\Orleans.TestingHost\Orleans.TestingHost.csproj", "{9BCF7A12-6A5B-43FF-828A-A804F9B9DBB4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansZooKeeperUtils", "src\OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.ZooKeeper", "src\Orleans.Membership.ZooKeeper\Orleans.Membership.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
 EndProject
@@ -110,23 +110,23 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharpInterfaces", "tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansManager", "src\OrleansManager\OrleansManager.csproj", "{1153256E-10C2-4729-ACDC-5DF18A7B92B5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansGCPUtils", "src\OrleansGCPUtils\OrleansGCPUtils.csproj", "{6E5860C5-44E7-415C-80D6-3ECF15A80796}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.GCP", "src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj", "{6E5860C5-44E7-415C-80D6-3ECF15A80796}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "test\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{EBD697E3-91BE-4844-B3F0-6997300A8C12}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Logging.Legacy", "src\Logging.Legacy\Logging.Legacy.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Logging.Legacy", "src\Orleans.Logging.Legacy\Orleans.Logging.Legacy.csproj", "{0A5009BF-C7D2-463B-BF39-34E1F5EF2F23}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClientGenerator", "src\ClientGenerator\ClientGenerator.csproj", "{345B12A5-C5F3-4AFC-84AA-A8CC00F8D511}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGeneration.Build", "src\Orleans.CodeGeneration.Build\Orleans.CodeGeneration.Build.csproj", "{345B12A5-C5F3-4AFC-84AA-A8CC00F8D511}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "bootstrap", "bootstrap", "{DA143BBE-5D97-4792-8E36-44A3FA727C74}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bootstrap", "Bootstrap", "{DA143BBE-5D97-4792-8E36-44A3FA727C74}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Bootstrap", "src\BootstrapBuild\Orleans\Orleans.Bootstrap.csproj", "{0CCA4C5C-1D31-4AA9-A7AF-90DD63C16F5B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Bootstrap", "src\BootstrapBuild\Orleans.Core\Orleans.Core.Bootstrap.csproj", "{0CCA4C5C-1D31-4AA9-A7AF-90DD63C16F5B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClientGenerator.Bootstrap", "src\BootstrapBuild\ClientGenerator\ClientGenerator.Bootstrap.csproj", "{F7D70028-7E3B-48E3-92B9-DB889AE5ABD1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGeneration.Build.Bootstrap", "src\BootstrapBuild\Orleans.CodeGeneration.Build\Orleans.CodeGeneration.Build.Bootstrap.csproj", "{F7D70028-7E3B-48E3-92B9-DB889AE5ABD1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCodeGenerator.Bootstrap", "src\BootstrapBuild\OrleansCodeGenerator\OrleansCodeGenerator.Bootstrap.csproj", "{9B07237D-651C-497D-9E8D-EADC8FAF26FF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGeneration.Bootstrap", "src\BootstrapBuild\Orleans.CodeGeneration\Orleans.CodeGeneration.Bootstrap.csproj", "{9B07237D-651C-497D-9E8D-EADC8FAF26FF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src\Orleans.Transactions\Orleans.Transactions.csproj", "{072B1B88-FE98-4354-86FA-AB6EF80EB9C4}"
 EndProject

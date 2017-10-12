@@ -77,7 +77,7 @@ namespace Tester
             var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig};
 
             return (SiloHost)appDomain.CreateInstanceFromAndUnwrap(
-                "OrleansRuntime.dll",
+                "Orleans.Runtime.dll",
                 typeof(SiloHost).FullName,
                 false,
                 BindingFlags.Default,

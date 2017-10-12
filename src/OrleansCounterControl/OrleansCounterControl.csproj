@@ -19,9 +19,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
-    <ProjectReference Include="..\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj" />
   </ItemGroup>
 
   <ItemGroup>
