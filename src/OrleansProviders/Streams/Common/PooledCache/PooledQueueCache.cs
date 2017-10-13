@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -31,7 +32,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
         private int itemCount;
@@ -75,7 +76,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
-        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
+        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, ILogger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             if (cacheDataAdapter == null)
             {
@@ -91,7 +92,7 @@ namespace Orleans.Providers.Streams.Common
             }
             this.cacheDataAdapter = cacheDataAdapter;
             this.comparer = comparer;
-            this.logger = logger.GetSubLogger("messagecache", "-");
+            this.logger = logger;
             this.itemCount = 0;
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();

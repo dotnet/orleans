@@ -1,6 +1,6 @@
 ﻿using Orleans.Runtime;
 using System;
-
+using Microsoft.Extensions.Logging;
 namespace Orleans.Providers.GCP
 {
     internal enum GoogleErrorCode
@@ -16,39 +16,34 @@ namespace Orleans.Providers.GCP
 
     internal static class LoggerExtensions
     {
-        internal static void Verbose(this Logger logger, GoogleErrorCode errorCode, string format, params object[] args)
+        internal static void Debug(this ILogger logger, GoogleErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose, format, args, null);
+            logger.LogDebug((int)errorCode, format, args);
         }
 
-        internal static void Verbose2(this Logger logger, GoogleErrorCode errorCode, string format, params object[] args)
+        internal static void Trace(this ILogger logger, GoogleErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose2, format, args, null);
+            logger.LogTrace((int)errorCode, format, args);
         }
 
-        internal static void Verbose3(this Logger logger, GoogleErrorCode errorCode, string format, params object[] args)
+        internal static void Info(this ILogger logger, GoogleErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Verbose3, format, args, null);
+            logger.LogInformation((int)errorCode, format, args);
         }
 
-        internal static void Info(this Logger logger, GoogleErrorCode errorCode, string format, params object[] args)
+        internal static void Warn(this ILogger logger, GoogleErrorCode errorCode, string format, params object[] args)
         {
-            logger.Log((int)errorCode, Severity.Info, format, args, null);
+            logger.LogWarning((int)errorCode, format, args);
         }
 
-        internal static void Warn(this Logger logger, GoogleErrorCode errorCode, string format, params object[] args)
+        internal static void Warn(this ILogger logger, GoogleErrorCode errorCode, string message, Exception exception)
         {
-            logger.Log((int)errorCode, Severity.Warning, format, args, null);
+            logger.LogWarning((int)errorCode, exception, message);
         }
 
-        internal static void Warn(this Logger logger, GoogleErrorCode errorCode, string message, Exception exception)
+        internal static void Error(this ILogger logger, GoogleErrorCode errorCode, string message, Exception exception = null)
         {
-            logger.Log((int)errorCode, Severity.Warning, message, new object[] { }, exception);
-        }
-
-        internal static void Error(this Logger logger, GoogleErrorCode errorCode, string message, Exception exception = null)
-        {
-            logger.Log((int)errorCode, Severity.Error, message, new object[] { }, exception);
+            logger.LogError((int)errorCode, exception, message);
         }
     }
 }

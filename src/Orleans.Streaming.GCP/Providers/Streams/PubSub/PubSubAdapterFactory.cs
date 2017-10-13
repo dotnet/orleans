@@ -5,7 +5,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Threading.Tasks;
-
+using Microsoft.Extensions.Logging;
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
     public class PubSubAdapterFactory<TDataAdapter> : IQueueAdapterFactory
@@ -22,7 +22,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private HashRingBasedStreamQueueMapper _streamQueueMapper;
         private IQueueAdapterCache _adapterCache;
         private Func<TDataAdapter> _adaptorFactory;
-        private Logger _logger;
+        private ILoggerFactory loggerFactory;
 
         /// <summary>
         /// Gets the serialization manager.
@@ -34,7 +34,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
+        public virtual void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             if (!config.Properties.TryGetValue(PubSubAdapterConstants.PROJECT_ID, out _projectId))
@@ -44,7 +44,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (!config.Properties.TryGetValue(PubSubAdapterConstants.DEPLOYMENT_ID, out _deploymentId))
                 throw new ArgumentException($"{PubSubAdapterConstants.DEPLOYMENT_ID} property not set");
 
-            _logger = logger;
+            loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
             config.Properties.TryGetValue(PubSubAdapterConstants.CUSTOM_ENDPOINT, out _customEndpoint);
 
@@ -80,7 +80,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             _providerName = providerName;
             _streamQueueMapper = new HashRingBasedStreamQueueMapper(_numSubscriptions, providerName);
-            _adapterCache = new SimpleQueueAdapterCache(_cacheSize, logger);
+            _adapterCache = new SimpleQueueAdapterCache(_cacheSize, loggerFactory);
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
@@ -93,7 +93,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), SerializationManager, _logger, _streamQueueMapper, 
+            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), SerializationManager, this.loggerFactory, _streamQueueMapper, 
                 _projectId, _topicId, _deploymentId, _providerName, _deadline, _customEndpoint);
             return Task.FromResult<IQueueAdapter>(adapter);
         }

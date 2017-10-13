@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -16,19 +17,19 @@ namespace Orleans.Providers.Streams.Common
         public const string CacheSizePropertyName = "CacheSize";
 
         private readonly int cacheSize;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         /// <summary>
         /// Adapter for simple queue caches
         /// </summary>
         /// <param name="cacheSize"></param>
-        /// <param name="logger"></param>
-        public SimpleQueueAdapterCache(int cacheSize, Logger logger)
+        /// <param name="loggerFactory"></param>
+        public SimpleQueueAdapterCache(int cacheSize, ILoggerFactory loggerFactory)
         {
             if (cacheSize <= 0)
                 throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
             this.cacheSize = cacheSize;
-            this.logger = logger;
+            this.logger = loggerFactory.CreateLogger<SimpleQueueAdapterCache>();
         }
 
         /// <summary>

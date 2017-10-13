@@ -13,6 +13,8 @@ using Microsoft.Azure.EventHubs;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
@@ -28,7 +30,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private EventHubAdapterReceiver receiver1;
         private EventHubAdapterReceiver receiver2;
         private ObjectPool<FixedSizeBuffer> bufferPool;
-        private Logger logger;
         private TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private EventHubPartitionSettings ehSettings;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
@@ -53,9 +54,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             var oneKB = 1024;
             this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB));
-
-            //set up logger
-            this.logger = new NoOpTestLogger().GetLogger(this.GetType().Name);
             this.telemetryProducer = new NullTelemetryProducer();
         }
 
@@ -206,9 +204,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             monitorDimensions.GlobalConfig = null;
             monitorDimensions.NodeConfig = null;
 
-            this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
+            this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), this.GetNodeConfiguration, this.telemetryProducer);
-            this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, this.logger,
+            this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), this.GetNodeConfiguration, this.telemetryProducer);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
@@ -257,12 +255,13 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
         }
 
-        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger logger, ITelemetryProducer telemetryProducer)
+        private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer)
         {
-            var evictionStrategy = new EHEvictionStrategyForTesting(this.logger, null, null, this.purgePredicate);
+            var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCacheForTesting)}.{partition}");
+            var evictionStrategy = new EHEvictionStrategyForTesting(cacheLogger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
             var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool),
-                EventHubDataComparer.Instance, this.logger, evictionStrategy);
+                EventHubDataComparer.Instance, cacheLogger, evictionStrategy);
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;

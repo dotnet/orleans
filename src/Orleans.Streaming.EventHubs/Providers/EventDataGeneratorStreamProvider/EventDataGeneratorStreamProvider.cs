@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
@@ -109,13 +110,13 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// <param name="providerName"></param>
             /// <param name="log"></param>
             /// <param name="svcProvider"></param>
-            public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
+            public override void Init(IProviderConfiguration providerCfg, string providerName, IServiceProvider svcProvider)
             {
                 this.CheckpointerFactory = partition => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
                 this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
                 this.ehGeneratorSettings = new EventHubGeneratorStreamProviderSettings(providerName);
                 this.ehGeneratorSettings.PopulateDataGeneratingConfigFromProviderConfig(providerCfg);
-                base.Init(providerCfg, providerName, log, svcProvider);
+                base.Init(providerCfg, providerName, svcProvider);
             }
 
             /// <inheritdoc/>
@@ -133,7 +134,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 return Task.FromResult(EventHubGeneratorStreamProviderSettings.GenerateEventHubPartitions(this.ehGeneratorSettings.EventHubPartitionCount));
             }
 
-            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, Logger logger, ITelemetryProducer telemetryProducer)
+            private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
             {
                 var generator = new EventHubPartitionDataGenerator(logger, this.serviceProvider.GetRequiredService<SerializationManager>(), this.ehGeneratorSettings);
                 var generatorReceiver = new EventHubPartitionGeneratorReceiver(generator);

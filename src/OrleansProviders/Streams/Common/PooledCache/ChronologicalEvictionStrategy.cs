@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Providers.Streams.Common
@@ -11,7 +12,7 @@ namespace Orleans.Providers.Streams.Common
     public abstract class ChronologicalEvictionStrategy<TCachedMessage> : IEvictionStrategy<TCachedMessage>
         where TCachedMessage : struct
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
         /// <summary>
         /// Buffers which are currently in use in the cache
@@ -30,7 +31,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="timePurage"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval">"Interval to write periodic statistics.  Only triggered for active caches.</param>
-        protected ChronologicalEvictionStrategy(Logger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        protected ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             if (logger == null) throw new ArgumentException(nameof(logger));
             if (timePurage == null) throw new ArgumentException(nameof(timePurage));
@@ -183,17 +184,17 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger"></param>
         /// <param name="purgeObservable"></param>
         /// <param name="itemsPurged"></param>
-        private static void ReportPurge(Logger logger, IPurgeObservable<TCachedMessage> purgeObservable, int itemsPurged)
+        private static void ReportPurge(ILogger logger, IPurgeObservable<TCachedMessage> purgeObservable, int itemsPurged)
         {
-            if (!logger.IsVerbose)
+            if (!logger.IsEnabled(LogLevel.Debug))
                 return;
             int itemCountAfterPurge = purgeObservable.ItemCount;
             var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
             if (itemCountAfterPurge == 0)
             {
-                logger.Verbose("BlockPurged: cache empty");
+                logger.Debug("BlockPurged: cache empty");
             }
-            logger.Verbose($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
+            logger.Debug($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
         }
     }
 }

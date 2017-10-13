@@ -61,7 +61,7 @@ namespace Tester.AzureUtils.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, new LoggerWrapper("AzureQueueAdapter", this.loggerFactory), this.fixture.Services);
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 

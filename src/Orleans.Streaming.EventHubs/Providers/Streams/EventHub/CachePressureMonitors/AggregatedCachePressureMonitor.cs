@@ -3,8 +3,7 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -14,7 +13,7 @@ namespace Orleans.ServiceBus.Providers
     public class AggregatedCachePressureMonitor : List<ICachePressureMonitor>, ICachePressureMonitor
     {
         private bool isUnderPressure;
-        private Logger logger;
+        private ILogger logger;
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
@@ -25,10 +24,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AggregatedCachePressureMonitor(Logger logger, ICacheMonitor monitor = null)
+        public AggregatedCachePressureMonitor(ILogger logger, ICacheMonitor monitor = null)
         {
             this.isUnderPressure = false;
-            this.logger = logger.GetSubLogger(this.GetType().Name);
+            this.logger = logger;
             this.CacheMonitor = monitor;
         }
 

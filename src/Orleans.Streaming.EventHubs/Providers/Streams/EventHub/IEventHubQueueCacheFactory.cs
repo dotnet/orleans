@@ -1,4 +1,5 @@
-﻿using Orleans.Runtime;
+﻿using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -11,6 +12,6 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Function used to create a IEventHubQueueCache
         /// </summary>
-        IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger cacheLogger, ITelemetryProducer telemetryProducer);
+        IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer);
     }
 }

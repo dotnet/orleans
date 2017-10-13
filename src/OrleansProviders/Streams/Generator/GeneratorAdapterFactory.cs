@@ -10,6 +10,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -42,12 +43,11 @@ namespace Orleans.Providers.Streams.Generator
         private IStreamFailureHandler streamFailureHandler;
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
-        private Logger logger;
         private SerializationManager serializationManager;
         private ITelemetryProducer telemetryProducer;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
         private MonitorAggregationDimensions sharedDimensions;
-
+        private ILoggerFactory loggerFactory;
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
         /// </summary>
@@ -83,11 +83,10 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <param name="providerConfig"></param>
         /// <param name="providerName"></param>
-        /// <param name="log"></param>
         /// <param name="svcProvider"></param>
-        public void Init(IProviderConfiguration providerConfig, string providerName, Logger log, IServiceProvider svcProvider)
+        public void Init(IProviderConfiguration providerConfig, string providerName,  IServiceProvider svcProvider)
         {
-            logger = log;
+            this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
             serviceProvider = svcProvider;
             receivers = new ConcurrentDictionary<QueueId, Receiver>();
             adapterConfig = new GeneratorAdapterConfig(providerName);
@@ -299,7 +298,7 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, logger.GetSubLogger(typeof(GeneratorPooledCache).Name), serializationManager, 
+            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{queueId}"), serializationManager, 
                 cacheMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
     }

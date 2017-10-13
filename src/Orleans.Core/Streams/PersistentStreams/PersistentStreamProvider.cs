@@ -68,7 +68,7 @@ namespace Orleans.Providers.Streams.Common
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
             logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
+            adapterFactory.Init(config, Name, providerRuntime.ServiceProvider);
             queueAdapter = await adapterFactory.CreateAdapter();
             this.loggerFactory = providerUtilitiesManager.ServiceProvider.GetRequiredService<ILoggerFactory>();
             myConfig = new PersistentStreamProviderConfig(config);
