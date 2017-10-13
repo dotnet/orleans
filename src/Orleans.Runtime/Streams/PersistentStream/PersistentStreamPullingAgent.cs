@@ -361,7 +361,7 @@ namespace Orleans.Streams
                     bool moreData = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         i => ReadFromQueue(queueId, receiver, maxCacheAddCount),
                         ReadLoopRetryMax,
-                        (e, i) => ReadLoopRetryExceptionFilter(e, i, queueId),
+                        ReadLoopRetryExceptionFilter,
                         Constants.INFINITE_TIMESPAN,
                         ReadLoopBackoff);
                     if (!moreData)
@@ -375,9 +375,9 @@ namespace Orleans.Streams
             }
         }
 
-        private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter, QueueId queueId)
+        private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter)
         {
-            this.logger.Warn(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while retrying the {retryCounter}th time reading from queue {queueId}", e);
+            this.logger.Warn(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while retrying the {retryCounter}th time reading from queue {this.QueueId}", e);
             return !IsShutdown;
         }
 
