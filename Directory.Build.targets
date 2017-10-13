@@ -4,6 +4,6 @@
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
     <OrleansCodeGeneratorAssembly>$(SourceRoot)Bootstrap/$(Configuration)/Orleans.CodeGeneration.Build.exe</OrleansCodeGeneratorAssembly>
   </PropertyGroup>
-  <Import Project="$(SourceRoot)src/Orleans.CodeGeneration.Build/build/Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " />
+  <Import Project="$(SourceRoot)src/Orleans.CodeGeneration.Build/build/Microsoft.Orleans.CodeGeneration.Build.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " />
   <!--End Orleans -->
 </Project>

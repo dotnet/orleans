@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansPSUtils</PackageId>
+    <PackageId>Microsoft.Orleans.PowerShell</PackageId>
     <Title>Microsoft Orleans PowerShell Client</Title>
     <Description>Library of utility types for PowerShell of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) PowerShell</PackageTags>
@@ -30,18 +30,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Microsoft.Orleans.OrleansPSUtils.psd1">
+    <None Update="Microsoft.Orleans.PowerShell.psd1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
   <Target Name="WriteVersionToPSDFile" AfterTargets="AfterBuild">
     <ItemGroup>
-      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)Microsoft.Orleans.OrleansPSUtils.psd1'))" />
+      <_PSDFileContent Include="$([System.IO.File]::ReadAllText('$(OutDir)Microsoft.Orleans.PowerShell.psd1'))" />
     </ItemGroup>
     <PropertyGroup>
       <VersionToEmbed>$(Version)</VersionToEmbed>
     </PropertyGroup>
-    <WriteLinesToFile File="$(OutDir)Microsoft.Orleans.OrleansPSUtils.psd1" Lines="@(_PSDFileContent-&gt;Replace('$version$', '$(VersionToEmbed)'))" Overwrite="true" ContinueOnError="true" />
+    <WriteLinesToFile File="$(OutDir)Microsoft.Orleans.PowerShell.psd1" Lines="@(_PSDFileContent-&gt;Replace('$version$', '$(VersionToEmbed)'))" Overwrite="true" ContinueOnError="true" />
   </Target>
 </Project>
