@@ -20,7 +20,7 @@ namespace Orleans.CodeGeneration
 {
     public class CodeGenerator : MarshalByRefObject
     {
-        public static readonly string OrleansAssemblyFileName = Path.GetFileName(typeof(RuntimeVersion).Assembly.Location);
+        public static readonly string OrleansAssemblyFileName = Path.GetFileName(typeof(IGrain).Assembly.Location);
         private static readonly int[] SuppressCompilerWarnings =
         {
             162, // CS0162 - Unreachable code detected.
