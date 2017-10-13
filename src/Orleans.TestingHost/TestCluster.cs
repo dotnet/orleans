@@ -93,8 +93,6 @@ namespace Orleans.TestingHost
         /// </summary>
         public SerializationManager SerializationManager { get; private set; }
 
-        public HashSet<AssemblyName> AssembliesToLoad { get; } = new HashSet<AssemblyName>();
-
         internal Type siloBuilderFactoryType;
 
         public TestCluster UseSiloBuilderFactory<TSiloBuilderFactory>() where TSiloBuilderFactory : ISiloBuilderFactory, new()
@@ -545,13 +543,7 @@ namespace Orleans.TestingHost
 
         private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            return AppDomainSiloHandle.Create(
-                siloName,
-                type,
-                this.siloBuilderFactoryType,
-                config,
-                nodeConfiguration,
-                appDomain => new List<AssemblyName>(this.AssembliesToLoad).ForEach(asm => appDomain.Load(asm)));
+            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration);
         }
 
         #endregion

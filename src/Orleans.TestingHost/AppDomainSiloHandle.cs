@@ -32,13 +32,11 @@ namespace Orleans.TestingHost
             Type siloBuilderFactory,
             ClusterConfiguration config,
             NodeConfiguration nodeConfiguration,
-            Action<AppDomain> configureAppDomain = null,
             string applicationBase = null)
         {
             AppDomainSetup setup = GetAppDomainSetupInfo(applicationBase);
 
             var appDomain = AppDomain.CreateDomain(siloName, null, setup);
-            configureAppDomain?.Invoke(appDomain);
             
             try
             {

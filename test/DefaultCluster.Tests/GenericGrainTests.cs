@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
@@ -13,17 +12,6 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    public class DefaultClusterTestsFixture : DefaultClusterFixture
-    {
-        protected override TestCluster CreateTestCluster()
-        {
-            var result = base.CreateTestCluster();
-            result.AssembliesToLoad.Add(UnitTests.GrainInterfaces.TestGrainInterfaces.Assembly.GetName());
-            result.AssembliesToLoad.Add(UnitTests.Grains.TestGrains.Assembly.GetName());
-            return result;
-        }
-    }
-
     /// <summary>
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
@@ -31,7 +19,7 @@ namespace DefaultCluster.Tests.General
     {
         private static int grainId = 0;
 
-        public GenericGrainTests(DefaultClusterTestsFixture fixture) : base(fixture)
+        public GenericGrainTests(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
