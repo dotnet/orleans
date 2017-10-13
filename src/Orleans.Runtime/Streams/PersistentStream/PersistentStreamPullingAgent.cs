@@ -12,9 +12,9 @@ namespace Orleans.Streams
     {
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
         private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
+        private const int ReadLoopRetryMax = 6;
         private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter =new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
-
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
@@ -354,19 +354,14 @@ namespace Orleans.Streams
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
                     
-                    var retryMax = 6;
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we break out of loop
                     // If read fails, we retry 6 more times, with backoff policy.
                     //    we log each failure as warnings. After 6 times retry if still fail, we break out of loop and log an error
                     bool moreData = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         i => ReadFromQueue(queueId, receiver, maxCacheAddCount),
-                        retryMax,
-                        (e, i) =>
-                        {
-                            this.logger.Warn(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while retrying the {i}th time reading from queue {queueId}. Exception is {e}");
-                            return !IsShutdown;
-                        },
+                        ReadLoopRetryMax,
+                        (e, i) => ReadLoopRetryExceptionFilter(e, i, queueId),
                         Constants.INFINITE_TIMESPAN,
                         ReadLoopBackoff);
                     if (!moreData)
@@ -376,10 +371,16 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 receiverInitTask = null;
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while trying to read from queue {queueId}", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_12, $"Giving up reading from queue {queueId} after retry attempts {ReadLoopRetryMax}", exc);
             }
         }
-        
+
+        private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter, QueueId queueId)
+        {
+            this.logger.Warn(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while retrying the {retryCounter}th time reading from queue {queueId}", e);
+            return !IsShutdown;
+        }
+
         /// <summary>
         /// Read from queue.
         /// Returns true, if data was read, false if it was not
