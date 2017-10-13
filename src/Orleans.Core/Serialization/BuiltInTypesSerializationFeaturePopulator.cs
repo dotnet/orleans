@@ -28,6 +28,7 @@ namespace Orleans.Serialization
             feature.AddSerializerDelegates(typeof(Tuple<,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
             feature.AddSerializerDelegates(typeof(Tuple<,,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
             feature.AddSerializerDelegates(typeof(Tuple<,,,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
+            feature.AddSerializerDelegates(typeof(Tuple<,,,,,,,>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
 
             // Built-in handlers: ValueTuples
             feature.AddSerializerDelegates(typeof(ValueTuple<>), BuiltInTypes.DeepCopyValueTuple, BuiltInTypes.SerializeValueTuple, BuiltInTypes.DeserializeValueTuple);
