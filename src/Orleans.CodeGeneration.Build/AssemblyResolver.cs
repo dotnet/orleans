@@ -140,27 +140,26 @@ namespace Orleans.CodeGeneration
             }
                 
             return null;
-
-            Assembly TryLoadAssemblyFromPath(string path)
-            {
-                try
-                {
-#if NETCOREAPP2_0
-                    return this.loadContext.LoadFromAssemblyPath(path);
-#else
-                    return Assembly.LoadFrom(path);
-#endif
-                }
-                catch (Exception exception)
-                {
-                }
-
-                return null;
-            }
             
             bool NamesMatch(RuntimeLibrary runtime)
             {
                 return string.Equals(runtime.Name, name.Name, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private Assembly TryLoadAssemblyFromPath(string path)
+        {
+            try
+            {
+#if NETCOREAPP2_0
+                return this.loadContext.LoadFromAssemblyPath(path);
+#else
+                return Assembly.LoadFrom(path);
+#endif
+            }
+            catch
+            {
+                return null;
             }
         }
 
