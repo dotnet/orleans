@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Scheduler
                 {
                     try
                     {
+                        RequestContext.Clear();
                         T result = await taskFunc();
                         resolver.TrySetResult(result);
                     }
@@ -35,6 +36,7 @@ namespace Orleans.Runtime.Scheduler
                 {
                     try
                     {
+                        RequestContext.Clear();
                         await taskFunc();
                         resolver.TrySetResult(true);
                     }
@@ -55,6 +57,7 @@ namespace Orleans.Runtime.Scheduler
                 {
                     try
                     {
+                        RequestContext.Clear();
                         await taskFunc();
                         resolver.TrySetResult(true);
                     }
