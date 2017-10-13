@@ -72,7 +72,7 @@ namespace Orleans.CodeGeneration
             using (var loggerFactory = new LoggerFactory())
             {
                 var config = new ClusterConfiguration();
-                loggerFactory.AddConsole(LogLevel.Error);
+                loggerFactory.AddConsole(LogLevel.Warning);
                 var serializationProviderOptions = Options.Create(
                     new SerializationProviderOptions
                     {
