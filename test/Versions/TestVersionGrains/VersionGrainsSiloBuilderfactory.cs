@@ -6,6 +6,7 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
+using UnitTests.Grains;
 
 namespace TestVersionGrains
 {
