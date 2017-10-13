@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Orleans.Metadata;
 
 namespace Orleans.ApplicationParts
@@ -39,8 +40,8 @@ namespace Orleans.ApplicationParts
         {
             foreach (var part in parts.OfType<AssemblyPart>())
             {
-                var attributes = part.Assembly.GetCustomAttributes(true);
-                foreach (var attribute in attributes.OfType<FeaturePopulatorAttribute>())
+                var attributes = part.Assembly.GetCustomAttributes<FeaturePopulatorAttribute>();
+                foreach (var attribute in attributes)
                 {
                     if (!typeof(IFeaturePopulator<TFeature>).IsAssignableFrom(attribute.PopulatorType)) continue;
 
