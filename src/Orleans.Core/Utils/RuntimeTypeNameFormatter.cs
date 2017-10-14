@@ -36,17 +36,16 @@ namespace Orleans.Utilities
         {
             if (type == null) throw new ArgumentNullException(nameof(type));
 
-            string result;
-            if (!Cache.TryGetValue(type, out result))
+            if (!Cache.TryGetValue(type, out var result))
             {
-                var builder = new StringBuilder();
-                Format(builder, type, isElementType: false);
-                result = builder.ToString();
-
-                if (!Cache.TryAdd(type, result))
+                string FormatType(Type t)
                 {
-                    result = Cache[type];
+                    var builder = new StringBuilder();
+                    Format(builder, t.GetTypeInfo(), isElementType: false);
+                    return builder.ToString();
                 }
+
+                result = Cache.GetOrAdd(type, FormatType);
             }
 
             return result;

@@ -20,7 +20,7 @@ namespace TestExtensions
         protected Logger Logger => this.Client.Logger;
         protected Logger logger => this.Logger;
 
-        public HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
+        protected HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
             this.HostedCluster = fixture.HostedCluster;
         }

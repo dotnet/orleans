@@ -19,7 +19,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Code generator which generates <see cref="GrainReference"/>s for grains.
     /// </summary>
-    public static class GrainReferenceGenerator
+    internal static class GrainReferenceGenerator
     {
         /// <summary>
         /// The suffix appended to the name of generated classes.
@@ -31,7 +31,14 @@ namespace Orleans.CodeGenerator
         /// </summary>
         private static readonly Expression<Action> CheckGrainObserverParamInternalExpression =
             () => GrainFactoryBase.CheckGrainObserverParamInternal(null);
-        
+
+        /// <summary>
+        /// Returns the name of the generated class for the provided type.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The name of the generated class for the provided type.</returns>
+        internal static string GetGeneratedClassName(Type type) => CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(type) + ClassSuffix;
+
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
@@ -44,7 +51,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        internal static TypeDeclarationSyntax GenerateClass(Type grainType, Action<Type> onEncounteredType)
+        internal static TypeDeclarationSyntax GenerateClass(Type grainType, string generatedTypeName, Action<Type> onEncounteredType)
         {
             var grainTypeInfo = grainType.GetTypeInfo();
             var genericTypes = grainTypeInfo.IsGenericTypeDefinition
@@ -66,15 +73,14 @@ namespace Orleans.CodeGenerator
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
                     markerAttribute);
 
-            var className = CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix;
             var classDeclaration =
-                SF.ClassDeclaration(className)
+                SF.ClassDeclaration(generatedTypeName)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                     .AddBaseListTypes(
                         SF.SimpleBaseType(typeof(GrainReference).GetTypeSyntax()),
                         SF.SimpleBaseType(grainType.GetTypeSyntax()))
                     .AddConstraintClauses(grainType.GetTypeConstraintSyntax())
-                    .AddMembers(GenerateConstructors(className))
+                    .AddMembers(GenerateConstructors(generatedTypeName))
                     .AddMembers(
                         GenerateInterfaceIdProperty(grainType),
                         GenerateInterfaceVersionProperty(grainType),
@@ -87,7 +93,7 @@ namespace Orleans.CodeGenerator
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
-
+            
             return classDeclaration;
         }
 

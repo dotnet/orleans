@@ -13,6 +13,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Orleans.TestingHost
 {
@@ -39,9 +40,7 @@ namespace Orleans.TestingHost
         public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-
-        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
-
+        
         /// <summary>
         /// Client configuration to use when initializing the client
         /// </summary>
@@ -460,6 +459,8 @@ namespace Orleans.TestingHost
 
             this.InternalClient = (IInternalClusterClient)new ClientBuilder()
                 .UseConfiguration(clientConfig)
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clientConfig.TraceFileName)).Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
@@ -542,7 +543,7 @@ namespace Orleans.TestingHost
 
         private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration, this.additionalAssemblies);
+            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration);
         }
 
         #endregion

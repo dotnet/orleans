@@ -210,7 +210,7 @@ namespace Orleans.CodeGeneration
             }
 
             throw new ArgumentException(
-                $"Could not find generic method {declaringType}.{methodName}<{new string(',', typeParameterCount)}>(...).");
+                $"Could not find generic method {declaringType}.{methodName}<{new string(',', typeParameterCount - 1)}>(...).");
         }
     }
 }

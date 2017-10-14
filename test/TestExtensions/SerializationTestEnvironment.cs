@@ -15,7 +15,11 @@ namespace TestExtensions
         public SerializationTestEnvironment(ClientConfiguration config = null)
         {
             if (config == null) config = this.DefaultConfig();
-            this.Client = new ClientBuilder().UseConfiguration(config).Build();
+            this.Client = new ClientBuilder()
+                .UseConfiguration(config)
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
+                .Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 

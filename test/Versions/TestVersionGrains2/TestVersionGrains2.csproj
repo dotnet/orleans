@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>TestVersionGrains</RootNamespace>
     <AssemblyName>TestVersionGrains</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OutDir)' != ''">

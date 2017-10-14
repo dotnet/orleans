@@ -2,11 +2,13 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
     internal class TypeSerializer
     {
+        private readonly ITypeResolver typeResolver;
         private readonly ConcurrentDictionary<Type, TypeKey> typeCache = new ConcurrentDictionary<Type, TypeKey>();
 
         private readonly ConcurrentDictionary<TypeKey, Type> typeKeyCache =
@@ -14,8 +16,9 @@ namespace Orleans.Serialization
 
         private readonly Func<Type, TypeKey> getTypeKey;
 
-        public TypeSerializer()
+        public TypeSerializer(ITypeResolver typeResolver)
         {
+            this.typeResolver = typeResolver;
             this.getTypeKey = type => new TypeKey(Encoding.UTF8.GetBytes(this.GetNameFromType(type)));
         }
 
@@ -68,8 +71,7 @@ namespace Orleans.Serialization
 
         public Type GetTypeFromTypeKey(TypeKey key, bool throwOnError = true)
         {
-            Type result;
-            if (!this.typeKeyCache.TryGetValue(key, out result))
+            if (!this.typeKeyCache.TryGetValue(key, out var result))
             {
                 result = this.GetTypeFromName(Encoding.UTF8.GetString(key.TypeName), throwOnError: throwOnError);
                 if (result != null)
@@ -94,7 +96,19 @@ namespace Orleans.Serialization
         /// <param name="throwOnError">Whether or not to throw if the type could not be loaded.</param>
         /// <returns>The type, or <see langword="null"/> if the type could not be loaded.</returns>
         internal virtual Type GetTypeFromName(string assemblyQualifiedTypeName, bool throwOnError)
-            => Type.GetType(assemblyQualifiedTypeName, throwOnError: throwOnError);
+        {
+            Type result;
+            if (throwOnError)
+            {
+                result = this.typeResolver.ResolveType(assemblyQualifiedTypeName);
+            }
+            else
+            {
+                this.typeResolver.TryResolveType(assemblyQualifiedTypeName, out result);
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// The method used by this instance to retrieve an assembly-qualified name from a type.

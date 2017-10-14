@@ -34,6 +34,7 @@ using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime
@@ -73,7 +74,6 @@ namespace Orleans.Runtime
             new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
-        private readonly AssemblyProcessor assemblyProcessor;
         private StorageProviderManager storageProviderManager;
         private LogConsistencyProviderManager logConsistencyProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
@@ -179,7 +179,14 @@ namespace Orleans.Runtime
                 serviceCollection.AddSingleton<Silo>(this);
                 serviceCollection.AddSingleton(initializationParams);
                 serviceCollection.AddLegacyClusterConfigurationSupport(config);
-                DefaultSiloServices.AddDefaultServices(null, serviceCollection);
+                serviceCollection.Configure<SiloIdentityOptions>(options => options.SiloName = name);
+                var hostContext = new HostBuilderContext(new Dictionary<object, object>());
+                DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
+
+                var applicationPartManager = hostContext.GetApplicationPartManager();
+                applicationPartManager.AddApplicationPartsFromAppDomain();
+                applicationPartManager.AddApplicationPartsFromBasePath();
+
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
@@ -201,9 +208,6 @@ namespace Orleans.Runtime
                 this.initializationParams.Type, LocalConfig.DNSHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
                 name, config.ToString(name));
-
-            this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
-            this.assemblyProcessor.Initialize();
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             BufferPool.InitGlobalBufferPool(siloMessagingOptions);
@@ -830,7 +834,6 @@ namespace Orleans.Runtime
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
-            SafeExecute(() => this.assemblyProcessor?.Dispose());
             SafeExecute(() => (this.Services as IDisposable)?.Dispose());
 
             // Setting the event should be the last thing we do.

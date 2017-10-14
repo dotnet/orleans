@@ -868,6 +868,7 @@ namespace Orleans
         Loader_LoadAndCreateInstance_Failure    = LoaderBase + 21,
         Loader_TryLoadAndCreateInstance_Failure = LoaderBase + 22,
         Loader_TypeLoadError_5                  = LoaderBase + 23,
+        Loader_AssemblyLoadError                = LoaderBase + 24,
 
         PlacementBase                               = Runtime + 1800,
         Placement_RuntimeStatisticsUpdateFailure_1  = PlacementBase + 1,

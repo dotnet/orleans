@@ -7,7 +7,6 @@ namespace Orleans.CodeGenerator
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Threading.Tasks;
-    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Orleans.Async;
@@ -20,7 +19,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Code generator which generates <see cref="IGrainMethodInvoker"/> for grains.
     /// </summary>
-    public static class GrainMethodInvokerGenerator
+    internal static class GrainMethodInvokerGenerator
     {
         /// <summary>
         /// The suffix appended to the name of generated classes.
@@ -28,15 +27,21 @@ namespace Orleans.CodeGenerator
         private const string ClassSuffix = "MethodInvoker";
 
         /// <summary>
+        /// Returns the name of the generated class for the provided type.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The name of the generated class for the provided type.</returns>
+        internal static string GetGeneratedClassName(Type type) => CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(type) + ClassSuffix;
+
+        /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
-        /// <param name="grainType">
-        /// The grain interface type.
-        /// </param>
+        /// <param name="grainType">The grain interface type.</param>
+        /// <param name="className">The name for the generated class.</param>
         /// <returns>
         /// The generated class.
         /// </returns>
-        internal static TypeDeclarationSyntax GenerateClass(Type grainType)
+        internal static TypeDeclarationSyntax GenerateClass(Type grainType, string className)
         {
             var baseTypes = new List<BaseTypeSyntax> { SF.SimpleBaseType(typeof(IGrainMethodInvoker).GetTypeSyntax()) };
 
@@ -76,8 +81,7 @@ namespace Orleans.CodeGenerator
             }
             
             var classDeclaration =
-                SF.ClassDeclaration(
-                    CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix)
+                SF.ClassDeclaration(className)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                     .AddBaseListTypes(baseTypes.ToArray())
                     .AddConstraintClauses(grainType.GetTypeConstraintSyntax())

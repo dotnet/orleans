@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
@@ -32,8 +33,10 @@ using Orleans.Transactions;
 using Orleans.LogConsistency;
 using Orleans.Storage;
 using Microsoft.Extensions.Logging;
+using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
+using Orleans.Metadata;
 
 namespace Orleans.Hosting
 {
@@ -95,7 +98,6 @@ namespace Orleans.Hosting
             services.AddLogging();
             //temporary change until runtime moved away from Logger
             services.TryAddSingleton(typeof(LoggerWrapper<>));
-            services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
             services.TryAddSingleton<StreamProviderManager>();
@@ -111,7 +113,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<TypeMetadataCache>();
-            services.TryAddSingleton<AssemblyProcessor>();
             services.TryAddSingleton<ActivationDirectory>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
@@ -119,7 +120,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SiloStatisticsManager>();
             services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
             services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
-            services.TryAddSingleton<SiloAssemblyLoader>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -147,7 +147,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<CodeGeneratorManager>();
 
             services.TryAddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
             services.TryAddSingleton<IGrainRegistrar<ClusterLocalRegistration>, ClusterLocalRegistrar>();
@@ -202,13 +201,27 @@ namespace Orleans.Hosting
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
                 });
-            
+
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
+            // Serialization
+            services.TryAddSingleton<SerializationManager>();
+            services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
+            
             // Transactions
             services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
             services.TryAddSingleton<ITransactionManagerService, DisabledTransactionManagerService>();
+
+            // Application Parts
+            var applicationPartManager = context.GetApplicationPartManager();
+            services.TryAddSingleton<ApplicationPartManager>(applicationPartManager);
+            applicationPartManager.AddApplicationPart(typeof(RuntimeVersion).Assembly);
+            applicationPartManager.AddApplicationPart(typeof(Silo).Assembly);
+            applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
+            applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
+            applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
+            applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
         }
     }
 }

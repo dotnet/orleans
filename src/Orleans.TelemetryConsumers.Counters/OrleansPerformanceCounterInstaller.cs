@@ -7,7 +7,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.ApplicationParts;
+using Orleans.Hosting;
 using Orleans.Logging;
+using Orleans.Metadata;
 using Orleans.Runtime.Configuration;
 
 namespace OrleansTelemetryConsumers.Counters
@@ -29,8 +33,14 @@ namespace OrleansTelemetryConsumers.Counters
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null};
             var loggerFactory = CreateDefaultLoggerFactory(cfg.TraceFileName);
-            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, new LoggerWrapper<SiloAssemblyLoader>(loggerFactory));
-            CrashUtils.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
+
+            var parts = new ApplicationPartManager();
+            parts.AddApplicationPartsFromAppDomain();
+            parts.AddApplicationPartsFromBasePath();
+            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
+            var grainClassFeature = parts.CreateAndPopulateFeature<GrainClassFeature>();
+
+            CrashUtils.GrainTypes = grainClassFeature.Classes.Select(metadata => TypeUtils.GetFullName(metadata.ClassType)).ToList();
             consumer = new OrleansPerfCounterTelemetryConsumer(loggerFactory);
             this.logger = loggerFactory.CreateLogger<OrleansPerformanceCounterInstaller>();
         }

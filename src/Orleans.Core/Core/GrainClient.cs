@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -74,8 +77,12 @@ namespace Orleans
                 Console.WriteLine("Error loading standard client configuration file.");
                 throw new ArgumentException("Error loading standard client configuration file");
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder()
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
+                .UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate)
+                .Build();
             InternalInitialize(orleansClient);
         }
 
@@ -113,8 +120,11 @@ namespace Orleans
                 throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
             var orleansClient = (IInternalClusterClient)new ClientBuilder()
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
                 .UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate).Build();
+                .ConfigureLogging(ConfigureLoggingDelegate)
+                .Build();
             InternalInitialize(orleansClient);
         }
 
@@ -130,8 +140,12 @@ namespace Orleans
                 Console.WriteLine("Initialize was called with null ClientConfiguration object.");
                 throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder()
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
+                .UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate)
+                .Build();
             InternalInitialize(orleansClient);
         }
 
@@ -163,8 +177,12 @@ namespace Orleans
                 config.Gateways.Add(gatewayAddress);
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
-            var orleansClient = (IInternalClusterClient)new ClientBuilder().UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate).Build();
+            var orleansClient = (IInternalClusterClient)new ClientBuilder()
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
+                .UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate)
+                .Build();
             InternalInitialize(orleansClient);
         }
 

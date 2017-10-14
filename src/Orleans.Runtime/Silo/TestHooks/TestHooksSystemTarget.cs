@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
@@ -100,13 +99,7 @@ namespace Orleans.Runtime.TestHooks
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.host.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
-
-        public Task AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly, ILogger logger)
-        {
-            CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly, logger);
-            return Task.CompletedTask;
-        }
-
+        
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
         {
             this.host.Services.GetRequiredService<SiloStatisticsManager>().MetricsTable.LatchIsOverload(overloaded);

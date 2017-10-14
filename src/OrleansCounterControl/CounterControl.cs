@@ -6,7 +6,10 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Principal;
 using Microsoft.Extensions.Logging;
+using Orleans.ApplicationParts;
+using Orleans.Hosting;
 using Orleans.Logging;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using OrleansTelemetryConsumers.Counters;
@@ -32,9 +35,15 @@ namespace Orleans.Counter.Control
             var userIdent = WindowsIdentity.GetCurrent();
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
-            
-            var siloAssemblyLoader = new SiloAssemblyLoader(new NodeConfiguration(), null, new LoggerWrapper<SiloAssemblyLoader>(loggerFactory));
-            CrashUtils.GrainTypes = siloAssemblyLoader.GetGrainClassTypes().Keys.ToList();
+
+            var parts = new ApplicationPartManager();
+            parts.AddApplicationPartsFromAppDomain();
+            parts.AddApplicationPartsFromBasePath();
+            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
+            var grainClassFeature = parts.CreateAndPopulateFeature<GrainClassFeature>();
+
+            CrashUtils.GrainTypes = grainClassFeature.Classes.Select(metadata => TypeUtils.GetFullName(metadata.ClassType)).ToList();
+
             perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer(loggerFactory);
             this.logger = loggerFactory.CreateLogger<CounterControl>();
         }
