@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Versions
         }
     }
 
-    [StorageProvider(ProviderName = Constants.DEFAULT_STORAGE_PROVIDER_NAME)]
+    [StorageProvider(ProviderName = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
     internal class VersionStoreGrain : Grain<VersionStoreGrainState>, IVersionStoreGrain
     {
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

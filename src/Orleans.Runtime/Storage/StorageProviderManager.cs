@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Storage
 
         public IStorageProvider GetDefaultProvider()
         {
-            return storageProviderLoader.GetDefaultProvider(Constants.DEFAULT_STORAGE_PROVIDER_NAME);
+            return storageProviderLoader.GetDefaultProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
         }
 
         public bool TryGetProvider(string name, out IStorageProvider provider, bool caseInsensitive = false)
