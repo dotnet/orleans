@@ -66,7 +66,7 @@ namespace UnitTests.Streaming.Reliability
         }
 
         private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseAzureTableGatewayProvider(gatewayOptions =>
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })

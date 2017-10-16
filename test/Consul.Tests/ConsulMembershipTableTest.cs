@@ -40,7 +40,7 @@ namespace Consul.Tests
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulMembershipOptions()
             {
-                ConnectionString = this.connectionString
+                Address = new Uri(this.connectionString)
             };
             return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create<ConsulMembershipOptions>(options), this.globalConfiguration);
         }
@@ -48,11 +48,11 @@ namespace Consul.Tests
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
             ConsulTestUtils.EnsureConsul();
-            var options = new ConsulGatewayProviderOptions()
+            var options = new ConsulGatewayListProviderOptions()
             {
-                ConnectionString = this.connectionString
+                Address = new Uri(this.connectionString)
             };
-            return new ConsulBasedGatewayListProvider(loggerFactory.CreateLogger<ConsulBasedGatewayListProvider>(), this.clientConfiguration, Options.Create(options));
+            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), this.clientConfiguration, Options.Create(options));
         }
 
         protected override async Task<string> GetConnectionString()

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace OrleansAzureUtils.Options
 {
-    public class AzureTableGatewayProviderOptions
+    public class AzureTableGatewayListProviderOptions
     {
         /// <summary>
         /// Connection string for Azure Storage

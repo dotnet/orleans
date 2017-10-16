@@ -15,12 +15,12 @@ namespace Orleans.Runtime.Membership
     {
         private readonly ILogger logger;
         private string deploymentId;
-        private readonly SqlGatewayProviderOptions options;
+        private readonly SqlGatewayListProviderOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
         public SqlGatewayListProvider(ILogger<SqlGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter, ClientConfiguration clientConfiguration,
-            IOptions<SqlGatewayProviderOptions> options)
+            IOptions<SqlGatewayListProviderOptions> options)
         {
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;

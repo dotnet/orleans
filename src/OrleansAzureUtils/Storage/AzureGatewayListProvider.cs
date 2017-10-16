@@ -14,10 +14,10 @@ namespace Orleans.AzureUtils
     {
         private OrleansSiloInstanceManager siloInstanceManager;
         private readonly string deploymentId;
-        private readonly AzureTableGatewayProviderOptions options;
+        private readonly AzureTableGatewayListProviderOptions options;
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
-        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayProviderOptions> options, ClientConfiguration clientConfiguration)
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, ClientConfiguration clientConfiguration)
         {
             this.loggerFactory = loggerFactory;
             this.deploymentId = clientConfiguration.DeploymentId;

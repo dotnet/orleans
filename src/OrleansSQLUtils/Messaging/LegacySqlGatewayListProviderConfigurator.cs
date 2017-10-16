@@ -6,17 +6,17 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansAzureUtils.Storage
+namespace OrleansSQLUtils.Messaging
 {
-    /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
-    public class LegacyAzureTableGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
+    /// <inheritdoc/>
+    public class LegacySqlGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
-        /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
         public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
         {
-            services.UseAzureTableGatewayProvider(options =>
+            services.UseSqlGatewayListProvider(options =>
             {
                 options.ConnectionString = configuration.DataConnectionString;
+                options.AdoInvariant = configuration.AdoInvariant;
             });
         }
     }

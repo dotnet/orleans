@@ -35,27 +35,27 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure the client to use ZooKeeperGatewayProvider
+        /// Configure the client to use ZooKeeperGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IClientBuilder UseZooKeeperGatewayProvider(this IClientBuilder builder,
-            Action<ZooKeeperGatewayProviderOptions> configureOptions)
+        public static IClientBuilder UseZooKeeperGatewayListProvider(this IClientBuilder builder,
+            Action<ZooKeeperGatewayListProviderOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseZooKeeperGatewayProvider(configureOptions));
+            return builder.ConfigureServices(services => services.UseZooKeeperGatewayListProvider(configureOptions));
         }
 
         /// <summary>
-        /// Configure the client to use ZooKeeperGatewayProvider
+        /// Configure the client to use ZooKeeperGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IClientBuilder UseZooKeeperGatewayProvider(this IClientBuilder builder,
+        public static IClientBuilder UseZooKeeperGatewayListProvider(this IClientBuilder builder,
             IConfiguration configuration)
         {
-            return builder.ConfigureServices(services => services.UseZooKeeperGatewayProvider(configuration));
+            return builder.ConfigureServices(services => services.UseZooKeeperGatewayListProvider(configuration));
         }
 
         /// <summary>
@@ -85,28 +85,28 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeperGatewayProvider
+        /// Configure DI container with ZooKeeperGatewayListProvider
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IServiceCollection UseZooKeeperGatewayProvider(this IServiceCollection services,
-            Action<ZooKeeperGatewayProviderOptions> configureOptions)
+        public static IServiceCollection UseZooKeeperGatewayListProvider(this IServiceCollection services,
+            Action<ZooKeeperGatewayListProviderOptions> configureOptions)
         {
             return services.Configure(configureOptions)
                 .AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeperGatewayProvider
+        /// Configure DI container with ZooKeeperGatewayListProvider
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IServiceCollection UseZooKeeperGatewayProvider(this IServiceCollection services,
+        public static IServiceCollection UseZooKeeperGatewayListProvider(this IServiceCollection services,
             IConfiguration configuration)
         {
-            return services.Configure<ZooKeeperGatewayProviderOptions>(configuration)
+            return services.Configure<ZooKeeperGatewayListProviderOptions>(configuration)
                 .AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
         }
     }

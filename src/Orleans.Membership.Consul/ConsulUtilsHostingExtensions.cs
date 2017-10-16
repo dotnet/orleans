@@ -35,27 +35,27 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use ConsulGatewayProvider
+        /// Configure client to use ConsulGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IClientBuilder UseConsulGatewayProvider(this IClientBuilder builder,
-            Action<ConsulGatewayProviderOptions> configureOptions)
+        public static IClientBuilder UseConsulGatewayListProvider(this IClientBuilder builder,
+            Action<ConsulGatewayListProviderOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseConsulGatewayProvider(configureOptions));
+            return builder.ConfigureServices(services => services.UseConsulGatewayListProvider(configureOptions));
         }
 
         /// <summary>
-        /// Configure client to use ConsulGatewayProvider
+        /// Configure client to use ConsulGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IClientBuilder UseConsulGatewayProvider(this IClientBuilder builder,
+        public static IClientBuilder UseConsulGatewayListProvider(this IClientBuilder builder,
             IConfiguration configuration)
         {
-            return builder.ConfigureServices(services => services.UseConsulGatewayProvider(configuration));
+            return builder.ConfigureServices(services => services.UseConsulGatewayListProvider(configuration));
         }
 
         /// <summary>
@@ -87,29 +87,29 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ConsulBasedGatewayProvider
+        /// Configure DI container with ConsulGatewayListProvider
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IServiceCollection UseConsulGatewayProvider(this IServiceCollection services,
-            Action<ConsulGatewayProviderOptions> configureOptions)
+        public static IServiceCollection UseConsulGatewayListProvider(this IServiceCollection services,
+            Action<ConsulGatewayListProviderOptions> configureOptions)
         {
             return services.Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, ConsulBasedGatewayListProvider>();
+                .AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
         }
 
         /// <summary>
-        /// Configure DI container with ConsulBasedGatewayProvider
+        /// Configure DI container with ConsulGatewayProvider
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IServiceCollection UseConsulGatewayProvider(this IServiceCollection services,
+        public static IServiceCollection UseConsulGatewayListProvider(this IServiceCollection services,
             IConfiguration configuration)
         {
-            return services.Configure<ConsulGatewayProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, ConsulBasedGatewayListProvider>();
+            return services.Configure<ConsulGatewayListProviderOptions>(configuration)
+                .AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
         }
     }
 }

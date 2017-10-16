@@ -49,7 +49,7 @@ namespace Tester.AzureUtils
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            var options = new AzureTableGatewayProviderOptions()
+            var options = new AzureTableGatewayListProviderOptions()
             {
                 ConnectionString = this.connectionString
             };

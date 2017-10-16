@@ -4,7 +4,7 @@ using System.Text;
 
 namespace OrleansZooKeeperUtils.Options
 {
-    public class ZooKeeperGatewayProviderOptions
+    public class ZooKeeperGatewayListProviderOptions
     {
         /// <summary>
         /// Connection string for ZooKeeper storage

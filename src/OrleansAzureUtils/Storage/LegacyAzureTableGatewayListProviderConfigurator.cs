@@ -6,15 +6,15 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansConsulUtils
+namespace OrleansAzureUtils.Storage
 {
-    /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
-    public class LegacyConsulGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
+    /// <inheritdoc/>
+    public class LegacyAzureTableGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
-        /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
+        /// <inheritdoc/>
         public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
         {
-            services.UseConsulGatewayProvider(options =>
+            services.UseAzureTableGatewayListProvider(options =>
             {
                 options.ConnectionString = configuration.DataConnectionString;
             });

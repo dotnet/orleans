@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Membership
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
         public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger, ClientConfiguration clientConfiguration,
-            IOptions<ZooKeeperGatewayProviderOptions> options)
+            IOptions<ZooKeeperGatewayListProviderOptions> options)
         {
             watcher = new ZooKeeperWatcher(logger);
 

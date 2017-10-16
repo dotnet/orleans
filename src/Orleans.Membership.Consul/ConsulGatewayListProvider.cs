@@ -11,14 +11,14 @@ using OrleansConsulUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
-    public class ConsulBasedGatewayListProvider : IGatewayListProvider
+    public class ConsulGatewayListProvider : IGatewayListProvider
     {
         private ConsulClient consulClient;
         private string deploymentId;
         private ILogger logger;
-        private readonly ConsulGatewayProviderOptions options;
+        private readonly ConsulGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
-        public ConsulBasedGatewayListProvider(ILogger<ConsulBasedGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulGatewayProviderOptions> options)
+        public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulGatewayListProviderOptions> options)
         {
             this.logger = logger;
             this.deploymentId = clientConfig.DeploymentId;
@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Membership
         public Task InitializeGatewayListProvider()
         {
             consulClient =
-                new ConsulClient(config => config.Address = new Uri(options.ConnectionString));
+                new ConsulClient(config => config.Address = options.Address);
 
             return Task.CompletedTask;
         }

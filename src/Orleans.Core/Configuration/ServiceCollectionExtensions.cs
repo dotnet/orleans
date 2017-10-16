@@ -88,8 +88,8 @@ namespace Orleans.Configuration
         /// <param name="collection"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IServiceCollection UseStaticGatewayProvider(this IServiceCollection collection,
-            Action<StaticGatewayProviderOptions> configureOptions)
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
+            Action<StaticGatewayListProviderOptions> configureOptions)
         {
             return collection
                 .Configure(configureOptions)
@@ -102,11 +102,11 @@ namespace Orleans.Configuration
         /// <param name="collection"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IServiceCollection UseStaticGatewayProvider(this IServiceCollection collection,
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
             IConfiguration configuration)
         {
             return collection
-                .Configure<StaticGatewayProviderOptions>(configuration)
+                .Configure<StaticGatewayListProviderOptions>(configuration)
                 .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
         }
 

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace OrleansSQLUtils.Options
 {
-    public class SqlGatewayProviderOptions
+    public class SqlGatewayListProviderOptions
     {
         /// <summary>
         /// Connection string for Sql

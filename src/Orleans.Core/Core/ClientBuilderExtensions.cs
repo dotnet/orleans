@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Configuration.Options;
 using Orleans.Hosting;
@@ -134,27 +135,27 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Configure the client to use StaticGatewayProvider
+        /// Configure the client to use <see cref="StaticGatewayListProvider"/>
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IClientBuilder UseStaticGatewayProvider(this IClientBuilder builder, Action<StaticGatewayProviderOptions> configureOptions)
+        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
         {
             return builder.ConfigureServices(collection =>
-                collection.UseStaticGatewayProvider(configureOptions));
+                collection.UseStaticGatewayListProvider(configureOptions));
         }
 
         /// <summary>
-        /// Configure the client to use StaticGatewayProvider
+        /// Configure the client to use <see cref="StaticGatewayListProvider"/>
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IClientBuilder UseStaticGatewayProvider(this IClientBuilder builder, IConfiguration configuration)
+        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, IConfiguration configuration)
         {
             return builder.ConfigureServices(collection =>
-                collection.UseStaticGatewayProvider(configuration));
+                collection.UseStaticGatewayListProvider(configuration));
         }
     }
 }

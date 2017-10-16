@@ -28,8 +28,10 @@ namespace OrleansAWSUtils.Storage
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
         private string service;
-        private int readCapacityUnits = 10;
-        private int writeCapacityUnits = 5;
+        public const int DefaultReadCapacityUnits = 10;
+        public const int DefaultWriteCapacityUnits = 5;
+        private int readCapacityUnits = DefaultReadCapacityUnits;
+        private int writeCapacityUnits = DefaultWriteCapacityUnits;
         private AmazonDynamoDBClient ddbClient;
         private ILogger Logger;
 
@@ -40,7 +42,31 @@ namespace OrleansAWSUtils.Storage
         /// <param name="loggerFactory">logger factory used to create loggers</param>
         public DynamoDBStorage(string dataConnectionString, ILoggerFactory loggerFactory)
         {
-            ParseDataConnectionString(dataConnectionString);
+            ParseDataConnectionString(dataConnectionString, out accessKey, out secretKey, out service, out readCapacityUnits, out writeCapacityUnits);
+            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
+            CreateClient();
+        }
+
+        /// <summary>
+        /// Create a DynamoDBStorage instance
+        /// </summary>
+        /// <param name="loggerFactory"></param>
+        /// <param name="accessKey"></param>
+        /// <param name="secretKey"></param>
+        /// <param name="service"></param>
+        /// <param name="readCapacityUnits"></param>
+        /// <param name="writeCapacityUnits"></param>
+        public DynamoDBStorage(ILoggerFactory loggerFactory, string accessKey, string secretKey, string service, int readCapacityUnits = DefaultReadCapacityUnits,
+            int writeCapacityUnits = DefaultWriteCapacityUnits)
+        {
+            if(accessKey == null) throw new ArgumentNullException(nameof(accessKey));
+            if(secretKey == null) throw new ArgumentNullException(nameof(secretKey));
+            if (service == null) throw new ArgumentNullException(nameof(service));
+            this.accessKey = accessKey;
+            this.secretKey = secretKey;
+            this.service = service;
+            this.readCapacityUnits = readCapacityUnits;
+            this.writeCapacityUnits = writeCapacityUnits;
             Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
             CreateClient();
         }
@@ -69,9 +95,15 @@ namespace OrleansAWSUtils.Storage
 
         #region Table Management Operations
 
-        private void ParseDataConnectionString(string dataConnectionString)
+        internal static void ParseDataConnectionString(string dataConnectionString, out string accessKey, out string secretKey, out string service, out int readCapacityUnits, out int writeCapacityUnits)
         {
             var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            //set default value
+            accessKey = null;
+            secretKey = null;
+            service = null;
+            readCapacityUnits = DefaultReadCapacityUnits;
+            writeCapacityUnits = DefaultReadCapacityUnits;
 
             var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(serviceConfig))

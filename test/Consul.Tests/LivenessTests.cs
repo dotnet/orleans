@@ -32,9 +32,9 @@ namespace Consul.Tests
         }
 
         private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseConsulGatewayProvider(gatewayOptions =>
+            .UseConfiguration(config).UseConsulGatewayListProvider(gatewayOptions =>
             {
-                gatewayOptions.ConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);;
             })
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
 
@@ -47,7 +47,7 @@ namespace Consul.Tests
                     .UseConfiguration(clusterConfiguration)
                     .UseConsulMembership(options =>
                     {
-                        options.ConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                        options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
                     })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
             }

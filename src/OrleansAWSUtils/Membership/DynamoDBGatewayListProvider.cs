@@ -22,9 +22,9 @@ namespace Orleans.Runtime.Membership
         private string deploymentId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILoggerFactory loggerFactory;
-        private readonly DynamoDBGatewayProviderOptions options;
+        private readonly DynamoDBGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBGatewayProviderOptions> options)
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBGatewayListProviderOptions> options)
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Membership
 
         public Task InitializeGatewayListProvider()
         {
-            storage = new DynamoDBStorage(options.ConnectionString, loggerFactory);
+            storage = new DynamoDBStorage(loggerFactory, options.AccessKey, options.SecretKey, options.Service, options.ReadCapacityUnits, options.WriteCapacityUnits);
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
                 {

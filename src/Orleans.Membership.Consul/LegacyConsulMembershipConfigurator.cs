@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
@@ -9,7 +10,7 @@ namespace Orleans.Runtime.MembershipService
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
         {
-            services.UseConsulMembership(options => options.ConnectionString = configuration.DataConnectionString);
+            services.UseConsulMembership(options => options.Address = new Uri(configuration.DataConnectionString));
         }
     }
 }

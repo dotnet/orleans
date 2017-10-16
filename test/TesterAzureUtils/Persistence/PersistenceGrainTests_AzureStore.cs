@@ -60,7 +60,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         public static Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseAzureTableGatewayProvider(gatewayOptions =>
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })

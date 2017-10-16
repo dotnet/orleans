@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
         public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
 
-        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "Orleans.Membership.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);

@@ -6,15 +6,14 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansAWSUtils.Membership
+namespace OrleansZooKeeperUtils
 {
-    /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
-    public class LegacyDynamoDBGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
+    /// <inheritdoc/>
+    public class LegacyZooKeeperGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
-        /// <inheritdoc cref="ILegacyGatewayListProviderConfigurator"/>
         public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
         {
-            services.UseDynamoDBGatewayProvider(options =>
+            services.UseZooKeeperGatewayListProvider(options =>
             {
                 options.ConnectionString = configuration.DataConnectionString;
             });

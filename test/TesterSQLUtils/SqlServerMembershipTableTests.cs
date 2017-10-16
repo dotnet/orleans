@@ -46,7 +46,7 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            var options = new SqlGatewayProviderOptions()
+            var options = new SqlGatewayListProviderOptions()
             {
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()

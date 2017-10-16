@@ -6,15 +6,17 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansZooKeeperUtils
+namespace OrleansConsulUtils
 {
-    public class LegacyZooKeeperGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
+    /// <inheritdoc/>
+    public class LegacyConsulGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
+        /// <inheritdoc/>
         public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
         {
-            services.UseZooKeeperGatewayProvider(options =>
+            services.UseConsulGatewayListProvider(options =>
             {
-                options.ConnectionString = configuration.DataConnectionString;
+                options.Address = new Uri(configuration.DataConnectionString);
             });
         }
     }

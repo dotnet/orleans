@@ -9,9 +9,9 @@ namespace Orleans.Messaging
 {
     public class StaticGatewayListProvider : IGatewayListProvider
     {
-        private readonly StaticGatewayProviderOptions options;
+        private readonly StaticGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
-        public StaticGatewayListProvider(IOptions<StaticGatewayProviderOptions> options, ClientConfiguration clientConfiguration )
+        public StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, ClientConfiguration clientConfiguration )
         {
             this.options = options.Value;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
@@ -19,24 +19,19 @@ namespace Orleans.Messaging
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider()
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeGatewayListProvider() => Task.CompletedTask;
+        
 
-        public Task<IList<Uri>> GetGateways()
-        {
-            return Task.FromResult(this.options.Gateways);
-        }
+        public Task<IList<Uri>> GetGateways() => Task.FromResult(this.options.Gateways);
 
-        public TimeSpan MaxStaleness 
+        public TimeSpan MaxStaleness
         {
-            get { return this.maxStaleness; }
+            get => this.maxStaleness;
         }
 
         public bool IsUpdatable
         {
-            get { return true; }
+            get => true;
         }
 
         #endregion

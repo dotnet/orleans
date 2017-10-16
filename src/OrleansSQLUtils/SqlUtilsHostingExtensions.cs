@@ -36,25 +36,25 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use SqlGatewayProvider
+        /// Configure client to use SqlGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IClientBuilder UseSqlGatewayProvider(this IClientBuilder builder, Action<SqlGatewayProviderOptions> configureOptions)
+        public static IClientBuilder UseSqlGatewayListProvider(this IClientBuilder builder, Action<SqlGatewayListProviderOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseSqlGatewayProvider(configureOptions));
+            return builder.ConfigureServices(services => services.UseSqlGatewayListProvider(configureOptions));
         }
 
         /// <summary>
-        /// Configure client to use SqlGatewayProvider
+        /// Configure client to use SqlGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IClientBuilder UseSqlGatewayProvider(this IClientBuilder builder, IConfiguration configuration)
+        public static IClientBuilder UseSqlGatewayListProvider(this IClientBuilder builder, IConfiguration configuration)
         {
-            return builder.ConfigureServices(services => services.UseSqlGatewayProvider(configuration));
+            return builder.ConfigureServices(services => services.UseSqlGatewayListProvider(configuration));
         }
 
         /// <summary>
@@ -84,13 +84,13 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlGatewayProvider
+        /// Configure DI container with SqlGatewayListProvider
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
-        public static IServiceCollection UseSqlGatewayProvider(this IServiceCollection services,
-            Action<SqlGatewayProviderOptions> configureOptions)
+        public static IServiceCollection UseSqlGatewayListProvider(this IServiceCollection services,
+            Action<SqlGatewayListProviderOptions> configureOptions)
         {
             return services.Configure(configureOptions)
                 .AddSingleton<IGatewayListProvider, SqlGatewayListProvider>();
@@ -102,10 +102,10 @@ namespace Orleans.Hosting
         /// <param name="services"></param>
         /// <param name="configuration"></param>
         /// <returns></returns>
-        public static IServiceCollection UseSqlGatewayProvider(this IServiceCollection services,
+        public static IServiceCollection UseSqlGatewayListProvider(this IServiceCollection services,
             IConfiguration configuration)
         {
-            return services.Configure<SqlGatewayProviderOptions>(configuration)
+            return services.Configure<SqlGatewayListProviderOptions>(configuration)
                 .AddSingleton<IGatewayListProvider, SqlGatewayListProvider>();
         }
     }

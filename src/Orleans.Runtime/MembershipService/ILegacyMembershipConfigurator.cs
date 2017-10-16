@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType;
 
@@ -34,16 +35,16 @@ namespace Orleans.Runtime.MembershipService
                     configurator = new LegacyGrainBasedMembershipConfigurator();
                     break;
                 case LivenessProviderType.SqlServer:
-                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
                     break;
                 case LivenessProviderType.AzureTable:
-                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL);
                     break;
                 case LivenessProviderType.ZooKeeper:
-                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
                     break;
                 case LivenessProviderType.Custom:
-                    configurator = AssemblyLoader.CreateInstance<ILegacyMembershipConfigurator>(configuration.MembershipTableAssembly);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(configuration.MembershipTableAssembly);
                     break;
                 default:
                     break;

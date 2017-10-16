@@ -36,7 +36,7 @@ namespace Orleans.Configuration
             });
 
             // GatewayProvider
-            LegacyGatewayProviderConfigurator.ConfigureServices(configuration, services);
+            LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
             return services;
         }
 

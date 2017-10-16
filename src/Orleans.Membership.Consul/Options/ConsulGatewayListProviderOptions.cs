@@ -4,11 +4,11 @@ using System.Text;
 
 namespace OrleansConsulUtils.Options
 {
-    public class ConsulGatewayProviderOptions
+    public class ConsulGatewayListProviderOptions
     {
         /// <summary>
-        /// Connection string for Consul
+        /// Address for ConsulClient
         /// </summary>
-        public string ConnectionString { get; set; }
+        public Uri Address { get; set; }
     }
 }
