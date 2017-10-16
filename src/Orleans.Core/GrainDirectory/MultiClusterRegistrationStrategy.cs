@@ -18,8 +18,7 @@ namespace Orleans.GrainDirectory
         /// <param name="mcConfig">The multi-cluster configuration</param>
         /// <param name="myClusterId">The cluster id of this cluster</param>
         /// <returns></returns>
-        IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId);
-
+        IEnumerable<string> GetRemoteInstances(IReadOnlyList<string> clusters, string myClusterId);
     }
 
     internal class MultiClusterRegistrationStrategyManager
@@ -65,6 +64,14 @@ namespace Orleans.GrainDirectory
     [Serializable]
     internal abstract class MultiClusterRegistrationStrategy : IMultiClusterRegistrationStrategy
     {
-        public abstract IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId);
+        public abstract IEnumerable<string> GetRemoteInstances(IReadOnlyList<string> clusters, string myClusterId);
+    }
+
+    public static class MultiClusterRegistrationStrategyExtensions
+    {
+        public static IEnumerable<string> GetRemoteInstances(this IMultiClusterRegistrationStrategy strategy, MultiClusterConfiguration configuration, string myClusterId)
+        {
+            return strategy.GetRemoteInstances(configuration.Clusters, myClusterId);
+        }
     }
 }

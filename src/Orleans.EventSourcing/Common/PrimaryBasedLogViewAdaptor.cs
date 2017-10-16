@@ -8,6 +8,7 @@ using System.Diagnostics;
 using Orleans.Serialization;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
+using Orleans.GrainDirectory;
 
 namespace Orleans.EventSourcing.Common
 {
