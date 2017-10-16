@@ -24,6 +24,7 @@ namespace Orleans
         [NonSerialized]
         private readonly ConcurrentDictionary<GrainId, GrainReference> _targetGrainReferences;
 
+        [NonSerialized]
         private IGrainCancellationTokenRuntime _cancellationTokenRuntime;
 
         /// <summary>
@@ -66,7 +67,7 @@ namespace Orleans
         {
             if (_cancellationTokenRuntime == null)
             {
-                _cancellationTokenSource.Cancel();
+                WrapInTask(_cancellationTokenSource.Cancel);
                 return Task.CompletedTask;
             }
 
@@ -84,6 +85,21 @@ namespace Orleans
         public void Dispose()
         {
             _cancellationTokenSource.Dispose();
+        }
+
+        private static Task WrapInTask(Action action)
+        {
+            try
+            {
+                action();
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                var completion = new TaskCompletionSource<object>();
+                completion.TrySetException(exception);
+                return completion.Task;
+            }
         }
 
         #region Serialization

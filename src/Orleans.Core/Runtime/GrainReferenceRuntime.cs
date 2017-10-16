@@ -18,17 +18,19 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
-        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime = new GrainCancellationTokenRuntime();
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
+            IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IInternalGrainFactory internalGrainFactory,
             SerializationManager serializationManager)
         {
             this.responseCallbackDelegate = this.ResponseCallback;
             this.logger = logger;
             this.RuntimeClient = runtimeClient;
+            this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;
         }
