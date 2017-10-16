@@ -67,8 +67,18 @@ namespace Orleans
         {
             if (_cancellationTokenRuntime == null)
             {
-                WrapInTask(_cancellationTokenSource.Cancel);
-                return Task.CompletedTask;
+                // Wrap in task
+                try
+                {
+                    _cancellationTokenSource.Cancel();
+                    return Task.CompletedTask;
+                }
+                catch (Exception exception)
+                {
+                    var completion = new TaskCompletionSource<object>();
+                    completion.TrySetException(exception);
+                    return completion.Task;
+                }
             }
 
             return _cancellationTokenRuntime.Cancel(Id, _cancellationTokenSource, _targetGrainReferences);
@@ -85,21 +95,6 @@ namespace Orleans
         public void Dispose()
         {
             _cancellationTokenSource.Dispose();
-        }
-
-        private static Task WrapInTask(Action action)
-        {
-            try
-            {
-                action();
-                return Task.CompletedTask;
-            }
-            catch (Exception exception)
-            {
-                var completion = new TaskCompletionSource<object>();
-                completion.TrySetException(exception);
-                return completion.Task;
-            }
         }
 
         #region Serialization
