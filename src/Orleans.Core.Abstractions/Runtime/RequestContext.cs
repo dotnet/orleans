@@ -142,7 +142,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static Dictionary<string, object> Export(SerializationManager serializationManager)
+        public static Dictionary<string, object> Export(ISerializationManager serializationManager)
         {
             var values = CallContextData.Value;
 
