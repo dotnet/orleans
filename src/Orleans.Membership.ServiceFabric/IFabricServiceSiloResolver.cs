@@ -5,6 +5,14 @@ namespace Microsoft.Orleans.ServiceFabric
     internal interface IFabricServiceSiloResolver
     {
         /// <summary>
+        /// Gets a value indicating whether or not this service exists in a singleton partition.
+        /// </summary>
+        /// <remarks>
+        /// If the result is null, the value is not yet determined.
+        /// </remarks>
+        bool? IsSingletonPartition { get; }
+
+        /// <summary>
         /// Subscribes the provided handler for update notifications.
         /// </summary>
         /// <param name="handler">The update notification handler.</param>

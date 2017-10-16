@@ -45,29 +45,23 @@ namespace Microsoft.Orleans.ServiceFabric
             this.log = new LoggerWrapper<FabricServiceSiloResolver>(loggerFactory);
             this.partitionChangeHandler = this.OnPartitionChange;
         }
-        
-        /// <summary>
-        /// Subscribes the provided handler for update notifications.
-        /// </summary>
-        /// <param name="handler">The update notification handler.</param>
+
+        /// <inheritdoc />
+        public bool? IsSingletonPartition { get; private set; }
+
+        /// <inheritdoc />
         public void Subscribe(IFabricServiceStatusListener handler)
         {
             this.subscribers.TryAdd(handler, handler);
         }
 
-        /// <summary>
-        /// Unsubscribes the provided handler from update notifications.
-        /// </summary>
-        /// <param name="handler">The update notification handler.</param>
+        /// <inheritdoc />
         public void Unsubscribe(IFabricServiceStatusListener handler)
         {
             this.subscribers.TryRemove(handler, out handler);
         }
 
-        /// <summary>
-        /// Forces a refresh of the partitions.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        /// <inheritdoc />
         public async Task Refresh()
         {
             if (this.log.IsVerbose) this.log.Verbose($"Refreshing silos for service {this.serviceName}");
@@ -75,6 +69,7 @@ namespace Microsoft.Orleans.ServiceFabric
             lock (this.updateLock)
             {
                 this.silos = result;
+                this.IsSingletonPartition = this.silos.FirstOrDefault()?.Partition.Kind == ServicePartitionKind.Singleton;
 
                 // Register for update notifications for each partition.
                 var oldRegistrations = this.changeHandlerRegistrations;
@@ -152,7 +147,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
                     $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
             }
-            else if (this.log.IsVerbose2)
+            else if (this.log.IsVerbose)
             {
                 var newSilos = new StringBuilder();
                 foreach (var silo in updated.Silos)
@@ -160,7 +155,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     newSilos.Append($"\n* {silo}");
                 }
 
-                this.log.Verbose2($"Received update for partition {updated.Partition}. Updated values:{newSilos}");
+                this.log.Verbose($"Received update for partition {updated.Partition}. Updated values: {newSilos}");
             }
         }
 
