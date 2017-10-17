@@ -66,6 +66,7 @@ namespace Tester.ClientConnectionTests
                     return gateway;
                 }))
                 .ConfigureServices(services => services.AddFromExisting<IGatewayListProvider, TestGatewayManager>())
+                .AddApplicationPartsFromBasePath()
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, configuration.TraceFileName));
         }
 

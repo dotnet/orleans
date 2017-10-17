@@ -64,6 +64,7 @@ namespace Tester.AzureUtils.Persistence
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })
+            .AddApplicationPartsFromAppDomain()
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
 
         public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)

@@ -36,6 +36,7 @@ namespace Consul.Tests
             {
                 gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);;
             })
+            .AddApplicationPartsFromAppDomain()
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
