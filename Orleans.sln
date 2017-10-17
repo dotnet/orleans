@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.12
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
@@ -55,9 +55,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrainInterfaces", "test\TestGrainInterfaces\TestGrainInterfaces.csproj", "{CC76035A-056B-43F3-8FFB-92DE66A19305}"
-	ProjectSection(ProjectDependencies) = postProject
-		{F7D70028-7E3B-48E3-92B9-DB889AE5ABD1} = {F7D70028-7E3B-48E3-92B9-DB889AE5ABD1}
-	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrains", "test\TestGrains\TestGrains.csproj", "{B84A0977-EF3A-44B0-B4EF-CE68B387AE63}"
 EndProject
