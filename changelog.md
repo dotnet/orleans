@@ -11,6 +11,7 @@ The idea is to track end-user facing changes as they occur.*
   - Fix infrequent `NullReferenceException` during activation collection #3399
   - Improve resiliency in in client message pump loop #3367
   - Service Fabric: fix leak in registration of partition notifications #3411
+  - Fixed duplicate stream message cache monitoring bug #3522
   - Several minor bug fixes and perf improvements #3419 #3420 #3489
 
 - Non-breaking improvements
