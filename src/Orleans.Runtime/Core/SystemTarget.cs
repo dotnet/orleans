@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
-        IRuntimeClient ISystemTargetBase.RuntimeClient => this.RuntimeClient;
+        IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
