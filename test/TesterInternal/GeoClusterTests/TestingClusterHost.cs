@@ -170,7 +170,7 @@ namespace Tests.GeoClusterTests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)));
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
 
             private void ConfigureLogging(ILoggingBuilder builder, string filePath)

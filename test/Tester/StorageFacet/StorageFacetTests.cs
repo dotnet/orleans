@@ -33,7 +33,7 @@ namespace Tester
                     var builder = new SiloHostBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)));
+                        .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
 
                     // Setup storage feature infrastructure.
                     // - Setup infrastructure.

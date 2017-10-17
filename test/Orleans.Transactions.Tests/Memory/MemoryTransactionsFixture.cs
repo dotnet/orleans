@@ -26,7 +26,7 @@ namespace Orleans.Transactions.Tests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)))
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)))
                     .UseInClusterTransactionManager(new TransactionsConfiguration())
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();

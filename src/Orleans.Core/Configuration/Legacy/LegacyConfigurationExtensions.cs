@@ -19,7 +19,6 @@ namespace Orleans.Configuration
             // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
             services.TryAddSingleton(configuration);
             services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
-            services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>

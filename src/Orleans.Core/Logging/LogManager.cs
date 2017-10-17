@@ -64,17 +64,6 @@ namespace Orleans.Runtime
             return process.Handle;
         }
 
-        /// <summary>
-        /// This custom comparer lets us sort the TraceLevelOverrides list so that the longest prefix comes first
-        /// </summary>
-        private class TraceOverrideComparer : Comparer<Tuple<string, Severity>>
-        {
-            public override int Compare(Tuple<string, Severity> x, Tuple<string, Severity> y)
-            {
-                return y.Item1.Length.CompareTo(x.Item1.Length);
-            }
-        }
-
         private static class NativeMethods
         {
             [DllImport("Dbghelp.dll")]

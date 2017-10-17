@@ -52,7 +52,7 @@ namespace Tester.StreamingTests
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestsUtils.GetLegacyTraceFileName(siloName, DateTime.UtcNow)));
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
 
             private void ConfigureServices(IServiceCollection services)

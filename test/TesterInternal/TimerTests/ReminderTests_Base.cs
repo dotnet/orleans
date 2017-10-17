@@ -44,14 +44,14 @@ namespace UnitTests.TimerTests
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
 
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
+            ClientConfiguration configuration = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             var filters = new LoggerFilterOptions();
 #if DEBUG
             filters.AddFilter("Storage", LogLevel.Trace);
             filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(TestsUtils.GetLegacyTraceFileName(cfg.ClientName, DateTime.UtcNow), filters));
+            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.DeploymentId), filters));
         }
 
         public IGrainFactory GrainFactory { get; }

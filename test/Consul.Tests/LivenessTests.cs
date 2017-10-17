@@ -37,7 +37,7 @@ namespace Consul.Tests
                 gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);;
             })
             .AddApplicationPartsFromAppDomain()
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {
@@ -50,7 +50,7 @@ namespace Consul.Tests
                     {
                         options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
                     })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
         }
 

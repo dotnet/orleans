@@ -154,7 +154,7 @@ namespace Orleans.TestingHost
                 .AddApplicationPartsFromAppDomain()
                 .AddApplicationPartsFromBasePath()
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder,
-                    DefaultSiloBuilderFactory.GetLegacyTraceFileName(config.ClientName, DateTime.UtcNow)));
+                    TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
 
         /// <summary>
         /// Factory delegate to create a client builder which will be used to build the <see cref="TestCluster"/> client. 
