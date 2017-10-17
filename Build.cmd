@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 SET CMDHOME=%~dp0.
-if "%BUILD_FLAGS%"=="" SET BUILD_FLAGS=/m:1 /v:m
+if "%BUILD_FLAGS%"=="" SET BUILD_FLAGS=/m /v:m
 if not defined BuildConfiguration SET BuildConfiguration=Debug
 
 :: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
