@@ -1144,7 +1144,7 @@ namespace Orleans.Runtime
             // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
-                RequestContext.Import(requestContextData);
+                RequestContextExtensions.Import(requestContextData);
                 await activation.Lifecycle.OnStart();
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
 
