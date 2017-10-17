@@ -4,12 +4,10 @@ namespace Orleans.CodeGenerator
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
-    using System.Linq.Expressions;
     using System.Reflection;
     using System.Threading.Tasks;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-    using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
@@ -213,6 +211,7 @@ namespace Orleans.CodeGenerator
             var argumentsVariable = SF.IdentifierName("arguments");
 
             var methodDeclaration = invokeMethod.GetDeclarationSyntax()
+                .AddModifiers(SF.Token(SyntaxKind.AsyncKeyword))
                 .AddBodyStatements(interfaceIdDeclaration, methodIdDeclaration, argumentsDeclaration);
 
             var interfaceCases = CodeGeneratorCommon.GenerateGrainInterfaceAndMethodSwitch(
@@ -296,36 +295,37 @@ namespace Orleans.CodeGenerator
                                         SF.IdentifierName(invokerFieldName)
                                           .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, null)))
                                     .AddArgumentListArguments(SF.Argument(grain), SF.Argument(arguments));
-                return new StatementSyntax[] { SF.ReturnStatement(invokerCall) };
+                return new StatementSyntax[] { SF.ReturnStatement(SF.AwaitExpression(invokerCall)) };
             }
 
             // Invoke the method.
             var grainMethodCall =
-                SF.InvocationExpression(castGrain.Member(method.Name))
-                    .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
+                    SF.InvocationExpression(castGrain.Member(method.Name))
+                      .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
 
-            // For void methods, invoke the method and return a completed task.
+            // For void methods, invoke the method and return null.
             if (method.ReturnType == typeof(void))
             {
-                var completed = (Expression<Func<Task<object>>>)(() => TaskUtility.Completed());
                 return new StatementSyntax[]
                 {
                     SF.ExpressionStatement(grainMethodCall),
-                    SF.ReturnStatement(completed.Invoke())
+                    SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
                 };
             }
 
-            // For methods which return the expected type, Task<object>, simply return that.
-            if (method.ReturnType == typeof(Task<object>))
+            // For methods which return non-generic Task, await the method and return null.
+            if (method.ReturnType == typeof(Task))
             {
-                return new StatementSyntax[] { SF.ReturnStatement(grainMethodCall) };
+                return new StatementSyntax[]
+                {
+                    SF.ExpressionStatement(SF.AwaitExpression(grainMethodCall)),
+                    SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
+                };
             }
-
-            // The invoke method expects a Task<object>, so we need to upcast the returned value.
-            // For methods which do not return a value, the Box extension method returns a meaningless value.
+            
             return new StatementSyntax[]
             {
-                SF.ReturnStatement(SF.InvocationExpression(grainMethodCall.Member((Task _) => _.Box())))
+                SF.ReturnStatement(SF.AwaitExpression(grainMethodCall))
             };
         }
 
