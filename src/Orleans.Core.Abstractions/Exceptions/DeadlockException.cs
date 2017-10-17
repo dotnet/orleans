@@ -29,11 +29,10 @@ namespace Orleans.Runtime
 
         public DeadlockException(string message, Exception innerException) : base(message, innerException) { }
 
-        internal DeadlockException(List<RequestInvocationHistory> callChain)
-            : base(String.Format("Deadlock Exception for grain call chain {0}.", Utils.EnumerableToString(callChain,
-                        elem => String.Format("{0}.{1}", elem.GrainId, elem.DebugContext))))
+        internal DeadlockException(string message, IList<Tuple<GrainId, string>> callChain)
+            : base(message)
         {
-            CallChain = callChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList();
+            CallChain = callChain;
         }
 
         protected DeadlockException(SerializationInfo info, StreamingContext context)
