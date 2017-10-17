@@ -26,7 +26,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster();
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]

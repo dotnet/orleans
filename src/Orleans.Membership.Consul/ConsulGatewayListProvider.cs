@@ -6,37 +6,39 @@ using Consul;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OrleansConsulUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
-    public class ConsulBasedGatewayListProvider : IGatewayListProvider
+    public class ConsulGatewayListProvider : IGatewayListProvider
     {
         private ConsulClient consulClient;
-        private TimeSpan _maxStaleness;
         private string deploymentId;
         private ILogger logger;
-        public ConsulBasedGatewayListProvider(ILogger<ConsulBasedGatewayListProvider> logger)
+        private readonly ConsulGatewayListProviderOptions options;
+        private readonly TimeSpan maxStaleness;
+        public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulGatewayListProviderOptions> options)
         {
             this.logger = logger;
+            this.deploymentId = clientConfig.DeploymentId;
+            this.maxStaleness = clientConfig.GatewayListRefreshPeriod;
+            this.options = options.Value;
         }
 
         public TimeSpan MaxStaleness
         {
-            get { return _maxStaleness; }
+            get { return this.maxStaleness; }
         }
 
         public Boolean IsUpdatable
         {
             get { return true; }
         }
-        public Task InitializeGatewayListProvider(ClientConfiguration configuration)
+        public Task InitializeGatewayListProvider()
         {
-            _maxStaleness = configuration.GatewayListRefreshPeriod;
-
-            this.deploymentId = configuration.DeploymentId;
-
             consulClient =
-                new ConsulClient(config => config.Address = new Uri(configuration.DataConnectionString));
+                new ConsulClient(config => config.Address = options.Address);
 
             return Task.CompletedTask;
         }

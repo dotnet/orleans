@@ -62,9 +62,16 @@ namespace UnitTests.Streaming.Reliability
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
-            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>().UseClientBuilderFactory(clientBuilderFactory);
         }
+
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+            })
+            .AddApplicationPartsFromAppDomain()
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {

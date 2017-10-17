@@ -35,7 +35,6 @@ namespace Tester.SQLUtils
                 options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
                 options.ClientConfiguration.DataConnectionString = connectionString;
                 options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
-
                 return new TestCluster(options);
             }
         }

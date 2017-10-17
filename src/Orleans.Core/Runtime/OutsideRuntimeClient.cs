@@ -181,6 +181,7 @@ namespace Orleans
                 }
 
                 this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
+
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory);
@@ -226,7 +227,7 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal()
         {
-            await this.gatewayListProvider.InitializeGatewayListProvider(config)
+            await this.gatewayListProvider.InitializeGatewayListProvider()
                                .WithTimeout(initTimeout);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
