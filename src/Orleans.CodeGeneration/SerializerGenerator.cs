@@ -40,16 +40,24 @@ namespace Orleans.CodeGenerator
         private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
 
         /// <summary>
+        /// Returns the name of the generated class for the provided type.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The name of the generated class for the provided type.</returns>
+        internal static string GetGeneratedClassName(Type type) => CodeGeneratorCommon.ClassPrefix + type.GetParseableName(GeneratedTypeNameOptions);
+
+        /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
-        /// <param name="type">The grain interface type.</param>
+        /// <param name="className">The name for the generated class.</param>
+        /// <param name="type">The type which this serializer is being generated for.</param>
         /// <param name="onEncounteredType">
         /// The callback invoked when a type is encountered.
         /// </param>
         /// <returns>
         /// The generated class.
         /// </returns>
-        internal static TypeDeclarationSyntax GenerateClass(Type type, Action<Type> onEncounteredType)
+        internal static TypeDeclarationSyntax GenerateClass(string className, Type type, Action<Type> onEncounteredType)
         {
             var typeInfo = type.GetTypeInfo();
             var genericTypes = typeInfo.IsGenericTypeDefinition
@@ -64,8 +72,7 @@ namespace Orleans.CodeGenerator
                     .AddArgumentListArguments(
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
             };
-
-            var className = CodeGeneratorCommon.ClassPrefix + type.GetParseableName(GeneratedTypeNameOptions);
+            
             var fields = GetFields(type);
 
             // Mark each field type for generation

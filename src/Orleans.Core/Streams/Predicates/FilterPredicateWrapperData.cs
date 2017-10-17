@@ -13,6 +13,8 @@ namespace Orleans.Streams
     [Serializable]
     internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper, ISerializable
     {
+        private static readonly ITypeResolver TypeResolver = new CachedTypeResolver();
+
         public object FilterData { get; private set; }
 
         private string methodName;
@@ -63,7 +65,7 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            Type funcClassType = TypeUtils.ResolveType(funcClassName);
+            Type funcClassType = TypeResolver.ResolveType(funcClassName);
             MethodInfo method = funcClassType.GetMethod(funcMethodName);
             StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
 #if DEBUG

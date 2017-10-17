@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
@@ -34,6 +35,8 @@ namespace Orleans.Configuration
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
 
+            // GatewayProvider
+            LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
             return services;
         }
 

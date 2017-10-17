@@ -16,7 +16,7 @@ namespace Orleans.Hosting
 
         private bool built;
         private HostBuilderContext hostBuilderContext;
-        private List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
+        private readonly List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
         private IConfiguration appConfiguration;
 
         /// <inheritdoc />
@@ -54,7 +54,6 @@ namespace Orleans.Hosting
             return this;
         }
 
-
         /// <inheritdoc />
         public ISiloHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
         {
@@ -84,8 +83,7 @@ namespace Orleans.Hosting
                 Configuration = null
             };
         }
-
-
+        
         private void BuildAppConfiguration()
         {
             var configBuilder = new ConfigurationBuilder();

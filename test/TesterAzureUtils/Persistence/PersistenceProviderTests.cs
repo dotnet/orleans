@@ -318,7 +318,7 @@ namespace Tester.AzureUtils.Persistence
         public void LoadClassByName()
         {
             string className = typeof(MockStorageProvider).FullName;
-            Type classType = TypeUtils.ResolveType(className);
+            Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }

@@ -49,7 +49,7 @@ namespace Microsoft.Orleans.ServiceFabric
         }
 
         /// <inheritdoc />
-        public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration)
+        public async Task InitializeGatewayListProvider()
         {
             this.fabricServiceSiloResolver.Subscribe(this);
             await this.RefreshAsync();

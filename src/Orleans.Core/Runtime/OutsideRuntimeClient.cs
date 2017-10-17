@@ -64,8 +64,7 @@ namespace Orleans
         /// Response timeout.
         /// </summary>
         private TimeSpan responseTimeout;
-
-        private AssemblyProcessor assemblyProcessor;
+        
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
@@ -141,14 +140,11 @@ namespace Orleans
             this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
 
             StatisticsCollector.Initialize(config);
-            this.assemblyProcessor = this.ServiceProvider.GetRequiredService<AssemblyProcessor>();
-            this.assemblyProcessor.Initialize();
 
             BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions);
 
             try
             {
-                LoadAdditionalAssemblies();
                 //init logger for UnobservedExceptionsHandlerClass
                 UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
                 if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
@@ -185,6 +181,7 @@ namespace Orleans
                 }
 
                 this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
+
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory);
@@ -212,34 +209,6 @@ namespace Orleans
             CurrentStreamProviderManager = streamProviderManager;
         }
 
-        private void LoadAdditionalAssemblies()
-        {
-            var logger = new LoggerWrapper("Orleans.AssemblyLoader.Client", this.loggerFactory);
-
-            var directories =
-                new Dictionary<string, SearchOption>
-                    {
-                        {
-                            Path.GetDirectoryName(typeof(OutsideRuntimeClient).GetTypeInfo().Assembly.Location),
-                            SearchOption.AllDirectories
-                        }
-                    };
-            var excludeCriteria =
-                new AssemblyLoaderPathNameCriterion[]
-                    {
-                        AssemblyLoaderCriteria.ExcludeResourceAssemblies,
-                        AssemblyLoaderCriteria.ExcludeSystemBinaries()
-                    };
-            var loadProvidersCriteria =
-                new AssemblyLoaderReflectionCriterion[]
-                    {
-                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
-                    };
-
-            this.assemblyProcessor.Initialize();
-            AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
-        }
-
         private void UnhandledException(ISchedulingContext context, Exception exception)
         {
             logger.Error(ErrorCode.Runtime_Error_100007, String.Format("OutsideRuntimeClient caught an UnobservedException."), exception);
@@ -258,7 +227,7 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal()
         {
-            await this.gatewayListProvider.InitializeGatewayListProvider(config)
+            await this.gatewayListProvider.InitializeGatewayListProvider()
                                .WithTimeout(initTimeout);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
@@ -881,9 +850,7 @@ namespace Orleans
                 Utils.SafeExecute(() => listeningCts.Dispose());
                 listeningCts = null;
             }
-
-            Utils.SafeExecute(() => this.assemblyProcessor?.Dispose());
-
+            
             Utils.SafeExecute(() => transport?.Dispose());
             if (ClientStatistics != null)
             {

@@ -1,6 +1,10 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.Extensions.Configuration;
+using Orleans.Configuration.Options;
+using Orleans.Messaging;
 
 namespace Orleans.Configuration
 {
@@ -76,6 +80,34 @@ namespace Orleans.Configuration
         {
             return collection.AddSingleton<IGrainCallFilter>(
                 new GrainCallFilterWrapper(filter));
+        }
+
+        /// <summary>
+        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
+            Action<StaticGatewayListProviderOptions> configureOptions)
+        {
+            return collection
+                .Configure(configureOptions)
+                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
+        }
+
+        /// <summary>
+        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configuration"/>
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="configuration"></param>
+        /// <returns></returns>
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
+            IConfiguration configuration)
+        {
+            return collection
+                .Configure<StaticGatewayListProviderOptions>(configuration)
+                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
         }
 
         private class GrainCallFilterWrapper : IGrainCallFilter

@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +23,8 @@ namespace Orleans.Runtime
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 
         private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
+
+        private static readonly CachedReflectionOnlyTypeResolver ReflectionOnlyTypeResolver = new CachedReflectionOnlyTypeResolver();
 
         public static string GetSimpleTypeName(Type t, Predicate<Type> fullName = null)
         {
@@ -398,7 +401,7 @@ namespace Orleans.Runtime
             }
 
             if (grainType == type || grainChevronType == type) return false;
-
+            
             if (!grainType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
@@ -428,7 +431,7 @@ namespace Orleans.Runtime
 
         public static bool IsGeneratedType(Type type)
         {
-            return TypeHasAttribute(type, typeof(GeneratedAttribute));
+            return TypeHasAttribute(type, typeof(GeneratedCodeAttribute));
         }
 
         /// <summary>
@@ -501,22 +504,13 @@ namespace Orleans.Runtime
 
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
+        
 
-        public static Type ResolveType(string fullName)
-        {
-            return CachedTypeResolver.Instance.ResolveType(fullName);
-        }
-
-        public static bool TryResolveType(string fullName, out Type type)
-        {
-            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
-        }
-
-        private static Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
+        private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {
             try
             {
-                CachedReflectionOnlyTypeResolver.Instance.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
+                ReflectionOnlyTypeResolver.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
                 return true;
             }
             catch (PlatformNotSupportedException)
@@ -534,7 +528,7 @@ namespace Orleans.Runtime
 
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
         {
-            return CachedReflectionOnlyTypeResolver.Instance.ResolveType(assemblyQualifiedName);
+            return ReflectionOnlyTypeResolver.ResolveType(assemblyQualifiedName);
         }
 
         public static Type ToReflectionOnlyType(Type type)
@@ -579,20 +573,7 @@ namespace Orleans.Runtime
                 return Enumerable.Empty<TypeInfo>();
             }
         }
-
-        public static IEnumerable<Type> GetTypes(Predicate<Type> whereFunc, Logger logger)
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            var result = new List<Type>();
-            foreach (var assembly in assemblies)
-            {
-                // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc, logger);
-                result.AddRange(types);
-            }
-            return result;
-        }
-
+        
         /// <summary>
         /// Returns a value indicating whether or not the provided <paramref name="methodInfo"/> is a grain method.
         /// </summary>
@@ -705,26 +686,32 @@ namespace Orleans.Runtime
         /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
         /// <param name="type">The type.</param>
         /// <param name="options">The type formatting options.</param>
+        /// <param name="getNameFunc">The delegate used to get the unadorned, simple type name of <paramref name="type"/>.</param>
         /// <returns>A string representation of the <paramref name="type"/>.</returns>
-        public static string GetParseableName(this Type type, TypeFormattingOptions options = null)
+        public static string GetParseableName(this Type type, TypeFormattingOptions options = null, Func<Type, string> getNameFunc = null)
         {
-            options = options ?? new TypeFormattingOptions();
-            return ParseableNameCache.GetOrAdd(
-                Tuple.Create(type, options),
-                _ =>
-                {
-                    var builder = new StringBuilder();
-                    var typeInfo = type.GetTypeInfo();
-                    GetParseableName(
-                        type,
-                        builder,
-                        new Queue<Type>(
-                            typeInfo.IsGenericTypeDefinition
-                                ? typeInfo.GetGenericArguments()
-                                : typeInfo.GenericTypeArguments),
-                        options);
-                    return builder.ToString();
-                });
+            options = options ?? TypeFormattingOptions.Default;
+
+            // If a naming function has been specified, skip the cache.
+            if (getNameFunc != null) return BuildParseableName();
+
+            return ParseableNameCache.GetOrAdd(Tuple.Create(type, options), _ => BuildParseableName());
+
+            string BuildParseableName()
+            {
+                var builder = new StringBuilder();
+                var typeInfo = type.GetTypeInfo();
+                GetParseableName(
+                    type,
+                    builder,
+                    new Queue<Type>(
+                        typeInfo.IsGenericTypeDefinition
+                            ? typeInfo.GetGenericArguments()
+                            : typeInfo.GenericTypeArguments),
+                    options,
+                    getNameFunc ?? (t => t.GetUnadornedTypeName() + options.NameSuffix));
+                return builder.ToString();
+            }
         }
 
         /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
@@ -736,15 +723,21 @@ namespace Orleans.Runtime
             Type type,
             StringBuilder builder,
             Queue<Type> typeArguments,
-            TypeFormattingOptions options)
+            TypeFormattingOptions options,
+            Func<Type, string> getNameFunc)
         {
             var typeInfo = type.GetTypeInfo();
             if (typeInfo.IsArray)
             {
-                builder.AppendFormat(
-                    "{0}[{1}]",
-                    typeInfo.GetElementType().GetParseableName(options),
-                    string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
+                var elementType = typeInfo.GetElementType().GetParseableName(options);
+                if (!string.IsNullOrWhiteSpace(elementType))
+                {
+                    builder.AppendFormat(
+                        "{0}[{1}]",
+                        elementType,
+                        string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
+                }
+
                 return;
             }
 
@@ -761,7 +754,7 @@ namespace Orleans.Runtime
             if (typeInfo.DeclaringType != null)
             {
                 // This is not the root type.
-                GetParseableName(typeInfo.DeclaringType, builder, typeArguments, options);
+                GetParseableName(typeInfo.DeclaringType, builder, typeArguments, options, t => t.GetUnadornedTypeName());
                 builder.Append(options.NestedTypeSeparator);
             }
             else if (!string.IsNullOrWhiteSpace(type.Namespace) && options.IncludeNamespace)
@@ -784,7 +777,7 @@ namespace Orleans.Runtime
             if (type.IsConstructedGenericType)
             {
                 // Get the unadorned name, the generic parameters, and add them together.
-                var unadornedTypeName = type.GetUnadornedTypeName() + options.NameSuffix;
+                var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
                     Enumerable.Range(0, Math.Min(typeInfo.GetGenericArguments().Count(), typeArguments.Count))
@@ -801,7 +794,7 @@ namespace Orleans.Runtime
             else if (typeInfo.IsGenericTypeDefinition)
             {
                 // Get the unadorned name, the generic parameters, and add them together.
-                var unadornedTypeName = type.GetUnadornedTypeName() + options.NameSuffix;
+                var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
                     Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
@@ -817,7 +810,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                builder.Append(EscapeIdentifier(type.GetUnadornedTypeName() + options.NameSuffix));
+                builder.Append(EscapeIdentifier(getNameFunc(type)));
             }
         }
 
@@ -1149,10 +1142,21 @@ namespace Orleans.Runtime
 
         private static string EscapeIdentifier(string identifier)
         {
+            if (IsCSharpKeyword(identifier)) return "@" + identifier;
+            return identifier;
+        }
+
+        internal static bool IsCSharpKeyword(string identifier)
+        {
             switch (identifier)
             {
                 case "abstract":
                 case "add":
+                case "alias":
+                case "as":
+                case "ascending":
+                case "async":
+                case "await":
                 case "base":
                 case "bool":
                 case "break":
@@ -1167,8 +1171,10 @@ namespace Orleans.Runtime
                 case "decimal":
                 case "default":
                 case "delegate":
+                case "descending":
                 case "do":
                 case "double":
+                case "dynamic":
                 case "else":
                 case "enum":
                 case "event":
@@ -1180,21 +1186,30 @@ namespace Orleans.Runtime
                 case "float":
                 case "for":
                 case "foreach":
+                case "from":
                 case "get":
+                case "global":
                 case "goto":
+                case "group":
                 case "if":
                 case "implicit":
                 case "in":
                 case "int":
                 case "interface":
                 case "internal":
+                case "into":
+                case "is":
+                case "join":
+                case "let":
                 case "lock":
                 case "long":
+                case "nameof":
                 case "namespace":
                 case "new":
                 case "null":
                 case "object":
                 case "operator":
+                case "orderby":
                 case "out":
                 case "override":
                 case "params":
@@ -1208,9 +1223,11 @@ namespace Orleans.Runtime
                 case "return":
                 case "sbyte":
                 case "sealed":
+                case "select":
                 case "set":
                 case "short":
                 case "sizeof":
+                case "stackalloc":
                 case "static":
                 case "string":
                 case "struct":
@@ -1222,15 +1239,22 @@ namespace Orleans.Runtime
                 case "typeof":
                 case "uint":
                 case "ulong":
+                case "unchecked":
                 case "unsafe":
                 case "ushort":
                 case "using":
+                case "value":
+                case "var":
                 case "virtual":
+                case "void":
+                case "volatile":
+                case "when":
                 case "where":
                 case "while":
-                    return "@" + identifier;
+                case "yield":
+                    return true;
                 default:
-                    return identifier;
+                    return false;
             }
         }
     }

@@ -15,7 +15,7 @@ namespace Orleans.Transactions.Tests
         private readonly ITransactionalState<GrainData> data;
 
         public SingleStateTransactionalGrain(
-            [TransactionalState(TransactionTestConstants.TransactionStore)]
+            [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data)
         {
             this.data = data;

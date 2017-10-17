@@ -39,7 +39,7 @@ namespace UnitTests.Serialization
             var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer5.xml");
             Assert.Equal(2, clientConfig.SerializationProviders.Count);
             Assert.Contains(typeof(FakeSerializer), clientConfig.SerializationProviders);
-            Assert.Contains(typeof(FakeSerializer2), clientConfig.SerializationProviders);
+            Assert.Contains(typeof(FakeExternalSerializer2), clientConfig.SerializationProviders);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -61,7 +61,7 @@ namespace UnitTests.Serialization
         }
     }
 
-    public class FakeSerializer2 : AbstractFakeSerializer
+    public class FakeExternalSerializer2 : AbstractFakeSerializer
     {
     }
 
@@ -71,7 +71,6 @@ namespace UnitTests.Serialization
         {
         }
     }
-
 
     public abstract class AbstractFakeSerializer : IExternalSerializer
     {

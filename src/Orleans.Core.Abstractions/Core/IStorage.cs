@@ -7,6 +7,8 @@ namespace Orleans.Core
     {
         TState State { get; set; }
 
+        string Etag { get; }
+
         /// <summary>
         /// Async method to cause the current grain state data to be cleared and reset. 
         /// This will usually mean the state record is deleted from backing store, but the specific behavior is defined by the storage provider instance configured for this grain.

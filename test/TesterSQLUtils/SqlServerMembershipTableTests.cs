@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,7 @@ using TestExtensions;
 using UnitTests.General;
 using Xunit;
 using OrleansSQLUtils;
+using OrleansSQLUtils.Options;
 
 namespace UnitTests.MembershipTests
 {
@@ -44,7 +46,12 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter);
+            var options = new SqlGatewayListProviderOptions()
+            {
+                ConnectionString = this.connectionString,
+                AdoInvariant = GetAdoInvariant()
+            };
+            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options));
         }
 
         protected override string GetAdoInvariant()

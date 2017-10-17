@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Membership
             this._logger = logger;
             this.membershipTableOptions = membershipTableOptions.Value;
             _consulClient =
-                new ConsulClient(config => config.Address = new Uri(this.membershipTableOptions.ConnectionString));
+                new ConsulClient(config => config.Address = this.membershipTableOptions.Address);
         }
 
         /// <summary>

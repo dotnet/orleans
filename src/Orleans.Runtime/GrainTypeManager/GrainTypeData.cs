@@ -5,10 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 
 using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Concurrency;
-using Orleans.GrainDirectory;
-using Orleans.MultiCluster;
 using Orleans.Placement;
 
 namespace Orleans.Runtime
@@ -25,9 +22,8 @@ namespace Orleans.Runtime
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
-        internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
    
-        public GrainTypeData(Type type, MultiClusterRegistrationStrategyManager registrationManager)
+        public GrainTypeData(Type type)
         {
             var typeInfo = type.GetTypeInfo();
             Type = type;
@@ -37,7 +33,6 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type);
             MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
-            MultiClusterRegistrationStrategy = registrationManager?.GetMultiClusterRegistrationStrategy(type);
         }
 
         /// <summary>

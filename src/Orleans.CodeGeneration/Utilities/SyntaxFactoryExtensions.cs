@@ -27,13 +27,15 @@ namespace Orleans.CodeGenerator.Utilities
         /// <param name="includeGenericParameters">
         /// Whether or not to include the names of generic parameters in the result.
         /// </param>
+        /// <param name="getNameFunc">The delegate used to get the unadorned, simple type name of <paramref name="type"/>.</param>
         /// <returns>
         /// <see cref="TypeSyntax"/> for the provided <paramref name="type"/>.
         /// </returns>
         public static TypeSyntax GetTypeSyntax(
             this Type type,
             bool includeNamespace = true,
-            bool includeGenericParameters = true)
+            bool includeGenericParameters = true,
+            Func<Type, string> getNameFunc = null)
         {
             if (type == typeof(void))
             {
@@ -45,7 +47,8 @@ namespace Orleans.CodeGenerator.Utilities
                     type.GetParseableName(
                         new TypeFormattingOptions(
                             includeNamespace: includeNamespace,
-                            includeGenericParameters: includeGenericParameters)));
+                            includeGenericParameters: includeGenericParameters),
+                        getNameFunc));
         }
         
         /// <summary>

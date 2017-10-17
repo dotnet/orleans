@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.DependencyModel.Resolution;
 using Orleans.Runtime;
@@ -18,8 +18,6 @@ namespace Orleans.CodeGeneration
     /// </summary>
     internal class AssemblyResolver
     {
-        private readonly Action<string> log;
-
         /// <summary>
         /// Needs to be public so can be serialized accross the the app domain.
         /// </summary>
@@ -33,9 +31,8 @@ namespace Orleans.CodeGeneration
         private readonly AssemblyLoadContext loadContext;
 #endif
 
-        public AssemblyResolver(string path, List<string> referencedAssemblies, Action<string> log)
+        public AssemblyResolver(string path, List<string> referencedAssemblies)
         {
-            this.log = log;
             if (Path.GetFileName(path) == "Orleans.Core.dll")  this.Assembly = typeof(RuntimeVersion).Assembly;
             else this.Assembly = Assembly.LoadFrom(path);
 
@@ -105,76 +102,64 @@ namespace Orleans.CodeGeneration
 
         public Assembly AssemblyLoadContextResolving(AssemblyLoadContext context, AssemblyName name)
         {
-            try
+            // Attempt to resolve the library from one of the dependency contexts.
+            var library = this.resolverRependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch)
+                ?? this.dependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch);
+            if (library != null)
             {
-                // Attempt to resolve the library from one of the dependency contexts.
-                var library = this.resolverRependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch)
-                    ?? this.dependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch);
-                if (library != null)
-                {
-                    var wrapper = new CompilationLibrary(
-                        library.Type,
-                        library.Name,
-                        library.Version,
-                        library.Hash,
-                        library.RuntimeAssemblyGroups.SelectMany(g => g.AssetPaths),
-                        library.Dependencies,
-                        library.Serviceable);
+                var wrapper = new CompilationLibrary(
+                    library.Type,
+                    library.Name,
+                    library.Version,
+                    library.Hash,
+                    library.RuntimeAssemblyGroups.SelectMany(g => g.AssetPaths),
+                    library.Dependencies,
+                    library.Serviceable);
 
-                    var assemblies = new List<string>();
-                    if (this.assemblyResolver.TryResolveAssemblyPaths(wrapper, assemblies))
+                var assemblies = new List<string>();
+                if (this.assemblyResolver.TryResolveAssemblyPaths(wrapper, assemblies))
+                {
+                    foreach (var asm in assemblies)
                     {
-                        foreach (var asm in assemblies)
-                        {
-                            var assembly = TryLoadAssemblyFromPath(asm);
-                            if (assembly != null) return assembly;
-                        }
+                        var assembly = TryLoadAssemblyFromPath(asm);
+                        if (assembly != null) return assembly;
                     }
                 }
-
-                if (this.ReferenceAssemblyPaths.TryGetValue(name.FullName, out string path))
-                {
-                    var assembly = TryLoadAssemblyFromPath(path);
-                    if (assembly != null) return assembly;
-                }
-
-                if (this.ReferenceAssemblyPaths.TryGetValue(name.Name, out path))
-                {
-                    var assembly = TryLoadAssemblyFromPath(path);
-                    if (assembly != null) return assembly;
-                }
-
-                this.log($"Could not resolve {name.Name}");
-                return null;
             }
-            catch (Exception exception)
+
+            if (this.ReferenceAssemblyPaths.TryGetValue(name.FullName, out string path))
             {
-                this.log($"Exception in AssemblyLoadContextResolving for assembly {name}: {exception}");
-                throw;
+                var assembly = TryLoadAssemblyFromPath(path);
+                if (assembly != null) return assembly;
             }
 
-            Assembly TryLoadAssemblyFromPath(string path)
+            if (this.ReferenceAssemblyPaths.TryGetValue(name.Name, out path))
             {
-                try
-                {
-                    this.log($"Trying to load assembly from path {path}");
-#if NETCOREAPP2_0
-                    return this.loadContext.LoadFromAssemblyPath(path);
-#else
-                    return Assembly.LoadFrom(path);
-#endif
-                }
-                catch (Exception exception)
-                {
-                    this.log($"Failed to load assembly {name} from path {path}: {exception}");
-                }
-
-                return null;
+                var assembly = TryLoadAssemblyFromPath(path);
+                if (assembly != null) return assembly;
             }
+                
+            return null;
             
             bool NamesMatch(RuntimeLibrary runtime)
             {
                 return string.Equals(runtime.Name, name.Name, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private Assembly TryLoadAssemblyFromPath(string path)
+        {
+            try
+            {
+#if NETCOREAPP2_0
+                return this.loadContext.LoadFromAssemblyPath(path);
+#else
+                return Assembly.LoadFrom(path);
+#endif
+            }
+            catch
+            {
+                return null;
             }
         }
 

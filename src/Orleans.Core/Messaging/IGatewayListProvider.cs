@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Messaging
 {
@@ -14,8 +12,7 @@ namespace Orleans.Messaging
         /// <summary>
         /// Initializes the provider, will be called before all other methods
         /// </summary>
-        /// <param name="clientConfiguration">the given client configuration</param>
-        Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration);
+        Task InitializeGatewayListProvider();
         /// <summary>
         /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
         /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
