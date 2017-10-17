@@ -23,9 +23,9 @@ namespace Orleans.GrainDirectory
             return this.GetType().GetHashCode();
         }
 
-        public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)
+        public override IEnumerable<string> GetRemoteInstances(IReadOnlyList<string> clusters, string myClusterId)
         {
-            foreach (var clusterId in mcConfig.Clusters)
+            foreach (var clusterId in clusters)
                 if (clusterId != myClusterId)
                     yield return clusterId;
         }

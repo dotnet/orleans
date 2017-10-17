@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
 
-            message.RequestContextData = RequestContext.Export(this.serializationManager);
+            message.RequestContextData = RequestContextExtensions.Export(this.serializationManager);
             return message;
         }
 
@@ -91,7 +91,7 @@ namespace Orleans.Runtime
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
             response.TimeToLive = request.TimeToLive;
 
-            var contextData = RequestContext.Export(this.serializationManager);
+            var contextData = RequestContextExtensions.Export(this.serializationManager);
             if (contextData != null)
             {
                 response.RequestContextData = contextData;

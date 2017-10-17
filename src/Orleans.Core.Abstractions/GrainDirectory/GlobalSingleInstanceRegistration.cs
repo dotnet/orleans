@@ -25,7 +25,7 @@ namespace Orleans.GrainDirectory
             return this.GetType().GetHashCode();
         }
 
-        public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)
+        public override IEnumerable<string> GetRemoteInstances(IReadOnlyList<string> clusters, string myClusterId)
         {
             return Enumerable.Empty<string>(); // there is only one instance, so no remote instances
         }

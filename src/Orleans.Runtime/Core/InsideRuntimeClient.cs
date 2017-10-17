@@ -308,12 +308,12 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContext.Import(message.RequestContextData);
+                RequestContextExtensions.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
-                    // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
+                    // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
 
                 bool startNewTransaction = false;

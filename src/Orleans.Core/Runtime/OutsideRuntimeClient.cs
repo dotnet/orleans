@@ -425,7 +425,7 @@ namespace Orleans
                     if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Invoke))
                         continue;
 
-                    RequestContext.Import(message.RequestContextData);
+                    RequestContextExtensions.Import(message.RequestContextData);
                     var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
@@ -664,7 +664,7 @@ namespace Orleans
             {
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContext.Import(response.RequestContextData);
+                // RequestContextExtensions.Import(response.RequestContextData);
                 callbackData.DoCallback(response);
             }
             else

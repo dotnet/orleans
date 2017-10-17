@@ -8,6 +8,7 @@ using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
+using Orleans.Providers;
 
 namespace Orleans.Runtime.Versions
 {
@@ -30,7 +31,7 @@ namespace Orleans.Runtime.Versions
         {
             IStorageProvider unused;
             IsEnabled = storageProviderManager.TryGetProvider(
-                Constants.DEFAULT_STORAGE_PROVIDER_NAME,
+                ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME,
                 out unused);
         }
 

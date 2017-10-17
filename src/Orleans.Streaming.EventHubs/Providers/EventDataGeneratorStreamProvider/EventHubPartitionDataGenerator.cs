@@ -58,7 +58,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             {
                 this.SequenceNumberCounter.Increment();
                 var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
-                    this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContext.Export(this.serializationManager));
+                    this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContextExtensions.Export(this.serializationManager));
 
                 //set partition key
                 eventData.SetPartitionKey(this.StreamId.Guid.ToString());

@@ -120,7 +120,7 @@ namespace Orleans.Runtime.LogConsistency
         {
             try
             {
-                return providerLoader.GetDefaultProvider(Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME);
+                return providerLoader.GetDefaultProvider(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME);
             } catch(InvalidOperationException)
             {
                 // default ILogConsistencyProvider are optional, will fallback to grain specific if not configured.
