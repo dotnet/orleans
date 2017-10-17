@@ -29,7 +29,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
-    public sealed class SerializationManager : ISerializationManager, IDisposable
+    public sealed class SerializationManager : IDisposable
     {
         #region Privates
 
