@@ -68,7 +68,8 @@ namespace Orleans.Messaging
         {
             var assembly = Assembly.Load(new AssemblyName(assemblyName));
             var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), null).FirstOrDefault();
-
+            if(foundType == null)
+                throw new InvalidOperationException($"type {typeof(T)} was not found in assembly {assembly}");
             return (T)Activator.CreateInstance(foundType, true);
         }
     }
