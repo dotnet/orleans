@@ -77,7 +77,7 @@ namespace Orleans.Runtime
             }
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return resultTask.Unbox<T>();
+            return resultTask.ToTypedTask<T>();
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
