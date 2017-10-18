@@ -5,6 +5,7 @@ using System.Net;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 
@@ -249,6 +250,39 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
+        /// Returns a task that will resolve when the silo has finished shutting down, or the cancellation token is cancelled.
+        /// </summary>
+        /// <param name="millisecondsTimeout">Timeout, or -1 for infinite.</param>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <returns></returns>
+        public Task ShutdownOrleansSiloAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        {
+            if (orleans == null || !IsStarted)
+                return Task.CompletedTask;
+
+            IsStarted = false;
+
+            var shutdownThread = new Thread(o =>
+            {
+                orleans.Shutdown();
+            });
+            shutdownThread.IsBackground = true;
+            shutdownThread.Start();
+
+            return WaitForOrleansSiloShutdownAsync(millisecondsTimeout, cancellationToken);
+        }
+
+        /// <summary>
+        /// /// Returns a task that will resolve when the silo has finished shutting down, or the cancellation token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <returns></returns>
+        public Task ShutdownOrleansSiloAsync(CancellationToken cancellationToken)
+        {
+            return ShutdownOrleansSiloAsync(Timeout.Infinite, cancellationToken);
+        }
+
+        /// <summary>
         /// Wait for this silo to shutdown.
         /// </summary>
         /// <remarks>
@@ -272,6 +306,40 @@ namespace Orleans.Runtime.Host
         public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
         {
             WaitForOrleansSiloShutdownImpl(cancellationToken);
+        }
+
+        /// <summary>
+        /// Waits for the SiloTerminatedEvent to fire or cancellation token to be cancelled.
+        /// </summary>
+        /// <param name="millisecondsTimeout">Timeout, or -1 for infinite.</param>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <remarks>
+        /// This is essentially an async version of WaitForOrleansSiloShutdown.
+        /// </remarks>
+        public async Task<bool> WaitForOrleansSiloShutdownAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        {
+            RegisteredWaitHandle registeredHandle = null;
+            CancellationTokenRegistration tokenRegistration = default(CancellationTokenRegistration);
+            try
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                registeredHandle = ThreadPool.RegisterWaitForSingleObject(
+                    orleans.SiloTerminatedEvent,
+                    (state, timedOut) => ((TaskCompletionSource<bool>)state).TrySetResult(!timedOut),
+                    tcs,
+                    millisecondsTimeout,
+                    true);
+                tokenRegistration = cancellationToken.Register(
+                    state => ((TaskCompletionSource<bool>)state).TrySetCanceled(),
+                    tcs);
+                return await tcs.Task;
+            }
+            finally
+            {
+                if (registeredHandle != null)
+                    registeredHandle.Unregister(null);
+                tokenRegistration.Dispose();
+            }
         }
 
         /// <summary>

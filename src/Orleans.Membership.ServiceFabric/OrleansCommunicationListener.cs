@@ -118,8 +118,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CloseAsync(CancellationToken cancellationToken)
         {
-            this.SiloHost.Stop();
-            return Task.CompletedTask;
+            return this.SiloHost.ShutdownAsync(cancellationToken);
         }
 
         /// <summary>
