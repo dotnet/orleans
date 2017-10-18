@@ -714,7 +714,7 @@ namespace UnitTests.SchedulerTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();
             NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName, filters);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.SiloName, orleansConfig.Globals.DeploymentId), filters);
             StatisticsCollector.Initialize(config);
             SchedulerStatisticsGroup.Init(loggerFactory);
             return loggerFactory;

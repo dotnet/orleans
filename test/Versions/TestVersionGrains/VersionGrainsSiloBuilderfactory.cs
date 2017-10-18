@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Placement;
 using UnitTests.GrainInterfaces;
@@ -20,7 +22,7 @@ namespace TestVersionGrains
                 .ConfigureServices(this.ConfigureServices)
                 .AddApplicationPartsFromAppDomain()
                 .AddApplicationPartsFromBasePath()
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
         }
 
         private void ConfigureServices(IServiceCollection services)

@@ -1,17 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema" 
            targetNamespace="urn:orleans" xmlns:tns="urn:orleans">
-  <xs:simpleType name="TraceLevel">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="Off" />
-      <xs:enumeration value="Error" />
-      <xs:enumeration value="Warning" />
-      <xs:enumeration value="Info" />
-      <xs:enumeration value="Verbose" />
-      <xs:enumeration value="Verbose2" />
-      <xs:enumeration value="Verbose3" />
-    </xs:restriction>
-  </xs:simpleType>
   <xs:simpleType name="AddressFamily">
     <xs:restriction base="xs:string">
       <xs:enumeration value="InterNetwork" />
@@ -555,83 +544,10 @@
   <xs:complexType name="TracingConfiguration">
     <xs:annotation>
       <xs:documentation>
-        The TracingConfiguration type contains various tracing-related configuration parameters.
+        The TracingConfiguration type contains PropagateActivityId configuration parameters.
         For production use, the default value of these parameters should be fine.
       </xs:documentation>
     </xs:annotation>
-    <xs:sequence>
-      <xs:element name="LogConsumer" minOccurs="0" maxOccurs="unbounded">
-        <xs:annotation>
-          <xs:documentation>
-            The LogConsumer element provides a mechanism to allow additional custom log writers to receive log messages produced by Orleans applications.
-            The contents of the LogConsumer element should be a fully qualified class name that implements the Orleans.ILogConsumer interface,
-            plus the assembly that class should be loaded from.
-            Example: Example.MyLogConsumer,MyLibrary
-            In addition to the LogConsumers added here, setting TraceToConsole or TraceToFile will also add additonal LogConsumers to this list as required.
-            There is also an Orleans LogConsumer class that can be added to send log messages to any .NET Trace Listeners configured for this application:
-            &lt;LogConsumer&gt;Orleans.LogWriterToTrace&lt;/LogConsumer&gt;
-          </xs:documentation>
-        </xs:annotation>
-      </xs:element>
-      <xs:element name="TraceLevelOverride" minOccurs="0" maxOccurs="unbounded">
-        <xs:annotation>
-          <xs:documentation>
-            The TraceLevelOverride element provides a mechanism to allow the tracing level to be set differently for different
-            parts of the Orleans system.
-            The tracing level for a logger is set based on a prefix match on the logger's name.
-            TraceLevelOverrides are applied in length order; that is, the override with the longest matching
-            LogPrefix takes precedence and specifies the tracing level for all matching loggers.
-          </xs:documentation>
-        </xs:annotation>
-        <xs:complexType>
-          <xs:attribute name="LogPrefix" type="xs:string" use="required">
-            <xs:annotation>
-              <xs:documentation>
-                The LogPrefix attribute specifies a string prefix that is used to match against logger names.
-                Logger names begin with one of "Runtime", "Grain", or "Application", followed by a period, followed by
-                an application-dependent name (usually the name of the class writing the log entries).
-              </xs:documentation>
-            </xs:annotation>
-          </xs:attribute>
-          <xs:attribute name="TraceLevel" use="required" type="tns:TraceLevel">
-            <xs:annotation>
-              <xs:documentation>
-                The TraceLevel attribute specifies the tracing level to use for use with loggers that match the associated LogPrefix.
-              </xs:documentation>
-            </xs:annotation>
-          </xs:attribute>
-        </xs:complexType>
-      </xs:element>
-    </xs:sequence>
-    <xs:attribute name="DefaultTraceLevel" use="optional" type="tns:TraceLevel">
-      <xs:annotation>
-        <xs:documentation>
-          The DefaultTraceLevel attribute specifies the default tracing level for all Orleans loggers, unless overridden by
-          a specific TraceLevelOverride element.
-          The default level is Info if this attribute does not appear.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="TraceToConsole" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The TraceToConsole attribute specifies whether trace output should be written to the console.
-          The default is not to write trace data to the console.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="TraceToFile" type="xs:string" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The TraceToFile attribute specifies the name of a file that trace output should be written to.
-          The silo Name may be embedded in the file name by including the sequence {0}.
-          The current timestamp in "round trip" format may be embedded by including the sequence {1}.
-          The machine host name may be embedded by including the sequence {2}.
-          If the value is an empty string, "", then trace output is not written to a file at all.
-          The default is to write to a file in the local directory named "{0}-{1}.log".
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
     <xs:attribute name="MetricWritePeriod" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>
@@ -640,27 +556,11 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
-    <xs:attribute name="LargeMessageWarningThreshold" type="xs:int" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The LargeMessageWarningThreshold attribute specifies what size of messages will be considered "large".
-          The runtime will write an Info log with for any messages sent or received which exceed this threshold.
-          The default is 85000 bytes.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
     <xs:attribute name="PropagateActivityId" type="xs:boolean" use="optional">
       <xs:annotation>
         <xs:documentation>
           The PropagateActivityId attribute specifies whether the value of Tracing.CorrelationManager.ActivityId should be propagated into grain calls, to support E2E tracing.
           The default is not to propagate ActivityId.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="BulkMessageLimit" type="xs:int" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The BulkMessageLimit attribute specifies how to bulk (aggregate) trace messages with identical erro code.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>

@@ -30,19 +30,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public string ConfigFileName { get; set; }
 
-        /// <summary>
-        /// Directory to use for the trace log file written by this silo.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// <para>
-        /// When deciding The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// </remarks>
-        public string TraceFilePath { get; set; }
-
         /// <summary> Configuration data for the Orleans system. </summary>
         public ClusterConfiguration Config { get; set; }
 
@@ -63,13 +50,13 @@ namespace Orleans.Runtime.Host
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private static ILoggerFactory defaultLoggerFactory = CreateDefaultLoggerFactory();
+        private ILoggerProvider loggerProvider;
         private ILogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
         private bool disposed;
-
+        private const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
         /// <summary>
         /// Constructor
         /// </summary>
@@ -77,16 +64,11 @@ namespace Orleans.Runtime.Host
         public SiloHost(string siloName)
         {
             Name = siloName;
-            this.logger = defaultLoggerFactory.CreateLogger<SiloHost>();
+            this.loggerProvider =
+                new FileLoggerProvider($"SiloHost-{siloName}-{DateTime.UtcNow.ToString(dateFormat)}.log");
+            this.logger = this.loggerProvider.CreateLogger(this.GetType().FullName);
             Type = Silo.SiloType.Secondary; // Default
             IsStarted = false;
-        }
-
-        private static ILoggerFactory CreateDefaultLoggerFactory()
-        {
-            var factory = new LoggerFactory();
-            factory.AddProvider(new FileLoggerProvider("SiloHost.log"));
-            return factory;
         }
 
         /// <summary> Constructor </summary>
@@ -480,7 +462,7 @@ namespace Orleans.Runtime.Host
 
             // Dump Startup error to a log file
             var now = DateTime.UtcNow;
-            const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
+           
             var dateString = now.ToString(dateFormat, CultureInfo.InvariantCulture);
             var startupLog = Name + "-StartupError-" + dateString + ".txt";
 
@@ -534,13 +516,6 @@ namespace Orleans.Runtime.Host
 
             NodeConfig = Config.GetOrCreateNodeConfigurationForSilo(Name);
             Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
-
-            if (TraceFilePath != null)
-            {
-                var traceFileName = NodeConfig.TraceFileName;
-                if (traceFileName != null && !Path.IsPathRooted(traceFileName))
-                    NodeConfig.TraceFileName = TraceFilePath + "\\" + traceFileName;
-            }
 
             ConfigLoaded = true;
         }
@@ -601,6 +576,8 @@ namespace Orleans.Runtime.Host
             {
                 if (disposing)
                 {
+                    this.loggerProvider?.Dispose();
+                    this.loggerProvider = null;
                     if (startupEvent != null)
                     {
                         startupEvent.Dispose();

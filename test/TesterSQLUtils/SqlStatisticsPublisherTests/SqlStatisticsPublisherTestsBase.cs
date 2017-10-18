@@ -40,7 +40,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
             this.environment = environment;
-            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log");
             logger = new LoggerWrapper<SqlStatisticsPublisherTestsBase>(loggerFactory);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);

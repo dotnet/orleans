@@ -23,7 +23,7 @@ namespace TestExtensions
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .UseGrainBasedMembership()
-                    .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
         }
     }

@@ -468,7 +468,6 @@ namespace Orleans.TestingHost
                 // Test is running inside debugger - Make timeout ~= infinite
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
-
             this.InternalClient = (IInternalClusterClient)this.clientBuilderFactory(clientConfig).Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();

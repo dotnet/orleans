@@ -26,7 +26,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
             services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
-            services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<Factory<NodeConfiguration>>(
                 sp =>
                 {

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
@@ -18,7 +20,7 @@ namespace Orleans.TestingHost
                 .AddApplicationPartsFromAppDomain()
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder,
-                    clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
         }
     }
 }

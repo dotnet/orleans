@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
-    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration
+    public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {
         /// <summary>
         /// Specifies the type of the gateway provider.
@@ -44,9 +44,6 @@ namespace Orleans.Runtime.Configuration
         /// The name of this client.
         /// </summary>
         public string ClientName { get; set; } = "Client";
-
-        private string traceFilePattern;
-        private readonly DateTime creationTimestamp;
 
         /// <summary>Gets the configuration source file path</summary>
         public string SourceFile { get; private set; }
@@ -161,25 +158,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IDictionary<string, ProviderCategoryConfiguration> ProviderConfigurations { get; set; }
 
-        /// <inheritdoc />
-        public string TraceFilePattern
-        {
-            get { return traceFilePattern; }
-            set
-            {
-                traceFilePattern = value;
-                ConfigUtilities.SetTraceFileName(this, ClientName, this.creationTimestamp);
-            }
-        }
-
-        /// <inheritdoc />
-        public string TraceFileName { get; set; }
-
         /// <summary>Initializes a new instance of <see cref="ClientConfiguration"/>.</summary>
         public ClientConfiguration()
             : base(false)
         {
-            creationTimestamp = DateTime.UtcNow;
             SourceFile = null;
             PreferedGatewayIndex = -1;
             Gateways = new List<IPEndPoint>();
@@ -192,8 +174,7 @@ namespace Orleans.Runtime.Configuration
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
-
-            TraceFilePattern = "{0}-{1}.log";
+            
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             GatewayListRefreshPeriod = DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
@@ -277,9 +258,9 @@ namespace Orleans.Runtime.Configuration
                                 }
                             }
                             break;
-
                         case "Tracing":
-                            ConfigUtilities.ParseTracing(this, child, ClientName);
+                            if (ConfigUtilities.TryParsePropagateActivityId(child, ClientName, out var propagateActivityId))
+                                this.PropagateActivityId = propagateActivityId;
                             break;
                         case "Statistics":
                             ConfigUtilities.ParseStatistics(this, child, ClientName);
@@ -491,7 +472,6 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Preferred Address Family: ").AppendLine(PreferredFamily.ToString());
             sb.Append("   DNS Host Name: ").AppendLine(DNSHostName);
             sb.Append("   Client Name: ").AppendLine(ClientName);
-            sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());

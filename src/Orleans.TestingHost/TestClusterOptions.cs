@@ -23,10 +23,6 @@ namespace Orleans.TestingHost
         /// <summary>Extended options to be used as fallbacks in the case that explicit options are not provided by the user.</summary>
         public class FallbackOptions
         {
-
-            /// <summary>Gets or sets the default subfolder the the logs</summary>
-            public string LogsFolder { get; set; }
-
             /// <summary>Gets or sets the default data connection string to use in tests</summary>
             public string DataConnectionString { get; set; }
 
@@ -40,7 +36,6 @@ namespace Orleans.TestingHost
                 builder.AddInMemoryCollection(new Dictionary<string, string>
                 {
                     { nameof(DataConnectionString), "UseDevelopmentStorage=true" },
-                    { nameof(LogsFolder), "logs" },
                     { nameof(InitialSilosCount), "2" },
                 });
                 return builder;
@@ -153,11 +148,13 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Default client builder factory
         /// </summary>
-        public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config)
-			.AddApplicationPartsFromAppDomain()
-            .AddApplicationPartsFromBasePath()
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, config.TraceFileName));
+        public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config =>
+            new ClientBuilder()
+                .UseConfiguration(config)
+                .AddApplicationPartsFromAppDomain()
+                .AddApplicationPartsFromBasePath()
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder,
+                    TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
 
         /// <summary>
         /// Factory delegate to create a client builder which will be used to build the <see cref="TestCluster"/> client. 
@@ -174,17 +171,6 @@ namespace Orleans.TestingHost
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
             config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
-
-            var defaultLogsFolder = extendedOptions.LogsFolder;
-            if (!string.IsNullOrWhiteSpace(defaultLogsFolder))
-            {
-                if (!Directory.Exists(defaultLogsFolder))
-                {
-                    Directory.CreateDirectory(defaultLogsFolder);
-                }
-
-                config.Defaults.TraceFilePattern = $"{defaultLogsFolder}\\{config.Defaults.TraceFilePattern}";
-            }
 
             AddNodeConfiguration(config, Silo.SiloType.Primary, 0, baseSiloPort, baseGatewayPort);
             for (short instanceNumber = 1; instanceNumber < silosCount; instanceNumber++)
@@ -241,7 +227,6 @@ namespace Orleans.TestingHost
         public static ClientConfiguration BuildClientConfiguration(ClusterConfiguration clusterConfig)
         {
             var config = new ClientConfiguration();
-            config.TraceFilePattern = clusterConfig.Defaults.TraceFilePattern;
             switch (clusterConfig.Globals.LivenessType)
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
