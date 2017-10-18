@@ -77,6 +77,19 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
+        internal static bool TryParsePropagateActivityId(XmlElement root, string nodeName, out bool propagateActivityId)
+        {
+            //set default value to make compiler happy, progateActivityId is only used when this method return true
+            propagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            if (root.HasAttribute("PropagateActivityId"))
+            {
+                propagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),
+                    "InvaliFd boolean value for PropagateActivityId attribute on Tracing element for " + nodeName);
+                return true;
+            }
+            return false;
+        }
+
         internal static void ParseStatistics(IStatisticsConfiguration config, XmlElement root, string nodeName)
         {
             if (root.HasAttribute("ProviderType"))

@@ -258,6 +258,10 @@ namespace Orleans.Runtime.Configuration
                                 }
                             }
                             break;
+                        case "Tracing":
+                            if (ConfigUtilities.TryParsePropagateActivityId(child, ClientName, out var propagateActivityId))
+                                this.PropagateActivityId = propagateActivityId;
+                            break;
                         case "Statistics":
                             ConfigUtilities.ParseStatistics(this, child, ClientName);
                             break;

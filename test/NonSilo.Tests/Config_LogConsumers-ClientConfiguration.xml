@@ -7,14 +7,7 @@
   It is possible to have multiple gateway nodes. -->
   <!--<Gateway Address="localhost" Port="11111" Proxied="false" />-->
   <Gateway Address="localhost" Port="40000" Proxied="true" />
-  <!-- To turn tracing off, set DefaultTraceLevel="Off" and have no overrides.
-    For the trace log file name, {0} is replaced by "Client" and {1} is the current time. -->
-  <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="" >
-    <LogConsumer>UnitTests.DummyLogConsumer,NonSilo.Tests</LogConsumer>
-    <TraceLevelOverride LogPrefix="Runtime" TraceLevel="Info" />
-    <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
-    <TraceLevelOverride LogPrefix="Tetris" TraceLevel="Info" />
-  </Tracing>
+  <Tracing PropagateActivityId="true"/>
   <Telemetry>
     <TelemetryConsumer Assembly="NonSilo.Tests" Type="UnitTests.DummyMetricTelemetryConsumer" connString="foo" />
   </Telemetry>

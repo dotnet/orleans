@@ -121,7 +121,7 @@ namespace UnitTests
             Assert.Null(cfg.SourceFile);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -139,7 +139,30 @@ namespace UnitTests
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ClientConfig_PropagateActivityId()
+        {
+            string filename = "Config_LogConsumers-ClientConfiguration.xml";
+            bool expectedPropagateActivityId = true;
+            var cfg = ClientConfiguration.LoadFromFile(filename);
+            Assert.Equal(filename, cfg.SourceFile);
+
+            Assert.Equal(cfg.PropagateActivityId, expectedPropagateActivityId);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ServerConfig_PropagateActivityId()
+        {
+            string filename = "Config_LogConsumers-OrleansConfiguration.xml";
+            bool expectedPropagateActivityId = true;
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.Equal(filename, config.SourceFile);
+
+            Assert.Equal(config.Defaults.PropagateActivityId, expectedPropagateActivityId);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ServerConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
