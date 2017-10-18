@@ -147,7 +147,7 @@ namespace Tester
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
             Thread.Sleep(bulkEventOptions.BulkEventInterval);
-            Thread.Sleep(1);
+            Thread.Sleep(50);
 
             // Write log messages to logger #2
             for (int i = 0; i < n; i++)
@@ -157,7 +157,7 @@ namespace Tester
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
             Thread.Sleep(bulkEventOptions.BulkEventInterval);
-            Thread.Sleep(1);
+            Thread.Sleep(50);
 
             logger1.Info(logCode1, "Penultimate message to logger1");
             logger2.Info(logCode2, "Penultimate message to logger2");
@@ -207,7 +207,7 @@ namespace Tester
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
             Thread.Sleep(bulkEventOptions.BulkEventInterval);
-            Thread.Sleep(1);
+            Thread.Sleep(50);
 
             logger1.Info(logCode1, "Penultimate message to logger1");
             logger1.Info(logCode1, "Final message to logger1");
@@ -303,7 +303,7 @@ namespace Tester
                 output.WriteLine("Sleeping for " + delay);
                 Thread.Sleep(delay);
             }
-            Thread.Sleep(10);
+            Thread.Sleep(50);
 
             logger.Info(finalLogCode, "Final msg");
 
