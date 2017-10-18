@@ -70,7 +70,7 @@ namespace Orleans.Runtime
                 if (typeof(T) == typeof(object))
                 {
                     // optimize for most common case when using one way calls.
-                    return PublicOrleansTaskExtensions.CompletedTask as Task<T>;
+                    return OrleansTaskExtentions.CompletedTask as Task<T>;
                 }
 
                 return Task.FromResult(default(T));

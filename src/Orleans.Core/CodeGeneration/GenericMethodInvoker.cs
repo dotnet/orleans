@@ -130,10 +130,10 @@ namespace Orleans.CodeGeneration
             if (taskType.GetGenericTypeDefinition() != typeof(Task<>))
                 throw new ArgumentException($"Unsupported return type {taskType}.");
             var innerType = taskType.GenericTypeArguments[0];
-            var methods = typeof(PublicOrleansTaskExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public);
+            var methods = typeof(OrleansTaskExtentions).GetMethods(BindingFlags.Static | BindingFlags.Public);
             foreach (var method in methods)
             {
-                if (method.Name != nameof(PublicOrleansTaskExtensions.Box) || !method.ContainsGenericParameters) continue;
+                if (method.Name != nameof(OrleansTaskExtentions.Box) || !method.ContainsGenericParameters) continue;
                 return method.MakeGenericMethod(innerType);
             }
 

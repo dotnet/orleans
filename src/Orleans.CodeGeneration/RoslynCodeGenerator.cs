@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.Async;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.ApplicationParts;
@@ -256,7 +255,7 @@ namespace Orleans.CodeGenerator
                 return
                     SF.NamespaceDeclaration(SF.ParseName(namespaceName))
                       .AddUsings(
-                          TypeUtils.GetNamespaces(typeof(TaskUtility), typeof(GrainExtensions), typeof(IntrospectionExtensions))
+                          TypeUtils.GetNamespaces(typeof(GrainExtensions), typeof(IntrospectionExtensions))
                                    .Select(_ => SF.UsingDirective(SF.ParseName(_)))
                                    .ToArray())
                       .AddMembers(namespaceMembers.ToArray());
