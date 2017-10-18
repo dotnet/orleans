@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Configuration
             if (root.HasAttribute("PropagateActivityId"))
             {
                 propagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),
-                    "InvaliFd boolean value for PropagateActivityId attribute on Tracing element for " + nodeName);
+                    "Invalid boolean value for PropagateActivityId attribute on Tracing element for " + nodeName);
                 return true;
             }
             return false;

@@ -544,7 +544,7 @@
   <xs:complexType name="TracingConfiguration">
     <xs:annotation>
       <xs:documentation>
-        The TracingConfiguration type contains various tracing-related configuration parameters.
+        The TracingConfiguration type contains PropagateActivityId configuration parameters.
         For production use, the default value of these parameters should be fine.
       </xs:documentation>
     </xs:annotation>
