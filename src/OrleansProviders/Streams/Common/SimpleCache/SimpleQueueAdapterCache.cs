@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams;
+using System;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -17,19 +15,21 @@ namespace Orleans.Providers.Streams.Common
         public const string CacheSizePropertyName = "CacheSize";
 
         private readonly int cacheSize;
-        private readonly ILogger logger;
-
+        private readonly string providerName;
+        private readonly ILoggerFactory loggerFactory;
         /// <summary>
         /// Adapter for simple queue caches
         /// </summary>
         /// <param name="cacheSize"></param>
+        /// <param name="providerName"></param>
         /// <param name="loggerFactory"></param>
-        public SimpleQueueAdapterCache(int cacheSize, ILoggerFactory loggerFactory)
+        public SimpleQueueAdapterCache(int cacheSize, string providerName, ILoggerFactory loggerFactory)
         {
             if (cacheSize <= 0)
                 throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
             this.cacheSize = cacheSize;
-            this.logger = loggerFactory.CreateLogger<SimpleQueueAdapterCache>();
+            this.loggerFactory = loggerFactory;
+            this.providerName = providerName;
         }
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new SimpleQueueCache(cacheSize, logger);
+            return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
         }
 
         /// <summary>

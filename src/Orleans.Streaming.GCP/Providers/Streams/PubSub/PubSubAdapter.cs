@@ -43,7 +43,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (string.IsNullOrEmpty(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
 
-            _logger = loggerFactory.CreateLogger<PubSubAdapter<TDataAdapter>>();
+            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{providerName}");
             this.loggerFactory = loggerFactory;
             _serializationManager = serializationManager;
             ProjectId = projectId;

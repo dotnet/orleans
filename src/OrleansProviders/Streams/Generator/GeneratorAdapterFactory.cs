@@ -48,6 +48,7 @@ namespace Orleans.Providers.Streams.Generator
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
         private MonitorAggregationDimensions sharedDimensions;
         private ILoggerFactory loggerFactory;
+        private string providerName;
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
         /// </summary>
@@ -88,6 +89,7 @@ namespace Orleans.Providers.Streams.Generator
         {
             this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
             serviceProvider = svcProvider;
+            this.providerName = providerName;
             receivers = new ConcurrentDictionary<QueueId, Receiver>();
             adapterConfig = new GeneratorAdapterConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
@@ -298,7 +300,7 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{queueId}"), serializationManager, 
+            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.providerName}.{queueId}"), serializationManager, 
                 cacheMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
     }

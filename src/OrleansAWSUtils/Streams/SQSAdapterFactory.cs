@@ -53,7 +53,7 @@ namespace OrleansAWSUtils.Streams
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheSize, serviceProvider.GetRequiredService<ILoggerFactory>());
+            adapterCache = new SimpleQueueAdapterCache(cacheSize, providerName, serviceProvider.GetRequiredService<ILoggerFactory>());
             this.serializationManager = serviceProvider.GetRequiredService<SerializationManager>();
             if (StreamFailureHandlerFactory == null)
             {

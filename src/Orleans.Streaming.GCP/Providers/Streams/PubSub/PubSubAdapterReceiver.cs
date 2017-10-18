@@ -30,10 +30,10 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
             var pubSub = new PubSubDataManager(loggerFactory, projectId, topicId, queueId.ToString(), deploymentId, deadline, customEndpoint);
-            return new PubSubAdapterReceiver(serializationManager, loggerFactory, queueId, pubSub, dataAdapter);
+            return new PubSubAdapterReceiver(serializationManager, loggerFactory, queueId, topicId, pubSub, dataAdapter);
         }
 
-        private PubSubAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
+        private PubSubAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string topicId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             Id = queueId;
@@ -44,7 +44,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             _dataAdapter = dataAdapter;
 
-            _logger = loggerFactory.CreateLogger<PubSubAdapterReceiver>();
+            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{topicId}.{queueId}");
             _pending = new List<PendingDelivery>();
         }
 

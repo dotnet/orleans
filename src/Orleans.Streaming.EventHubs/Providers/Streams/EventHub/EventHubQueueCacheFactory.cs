@@ -64,7 +64,7 @@ namespace Orleans.ServiceBus.Providers
             string blockPoolId;
             var blockPool = CreateBufferPool(this.providerSettings, loggerFactory, this.sharedDimensions, telemetryProducer, out blockPoolId);
             var cache = CreateCache(partition, this.providerSettings, checkpointer, loggerFactory, blockPool, blockPoolId, this.timePurge, this.serializationManager, this.sharedDimensions, telemetryProducer);
-            AddCachePressureMonitors(cache, this.providerSettings, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}-{partition}"));
+            AddCachePressureMonitors(cache, this.providerSettings, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.sharedDimensions.EventHubPath}.{partition}"));
             return cache;
         }
 
@@ -130,7 +130,7 @@ namespace Orleans.ServiceBus.Providers
         {
             var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
-            return new EventHubQueueCache(checkpointer, bufferPool, timePurge, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{partition}"), serializationManager, cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
+            return new EventHubQueueCache(checkpointer, bufferPool, timePurge, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}"), serializationManager, cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
         }
     }
 }

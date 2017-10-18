@@ -32,7 +32,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             {
                 var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), null, null);
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
-                var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{partition}");
+                var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.adapterSettings.StreamProviderName}.{partition}");
                 return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger,
                     new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate, null, null), null, null);
             }

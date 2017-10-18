@@ -82,7 +82,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
             this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Partition}");
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
             this.monitor = monitor;
             this.getNodeConfig = getNodeConfig;
             this.telemetryProducer = telemetryProducer;

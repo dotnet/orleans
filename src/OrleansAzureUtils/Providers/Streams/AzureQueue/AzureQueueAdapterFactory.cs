@@ -71,7 +71,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheSize, loggerFactory);
+            adapterCache = new SimpleQueueAdapterCache(cacheSize, providerName, loggerFactory);
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =

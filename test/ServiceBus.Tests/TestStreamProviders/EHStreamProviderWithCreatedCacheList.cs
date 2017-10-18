@@ -58,7 +58,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 {
                     var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
                     var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
-                    var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{partition}");
+                    var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{providerSettings.StreamProviderName}.{partition}");
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                     var cache = new QueueCacheForTesting(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge, cacheMonitor, providerSettings.StatisticMonitorWriteInterval),

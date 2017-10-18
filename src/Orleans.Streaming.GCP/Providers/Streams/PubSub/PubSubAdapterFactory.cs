@@ -80,7 +80,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             _providerName = providerName;
             _streamQueueMapper = new HashRingBasedStreamQueueMapper(_numSubscriptions, providerName);
-            _adapterCache = new SimpleQueueAdapterCache(_cacheSize, loggerFactory);
+            _adapterCache = new SimpleQueueAdapterCache(_cacheSize, providerName, loggerFactory);
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
