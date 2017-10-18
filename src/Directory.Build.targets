@@ -5,7 +5,7 @@
 
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
-  <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and $(IncludeBuildOutput)'=='true'">
+  <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
     <PackageReference Include="SourceLink.Create.CommandLine" Version="$(SourceLinkVersion)" PrivateAssets="all" />
   </ItemGroup>
 </Project>
