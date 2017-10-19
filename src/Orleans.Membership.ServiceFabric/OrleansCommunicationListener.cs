@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric.Description;
-using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric

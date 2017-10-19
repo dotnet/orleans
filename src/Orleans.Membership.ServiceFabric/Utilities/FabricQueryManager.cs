@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Orleans.ServiceFabric.Models;
@@ -13,6 +14,8 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
 
     internal class FabricQueryManager : IFabricQueryManager
     {
+        private readonly ConcurrentDictionary<Uri, ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition>> previousResolves =
+            new ConcurrentDictionary<Uri, ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition>>();
         private readonly FabricClient fabricClient;
         private readonly IServicePartitionResolver resolver;
         private readonly TimeSpan timeoutPerAttempt;
@@ -52,7 +55,7 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
             }
             
             // Wrap the provided handler so that it's compatible with Service Fabric.
-            ServicePartitionResolutionChangeHandler actualHandler = (source, id, args) =>
+            void ChangeHandler(FabricClient source, long id, ServicePartitionResolutionChange args)
             {
                 ServicePartitionSilos result = null;
                 if (!args.HasException)
@@ -62,10 +65,8 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
                         args.Result.GetPartitionEndpoints());
                 }
 
-                handler(
-                    id,
-                    new FabricPartitionResolutionChange(result, args.Exception));
-            };
+                handler(id, new FabricPartitionResolutionChange(result, args.Exception));
+            }
 
             var sm = this.fabricClient.ServiceManager;
             switch (servicePartition.Kind)
@@ -74,14 +75,14 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
                     return sm.RegisterServicePartitionResolutionChangeHandler(
                         serviceName,
                         ((Int64RangePartitionInformation) partition.Partition.Info).LowKey,
-                        actualHandler);
+                        ChangeHandler);
                 case ServicePartitionKind.Named:
                     return sm.RegisterServicePartitionResolutionChangeHandler(
                         serviceName,
                         ((NamedPartitionInformation) partition.Partition.Info).Name,
-                        actualHandler);
+                        ChangeHandler);
                 case ServicePartitionKind.Singleton:
-                    return sm.RegisterServicePartitionResolutionChangeHandler(serviceName, actualHandler);
+                    return sm.RegisterServicePartitionResolutionChangeHandler(serviceName, ChangeHandler);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(servicePartition),
@@ -110,16 +111,41 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
             ServicePartitionKey partitionKey,
             CancellationToken cancellationToken)
         {
-            var resolved = await this.resolver.ResolveAsync(
-                serviceName,
-                partitionKey,
-                this.timeoutPerAttempt,
-                this.maxBackoffInterval,
-                cancellationToken);
+            ResolvedServicePartition result;
+            var cache = this.previousResolves.GetOrAdd(serviceName, CreateCache);
+            if (cache.TryGetValue(partitionKey, out var previousResult))
+            {
+                // Re-resolve the partition and avoid caching.
+                result = await this.resolver.ResolveAsync(
+                    previousResult,
+                    this.timeoutPerAttempt,
+                    this.maxBackoffInterval,
+                    cancellationToken);
+            }
+            else
+            {
+                // Perform an initial resolution for the partition.
+                result = await this.resolver.ResolveAsync(
+                    serviceName,
+                    partitionKey,
+                    this.timeoutPerAttempt,
+                    this.maxBackoffInterval,
+                    cancellationToken);
+            }
 
+            // Cache the results of this resolution to provide to the next resolution call.
+            cache.AddOrUpdate(
+                partitionKey,
+                _ => result,
+                (key, existing) => existing.CompareVersion(result) < 0 ? result : existing);
             return new ServicePartitionSilos(
-                new ResolvedServicePartitionWrapper(resolved),
-                resolved.GetPartitionEndpoints());
+                new ResolvedServicePartitionWrapper(result),
+                result.GetPartitionEndpoints());
+
+            ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition> CreateCache(Uri uri)
+            {
+                return new ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition>(ServicePartitionKeyComparer.Instance);
+            }
         }
         
         /// <summary>
@@ -157,13 +183,70 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
 
             public bool IsSamePartitionAs(IResolvedServicePartition other)
             {
-                var otherWrapper = other as ResolvedServicePartitionWrapper;
-                if (otherWrapper == null) return false;
+                if (other is ResolvedServicePartitionWrapper otherWrapper)
+                {
+                    return this.Partition.IsSamePartitionAs(otherWrapper.Partition);
+                }
 
-                return this.Partition.IsSamePartitionAs(otherWrapper.Partition);
+                return false;
             }
 
             public override string ToString() => this.Partition.ToPartitionString();
+        }
+
+        /// <summary>
+        /// Equality comparer for <see cref="ServicePartitionKey"/>.
+        /// </summary>
+        private struct ServicePartitionKeyComparer : IEqualityComparer<ServicePartitionKey>
+        {
+            /// <summary>
+            /// Gets a singleton instance of this class.
+            /// </summary>
+            public static ServicePartitionKeyComparer Instance { get; } = new ServicePartitionKeyComparer();
+
+            /// <inheritdoc />
+            public bool Equals(ServicePartitionKey x, ServicePartitionKey y)
+            {
+                if (ReferenceEquals(x, y)) return true;
+                if (ReferenceEquals(x, null)) return false;
+                if (ReferenceEquals(y, null)) return false;
+                if (x.Kind != y.Kind) return false;
+                switch (x.Kind)
+                {
+                    case ServicePartitionKind.Int64Range:
+                        return (long) x.Value == (long) y.Value;
+                    case ServicePartitionKind.Named:
+                        return string.Equals(x.Value as string, y.Value as string, StringComparison.Ordinal);
+                    case ServicePartitionKind.Singleton:
+                        return true;
+                    default:
+                        ThrowKindOutOfRange(x);
+                        return false;
+                }
+            }
+
+            /// <inheritdoc />
+            public int GetHashCode(ServicePartitionKey obj)
+            {
+                switch (obj.Kind)
+                {
+                    case ServicePartitionKind.Int64Range:
+                        return ((long) obj.Value).GetHashCode();
+                    case ServicePartitionKind.Named:
+                        return ((string) obj.Value).GetHashCode();
+                    case ServicePartitionKind.Singleton:
+                        return 0;
+                    default:
+                        ThrowKindOutOfRange(obj);
+                        return -1;
+                }
+            }
+
+            private static void ThrowKindOutOfRange(ServicePartitionKey x)
+            {
+                throw new ArgumentOutOfRangeException(nameof(x), $"Partition kind {x.Kind} is not supported");
+
+            }
         }
     }
 }
