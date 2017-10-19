@@ -38,7 +38,7 @@ namespace Tests.GeoClusterTests
             numGrains = 600;
             await RunWithTimeout("IndependentCreation", 5000, IndependentCreation);
             await RunWithTimeout("CreationRace", 10000, CreationRace);
-            await RunWithTimeout("ConflictResolution", 20000, ConflictResolution);
+            await RunWithTimeout("ConflictResolution", 40000, ConflictResolution);
         }
 
         /// <summary>

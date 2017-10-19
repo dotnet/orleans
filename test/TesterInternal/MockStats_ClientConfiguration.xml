@@ -4,11 +4,6 @@
   <StatisticsProviders>
     <Provider Type="UnitTests.Stats.MockStatsClientCollector" Name="MockStats" />
   </StatisticsProviders>
-  <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log">
-    <TraceLevelOverride LogPrefix="Application" TraceLevel="Warning" />
-    <TraceLevelOverride LogPrefix="AssemblyLoader.Client" TraceLevel="Warning" />
-    <TraceLevelOverride LogPrefix="ClientLogStatistics" TraceLevel="Warning" />
-  </Tracing>
   <Statistics MetricsTableWriteInterval="1s" LogWriteInterval="1s" WriteLogStatisticsToTable="true" />
 </ClientConfiguration>
 

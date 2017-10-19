@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Tester</RootNamespace>
     <AssemblyName>Tester</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,10 +14,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
-    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
-    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj" />
-    <ProjectReference Include="..\..\src\Logging.Legacy\Logging.Legacy.csproj" />
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Logging.Legacy\Orleans.Logging.Legacy.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />

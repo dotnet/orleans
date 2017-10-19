@@ -49,6 +49,7 @@ namespace Orleans.Providers.Streams.Common
 
         /// <summary>
         /// Statistic monitor write interval
+        /// Statistics generation is triggered by activity.  Interval will be ignored when streams are inactive.
         /// </summary>
         public TimeSpan StatisticMonitorWriteInterval { get; set; } = DefaultStatisticMonitorWriteInterval;
 

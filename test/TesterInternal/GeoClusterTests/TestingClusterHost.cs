@@ -170,7 +170,7 @@ namespace Tests.GeoClusterTests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
 
             private void ConfigureLogging(ILoggingBuilder builder, string filePath)
@@ -305,7 +305,11 @@ namespace Tests.GeoClusterTests
 
                 configCustomizer?.Invoke(config);
 
-                this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(config).Build();
+                this.InternalClient = (IInternalClusterClient) new ClientBuilder()
+                    .AddApplicationPartsFromAppDomain()
+                    .AddApplicationPartsFromBasePath()
+                    .UseConfiguration(config)
+                    .Build();
                 this.InternalClient.Connect().Wait();
             }
 

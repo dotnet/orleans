@@ -1,13 +1,19 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.SqlUtils;
+using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
+using OrleansSQLUtils;
+using OrleansSQLUtils.Options;
 
 namespace UnitTests.MembershipTests
 {
@@ -29,12 +35,23 @@ namespace UnitTests.MembershipTests
         }
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter, this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            var options = new SqlMembershipOptions()
+            {
+                AdoInvariant = GetAdoInvariant(),
+                ConnectionString = this.connectionString,
+            };
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.globalConfiguration,
+                Options.Create<SqlMembershipOptions>(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter, this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            var options = new SqlGatewayListProviderOptions()
+            {
+                ConnectionString = this.connectionString,
+                AdoInvariant = GetAdoInvariant()
+            };
+            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options));
         }
 
         protected override string GetAdoInvariant()

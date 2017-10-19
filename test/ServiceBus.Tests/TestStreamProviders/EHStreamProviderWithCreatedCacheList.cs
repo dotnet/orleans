@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 using Orleans.ServiceBus.Providers.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
+using Microsoft.Azure.EventHubs;
+using System.Collections.Concurrent;
+using System.Linq;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
@@ -17,11 +20,11 @@ namespace ServiceBus.Tests.TestStreamProviders
     {
         public class AdapterFactory : EventDataGeneratorStreamProvider.AdapterFactory
         {
-            protected readonly List<IEventHubQueueCache> createdCaches;
+            private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = new ConcurrentBag<QueueCacheForTesting>();
 
             public AdapterFactory()
             {
-                createdCaches = new List<IEventHubQueueCache>();
+                createdCaches = new ConcurrentBag<QueueCacheForTesting>();
             }
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
@@ -33,18 +36,19 @@ namespace ServiceBus.Tests.TestStreamProviders
                 return new CacheFactoryForTesting(providerSettings, SerializationManager, this.createdCaches, sharedDimensions);
             }
 
-            public class CacheFactoryForTesting : EventHubQueueCacheFactory
+            private class CacheFactoryForTesting : EventHubQueueCacheFactory
             {
-                private readonly List<IEventHubQueueCache> caches;
+                private readonly ConcurrentBag<QueueCacheForTesting> caches; 
 
                 public CacheFactoryForTesting(EventHubStreamProviderSettings providerSettings,
-                    SerializationManager serializationManager, List<IEventHubQueueCache> caches, EventHubMonitorAggregationDimensions sharedDimensions,
+                    SerializationManager serializationManager, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                     Func<EventHubCacheMonitorDimensions, Logger, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                     Func<EventHubBlockPoolMonitorDimensions, Logger, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
                     : base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
                 {
                     this.caches = caches;
                 }
+
                 private const int defaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
                     Logger cacheLogger, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
@@ -53,11 +57,30 @@ namespace ServiceBus.Tests.TestStreamProviders
                     var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
                     var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, cacheLogger, telemetryProducer);
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
-                    var cache = new EventHubQueueCache(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
+                    var cache = new QueueCacheForTesting(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge, cacheMonitor, providerSettings.StatisticMonitorWriteInterval),
                         cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
                     this.caches.Add(cache);
                     return cache;
+                }
+            }
+
+            private class QueueCacheForTesting : EventHubQueueCache, IQueueFlowController
+            {
+                public bool IsUnderPressure { get; private set; }
+
+                public QueueCacheForTesting(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
+                    ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy,
+                    ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
+                    : base(defaultMaxAddCount, checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, cacheMonitor, cacheMonitorWriteInterval)
+                {
+                }
+
+                int IQueueFlowController.GetMaxAddCount()
+                {
+                    int maxAddCount = base.GetMaxAddCount();
+                    this.IsUnderPressure = maxAddCount <= 0;
+                    return maxAddCount;
                 }
             }
 
@@ -75,15 +98,9 @@ namespace ServiceBus.Tests.TestStreamProviders
                 switch (command)
                 {
                     case IsCacheBackPressureTriggeredCommand:
-                        foreach (var cache in this.createdCaches)
-                        {
-                            if (cache.GetMaxAddCount() == 0)
-                                return Task.FromResult<object>(true);
-                        }
-                        return Task.FromResult<object>(false);
+                        return Task.FromResult<object>(createdCaches.Any(cache => cache.IsUnderPressure));
                     default: return base.ExecuteCommand(command, arg);
                 }
-
             }
         }
     }
