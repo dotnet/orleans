@@ -17,7 +17,7 @@
     <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
-    <IncludeSource>false</IncludeSource>
+    <IncludeSource>true</IncludeSource>
   </PropertyGroup>
 
   <!-- Common compile parameters -->
