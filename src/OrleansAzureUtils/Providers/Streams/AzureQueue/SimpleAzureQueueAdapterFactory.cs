@@ -18,7 +18,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         public const string QUEUE_NAME_STRING = "QueueName";
 
         /// <summary> Init the factory.</summary>
-        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
+        public virtual void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (!config.Properties.TryGetValue(AzureQueueAdapterConstants.DataConnectionStringPropertyName, out dataConnectionString))

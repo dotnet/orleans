@@ -39,7 +39,7 @@ namespace OrleansAWSUtils.Streams
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
         /// <summary> Init the factory.</summary>
-        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
+        public virtual void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (!config.Properties.TryGetValue(DataConnectionStringPropertyName, out dataConnectionString))
@@ -53,7 +53,7 @@ namespace OrleansAWSUtils.Streams
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheSize, logger);
+            adapterCache = new SimpleQueueAdapterCache(cacheSize, providerName, serviceProvider.GetRequiredService<ILoggerFactory>());
             this.serializationManager = serviceProvider.GetRequiredService<SerializationManager>();
             if (StreamFailureHandlerFactory == null)
             {

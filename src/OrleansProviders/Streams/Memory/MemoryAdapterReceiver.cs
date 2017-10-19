@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -15,11 +16,11 @@ namespace Orleans.Providers
     { 
         private readonly IMemoryStreamQueueGrain queueGrain;
         private readonly List<Task> awaitingTasks;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly TSerializer serializer;
         private readonly IQueueAdapterReceiverMonitor receiverMonitor;
 
-        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, Logger logger, TSerializer serializer, IQueueAdapterReceiverMonitor receiverMonitor)
+        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, ILogger logger, TSerializer serializer, IQueueAdapterReceiverMonitor receiverMonitor)
         {
             this.queueGrain = queueGrain;
             this.logger = logger;

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -26,7 +27,7 @@ namespace Orleans.Providers
         /// <param name="serializer"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
-        public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, Logger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate purgePredicate, ILogger logger, TSerializer serializer, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializer);
             cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
@@ -55,7 +56,7 @@ namespace Orleans.Providers
 
         private class MemoryPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<MemoryMessageData>
         {
-            public MemoryPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            public MemoryPooledCacheEvictionStrategy(ILogger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
                 : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {
             }

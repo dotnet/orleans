@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Microsoft.Extensions.Logging;
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
     /// <summary>
@@ -28,16 +28,16 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private ServiceEndpoint _customEndpoint;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
-        private readonly Logger _logger;
+        private readonly ILogger _logger;
 
-        public PubSubDataManager(Logger baseLogger, string projectId, string topicId, string subscriptionId, string deploymentId, TimeSpan? deadline = null, string customEndpoint = "")
+        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string deploymentId, TimeSpan? deadline = null, string customEndpoint = "")
         {
             if (string.IsNullOrWhiteSpace(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrWhiteSpace(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrWhiteSpace(subscriptionId)) throw new ArgumentNullException(nameof(subscriptionId));
 
-            _logger = baseLogger.GetSubLogger(GetType().Name);
+            _logger = loggerFactory.CreateLogger<PubSubDataManager>();
             _deadline = deadline;
             topicId = $"{topicId}-{deploymentId}";
             subscriptionId = $"{projectId}-{deploymentId}";
@@ -106,7 +106,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task DeleteTopic()
         {
-            if (_logger.IsVerbose2) _logger.Verbose2("Deleting Google PubSub topic: {0}", TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.Debug("Deleting Google PubSub topic: {0}", TopicName.TopicId);
             try
             {
                 await _publisher?.DeleteTopicAsync(TopicName);
@@ -123,7 +123,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsVerbose2) _logger.Verbose2("Publishing {0} message to topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Publishing {0} message to topic {1}", count, TopicName.TopicId);
 
             try
             {
@@ -137,7 +137,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task<IEnumerable<ReceivedMessage>> GetMessages(int count = 1)
         {
-            if (_logger.IsVerbose2) _logger.Verbose2("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
 
             PullResponse response = null;
             try
@@ -150,13 +150,13 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 ReportErrorAndRethrow(exc, "GetMessages", GoogleErrorCode.GetMessages);
             }
 
-            if (_logger.IsVerbose2)
+            if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.Verbose2("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
+                _logger.Trace("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
 
                 foreach (var received in response.ReceivedMessages)
                 {
-                    _logger.Verbose2("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
+                    _logger.Trace("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
                             received.Message.PublishTime.ToDateTime(), TopicName.TopicId);
                 }
             }
@@ -169,7 +169,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsVerbose2) _logger.Verbose2("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
 
             try
             {
