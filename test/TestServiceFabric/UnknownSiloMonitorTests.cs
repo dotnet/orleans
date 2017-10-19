@@ -31,9 +31,8 @@ namespace TestServiceFabric
         /// <param name="singletonPartition">
         /// Whether or not the service is running in a singleton Service Fabric partition.
         /// </param>
-        [Theory]
-        [InlineData(true), InlineData(false)]
-        public void SiloEventuallyBecomesDead(bool singletonPartition)
+        [Fact]
+        public void SiloEventuallyBecomesDead()
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
@@ -53,14 +52,14 @@ namespace TestServiceFabric
 
             // No time has passed and the set of known silos contains no information about the reported silo,
             // therefore we expect no reports even after running multiple times.
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
 
             // Advance passed the expiration time.
             now[0] += options.UnknownSiloRemovalPeriod + TimeSpan.FromMilliseconds(1);
 
             // The silo should be declared dead by the monitor.
-            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos));
         }
 
         /// <summary>
@@ -69,9 +68,8 @@ namespace TestServiceFabric
         /// <param name="singletonPartition">
         /// Whether or not the service is running in a singleton Service Fabric partition.
         /// </param>
-        [Theory]
-        [InlineData(true), InlineData(false)]
-        public void SiloDeclaredDeadWhenSupersededOnSameEndpoint(bool singletonPartition)
+        [Fact]
+        public void SiloDeclaredDeadWhenSupersededOnSameEndpoint()
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
@@ -85,30 +83,30 @@ namespace TestServiceFabric
             // Report a silo as having an unknown status.
             var deadSilo = NewSiloAddress("1.1.1.1", 9030, 1000);
             monitor.ReportUnknownSilo(deadSilo);
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
 
             // Create a silo with the same IP and port but a lower generation.
             var predecessorSilo = NewSiloAddress("1.1.1.1", 9030, 500);
             knownSilos[predecessorSilo] = SiloStatus.Active;
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
 
             knownSilos[predecessorSilo] = SiloStatus.Dead;
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
 
             // Create a silo with the same IP and port but a higher generation.
             var supersedingSilo = NewSiloAddress("1.1.1.1", 9030, 2000);
 
             // A status of None is equivalent to no status, so no declarations should be made.
             knownSilos[supersedingSilo] = SiloStatus.None;
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
 
             // The silo should be declared dead by the monitor even if the newer silo is dead.
             knownSilos[supersedingSilo] = SiloStatus.Dead;
-            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos));
 
             // The silo should be declared dead by the monitor.
             knownSilos[supersedingSilo] = SiloStatus.Active;
-            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos, singletonPartition));
+            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos));
         }
 
         /// <summary>
@@ -116,7 +114,7 @@ namespace TestServiceFabric
         /// the service has a singleton partition.
         /// </summary>
         [Fact]
-        public void SiloDeclaredDeadWhenSupersededOnSameAddress()
+        public void SiloNotDeclaredDeadWhenSupersededOnSameAddressDifferentPort()
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
@@ -135,9 +133,8 @@ namespace TestServiceFabric
             // Report a silo as having an unknown status.
             monitor.ReportUnknownSilo(deadSilo);
 
-            // The silo is declared dead only if the partition is a singleton.
-            Assert.Empty(monitor.DetermineDeadSilos(knownSilos, false));
-            Assert.Contains(deadSilo, monitor.DetermineDeadSilos(knownSilos, true));
+            // The silo is not declared dead.
+            Assert.Empty(monitor.DetermineDeadSilos(knownSilos));
         }
 
         private static SiloAddress NewSiloAddress(string ip, ushort port, int generation) =>

@@ -52,9 +52,8 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Finds dead silos which were previously in an unknown state.
         /// </summary>
         /// <param name="allKnownSilos">The collection of all known silos, including dead silos.</param>
-        /// <param name="isSingletonPartition">Whether or not this service is running inside of a singleton partition.</param>
         /// <returns>A collection of dead silos.</returns>
-        public IEnumerable<SiloAddress> DetermineDeadSilos(Dictionary<SiloAddress, SiloStatus> allKnownSilos, bool isSingletonPartition)
+        public IEnumerable<SiloAddress> DetermineDeadSilos(Dictionary<SiloAddress, SiloStatus> allKnownSilos)
         {
             if (this.unknownSilos.Count == 0) return Array.Empty<SiloAddress>();
             
@@ -90,21 +89,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     this.log.Info($"Previously unknown silo {unknownSilo} was superseded by later generation on same endpoint {SiloAddress.New(unknownSilo.Endpoint, knownGeneration)}.");
                     updates.Add(unknownSilo);
                 }
-
-                // If this is a singleton partition, then any silo with a given address (excluding port) and a higher generation indicates that the
-                // unknown silo is dead.
-                if (isSingletonPartition)
-                {
-                    foreach (var knownSilo in latestGenerations)
-                    {
-                        if (unknownSilo.Endpoint.Address.Equals(knownSilo.Key.Address) && knownSilo.Value > unknownSilo.Generation)
-                        {
-                            this.log.Info($"Previously unknown silo {unknownSilo} was superseded by {knownSilo}.");
-                            updates.Add(unknownSilo);
-                        }
-                    }
-                }
-
+                
                 // Silos which have been in an unknown state for more than configured maximum allowed time are automatically considered dead.
                 if (this.GetDateTime() - pair.Value > this.options.UnknownSiloRemovalPeriod)
                 {

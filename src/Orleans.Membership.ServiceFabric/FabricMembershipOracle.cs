@@ -307,8 +307,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 this.ClearCaches();
 
                 // Determine dead silos which this silo has seen queries for but have never been seen in an update from Service Fabric.
-                var singleton = this.fabricServiceSiloResolver.IsSingletonPartition.HasValue && this.fabricServiceSiloResolver.IsSingletonPartition.Value;
-                foreach (var deadSilo in this.unknownSiloMonitor.DetermineDeadSilos(this.GetApproximateSiloStatuses(true), singleton))
+                foreach (var deadSilo in this.unknownSiloMonitor.DetermineDeadSilos(this.GetApproximateSiloStatuses(true)))
                 {
                     if (this.silos.TryGetValue(deadSilo, out var entry))
                     {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Fabric;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -47,9 +46,6 @@ namespace Microsoft.Orleans.ServiceFabric
         }
 
         /// <inheritdoc />
-        public bool? IsSingletonPartition { get; private set; }
-
-        /// <inheritdoc />
         public void Subscribe(IFabricServiceStatusListener handler)
         {
             this.subscribers.TryAdd(handler, handler);
@@ -69,7 +65,6 @@ namespace Microsoft.Orleans.ServiceFabric
             lock (this.updateLock)
             {
                 this.silos = result;
-                this.IsSingletonPartition = this.silos.FirstOrDefault()?.Partition.Kind == ServicePartitionKind.Singleton;
 
                 // Register for update notifications for each partition.
                 var oldRegistrations = this.changeHandlerRegistrations;

@@ -333,8 +333,6 @@ namespace TestServiceFabric
 
             public int RefreshCalled { get; private set; }
 
-            public bool? IsSingletonPartition => true;
-
             public void Subscribe(IFabricServiceStatusListener handler)
             {
                 this.Handlers.Add(handler);
