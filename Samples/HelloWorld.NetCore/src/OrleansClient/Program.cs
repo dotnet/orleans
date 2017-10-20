@@ -52,6 +52,7 @@ namespace OrleansClient
                 {
                     client = new ClientBuilder()
                         .UseConfiguration(config)
+                        .AddApplicationPartsFromAppDomain()
                         .Build();
 
                     await client.Connect();
