@@ -58,7 +58,7 @@ namespace Orleans.Logging.Legacy
 
         /// <summary>
         /// Log a message. Current logger supports legacy event bulking feature. Message bulking feature will only log eventId code appearance count
-        /// if certain event appear more than <see cref="EventBulkingOptions.BulkEventLimit"/>> in <see cref="EventBulkingOptions.BulkEventInterval"/>
+        /// if certain event appear more than <see cref="EventBulkingOptions.BulkEventLimit" /> in <see cref="EventBulkingOptions.BulkEventInterval"/>
         /// </summary>
         /// <typeparam name="TState"></typeparam>
         /// <param name="logLevel"></param>

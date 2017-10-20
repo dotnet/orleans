@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
                 {"HostName", dimensions.NodeConfig.HostNameOrIPAddress }
             };
         }
-        /// <inheritdoc cref="IBlockPoolMonitor"/>
+        /// <inheritdoc />
         public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
             this.TelemetryProducer.TrackMetric("TotalMemoryInByte", totalMemoryInByte, this.LogProperties);
@@ -37,13 +37,13 @@ namespace Orleans.Providers.Streams.Common
             this.TelemetryProducer.TrackMetric("ClaimedMemoryInByte", claimedMemoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="IBlockPoolMonitor"/>
+        /// <inheritdoc />
         public void TrackMemoryReleased(long releasedMemoryInByte)
         {
             this.TelemetryProducer.TrackMetric("ReleasedMemoryInByte", releasedMemoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="IBlockPoolMonitor"/>
+        /// <inheritdoc />
         public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
             this.TelemetryProducer.TrackMetric("AllocatedMemoryInByte", allocatedMemoryInByte, this.LogProperties);

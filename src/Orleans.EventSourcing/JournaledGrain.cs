@@ -236,7 +236,7 @@ namespace Orleans.EventSourcing
         }
 
 
-        /// <inheritdoc cref="ILogConsistencyDiagnostics.UnresolvedConnectionIssues"/>
+        /// <inheritdoc />
         protected IEnumerable<ConnectionIssue> UnresolvedConnectionIssues
         {
             get
@@ -245,19 +245,19 @@ namespace Orleans.EventSourcing
             }
         }
 
-        /// <inheritdoc cref="ILogConsistencyDiagnostics.EnableStatsCollection"/>
+        /// <inheritdoc />
         protected void EnableStatsCollection()
         {
             LogViewAdaptor.EnableStatsCollection();
         }
 
-        /// <inheritdoc cref="ILogConsistencyDiagnostics.DisableStatsCollection"/>
+        /// <inheritdoc />
         protected void DisableStatsCollection()
         {
             LogViewAdaptor.DisableStatsCollection();
         }
 
-        /// <inheritdoc cref="ILogConsistencyDiagnostics.GetStats"/>
+        /// <inheritdoc />
         protected LogConsistencyStatistics GetStats()
         {
             return LogViewAdaptor.GetStats();
