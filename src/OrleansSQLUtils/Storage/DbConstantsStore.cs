@@ -13,27 +13,50 @@ namespace Orleans.SqlUtils
                     AdoNetInvariants.InvariantNameSqlServer,
                     new DbConstants(startEscapeIndicator: '[',
                                     endEscapeIndicator: ']',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    queriesInitalizationQuery: "SELECT QueryKey, QueryText FROM OrleansQuery;",
+                                    storageQueriesInitalizationQuery:"SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey';")
                 },
                 {AdoNetInvariants.InvariantNameMySql, new DbConstants(
                                     startEscapeIndicator: '`',
                                     endEscapeIndicator: '`',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    queriesInitalizationQuery: "SELECT QueryKey, QueryText FROM OrleansQuery;",
+                                    storageQueriesInitalizationQuery:"SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey';")
                 },
                 {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
                                     startEscapeIndicator: '"',
                                     endEscapeIndicator: '"',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    queriesInitalizationQuery: "SELECT QueryKey, QueryText FROM OrleansQuery;",
+                                    storageQueriesInitalizationQuery:"SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey';")
                 },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
                                     endEscapeIndicator: '\"',
-                                    unionAllSelectTemplate: " UNION ALL SELECT FROM DUAL ")},
+                                    unionAllSelectTemplate: " UNION ALL SELECT FROM DUAL ",
+                                    queriesInitalizationQuery: "SELECT QueryKey, QueryText FROM OrleansQuery",
+                                    storageQueriesInitalizationQuery:"SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'")},
             };
 
         public static DbConstants GetDbConstants(string invariantName)
         {
+            if(!invariantNameToConsts.ContainsKey(invariantName))
+                throw new InvalidOperationException($"No DbConstants are registed for invariant {invariantName}");
+
             return invariantNameToConsts[invariantName];
+        }
+
+        public static string GetQueriesInitalizationQuery(string invariantName)
+        {
+            var constants = GetDbConstants(invariantName);
+            return constants.QueriesInitalizationQuery;
+        }
+
+        public static string GetStorageQueriesInitalizationQuery(string invariantName)
+        {
+            var constants = GetDbConstants(invariantName);
+            return constants.StorageQueriesInitalizationQuery;
         }
 
         /// <summary>
@@ -131,11 +154,24 @@ namespace Orleans.SqlUtils
         /// </summary>
         public readonly char EndEscapeIndicator;
 
-        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate)
+        /// <summary>
+        /// Query which selects all queries from the query store in the database.
+        /// </summary>
+        public readonly string QueriesInitalizationQuery;
+
+        /// <summary>
+        /// Query which gets queries for ReadState, WriteState and ClearState
+        /// </summary>
+        public readonly string StorageQueriesInitalizationQuery;
+
+        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate, 
+                           string queriesInitalizationQuery, string storageQueriesInitalizationQuery)
         {
             StartEscapeIndicator = startEscapeIndicator;
             EndEscapeIndicator = endEscapeIndicator;
             UnionAllSelectTemplate = unionAllSelectTemplate;
+            QueriesInitalizationQuery = queriesInitalizationQuery;
+            StorageQueriesInitalizationQuery = storageQueriesInitalizationQuery;
         }
     }
 }

@@ -61,7 +61,10 @@ namespace Orleans.SqlUtils
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 
-            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
+            //Get queries initalization query for the given invariant
+            var getQueriesQuery = DbConstantsStore.GetQueriesInitalizationQuery(invariantName);
+
+            var queries = await storage.ReadAsync(getQueriesQuery, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
 
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)), grainReferenceConverter);
         }
