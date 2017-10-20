@@ -18,7 +18,7 @@ namespace Orleans.SqlUtils
             {
                 { AdoNetInvariants.InvariantNameSqlServer, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
                 { AdoNetInvariants.InvariantNameMySql, new Tuple<string, string>("MySql.Data", "MySql.Data.MySqlClient.MySqlClientFactory") },
-                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
+                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("Oracle.ManagedDataAccess", "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
                 { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
                 { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
             };
