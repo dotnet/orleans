@@ -16,7 +16,7 @@
     <RootNamespace>Orleans.CodeGeneration.Build</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PreserveCompilationContext>true</PreserveCompilationContext>
-    <PublishRoot>$(SourceRoot)Bootstrap/$(Configuration)/published/</PublishRoot>
+    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
