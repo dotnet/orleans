@@ -5,7 +5,7 @@ using Orleans.Hosting;
 
 namespace OrleansZooKeeperUtils
 {
-    /// <inheritdoc cref="ILegacyMembershipConfigurator"/>
+    /// <inheritdoc />
     public class LegacyZooKeeperMembershipConfigurator : ILegacyMembershipConfigurator
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)

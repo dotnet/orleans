@@ -5,7 +5,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
-    /// <inheritdoc cref="ILegacyMembershipConfigurator"/>
+    /// <inheritdoc />
     public class LegacyConsulMembershipConfigurator : ILegacyMembershipConfigurator
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)

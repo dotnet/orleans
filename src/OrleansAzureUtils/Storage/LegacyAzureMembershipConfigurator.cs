@@ -4,7 +4,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
-    /// <inheritdoc cref="ILegacyMembershipConfigurator"/>
+    /// <inheritdoc />
     public class LegacyAzureTableMembershipConfigurator : ILegacyMembershipConfigurator
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
