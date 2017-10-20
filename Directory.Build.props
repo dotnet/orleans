@@ -148,8 +148,4 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
-
-  <PropertyGroup>
-    <InformationalVersion>$(VersionPrefix)-$(VersionSuffix). Commit Hash: $(GitHeadSha)</InformationalVersion>
-  </PropertyGroup>
 </Project>
