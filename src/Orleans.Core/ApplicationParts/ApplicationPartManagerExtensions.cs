@@ -125,6 +125,7 @@ namespace Orleans.Hosting
             }
 
             var processedAssemblies = new HashSet<Assembly>();
+            processedAssemblies.Add(assembly);
             LoadReferencedAssemblies(assembly, processedAssemblies);
 
             foreach (var asm in processedAssemblies)
