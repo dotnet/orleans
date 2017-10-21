@@ -34,7 +34,7 @@ namespace OrleansSQLUtils.Storage
         /// The query that's used to get all the stored queries.
         /// this will probably be the same for all relational dbs.
         /// </summary>
-        internal const string GetQueriesKey = "SELECT QueryKey, QueryText FROM OrleansQuery;";
+        internal const string GetQueriesKey = "SELECT QueryKey, QueryText FROM OrleansQuery";
 
         /// <summary>
         /// A query template to retrieve gateway URIs.

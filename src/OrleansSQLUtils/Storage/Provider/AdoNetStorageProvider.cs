@@ -82,7 +82,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The default query to initialize this structure from the Orleans database.
         /// </summary>
-        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey';";
+        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'";
 
         /// <summary>
         /// The default ADO.NET invariant used for storage if none is given. This corresponds to Orleans.Runtime.Constants.INVARIANT_NAME_SQL_SERVER.
