@@ -41,10 +41,8 @@ namespace OrleansSiloHost
 
             var builder = new SiloHostBuilder()
                 .UseConfiguration(config)
+                .AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly)
                 .ConfigureLogging(logging => logging.AddConsole());
-            // TODO: After #3578 is released, this should be enough: builder.AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly);
-            builder.GetApplicationPartManager().AddApplicationPart(typeof(HelloGrain).Assembly);
-            builder.GetApplicationPartManager().AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly);
 
             var host = builder.Build();
             await host.StartAsync();
