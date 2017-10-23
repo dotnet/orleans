@@ -21,19 +21,20 @@ You can then compile as usual, build solution.
 
 ```
 dotnet restore
-dotnet publish
 ```
 
 #### Running the sample
-The sample has to run from the published folder that contains all the binaries (as of 2.0.0-preview3 at least, might be simpler in the future)
+From Visual Studio, you can start start the SiloHost and OrleansClient projects simultaneously (you can set up multiple startup projects by right-clicking the solution in the Solution Explorer, and select `Set StartUp projects`.
+
+Alternatively, you can run from the command line:
 
 To start the silo
 ```
-dotnet src\SiloHost\bin\Debug\netcoreapp2.0\publish\SiloHost.dll
+dotnet run src\SiloHost
 ```
 
 
 To start the client (you will have to use a different command window)
 ```
-dotnet src\OrleansClient\bin\Debug\netcoreapp2.0\publish\OrleansClient.dll
+dotnet run src\OrleansClient\
 ```

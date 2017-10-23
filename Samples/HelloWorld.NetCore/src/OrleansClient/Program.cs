@@ -48,7 +48,7 @@ namespace OrleansClient
                     var config = ClientConfiguration.LocalhostSilo();
                     client = new ClientBuilder()
                         .UseConfiguration(config)
-                        .AddApplicationPartsFromReferences(typeof(Program).Assembly)
+                        .AddApplicationPartsFromReferences(typeof(IHello).Assembly)
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 
