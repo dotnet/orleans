@@ -30,11 +30,11 @@ Alternatively, you can run from the command line:
 
 To start the silo
 ```
-dotnet run src\SiloHost
+dotnet run --project src\SiloHost
 ```
 
 
 To start the client (you will have to use a different command window)
 ```
-dotnet run src\OrleansClient\
+dotnet run --project src\OrleansClient\
 ```
