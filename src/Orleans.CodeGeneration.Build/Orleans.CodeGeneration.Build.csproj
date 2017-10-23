@@ -20,6 +20,7 @@
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <DevelopmentDependency>true</DevelopmentDependency>
   </PropertyGroup>
   
   <ItemGroup>
@@ -36,16 +37,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" PrivateAssets="All" />
-    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" PrivateAssets="All" />
-    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" PrivateAssets="All" />
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
   </ItemGroup>
-
+  <ItemGroup>
+    <!-- This must come after all other PackageReference elements -->
+    <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj">
       <PrivateAssets>all</PrivateAssets>
