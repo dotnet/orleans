@@ -40,7 +40,7 @@ namespace UnitTests.Grains
 
         public Task<Guid> E2ELegacyActivityId()
         {
-            if (!RequestContext.PropagateActivityId) throw new OrleansException("ActivityId Propegation is not enabled on silo.");
+            if (!RequestContext.PropagateActivityId) throw new InvalidOperationException("ActivityId propagation is not enabled on silo.");
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
         }
 
