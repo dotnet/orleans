@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Logging;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Host
 {
@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void UnInitializeOrleansSilo()
         {
-            Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
+            Utils.SafeExecute(this.orleans.Services.GetService<UnobservedExceptionsHandler>().ResetUnobservedExceptionHandler);
         }
 
         /// <summary>

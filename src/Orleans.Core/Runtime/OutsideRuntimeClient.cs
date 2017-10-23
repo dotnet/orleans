@@ -69,6 +69,7 @@ namespace Orleans
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
+        private readonly UnobservedExceptionsHandler unobservedExceptionsHandler;
         public SerializationManager SerializationManager { get; set; }
 
         public ActivationAddress CurrentActivationAddress
@@ -96,8 +97,9 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ILoggerFactory loggerFactory)
+        public OutsideRuntimeClient(ILoggerFactory loggerFactory, UnobservedExceptionsHandler unobservedExceptionsHandler)
         {
+            this.unobservedExceptionsHandler = unobservedExceptionsHandler;
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
@@ -145,9 +147,7 @@ namespace Orleans
 
             try
             {
-                //init logger for UnobservedExceptionsHandlerClass
-                UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
-                if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
+                if (!unobservedExceptionsHandler.TrySetUnobservedExceptionHandler(UnhandledException))
                 {
                     logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
                 }
@@ -748,7 +748,7 @@ namespace Orleans
 
             try
             {
-                UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
+                unobservedExceptionsHandler.ResetUnobservedExceptionHandler();
             }
             catch (Exception) { }
             try

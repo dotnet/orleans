@@ -6,17 +6,18 @@ namespace Orleans
 {
     using Orleans.Runtime;
 
-    internal class UnobservedExceptionsHandlerClass
+    internal class UnobservedExceptionsHandler
     {
-        private static readonly Object lockObject = new Object();
-        private static ILogger logger;
-        private static UnobservedExceptionDelegate unobservedExceptionHandler;
-        private static readonly bool alreadySubscribedToTplEvent = false;
+        private readonly Object lockObject = new Object();
+        private ILogger logger;
+        private UnobservedExceptionDelegate unobservedExceptionHandler;
+        private readonly bool alreadySubscribedToTplEvent = false;
 
         internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception);
         
-        static UnobservedExceptionsHandlerClass()
+        public UnobservedExceptionsHandler(ILogger<UnobservedExceptionsHandler> logger)
         {
+            this.logger = logger;
             lock (lockObject)
             {
                 if (!alreadySubscribedToTplEvent)
@@ -27,12 +28,8 @@ namespace Orleans
             }
         }
 
-        internal static void InitLogger(ILoggerFactory loggerFactory)
-        {
-            logger = loggerFactory.CreateLogger<UnobservedExceptionsHandlerClass>();
-        }
 
-        internal static bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
+        internal bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
             lock (lockObject)
@@ -48,7 +45,7 @@ namespace Orleans
             return true;
         }
 
-        internal static void ResetUnobservedExceptionHandler()
+        internal void ResetUnobservedExceptionHandler()
         {
             lock (lockObject)
             {
@@ -56,7 +53,7 @@ namespace Orleans
             }
         }
 
-        private static void InternalUnobservedTaskExceptionHandler(object sender, UnobservedTaskExceptionEventArgs e)
+        private void InternalUnobservedTaskExceptionHandler(object sender, UnobservedTaskExceptionEventArgs e)
         {
             var aggrException = e.Exception;
             var baseException = aggrException.GetBaseException();

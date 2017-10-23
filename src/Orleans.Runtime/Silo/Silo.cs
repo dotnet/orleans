@@ -82,7 +82,7 @@ namespace Orleans.Runtime
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private readonly IMembershipOracle membershipOracle;
         private readonly IMultiClusterOracle multiClusterOracle;
-
+        private readonly UnobservedExceptionsHandler unobservedExceptionsHandler;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
@@ -210,10 +210,9 @@ namespace Orleans.Runtime
                 name, config.ToString(name));
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
+            this.unobservedExceptionsHandler = this.Services.GetRequiredService<UnobservedExceptionsHandler>();
             BufferPool.InitGlobalBufferPool(siloMessagingOptions);
-            //init logger for UnobservedExceptionsHandlerClass
-            UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
-            if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnobservedExceptionHandler))
+            if (!this.unobservedExceptionsHandler.TrySetUnobservedExceptionHandler(UnobservedExceptionHandler))
             {
                 logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
             }
@@ -830,7 +829,7 @@ namespace Orleans.Runtime
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
 
-            UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
+            this.unobservedExceptionsHandler.ResetUnobservedExceptionHandler();
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
