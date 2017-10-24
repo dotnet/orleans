@@ -84,6 +84,7 @@ namespace Orleans.CodeGenerator
 
             var members = new List<MemberDeclarationSyntax>(GenerateStaticFields(fields))
             {
+                GenerateConstructor(className, type, fields),
                 GenerateDeepCopierMethod(type, fields),
                 GenerateSerializerMethod(type, fields),
                 GenerateDeserializerMethod(type, fields),
@@ -92,6 +93,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration =
                 SF.ClassDeclaration(className)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
+                    .AddModifiers(SF.Token(SyntaxKind.SealedKeyword))
                     .AddAttributeLists(SF.AttributeList().AddAttributes(attributes.ToArray()))
                     .AddMembers(members.ToArray())
                     .AddConstraintClauses(type.GetTypeConstraintSyntax());
@@ -101,6 +103,77 @@ namespace Orleans.CodeGenerator
             }
 
             return classDeclaration;
+        }
+
+        private static MemberDeclarationSyntax GenerateConstructor(string className, Type type, List<FieldInfoMember> fields)
+        {
+            var body = new List<StatementSyntax>();
+
+            Expression<Action<IFieldUtils>> getGetter = _ => _.GetGetter(default(FieldInfo));
+            Expression<Action<IFieldUtils>> getReferenceSetter = _ => _.GetReferenceSetter(default(FieldInfo));
+            Expression<Action<IFieldUtils>> getValueSetter = _ => _.GetValueSetter(default(FieldInfo));
+
+            var fieldUtils = SF.IdentifierName("fieldUtils");
+
+            foreach (var field in fields)
+            {
+                var fieldInfoField = SF.IdentifierName(field.InfoFieldName);
+
+                // Declare the getter for this field.
+                if (!field.IsGettableProperty)
+                {
+                    var getterType =
+                        typeof(Func<,>).MakeGenericType(field.FieldInfo.DeclaringType, field.FieldInfo.FieldType)
+                            .GetTypeSyntax();
+
+                    var getterInvoke = SF.CastExpression(
+                                getterType,
+                                getGetter.Invoke(fieldUtils).AddArgumentListArguments(SF.Argument(fieldInfoField)));
+
+                    body.Add(SF.ExpressionStatement(
+                        SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(field.GetterFieldName), getterInvoke)));
+                }
+                if (!field.IsSettableProperty)
+                {
+                    if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.GetTypeInfo().IsValueType)
+                    {
+                        var setterType =
+                            typeof(ValueTypeSetter<,>).MakeGenericType(
+                                field.FieldInfo.DeclaringType,
+                                field.FieldInfo.FieldType).GetTypeSyntax();
+
+                        var getValueSetterInvoke = SF.CastExpression(
+                                            setterType,
+                                            getValueSetter.Invoke(fieldUtils)
+                                                .AddArgumentListArguments(SF.Argument(fieldInfoField)));
+
+                        body.Add(SF.ExpressionStatement(
+                            SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(field.SetterFieldName), getValueSetterInvoke)));
+                    }
+                    else
+                    {
+                        var setterType =
+                            typeof(Action<,>).MakeGenericType(field.FieldInfo.DeclaringType, field.FieldInfo.FieldType)
+                                .GetTypeSyntax();
+
+                        var getReferenceSetterInvoke = SF.CastExpression(
+                                            setterType,
+                                            getReferenceSetter.Invoke(fieldUtils)
+                                                .AddArgumentListArguments(SF.Argument(fieldInfoField)));
+
+                        body.Add(SF.ExpressionStatement(
+                            SF.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, SF.IdentifierName(field.SetterFieldName), getReferenceSetterInvoke)));
+                    }
+                }
+
+            }
+
+            return
+                SF.ConstructorDeclaration(className)
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword))
+                    .AddParameterListParameters(
+                        SF.Parameter(fieldUtils.Identifier).WithType(typeof(IFieldUtils).GetTypeSyntax()))
+                    .AddBodyStatements(body.ToArray());
         }
 
         /// <summary>
@@ -165,7 +238,7 @@ namespace Orleans.CodeGenerator
             body.Add(SF.ReturnStatement(SF.CastExpression(type.GetTypeSyntax(), resultVariable)));
             return
                 SF.MethodDeclaration(typeof(object).GetTypeSyntax(), "Deserializer")
-                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword))
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword))
                     .AddParameterListParameters(
                         SF.Parameter(SF.Identifier("expected")).WithType(typeof(Type).GetTypeSyntax()),
                         SF.Parameter(SF.Identifier("context")).WithType(typeof(IDeserializationContext).GetTypeSyntax()))
@@ -208,7 +281,7 @@ namespace Orleans.CodeGenerator
 
             return
                 SF.MethodDeclaration(typeof(void).GetTypeSyntax(), "Serializer")
-                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword))
+                    .AddModifiers(SF.Token(SyntaxKind.PublicKeyword))
                     .AddParameterListParameters(
                         SF.Parameter(SF.Identifier("untypedInput")).WithType(typeof(object).GetTypeSyntax()),
                         SF.Parameter(SF.Identifier("context")).WithType(typeof(ISerializationContext).GetTypeSyntax()),
@@ -277,7 +350,7 @@ namespace Orleans.CodeGenerator
 
             return
                 SF.MethodDeclaration(typeof(object).GetTypeSyntax(), "DeepCopier")
-                  .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.StaticKeyword))
+                  .AddModifiers(SF.Token(SyntaxKind.PublicKeyword))
                   .AddParameterListParameters(
                       SF.Parameter(SF.Identifier("original")).WithType(typeof(object).GetTypeSyntax()),
                       SF.Parameter(SF.Identifier("context")).WithType(typeof(ICopyContext).GetTypeSyntax()))
@@ -298,9 +371,6 @@ namespace Orleans.CodeGenerator
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
             Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
             Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
-            Expression<Action> getGetter = () => FieldUtils.GetGetter(default(FieldInfo));
-            Expression<Action> getReferenceSetter = () => FieldUtils.GetReferenceSetter(default(FieldInfo));
-            Expression<Action> getValueSetter = () => FieldUtils.GetValueSetter(default(FieldInfo));
 
             // Expressions for specifying binding flags.
             var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
@@ -328,7 +398,6 @@ namespace Orleans.CodeGenerator
                             SF.VariableDeclaration(typeof(FieldInfo).GetTypeSyntax()).AddVariables(fieldInfoVariable))
                             .AddModifiers(
                                 SF.Token(SyntaxKind.PrivateKeyword),
-                                SF.Token(SyntaxKind.StaticKeyword),
                                 SF.Token(SyntaxKind.ReadOnlyKeyword)));
                 }
 
@@ -338,19 +407,12 @@ namespace Orleans.CodeGenerator
                     var getterType =
                         typeof(Func<,>).MakeGenericType(field.FieldInfo.DeclaringType, field.FieldInfo.FieldType)
                             .GetTypeSyntax();
-                    var fieldGetterVariable =
-                        SF.VariableDeclarator(field.GetterFieldName)
-                            .WithInitializer(
-                                SF.EqualsValueClause(
-                                    SF.CastExpression(
-                                        getterType,
-                                        getGetter.Invoke().AddArgumentListArguments(SF.Argument(fieldInfoField)))));
+                    var fieldGetterVariable = SF.VariableDeclarator(field.GetterFieldName);
+
                     result.Add(
                         SF.FieldDeclaration(SF.VariableDeclaration(getterType).AddVariables(fieldGetterVariable))
                             .AddModifiers(
-                                SF.Token(SyntaxKind.PrivateKeyword),
-                                SF.Token(SyntaxKind.StaticKeyword),
-                                SF.Token(SyntaxKind.ReadOnlyKeyword)));
+                                SF.Token(SyntaxKind.PrivateKeyword)));
                 }
 
                 if (!field.IsSettableProperty)
@@ -362,20 +424,12 @@ namespace Orleans.CodeGenerator
                                 field.FieldInfo.DeclaringType,
                                 field.FieldInfo.FieldType).GetTypeSyntax();
 
-                        var fieldSetterVariable =
-                            SF.VariableDeclarator(field.SetterFieldName)
-                                .WithInitializer(
-                                    SF.EqualsValueClause(
-                                        SF.CastExpression(
-                                            setterType,
-                                            getValueSetter.Invoke()
-                                                .AddArgumentListArguments(SF.Argument(fieldInfoField)))));
+                        var fieldSetterVariable = SF.VariableDeclarator(field.SetterFieldName);
+
                         result.Add(
                             SF.FieldDeclaration(SF.VariableDeclaration(setterType).AddVariables(fieldSetterVariable))
                                 .AddModifiers(
-                                    SF.Token(SyntaxKind.PrivateKeyword),
-                                    SF.Token(SyntaxKind.StaticKeyword),
-                                    SF.Token(SyntaxKind.ReadOnlyKeyword)));
+                                    SF.Token(SyntaxKind.PrivateKeyword)));
                     }
                     else
                     {
@@ -383,27 +437,19 @@ namespace Orleans.CodeGenerator
                             typeof(Action<,>).MakeGenericType(field.FieldInfo.DeclaringType, field.FieldInfo.FieldType)
                                 .GetTypeSyntax();
 
-                        var fieldSetterVariable =
-                            SF.VariableDeclarator(field.SetterFieldName)
-                                .WithInitializer(
-                                    SF.EqualsValueClause(
-                                        SF.CastExpression(
-                                            setterType,
-                                            getReferenceSetter.Invoke()
-                                                .AddArgumentListArguments(SF.Argument(fieldInfoField)))));
+                        var fieldSetterVariable = SF.VariableDeclarator(field.SetterFieldName);
 
                         result.Add(
                             SF.FieldDeclaration(SF.VariableDeclaration(setterType).AddVariables(fieldSetterVariable))
                                 .AddModifiers(
-                                    SF.Token(SyntaxKind.PrivateKeyword),
-                                    SF.Token(SyntaxKind.StaticKeyword),
-                                    SF.Token(SyntaxKind.ReadOnlyKeyword)));
+                                    SF.Token(SyntaxKind.PrivateKeyword)));
                     }
                 }
             }
 
             return result.ToArray();
         }
+
 
         /// <summary>
         /// Returns syntax for initializing a new instance of the provided type.
@@ -446,6 +492,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>A sorted list of the fields of the provided type.</returns>
+        
         private static List<FieldInfoMember> GetFields(Type type)
         {
             var result =

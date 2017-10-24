@@ -222,6 +222,22 @@ namespace Orleans.Serialization
             Register(t, cop, ser, deser, false);
         }
 
+        private object InitializeSerializer(Type serializerType)
+        {
+            if (this.ServiceProvider == null)
+                return null;
+
+            if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
+                return null;
+
+            var constructors = serializerType.GetConstructors();
+            if (constructors == null || constructors.Length < 1)
+                return null;
+
+            var serializer = ActivatorUtilities.CreateInstance(this.ServiceProvider, serializerType);
+            return serializer;
+        }
+
         /// <summary>
         /// Register a Type with the serialization system to use the specified DeepCopier, Serializer and Deserializer functions.
         /// If <c>forcOverride == true</c> then this definition will replace any any previous functions registered for this Type.
@@ -428,11 +444,12 @@ namespace Orleans.Serialization
                 }
                 else
                 {
+                    var target = this.InitializeSerializer(serializerType);
                     this.Register(
                         type,
-                        copier?.CreateDelegate(typeof(DeepCopier)) as DeepCopier,
-                        serializer?.CreateDelegate(typeof(Serializer)) as Serializer,
-                        deserializer?.CreateDelegate(typeof(Deserializer)) as Deserializer,
+                        CreateDelegate(copier, typeof(DeepCopier), target) as DeepCopier,
+                        CreateDelegate(serializer, typeof(Serializer), target) as Serializer,
+                        CreateDelegate(deserializer, typeof(Deserializer), target) as Deserializer,
                         true);
                 }
             }
@@ -545,10 +562,12 @@ namespace Orleans.Serialization
             }
 
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
-            var concreteCopier = (DeepCopier)copier.CreateDelegate(typeof(DeepCopier));
-            var concreteSerializer = (Serializer)serializer.CreateDelegate(typeof(Serializer));
-            var concreteDeserializer = (Deserializer)deserializer.CreateDelegate(typeof(Deserializer));
-            Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
+            var target = this.InitializeSerializer(concreteSerializerType);
+            var concreteCopier = (DeepCopier) CreateDelegate(copier, typeof(DeepCopier), target);
+            var concreteSerializer = (Serializer) CreateDelegate(serializer, typeof(Serializer), target);
+            var concreteDeserializer = (Deserializer) CreateDelegate(deserializer, typeof(Deserializer), target);
+
+            this.Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
 
             return new SerializerMethods(concreteCopier, concreteSerializer, concreteDeserializer);
         }
@@ -558,7 +577,7 @@ namespace Orleans.Serialization
             copier = null;
             serializer = null;
             deserializer = null;
-            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Any())
                 {
@@ -573,6 +592,19 @@ namespace Orleans.Serialization
                     deserializer = method;
                 }
             }
+        }
+
+        private Delegate CreateDelegate(MethodInfo methodInfo, Type delegateType, object target)
+        {
+            if (this.ServiceProvider == null)
+                return null;
+
+            if (methodInfo == null)
+                return null;
+
+            return methodInfo.IsStatic
+                ? methodInfo.CreateDelegate(delegateType)
+                : methodInfo.CreateDelegate(delegateType, target);
         }
 
         #endregion

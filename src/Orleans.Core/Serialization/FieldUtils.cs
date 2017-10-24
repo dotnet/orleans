@@ -4,18 +4,10 @@ using System.Reflection.Emit;
 
 namespace Orleans.Serialization
 {
-    /// <summary>
-    /// The delegate used to set fields in value types.
-    /// </summary>
-    /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
-    /// <typeparam name="TField">The field type.</typeparam>
-    /// <param name="instance">The instance having its field set.</param>
-    /// <param name="value">The value being set.</param>
-    public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
-
-    public sealed class FieldUtils
+    public class FieldUtils : IFieldUtils
     {
-        public static Delegate GetGetter(FieldInfo field)
+        /// <inheritdoc />
+        public Delegate GetGetter(FieldInfo field)
         {
             return GetGetDelegate(
                 field,
@@ -57,21 +49,15 @@ namespace Orleans.Serialization
             return method.CreateDelegate(delegateType);
         }
 
-        /// <summary>
-        /// Returns a delegate to set the value of this field for an instance.
-        /// </summary>
-        /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetReferenceSetter(FieldInfo field)
+        /// <inheritdoc />
+        public Delegate GetReferenceSetter(FieldInfo field)
         {
             var delegateType = typeof(Action<,>).MakeGenericType(field.DeclaringType, field.FieldType);
             return GetSetDelegate(field, delegateType, new[] { field.DeclaringType, field.FieldType });
         }
 
-        /// <summary>
-        /// Returns a delegate to set the value of this field for an instance.
-        /// </summary>
-        /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetValueSetter(FieldInfo field)
+        /// <inheritdoc />
+        public Delegate GetValueSetter(FieldInfo field)
         {
             var declaringType = field.DeclaringType;
             if (declaringType == null)
