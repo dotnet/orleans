@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;TaskAssembly;OutputFileName;CoreAssembly;FullAssembly;GeneratorAssembly">
+<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;MSBuildIsCore;TargetIsCore;TaskAssembly;OutputFileName;CoreAssembly;FullAssembly;GeneratorAssembly">
   
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' != ''">
     <!-- OrleansCodeGeneratorAssembly is used here to override the MSBuildIsCore value during Orleans.sln builds -->
