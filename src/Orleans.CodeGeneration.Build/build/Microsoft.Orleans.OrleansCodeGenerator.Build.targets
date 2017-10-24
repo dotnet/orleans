@@ -1,16 +1,39 @@
-<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;TaskAssembly;OutputFileName">
+<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;TaskAssembly;OutputFileName;CoreAssembly;FullAssembly;GeneratorAssembly">
+  
+  <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' != ''">
+    <!-- OrleansCodeGeneratorAssembly is used here to override the MSBuildIsCore value during Orleans.sln builds -->
+    <MSBuildIsCore></MSBuildIsCore>
+    <TargetIsCore></TargetIsCore>
+    <TaskAssembly>$(OrleansCodeGeneratorAssembly)</TaskAssembly>
+    <GeneratorAssembly>$(OrleansCodeGeneratorAssembly)</GeneratorAssembly>
+  </PropertyGroup>
+    
+  <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' == ''">
+    <CoreAssembly>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.0\Orleans.CodeGeneration.Build.dll</CoreAssembly>
+    <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</FullAssembly>
+    
+    <!-- Specify the assembly containing the MSBuild tasks. -->
+    <MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core'">true</MSBuildIsCore>
+    <TaskAssembly Condition="'$(MSBuildIsCore)' == 'true'">$(CoreAssembly)</TaskAssembly>
+    <TaskAssembly Condition="'$(MSBuildIsCore)' != 'true'">$(FullAssembly)</TaskAssembly>
+
+    <!-- When the MSBuild host is full-framework, we defer to PATH for dotnet -->
+    <DotNetHost Condition="'$(MSBuildIsCore)' != 'true'">dotnet</DotNetHost>
+    
+    <!-- Specify the assembly containing the code generator. -->
+    <TargetIsCore Condition="$(TargetFramework.StartsWith('netcore')) or $(TargetFramework.StartsWith('netstandard'))">true</TargetIsCore>
+    <GeneratorAssembly Condition="'$(TargetIsCore)' == 'true'">$(CoreAssembly)</GeneratorAssembly>
+    <GeneratorAssembly Condition="'$(TargetIsCore)' != 'true'">$(FullAssembly)</GeneratorAssembly>
+  </PropertyGroup>
+  
   <PropertyGroup>
-    <TaskAssembly Condition="'$(OrleansCodeGeneratorAssembly)' != ''">$(OrleansCodeGeneratorAssembly)</TaskAssembly>
-    <IsCore Condition=" '$(MSBuildRuntimeType)' == 'Core' and '$(OrleansCodeGeneratorAssembly)' == ''">true</IsCore>
-    <TaskAssembly Condition=" '$(IsCore)' == 'true' and '$(TaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.0\Orleans.CodeGeneration.Build.dll</TaskAssembly>
-    <TaskAssembly Condition=" '$(IsCore)' != 'true' and '$(TaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</TaskAssembly>
     <CodeGenDirectory Condition="'$([System.IO.Path]::IsPathRooted($(IntermediateOutputPath)))' == 'true'">$(IntermediateOutputPath)</CodeGenDirectory>
     <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
     <OutputFileName>$(CodeGenDirectory)$(TargetName).orleans.g.cs</OutputFileName>
     <CodeGeneratorEnabled Condition="'$(OrleansCodeGenPrecompile)'!='true' and '$(DesignTimeBuild)' != 'true'">true</CodeGeneratorEnabled>
   </PropertyGroup>
 
-  <UsingTask TaskName="Orleans.CodeGeneration.GetDotNetHost" AssemblyFile="$(TaskAssembly)" Condition="'$(CodeGeneratorEnabled)' == 'true' and '$(IsCore)' == 'true'" />
+  <UsingTask TaskName="Orleans.CodeGeneration.GetDotNetHost" AssemblyFile="$(TaskAssembly)" Condition="'$(CodeGeneratorEnabled)' == 'true' and '$(DotNetHost)' == '' and '$(MSBuildIsCore)' == 'true'" />
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="GenerateOrleansCode"
@@ -24,7 +47,7 @@
       <InputAssembly>$(IntermediateOutputPath)$(TargetName)$(TargetExt)</InputAssembly>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).orleans.g.args.txt</ArgsFile>
     </PropertyGroup>
-    <GetDotNetHost Condition="'$(DotNetHost)' == '' and '$(IsCore)' == 'true' ">
+    <GetDotNetHost Condition="'$(DotNetHost)' == '' and '$(TargetIsCore)' == 'true' ">
       <Output TaskParameter="DotNetHost" PropertyName="DotNetHost" />
     </GetDotNetHost>
     <ItemGroup>
@@ -42,14 +65,14 @@
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     
-    <!-- If building on .NET Core, use dotnet to execute the process. -->
-    <Exec Command="&quot;$(DotNetHost)&quot; &quot;$(TaskAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(IsCore)' == 'true'">
+    <!-- If building a .NET Core or .NET Standard target, use dotnet to execute the process. -->
+    <Exec Command="&quot;$(DotNetHost)&quot; &quot;$(GeneratorAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(TargetIsCore)' == 'true'">
       <Output TaskParameter="Outputs" ItemName="Compile" />
       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
 
-    <!-- If not building on .NET Core, execute the process directly. -->
-    <Exec Command="&quot;$(TaskAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(IsCore)' != 'true'">
+    <!-- If building a Full .NET target, execute the process directly. -->
+    <Exec Command="&quot;$(GeneratorAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(TargetIsCore)' != 'true'">
       <Output TaskParameter="Outputs" ItemName="Compile" />
       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
