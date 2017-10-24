@@ -114,7 +114,6 @@ namespace Orleans
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
-            services.TryAddSingleton<UnobservedExceptionsHandler>();
             // Application parts
             var parts = context.GetApplicationPartManager();
             services.TryAddSingleton<ApplicationPartManager>(parts);

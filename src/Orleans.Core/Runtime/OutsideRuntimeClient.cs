@@ -69,7 +69,6 @@ namespace Orleans
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
-        private readonly UnobservedExceptionsHandler unobservedExceptionsHandler;
         public SerializationManager SerializationManager { get; set; }
 
         public ActivationAddress CurrentActivationAddress
@@ -97,9 +96,8 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ILoggerFactory loggerFactory, UnobservedExceptionsHandler unobservedExceptionsHandler)
+        public OutsideRuntimeClient(ILoggerFactory loggerFactory)
         {
-            this.unobservedExceptionsHandler = unobservedExceptionsHandler;
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
@@ -147,11 +145,6 @@ namespace Orleans
 
             try
             {
-                if (!unobservedExceptionsHandler.TrySetUnobservedExceptionHandler(UnhandledException))
-                {
-                    logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
-                }
-
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
@@ -745,12 +738,7 @@ namespace Orleans
                     logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
-
-            try
-            {
-                unobservedExceptionsHandler.ResetUnobservedExceptionHandler();
-            }
-            catch (Exception) { }
+            
             try
             {
                 AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
