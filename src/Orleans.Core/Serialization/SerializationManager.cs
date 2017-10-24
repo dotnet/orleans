@@ -447,9 +447,9 @@ namespace Orleans.Serialization
                     var target = this.InitializeSerializer(serializerType);
                     this.Register(
                         type,
-                        CreateDelegate(copier, typeof(DeepCopier), target) as DeepCopier,
-                        CreateDelegate(serializer, typeof(Serializer), target) as Serializer,
-                        CreateDelegate(deserializer, typeof(Deserializer), target) as Deserializer,
+                        CreateDelegate<DeepCopier>(copier, target),
+                        CreateDelegate<Serializer>(serializer, target),
+                        CreateDelegate<Deserializer>(deserializer, target),
                         true);
                 }
             }
@@ -563,9 +563,9 @@ namespace Orleans.Serialization
 
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
             var target = this.InitializeSerializer(concreteSerializerType);
-            var concreteCopier = (DeepCopier) CreateDelegate(copier, typeof(DeepCopier), target);
-            var concreteSerializer = (Serializer) CreateDelegate(serializer, typeof(Serializer), target);
-            var concreteDeserializer = (Deserializer) CreateDelegate(deserializer, typeof(Deserializer), target);
+            var concreteCopier = CreateDelegate<DeepCopier>(copier, target);
+            var concreteSerializer = CreateDelegate<Serializer>(serializer, target);
+            var concreteDeserializer = CreateDelegate<Deserializer>(deserializer, target);
 
             this.Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
 
@@ -594,17 +594,17 @@ namespace Orleans.Serialization
             }
         }
 
-        private Delegate CreateDelegate(MethodInfo methodInfo, Type delegateType, object target)
+        private T CreateDelegate<T>(MethodInfo methodInfo, object target) where T : class
         {
             if (this.ServiceProvider == null)
-                return null;
+                return default(T);
 
             if (methodInfo == null)
-                return null;
+                return default(T);
 
-            return methodInfo.IsStatic
-                ? methodInfo.CreateDelegate(delegateType)
-                : methodInfo.CreateDelegate(delegateType, target);
+            return (methodInfo.IsStatic
+                ? methodInfo.CreateDelegate(typeof(T))
+                : methodInfo.CreateDelegate(typeof(T), target)) as T;
         }
 
         #endregion
