@@ -82,9 +82,9 @@ namespace Orleans.CodeGenerator
                 onEncounteredType(fieldType);
             }
 
-            var members = new List<MemberDeclarationSyntax>(GenerateStaticFields(fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateFields(fields))
             {
-                GenerateConstructor(className, type, fields),
+                GenerateConstructor(className, fields),
                 GenerateDeepCopierMethod(type, fields),
                 GenerateSerializerMethod(type, fields),
                 GenerateDeserializerMethod(type, fields),
@@ -105,7 +105,7 @@ namespace Orleans.CodeGenerator
             return classDeclaration;
         }
 
-        private static MemberDeclarationSyntax GenerateConstructor(string className, Type type, List<FieldInfoMember> fields)
+        private static MemberDeclarationSyntax GenerateConstructor(string className, List<FieldInfoMember> fields)
         {
             var body = new List<StatementSyntax>();
 
@@ -364,7 +364,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="fields">The fields.</param>
         /// <returns>Syntax for the static fields of the serializer class.</returns>
-        private static MemberDeclarationSyntax[] GenerateStaticFields(List<FieldInfoMember> fields)
+        private static MemberDeclarationSyntax[] GenerateFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
