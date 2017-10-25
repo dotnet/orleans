@@ -3,7 +3,7 @@ param(
     [string] $testFilter,
     [string] $outDir)
 
-$maxDegreeOfParallelism = 3
+$maxDegreeOfParallelism = 4
 $failed = $false
 
 function Receive-CompletedJobs {
