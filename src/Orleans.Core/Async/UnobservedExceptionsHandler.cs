@@ -6,12 +6,12 @@ namespace Orleans
 {
     using Orleans.Runtime;
 
-    internal class UnobservedExceptionsHandler
+    internal class UnobservedExceptionsHandler : IDisposable
     {
         private readonly Object lockObject = new Object();
-        private ILogger logger;
+        private readonly ILogger logger;
         private UnobservedExceptionDelegate unobservedExceptionHandler;
-        private readonly bool alreadySubscribedToTplEvent = false;
+        private bool alreadySubscribedToTplEvent = false;
 
         internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception);
         
@@ -45,14 +45,6 @@ namespace Orleans
             return true;
         }
 
-        internal void ResetUnobservedExceptionHandler()
-        {
-            lock (lockObject)
-            {
-                unobservedExceptionHandler = null;
-            }
-        }
-
         private void InternalUnobservedTaskExceptionHandler(object sender, UnobservedTaskExceptionEventArgs e)
         {
             var aggrException = e.Exception;
@@ -82,6 +74,16 @@ namespace Orleans
                     logger.Error(ErrorCode.Runtime_Error_100005, errorStr);
                     logger.Error(ErrorCode.Runtime_Error_100006, "Exception remained UnObserved!!! The subsequent behavior depends on the ThrowUnobservedTaskExceptions setting in app config and .NET version.");
                 }
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (lockObject)
+            {
+                TaskScheduler.UnobservedTaskException -= InternalUnobservedTaskExceptionHandler;
+                unobservedExceptionHandler = null;
+                alreadySubscribedToTplEvent = false;
             }
         }
     }

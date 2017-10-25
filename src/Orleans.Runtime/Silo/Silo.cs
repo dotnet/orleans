@@ -829,7 +829,7 @@ namespace Orleans.Runtime
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
 
-            this.unobservedExceptionsHandler.ResetUnobservedExceptionHandler();
+            SafeExecute(this.unobservedExceptionsHandler.Dispose);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
             SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);

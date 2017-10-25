@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Host
         {
             var unObservedExceptionHandler = this.orleans?.Services?.GetService<UnobservedExceptionsHandler>();
             if(unObservedExceptionHandler != null)
-                Utils.SafeExecute(unObservedExceptionHandler.ResetUnobservedExceptionHandler);
+                Utils.SafeExecute(unObservedExceptionHandler.Dispose);
         }
 
         /// <summary>
