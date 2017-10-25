@@ -47,9 +47,9 @@
       <InputAssembly>$(IntermediateOutputPath)$(TargetName)$(TargetExt)</InputAssembly>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).orleans.g.args.txt</ArgsFile>
     </PropertyGroup>
-    <GetDotNetHost Condition="'$(DotNetHost)' == '' and '$(TargetIsCore)' == 'true' ">
+    <Orleans.CodeGeneration.GetDotNetHost Condition="'$(DotNetHost)' == '' and '$(TargetIsCore)' == 'true' ">
       <Output TaskParameter="DotNetHost" PropertyName="DotNetHost" />
-    </GetDotNetHost>
+    </Orleans.CodeGeneration.GetDotNetHost>
     <ItemGroup>
       <CodeGenArgs Include="/in:$(InputAssembly)"/>
       <CodeGenArgs Include="/out:$(OutputFileName)"/>
