@@ -5,6 +5,44 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+- Published symbols for beta do not expose this yet, so it's not working in it: Add SourceLink support for easier debugging of nuget packages. You can now follow the following steps to debug Orleans code within your app: https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source #3564
+
+### [2.0.0-beta1]
+- Breaking changes
+  - Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2), with the exception of `Microsoft.Orleans.TestingSiloHost` and `Microsoft.Orleans.ServiceFabric` which still target .NET Framework 4.6.1.
+  - Deprecated the Orleans Logging infrastructure.
+    - Orleans now uses the `Microsoft.Extensions.Logging` abstraction.
+    - The legacy Orleans' `Logger` abstraction is preserved as obsolete for backwards compatibility in a new `Microsoft.Orleans.Logging.Legacy` package, but it's just a wrapper that forwards to `ILogger` from MEL. It is recommended that you migrate to it directly. 
+    - This package also contains a provider for the new MEL abstraccion that allows forwarding to `ILogConsumer`, in case the end-user has a custom implementation of that legacy interface. Similarly, it is recommended to rewrite the custom log consumer or telemetry consumer and implement `ILoggerProvider` from MEL instead.
+    - The APM methods (TrackXXX) from `Logger` were separated into a new `ITelemetryProducer` interface, and it's currently only being used by Orleans to publish metrics. #3390
+    - Logging configuration is no longer parsed from the XML configuration, as the user would have to configure MEL instead.
+  - Created a `Microsoft.Orleans.Core.Abstractions` nuget package and moved/refactored several types into it. We plan to rev and do breaking changes here very infrequently.
+  - NuGet package names were preserved, but DLL filenames were renamed.
+  - Runtime code generation was removed (`Microsoft.Orleans.OrleansCodeGenerator` package). You should use build-time codgen by installing the `Microsoft.Orleans.OrleansCodeGenerator.Build` package in the grains implementation and interfaces projects.
+  - `SiloHostBuilder` and `ClientBuilder` are intended to replace the previous ways of initializing Orleans. They are not at 100% parity with `ClusterConfiguration` and `ClientConfiguration` so these are still required for beta1, but they will be eventually deprecated.
+  - Note that when using `SiloHostBuilder` and `ClientBuilder`, Orleans will no longer scan every single assembly loaded in the AppDomain by default, and instead you need to be explicit to which ones you use by calling the `AddApplicationPartXXX` methods from each of the builders.
+  - Silo membership (and its counterpart Gateway List Provider on the client) and `MessagingOptions` can be configured using the utilities in the `Microsoft.Extensions.Options` package. Before the final 2.0.0 release, the plan is to have everything moved to that configuration infrastructure.
+  - Upgraded several dependencies to external packages that are .NET Standard compatible
+  - Add support for Scoped services. This means that each grain activation gets its own scoped service provider, and Orleans registers `IGrainActivationContext` that can be injected into Transient or Scoped service to get access to activation specific information and lifecycle events #2856 #3270 #3385
+  - Propagate failures in `Grain.OnActivateAsync` to callers #3315
+  - Removed obsolete `GrainState` class #3167
+
+- Non-breaking improvements
+  - Build-time codegen and silo startup have been hugely improved so that the expensive type discovery happens during build, but at startup it is very fast. This can remove several seconds to startup time, which can be especially noticeable when using `TestCluster` to spin up in-memory clusters all the time #3518
+  - Add commit hash information in published assemblies #3575
+  - First version of Transactions support (still experimental, and will change in the future, not necessarily back-compatible when it does). Docs coming soon.
+  - Fast path for message addressing #3119
+  - Add extension for one-way grain calls #3224
+  - Google PubSub Stream provider #3210
+  - Lease based queue balancer for streams #3196 #3237 #3333
+  - Allow localhost connection in AWS SQS Storage provider #3485
+
+- Non-breaking bug fixes
+  - Fix occasional NullReferenceException during silo shutdown #3328
+  - Avoid serializing delegates and other non-portable types #3240
+  - ServiceFabric membership: ensure all silos reach a terminal state #3568
+  - Limit RequestContext to messaging layer. It is technically a change in behavior, but not one that end users could have relied upon, but listing it here in case someone notices side-effects due to this #3546
+
 ### [1.5.2]
 - Non-breaking bug fixes
   - Fix memory leak when using grain timers #3452
