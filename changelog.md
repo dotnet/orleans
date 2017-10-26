@@ -9,16 +9,17 @@ The idea is to track end-user facing changes as they occur.*
 
 ### [2.0.0-beta1]
 - Breaking changes
-  - Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2), with the exception of `Microsoft.Orleans.TestingSiloHost` and `Microsoft.Orleans.ServiceFabric` which still target .NET Framework 4.6.1.
+  - Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0).
+    - These packages still target .NET Framework 4.6.1: `Microsoft.Orleans.TestingSiloHost`, `Microsoft.Orleans.ServiceFabric`, `Microsoft.Orleans.OrleansTelemetryConsumers.Counters`, `Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic` and the PowerShell module.
   - Deprecated the Orleans Logging infrastructure.
     - Orleans now uses the `Microsoft.Extensions.Logging` abstraction.
-    - The legacy Orleans' `Logger` abstraction is preserved as obsolete for backwards compatibility in a new `Microsoft.Orleans.Logging.Legacy` package, but it's just a wrapper that forwards to `ILogger` from MEL. It is recommended that you migrate to it directly. 
-    - This package also contains a provider for the new MEL abstraccion that allows forwarding to `ILogConsumer`, in case the end-user has a custom implementation of that legacy interface. Similarly, it is recommended to rewrite the custom log consumer or telemetry consumer and implement `ILoggerProvider` from MEL instead.
+    - The legacy Orleans' `Logger` abstraction is preserved as obsolete for backwards compatibility in a new `Microsoft.Orleans.Logging.Legacy` package, but it's just a wrapper that forwards to `ILogger` from MEL. It is recommended that you migrate to it directly.
+    - This package also contains a provider for the new MEL abstraction that allows forwarding to `ILogConsumer`, in case the end-user has a custom implementation of that legacy interface. Similarly, it is recommended to rewrite the custom log consumer or telemetry consumer and implement `ILoggerProvider` from MEL instead.
     - The APM methods (TrackXXX) from `Logger` were separated into a new `ITelemetryProducer` interface, and it's currently only being used by Orleans to publish metrics. #3390
     - Logging configuration is no longer parsed from the XML configuration, as the user would have to configure MEL instead.
-  - Created a `Microsoft.Orleans.Core.Abstractions` nuget package and moved/refactored several types into it. We plan to rev and do breaking changes here very infrequently.
-  - NuGet package names were preserved, but DLL filenames were renamed.
-  - Runtime code generation was removed (`Microsoft.Orleans.OrleansCodeGenerator` package). You should use build-time codgen by installing the `Microsoft.Orleans.OrleansCodeGenerator.Build` package in the grains implementation and interfaces projects.
+  - Created a `Microsoft.Orleans.Core.Abstractions` nuget package and moved/refactored several types into it. We plan to rev and do breaking changes to this package very infrequently.
+  - NuGet package names were preserved for beta1, but several DLL filenames were renamed.
+  - Runtime code generation was removed (`Microsoft.Orleans.OrleansCodeGenerator` package). You should use build-time codegen by installing the `Microsoft.Orleans.OrleansCodeGenerator.Build` package in the grain implementations' and interfaces' projects.
   - `SiloHostBuilder` and `ClientBuilder` are intended to replace the previous ways of initializing Orleans. They are not at 100% parity with `ClusterConfiguration` and `ClientConfiguration` so these are still required for beta1, but they will be eventually deprecated.
   - Note that when using `SiloHostBuilder` and `ClientBuilder`, Orleans will no longer scan every single assembly loaded in the AppDomain by default, and instead you need to be explicit to which ones you use by calling the `AddApplicationPartXXX` methods from each of the builders.
   - Silo membership (and its counterpart Gateway List Provider on the client) and `MessagingOptions` can be configured using the utilities in the `Microsoft.Extensions.Options` package. Before the final 2.0.0 release, the plan is to have everything moved to that configuration infrastructure.
