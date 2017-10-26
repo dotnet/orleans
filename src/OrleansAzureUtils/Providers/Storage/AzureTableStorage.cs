@@ -57,10 +57,7 @@ namespace Orleans.Storage
         private string serviceId;
         private GrainStateTableDataManager tableDataManager;
         private bool isDeleteStateOnClear;
-        private static int counter;
-        private readonly int id;
-
-        private ILoggerFactory loggerFactory;
+        
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
         private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
@@ -88,7 +85,6 @@ namespace Orleans.Storage
         public AzureTableStorage()
         {
             tableName = TableNameDefaultValue;
-            id = Interlocked.Increment(ref counter);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
@@ -118,7 +114,6 @@ namespace Orleans.Storage
 
             if (config.Properties.ContainsKey(UseJsonFormatPropertyName))
                 useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
-            this.loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
             this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
