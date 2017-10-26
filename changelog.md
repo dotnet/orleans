@@ -1,13 +1,16 @@
 # Microsoft Orleans Changelog
+
 All notable end-user facing changes are documented in this file.
 
 ### [vNext]
+
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
 - Published symbols for beta do not expose this yet, so it's not working in it: Add SourceLink support for easier debugging of nuget packages. You can now follow the following steps to debug Orleans code within your app: https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source #3564
 
 ### [2.0.0-beta1]
+
 - Breaking changes
   - Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0).
     - These packages still target .NET Framework 4.6.1: `Microsoft.Orleans.TestingSiloHost`, `Microsoft.Orleans.ServiceFabric`, `Microsoft.Orleans.OrleansTelemetryConsumers.Counters`, `Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic` and the PowerShell module.
@@ -45,6 +48,7 @@ The idea is to track end-user facing changes as they occur.*
   - Limit RequestContext to messaging layer. It is technically a change in behavior, but not one that end users could have relied upon, but listing it here in case someone notices side-effects due to this #3546
 
 ### [1.5.2]
+
 - Non-breaking bug fixes
   - Fix memory leak when using grain timers #3452
   - Fix infrequent `NullReferenceException` during activation collection #3399
@@ -59,6 +63,7 @@ The idea is to track end-user facing changes as they occur.*
   - Set TypeNameHandling in OrleansJsonSerializer according to configuration #3400
 
 ### [1.5.1]
+
 - Non-breaking bug fixes
   - Support implicit authentication to DynamoDB (via IAM Roles) #3229
   - Added missing registration for 7-component tuple and several collection interfaces #3282 #3313
@@ -71,6 +76,7 @@ The idea is to track end-user facing changes as they occur.*
   - Several minor bug fixes and perf improvements, as well as reliability in our test code #3234 #3250 #3258 #3283 #3301 #3309 #3311
 
 ### [1.5.0]
+
 - Breaking changes
   - Bug fix: Azure storage providers now throw `InconsistenStateException` instead of `StorageException` when eTags do not match #2971
   - Automatically deactivate a grain if it bubbles up `InconsistentStateException` (thrown when there is an optimistic concurrency conflict when writing to storage) #2959
@@ -122,6 +128,7 @@ The idea is to track end-user facing changes as they occur.*
   - Several minor bug fixes and perf improvements, as well as reliability in our test code
   
 ### [v1.4.2] (changes since 1.4.1)
+
 - Non-breaking improvements
   - Generate serializers for more types #3035
   - Improvements to GrainServices API #2839
@@ -139,6 +146,7 @@ The idea is to track end-user facing changes as they occur.*
   - Remove unneeded extra constructors to play nicer with some non fully-conforming 3rd party containers #2996 #3074
 
 ### [v1.4.1]
+
 - Improvements
   - Fix a cleanup issue in TestCluster after a failure #2734
   - Remove unnecessary service registration of IServiceProvider to itself, which improves support for 3rd party containers #2749
@@ -159,6 +167,7 @@ The idea is to track end-user facing changes as they occur.*
   - Fix null reference exception in simple queue cache. #2829 
 
 ### [v1.4.0]
+
 - Breaking changes
   - All grain instances and providers are constructed using the configured Dependency Injection container. The result is that all grains must have a single parameterless public constructor or single constructor with arguments which can all be injected. If no container is configured, the default container will be used. [#2485](https://github.com/dotnet/orleans/pull/2485)
 - Known issues
@@ -181,6 +190,7 @@ The idea is to track end-user facing changes as they occur.*
   - Other minor fixes: #2729 #2691
 
 ### [v1.4.0-beta]
+
 - Noteworthy breaking changes:
   - Azure table storage throws InconsistentStateException #2630
 - Improvements
@@ -234,6 +244,7 @@ The idea is to track end-user facing changes as they occur.*
   - GrainServices are now Started by the Silo on Startup #2642
 
 ### [v1.3.1]
+
 - Improvements
   - Ability to specify interleaving per message type (was needed for Orleankka) #2246
   - Support serialization of enums backed by non-Int32 fields #2237 
@@ -260,6 +271,7 @@ The idea is to track end-user facing changes as they occur.*
   - LoadShedQueueFlowControl cast fix #2405
 
 ### [v1.3.0]
+
 - Bug fixes:
   - Ignore empty deployment Id in Azure #2230 
   - Remove zero length check in Protobuf serializer #2251 
@@ -267,6 +279,7 @@ The idea is to track end-user facing changes as they occur.*
 - Updated MemoryStreamProvider to support custom message serialization #2271 
 
 ### [v1.3.0-beta2]
+
 - Support for geo-distributed multi-cluster deployments #1108 #1109 #1800
 - Providers
   - Remove confusing parameter from AzureSilo.Start #2109
@@ -334,9 +347,11 @@ The idea is to track end-user facing changes as they occur.*
   - Reworked documentation to use DocFX #1970
 
 ### [v1.2.4]
+
 - Bug fix: Prevent null reference exception after clearing PubSubRendezvousGrain state #2040
   
 ### [v1.2.3]
+
 - Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
 - Troubleshooting improvements:
   - Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) #1879 #1808
@@ -351,18 +366,21 @@ The idea is to track end-user facing changes as they occur.*
   - It is not advisable for your Orleans application to depend on WindowsAzure.Storage >= 7.0 due to #1912. This new constraint applies to previously released Orleans versions too. Will be fixed in 1.3.0.
   
 ### [v1.2.2]
+
 - Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. #1804
 - Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). #1720
 - Added GrainCreator abstraction to enable some unit testing scenarios. #1802 #1792
 - ServiceBus package dependency upgraded to 3.2.2 #1758
 
 ### [v1.2.1]
+
 - Bug fixes:
   - SupressDuplicateDeads: Use SiloAddress.Endpoint instead of InstanceName. #1728
   - Added support for complex generic grain parameters #1732
   - Fix race condition bugs in LocalReminderService #1757
 
 ### [v1.2.0]
+
 - Major improvements
   - Added an EventHub stream provider based on the same code that is used in Halo 5.
   - Increased throughput by between 5% and 26% depending on the scenario. #1586
@@ -397,6 +415,7 @@ The idea is to track end-user facing changes as they occur.*
 - Many other fixes and improvements.
 
 ### [v1.1.3]
+
 - Bug fixes:
   - #1345 Initialize SerializationManager before CodeGeneratorManager
   - #1348 Avoid unnecessary table scan when finding reminder entries to delete
@@ -412,6 +431,7 @@ The idea is to track end-user facing changes as they occur.*
   - #1534 Safe load of types from failing assemblies in TypeUtils.GetTypes
 
 ### [v1.1.2]
+
 - Bug fixes (primarily for codegen and serializer corner cases):
   - #1137 Add support for generic type constraints in codegen
   - #1178 Correctly specify struct type constraint in generated code
@@ -426,11 +446,13 @@ The idea is to track end-user facing changes as they occur.*
   - #1270 Make Namespace access modifier public in ImplicitStreamSubscriptionAttribute. Add Provider property.
 
 ### [v1.1.1]
+
 - Bug fixes:
   - #1134 Missing argument to trace format in TraceLogger.Initialize
   - #1195 Make ConsoleText resilient to ObjectDisposedExceptions
 
 ### [v1.1.0]
+
 - New Roslyn-based codegen, compile time and run time
 - Public APIs:
   - Core API for Event Sourcing
