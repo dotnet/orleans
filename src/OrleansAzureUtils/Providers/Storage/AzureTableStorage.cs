@@ -110,7 +110,7 @@ namespace Orleans.Storage
             isDeleteStateOnClear = config.Properties.ContainsKey(DeleteOnClearPropertyName) &&
                 "true".Equals(config.Properties[DeleteOnClearPropertyName], StringComparison.OrdinalIgnoreCase);
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            var loggerName = this.GetType().FullName + id;
+            var loggerName = $"{this.GetType().FullName}.{Name}";
             logger = loggerFactory.CreateLogger(loggerName);
             Log = new LoggerWrapper(loggerName, loggerFactory);
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",

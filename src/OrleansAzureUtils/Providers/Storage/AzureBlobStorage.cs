@@ -68,8 +68,9 @@ namespace Orleans.Storage
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            this.logger = loggerFactory.CreateLogger<AzureBlobStorage>();
-            Log = new LoggerWrapper(this.GetType().FullName, loggerFactory);
+            var loggerName = $"{this.GetType().FullName}.{name}";
+            this.logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(loggerName, loggerFactory);
 
             try
             {
