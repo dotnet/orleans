@@ -114,9 +114,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void UnInitializeOrleansSilo()
         {
-            var unObservedExceptionHandler = this.orleans?.Services?.GetService<UnobservedExceptionsHandler>();
-            if(unObservedExceptionHandler != null)
-                Utils.SafeExecute(unObservedExceptionHandler.Dispose);
+            //currently an empty method, keep this method for backward-compatibility
         }
 
         /// <summary>

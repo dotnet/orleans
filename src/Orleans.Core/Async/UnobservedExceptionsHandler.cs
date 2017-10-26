@@ -8,39 +8,26 @@ namespace Orleans
 
     internal class UnobservedExceptionsHandler : IDisposable
     {
-        private readonly Object lockObject = new Object();
         private readonly ILogger logger;
         private UnobservedExceptionDelegate unobservedExceptionHandler;
-        private bool alreadySubscribedToTplEvent = false;
 
         internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception);
         
         public UnobservedExceptionsHandler(ILogger<UnobservedExceptionsHandler> logger)
         {
             this.logger = logger;
-            lock (lockObject)
-            {
-                if (!alreadySubscribedToTplEvent)
-                {
-                    TaskScheduler.UnobservedTaskException += InternalUnobservedTaskExceptionHandler;
-                    alreadySubscribedToTplEvent = true;
-                }
-            }
+            TaskScheduler.UnobservedTaskException += InternalUnobservedTaskExceptionHandler;
         }
 
 
         internal bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
-            lock (lockObject)
+            if (unobservedExceptionHandler != null)
             {
-                if (unobservedExceptionHandler != null)
-                {
-                    return false;
-                }
-
-                unobservedExceptionHandler = handler;
+                return false;
             }
+            unobservedExceptionHandler = handler;
 
             return true;
         }
@@ -79,12 +66,8 @@ namespace Orleans
 
         public void Dispose()
         {
-            lock (lockObject)
-            {
-                TaskScheduler.UnobservedTaskException -= InternalUnobservedTaskExceptionHandler;
-                unobservedExceptionHandler = null;
-                alreadySubscribedToTplEvent = false;
-            }
+            TaskScheduler.UnobservedTaskException -= InternalUnobservedTaskExceptionHandler;
+            unobservedExceptionHandler = null;
         }
     }
 }
