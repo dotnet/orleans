@@ -1,6 +1,7 @@
 ﻿using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
@@ -8,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TesterInternal;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
@@ -162,7 +164,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference()
+        public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid id = Guid.NewGuid();
@@ -170,8 +172,8 @@ namespace AWSUtils.Tests.StorageTests
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
-            var storage = new DynamoDBStorageProvider();
-            storage.InitLogger(this.HostedCluster.Client.Logger);
+            var storage = await InitDynamoDBTableStorageProvider(
+                this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "dynamoDB");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
@@ -180,7 +182,7 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference_List()
+        public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
@@ -196,8 +198,9 @@ namespace AWSUtils.Tests.StorageTests
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
             var entity = new GrainStateRecord();
-            var storage = new DynamoDBStorageProvider();
-            storage.InitLogger(this.HostedCluster.Client.Logger);
+            var storage =
+                await InitDynamoDBTableStorageProvider(
+                    this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "dynamoDB");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.NotNull(convertedState);
@@ -210,6 +213,16 @@ namespace AWSUtils.Tests.StorageTests
                 Assert.Equal(initialState.GrainDict[iStr], convertedState.GrainDict[iStr]);  // "GrainDict #{0}", i
             }
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
+        }
+
+        private async Task<DynamoDBStorageProvider> InitDynamoDBTableStorageProvider(IProviderRuntime runtime, string storageName)
+        {
+            Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+            var store = new DynamoDBStorageProvider();
+            providerCfgProps["DataConnectionString"] = TestDefaultConfiguration.DataConnectionString;
+            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            await store.Init(storageName, runtime, cfg);
+            return store;
         }
     }
 }
