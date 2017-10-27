@@ -37,11 +37,11 @@ namespace Microsoft.Orleans.ServiceFabric
         public FabricServiceSiloResolver(
             Uri serviceName,
             IFabricQueryManager queryManager,
-            ILoggerFactory loggerFactory)
+            ILogger logger)
         {
             this.serviceName = serviceName;
             this.queryManager = queryManager;
-            this.log = loggerFactory.CreateLogger<FabricServiceSiloResolver>();
+            this.log =logger;
             this.partitionChangeHandler = this.OnPartitionChange;
         }
 
