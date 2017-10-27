@@ -7,8 +7,6 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
-- Published symbols for beta do not expose this yet, so it's not working in it: Add SourceLink support for easier debugging of nuget packages. You can now follow the following steps to debug Orleans code within your app: https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source #3564
-
 ### [2.0.0-beta1]
 
 - Breaking changes
@@ -33,6 +31,7 @@ The idea is to track end-user facing changes as they occur.*
 
 - Non-breaking improvements
   - Build-time codegen and silo startup have been hugely improved so that the expensive type discovery happens during build, but at startup it is very fast. This can remove several seconds to startup time, which can be especially noticeable when using `TestCluster` to spin up in-memory clusters all the time #3518
+  - Add SourceLink support for easier debugging of nuget packages. You can now follow the following steps to debug Orleans code within your app: https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source #3564
   - Add commit hash information in published assemblies #3575
   - First version of Transactions support (still experimental, and will change in the future, not necessarily back-compatible when it does). Docs coming soon.
   - Fast path for message addressing #3119
