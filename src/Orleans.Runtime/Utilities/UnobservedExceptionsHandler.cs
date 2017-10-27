@@ -2,34 +2,21 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans
+namespace Orleans.Runtime
 {
-    using Orleans.Runtime;
 
     internal class UnobservedExceptionsHandler : IDisposable
     {
         private readonly ILogger logger;
         private UnobservedExceptionDelegate unobservedExceptionHandler;
 
-        internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception);
+        internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception, ILogger logger);
         
-        public UnobservedExceptionsHandler(ILogger<UnobservedExceptionsHandler> logger)
+        public UnobservedExceptionsHandler(ILogger<UnobservedExceptionsHandler> logger, UnobservedExceptionDelegate handler)
         {
             this.logger = logger;
             TaskScheduler.UnobservedTaskException += InternalUnobservedTaskExceptionHandler;
-        }
-
-
-        internal bool TrySetUnobservedExceptionHandler(UnobservedExceptionDelegate handler)
-        {
-            if (handler == null) throw new ArgumentNullException(nameof(handler));
-            if (unobservedExceptionHandler != null)
-            {
-                return false;
-            }
             unobservedExceptionHandler = handler;
-
-            return true;
         }
 
         private void InternalUnobservedTaskExceptionHandler(object sender, UnobservedTaskExceptionEventArgs e)
@@ -44,7 +31,7 @@ namespace Orleans
             {
                 if (unobservedExceptionHandler != null)
                 {
-                    unobservedExceptionHandler(context, baseException);
+                    unobservedExceptionHandler(context, baseException, this.logger);
                 }
             }
             finally

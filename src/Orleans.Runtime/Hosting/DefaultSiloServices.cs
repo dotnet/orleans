@@ -76,7 +76,7 @@ namespace Orleans.Hosting
             services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
             services.TryAddSingleton<ProviderManagerSystemTarget>();
-            services.TryAddSingleton<UnobservedExceptionsHandler>();
+            services.TryAddSingleton<UnobservedExceptionsHandler>(sp => ActivatorUtilities.CreateInstance<UnobservedExceptionsHandler>(sp, Silo.UnobservedExceptionDelegate));
             services.TryAddSingleton<StatisticsProviderManager>();
             services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
 
