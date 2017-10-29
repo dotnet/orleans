@@ -12,6 +12,9 @@ Similarly, debugger can be attached to the Worker/Web Role instance process when
 In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.
 Hence, in productions tracing is the primary 'debugging' mechanism.
 
+### Source Link
+Starting with the 2.0.0-beta1 release we added [Source Link](https://github.com/ctaggart/SourceLink) support to our Symbols. It means that if a project consumes the Orleans NuGet packages, when debugging the application code, they can step into the Orleans source code. In Steve Gordon's [blog post](https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source), you can see what steps are needed to configure it.
+
 ### Symbols
 Starting with 1.3.0 release, symbols for Orleans binaries are published to Microsoft symbol servers.
 Make sure you enable `Microsoft Symbol Servers` in Visual Studio in Tools/Options/Debugging/Symbols for debugging Orleans code.
