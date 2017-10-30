@@ -1,0 +1,5 @@
+.vs
+connection-string.txt
+**/publish/
+**/obj/
+**/bin/
