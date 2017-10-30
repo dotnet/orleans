@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime.Configuration;
 
 
+#pragma warning disable CS0618 // Type or member is obsolete
 namespace Orleans.Runtime.Host
 {
     /// <summary>
@@ -209,3 +210,4 @@ namespace Orleans.Runtime.Host
         #endregion
     }
 }
+#pragma warning restore CS0618 // Type or member is obsolete
