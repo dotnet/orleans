@@ -8,5 +8,9 @@
   href: Heterogeneous-Silos.md
 - name: Using Azure Web Apps
   href: Using-Azure-Web-Apps.md
-- name: Docker Deployment
-  href: Docker-Deployment.md
+- name: Docker
+  items:
+    - name: Simple Docker example
+      href: Docker/simple-docker-example.md
+    - name: Container networking
+      href: Docker/container-networking.md
