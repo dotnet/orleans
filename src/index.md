@@ -54,13 +54,13 @@ tagline: A straightforward approach to building distributed, high-scale applicat
         <h3>Simplified Concurrency</h3>
 
         Orleans allows you to write simple, single threaded C# code, handling concurrency with asynchronous
-        message passing between actors.
+        message passing between objects (grains).
     </div>
 </div>
 
 ---
 
-In Orleans, actors are called 'grains', and are described using an interface. Async methods are used to indicate which messages the actor can receive:
+In Orleans, grains are the building blocks of application code. Grains are instances of .NET classes that implement a conforming interface. Asynchronous methods of the interface are used to indicate which operations the grain can perform:
 
 ``` csharp
 public interface IMyGrain : IGrainWithStringKey
@@ -81,7 +81,7 @@ public class MyGrain : IMyGrain
 }
 ```
 
-You can then send messages to the grain by creating a proxy object, and calling the methods:
+You can then invoke the grain by obtaining a proxy object (a grain reference), and calling the methods:
 
 ``` csharp
 var grain = GrainClient.GrainFactory.GetGrain<IMyGrain>("grain1");
