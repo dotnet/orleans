@@ -13,7 +13,7 @@ namespace Silo
     class Program
     {
         private static ISiloHost silo;
-        private static readonly AutoResetEvent closing = new AutoResetEvent(false);
+        private static readonly ManualResetEvent siloStopped = new ManualResetEvent(false);
 
         static void Main(string[] args)
         {
@@ -40,10 +40,10 @@ namespace Silo
             {
                 Console.WriteLine("ProcessExit fired");
                 Task.Run(StopSilo);
-                closing.WaitOne();
+                siloStopped.WaitOne();
             };
 
-            closing.WaitOne();
+            siloStopped.WaitOne();
         }
 
         private static async Task StartSilo()
@@ -56,7 +56,7 @@ namespace Silo
         {
             await silo.StopAsync();
             Console.WriteLine("Silo stopped");
-            closing.Set();
+            siloStopped.Set();
         }
     }
 }
