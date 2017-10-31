@@ -70,7 +70,7 @@ namespace Orleans.Storage
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var loggerName = $"{this.GetType().FullName}.{name}";
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(loggerName, loggerFactory);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             try
             {

@@ -45,8 +45,6 @@ namespace Orleans.Storage
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private string tableName;
-        private static int counter;
-        private readonly int id;
         private string serviceId;
         private bool isDeleteStateOnClear = false;
         private bool useJsonFormat;
@@ -72,7 +70,6 @@ namespace Orleans.Storage
         public DynamoDBStorageProvider()
         {
             tableName = TABLE_NAME_DEFAULT_VALUE;
-            id = Interlocked.Increment(ref counter);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
@@ -90,8 +87,8 @@ namespace Orleans.Storage
                 "true".Equals(config.Properties[DELETE_ON_CLEAR_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var loggerName = $"{this.GetType().FullName}.{name}";
-            Log = new LoggerWrapper(loggerName, loggerFactory);
             logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                 Name, serviceId, tableName, isDeleteStateOnClear);
 

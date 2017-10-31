@@ -20,6 +20,7 @@ namespace AWSUtils.Tests.StorageTests
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
+        private static string DataConnectionString = $"Service={AWSTestConstants.Service}";
         public class Fixture : TestExtensions.BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -27,7 +28,7 @@ namespace AWSUtils.Tests.StorageTests
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {
                     Guid serviceId = Guid.NewGuid();
-                    string dataConnectionString = $"Service={AWSTestConstants.Service}";
+                    string dataConnectionString = DataConnectionString;
                     var options = new TestClusterOptions(initialSilosCount: 4);
 
 
@@ -173,7 +174,7 @@ namespace AWSUtils.Tests.StorageTests
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
             var storage = await InitDynamoDBTableStorageProvider(
-                this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "dynamoDB");
+                this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
@@ -200,7 +201,7 @@ namespace AWSUtils.Tests.StorageTests
             var entity = new GrainStateRecord();
             var storage =
                 await InitDynamoDBTableStorageProvider(
-                    this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "dynamoDB");
+                    this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.NotNull(convertedState);
@@ -219,7 +220,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
             var store = new DynamoDBStorageProvider();
-            providerCfgProps["DataConnectionString"] = TestDefaultConfiguration.DataConnectionString;
+            providerCfgProps["DataConnectionString"] = DataConnectionString;
             var cfg = new ProviderConfiguration(providerCfgProps, null);
             await store.Init(storageName, runtime, cfg);
             return store;
