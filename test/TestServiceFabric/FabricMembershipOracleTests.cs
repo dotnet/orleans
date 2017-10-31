@@ -5,10 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.Orleans.ServiceFabric;
-using Microsoft.Orleans.ServiceFabric.Models;
+using Orleans.Membership.ServiceFabric;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.ServiceFabric;
 using TestExtensions;
 using Xunit;
 

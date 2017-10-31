@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
     internal interface IFabricServiceSiloResolver
     {

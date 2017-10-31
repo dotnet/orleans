@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Membership.ServiceFabric.Utilities;
 using Orleans.Runtime;
-using Orleans;
-using Microsoft.Orleans.ServiceFabric.Models;
-using Microsoft.Orleans.ServiceFabric.Utilities;
 using Orleans.Runtime.Configuration;
+using Orleans.ServiceFabric;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
     internal class FabricMembershipOracle : IMembershipOracle, IFabricServiceStatusListener, IDisposable
     {

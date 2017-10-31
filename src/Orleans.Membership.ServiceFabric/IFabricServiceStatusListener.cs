@@ -1,6 +1,6 @@
-using Microsoft.Orleans.ServiceFabric.Models;
+using Orleans.ServiceFabric;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
     /// <summary>
     /// Listener for partition changes.

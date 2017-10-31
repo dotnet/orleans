@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
     /// <summary>
     /// Monitors cluster changes for information about silos which are defunct and have not been reported as functional by Service Fabric.
