@@ -1,8 +1,8 @@
 # Prerequisites
 
 You need to have installed:
- - dotnet core sdk
- - docker engine and docker-compose
+ - dotnet core sdk (https://www.microsoft.com/net/core)
+ - docker engine and docker-compose (https://www.docker.com/get-docker)
  - a text file named "connection-string.txt" at the solution root containing a connection string to an azure storage account
 
 # Build
