@@ -1,22 +1,29 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Scheduler;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
+    internal static class ServiceProviderExtensions
+    {
+        public static void InitializeSiloUnobservedExceptionsHandler(this IServiceProvider services)
+        {
+            //resolve handler from DI to initialize it
+            var ignore = services.GetService<SiloUnobservedExceptionsHandler>();
+        }
+    }
 
-    internal class UnobservedExceptionsHandler : IDisposable
+    internal class SiloUnobservedExceptionsHandler : IDisposable
     {
         private readonly ILogger logger;
-        private UnobservedExceptionDelegate unobservedExceptionHandler;
-
-        internal delegate void UnobservedExceptionDelegate(ISchedulingContext context, Exception exception, ILogger logger);
         
-        public UnobservedExceptionsHandler(ILogger<UnobservedExceptionsHandler> logger, UnobservedExceptionDelegate handler)
+        public SiloUnobservedExceptionsHandler(ILogger<SiloUnobservedExceptionsHandler> logger)
         {
             this.logger = logger;
+            AppDomain.CurrentDomain.UnhandledException += this.DomainUnobservedExceptionHandler;
             TaskScheduler.UnobservedTaskException += InternalUnobservedTaskExceptionHandler;
-            unobservedExceptionHandler = handler;
         }
 
         private void InternalUnobservedTaskExceptionHandler(object sender, UnobservedTaskExceptionEventArgs e)
@@ -29,10 +36,7 @@ namespace Orleans.Runtime
 
             try
             {
-                if (unobservedExceptionHandler != null)
-                {
-                    unobservedExceptionHandler(context, baseException, this.logger);
-                }
+                UnobservedExceptionHandler(context, baseException);
             }
             finally
             {
@@ -51,10 +55,36 @@ namespace Orleans.Runtime
             }
         }
 
+        private void UnobservedExceptionHandler(ISchedulingContext context, Exception exception)
+        {
+            var schedulingContext = context as SchedulingContext;
+            if (schedulingContext == null)
+            {
+                if (context == null)
+                    logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
+                else
+                    logger.Error(ErrorCode.Runtime_Error_100103, String.Format("Silo caught an UnobservedException with context of type different than OrleansContext. The type of the context is {0}. The context is {1}",
+                        context.GetType(), context), exception);
+            }
+            else
+            {
+                logger.Error(ErrorCode.Runtime_Error_100104, String.Format("Silo caught an UnobservedException thrown by {0}.", schedulingContext.Activation), exception);
+            }
+        }
+
+        private void DomainUnobservedExceptionHandler(object context, UnhandledExceptionEventArgs args)
+        {
+            var exception = (Exception)args.ExceptionObject;
+            if (context is ISchedulingContext)
+                UnobservedExceptionHandler(context as ISchedulingContext, exception);
+            else
+                logger.Error(ErrorCode.Runtime_Error_100324, String.Format("Called DomainUnobservedExceptionHandler with context {0}.", context), exception);
+        }
+
         public void Dispose()
         {
             TaskScheduler.UnobservedTaskException -= InternalUnobservedTaskExceptionHandler;
-            unobservedExceptionHandler = null;
+            AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler;
         }
     }
 }

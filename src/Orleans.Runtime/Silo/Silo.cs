@@ -112,7 +112,6 @@ namespace Orleans.Runtime
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal ICatalog Catalog => catalog;
-        internal static UnobservedExceptionsHandler.UnobservedExceptionDelegate UnobservedExceptionDelegate = Silo.UnobservedExceptionHandler;
 
         internal SystemStatus SystemStatus { get; set; }
 
@@ -192,6 +191,7 @@ namespace Orleans.Runtime
             }
 
             this.Services = services;
+            this.Services.InitializeSiloUnobservedExceptionsHandler();
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = this.initializationParams.NodeConfig.PropagateActivityId;
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
@@ -211,8 +211,6 @@ namespace Orleans.Runtime
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             BufferPool.InitGlobalBufferPool(siloMessagingOptions);
-
-            AppDomain.CurrentDomain.UnhandledException += this.DomainUnobservedExceptionHandler;
 
             try
             {
@@ -466,7 +464,7 @@ namespace Orleans.Runtime
 
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Storage provider manager created successfully."); }
+            logger.Debug("Storage provider manager created successfully."); 
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating
             logConsistencyProviderManager = this.Services.GetRequiredService<LogConsistencyProviderManager>();
@@ -474,7 +472,7 @@ namespace Orleans.Runtime
                 () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Log consistency provider manager created successfully."); }
+            logger.Debug("Log consistency provider manager created successfully."); 
 
             // Load and init stream providers before silo becomes active
             var siloStreamProviderManager = (StreamProviderManager) this.Services.GetRequiredService<IStreamProviderManager>();
@@ -483,7 +481,7 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Stream provider manager created successfully."); }
+            logger.Debug("Stream provider manager created successfully."); 
 
             // Load and init grain services before silo becomes active.
             CreateGrainServices(GlobalConfig.GrainServiceConfigurations);
@@ -492,10 +490,10 @@ namespace Orleans.Runtime
                                        this.providerManagerSystemTarget.SchedulingContext;
             scheduler.QueueTask(() => this.membershipOracle.Start(), this.membershipOracleContext)
                 .WaitWithThrow(initTimeout);
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Local silo status oracle created successfully."); }
+            logger.Debug("Local silo status oracle created successfully."); 
             scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
                 .WaitWithThrow(initTimeout);
-            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Local silo status oracle became active successfully."); }
+            logger.Debug("Local silo status oracle became active successfully."); 
             scheduler.QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
                 .WaitWithThrow(this.initTimeout);
 
@@ -509,19 +507,19 @@ namespace Orleans.Runtime
                                                           this.providerManagerSystemTarget.SchedulingContext;
                 scheduler.QueueTask(() => multiClusterOracle.Start(), multiClusterOracleContext)
                                     .WaitWithThrow(initTimeout);
-                if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("multicluster oracle created successfully."); }
+                logger.Debug("multicluster oracle created successfully."); 
             }
 
             try
             {
                 this.siloStatistics.Start(this.LocalConfig);
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo statistics manager started successfully."); }
+                logger.Debug("Silo statistics manager started successfully."); 
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
                 this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
                     .WaitWithThrow(this.initTimeout);
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo deployment load publisher started successfully."); }
+                logger.Debug("Silo deployment load publisher started successfully."); 
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 this.platformWatchdog = new Watchdog(this.LocalConfig.StatisticsLogWriteInterval, this.healthCheckParticipants, this.loggerFactory);
@@ -535,10 +533,7 @@ namespace Orleans.Runtime
                                                            this.providerManagerSystemTarget.SchedulingContext;
                     this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
                         .WaitWithThrow(this.initTimeout);
-                    if (this.logger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.logger.Debug("Reminder service started successfully.");
-                    }
+                    this.logger.Debug("Reminder service started successfully.");
                 }
 
                 this.bootstrapProviderManager = this.Services.GetRequiredService<BootstrapProviderManager>();
@@ -548,18 +543,18 @@ namespace Orleans.Runtime
                         .WaitWithThrow(this.initTimeout);
                 this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
 
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("App bootstrap calls done successfully."); }
+                logger.Debug("App bootstrap calls done successfully."); 
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
                 this.scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, this.providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(this.initTimeout);
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Stream providers started successfully."); }
+                logger.Debug("Stream providers started successfully."); 
 
                 // Now that we're active, we can start the gateway
                 var mc = this.messageCenter as MessageCenter;
                 mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Message gateway service started successfully."); }
+               logger.Debug("Message gateway service started successfully."); 
 
                 this.SystemStatus = SystemStatus.Running;
             }
@@ -825,7 +820,6 @@ namespace Orleans.Runtime
             SafeExecute(siloStatistics.Stop);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-            SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
             SafeExecute(() => (this.Services as IDisposable)?.Dispose());
 
             // Setting the event should be the last thing we do.
@@ -852,32 +846,6 @@ namespace Orleans.Runtime
                 
             logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
             FastKill();
-        }
-
-        private static void UnobservedExceptionHandler(ISchedulingContext context, Exception exception, ILogger logger)
-        {
-            var schedulingContext = context as SchedulingContext;
-            if (schedulingContext == null)
-            {
-                if (context == null)
-                    logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
-                else
-                    logger.Error(ErrorCode.Runtime_Error_100103, String.Format("Silo caught an UnobservedException with context of type different than OrleansContext. The type of the context is {0}. The context is {1}",
-                        context.GetType(), context), exception);
-            }
-            else
-            {
-                logger.Error(ErrorCode.Runtime_Error_100104, String.Format("Silo caught an UnobservedException thrown by {0}.", schedulingContext.Activation), exception);
-            }   
-        }
-
-        private void DomainUnobservedExceptionHandler(object context, UnhandledExceptionEventArgs args)
-        {
-            var exception = (Exception)args.ExceptionObject;
-            if (context is ISchedulingContext)
-                UnobservedExceptionHandler(context as ISchedulingContext, exception, this.logger);
-            else
-                logger.Error(ErrorCode.Runtime_Error_100324, String.Format("Called DomainUnobservedExceptionHandler with context {0}.", context), exception);
         }
 
         internal void RegisterSystemTarget(SystemTarget target)
