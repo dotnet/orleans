@@ -569,9 +569,7 @@ namespace Orleans.Runtime
 
                         if (logger != null && logger.IsWarning)
                         {
-                            var badImageFormatExceptionCount = typeLoadException.LoaderExceptions.Count(ex => ex as BadImageFormatException != null);
-
-                            if (typeLoadException.LoaderExceptions.Count() != badImageFormatExceptionCount)
+                            if (typeLoadException.LoaderExceptions.Any(ex => !(ex is BadImageFormatException)) || logger.IsVerbose)
                             {
                                 var message =
                                     $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
