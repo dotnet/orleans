@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
-    internal static class ServiceProviderExtensions
+    internal static class SiloUnobservedExceptionsHandlerServiceProviderExtensions
     {
         public static void InitializeSiloUnobservedExceptionsHandler(this IServiceProvider services)
         {
@@ -42,12 +42,12 @@ namespace Orleans.Runtime
             {
                 if (e.Observed)
                 {
-                    logger.Info(ErrorCode.Runtime_Error_100311, "UnobservedExceptionsHandlerClass caught an UnobservedTaskException which was successfully observed and recovered from. BaseException = {0}. Exception = {1}",
+                    logger.Info(ErrorCode.Runtime_Error_100311, "Silo caught an UnobservedTaskException which was successfully observed and recovered from. BaseException = {0}. Exception = {1}",
                             baseException.Message, LogFormatter.PrintException(aggrException));
                 }
                 else
                 {
-                    var errorStr = String.Format("UnobservedExceptionsHandlerClass Caught an UnobservedTaskException event sent by {0}. Exception = {1}",
+                    var errorStr = String.Format("Silo Caught an UnobservedTaskException event sent by {0}. Exception = {1}",
                             OrleansTaskExtentions.ToString((Task)sender), LogFormatter.PrintException(aggrException));
                     logger.Error(ErrorCode.Runtime_Error_100005, errorStr);
                     logger.Error(ErrorCode.Runtime_Error_100006, "Exception remained UnObserved!!! The subsequent behavior depends on the ThrowUnobservedTaskExceptions setting in app config and .NET version.");
