@@ -4,6 +4,7 @@ using Orleans.Runtime.Configuration;
 using System;
 using System.IO;
 using System.Net;
+using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -35,10 +36,11 @@ namespace Silo
 
             Task.Run(StartSilo);
 
-            AppDomain.CurrentDomain.ProcessExit += (object sender, EventArgs e) =>
+            AssemblyLoadContext.Default.Unloading += context =>
             {
                 Console.WriteLine("ProcessExit fired");
                 Task.Run(StopSilo);
+                closing.WaitOne();
             };
 
             closing.WaitOne();

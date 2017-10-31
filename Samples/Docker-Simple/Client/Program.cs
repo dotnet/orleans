@@ -5,12 +5,18 @@ using Orleans.Runtime.Configuration;
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Client
 {
     class Program
     {
         static void Main(string[] args)
+        {
+            MainAsync().GetAwaiter().GetResult();
+        }
+
+        static async Task MainAsync()
         {
             var connectionString = File.ReadAllText("connection-string.txt");
 
@@ -25,13 +31,13 @@ namespace Client
                 .UseConfiguration(config)
                 .Build();
 
-            client.Connect().Wait();
+            await client.Connect();
 
             var grain = client.GetGrain<IPingGrain>(Guid.NewGuid());
 
-            for (int i=0; i< 10; i++)
+            for (int i = 0; i < 10; i++)
             {
-                var value = grain.Ping().Result;
+                var value = await grain.Ping();
                 Thread.Sleep(500);
                 Console.WriteLine($"Ping: {value}");
             }
