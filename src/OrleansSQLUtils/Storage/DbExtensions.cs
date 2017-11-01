@@ -181,9 +181,38 @@ namespace Orleans.SqlUtils
         public static TValue GetValue<TValue>(this IDataRecord record, string fieldName)
         {
             var ordinal = record.GetOrdinal(fieldName);
+
             return (TValue)record.GetValue(ordinal);
         }
 
+
+        /// <summary>
+        /// Returns a value with the given <see paramref="fieldName"/> as int.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <returns>Value in the given field indicated by <see paramref="fieldName"/>.</returns>
+        public static int GetInt32(this IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            return record.GetInt32(ordinal);
+        }
+
+        /// <summary>
+        /// Returns a value with the given <see paramref="fieldName"/> as nullable int.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <returns>Value in the given field indicated by <see paramref="fieldName"/>.</returns>
+        public static int? GetNullableInt32(this IDataRecord record, string fieldName)
+        {
+            var ordinal = record.GetOrdinal(fieldName);
+            var value = record.GetValue(ordinal);
+            if (value == DBNull.Value)
+                return null;
+
+            return Convert.ToInt32(value);
+        }
 
         /// <summary>
         /// Returns a value with the given <see paramref="fieldName"/>.
