@@ -17,4 +17,9 @@
   </PropertyGroup>
   <Import Project="$(SourceRoot)src/Orleans.CodeGeneration.Build/build/Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " />
   <!--End Orleans -->
+
+  <!-- Set InformationVersion here, since $(Version) is already set at this point. -->
+  <PropertyGroup>
+    <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
+  </PropertyGroup>
 </Project>

@@ -21,7 +21,7 @@ namespace Orleans.Streams
             this.regex = regex;
         }
 
-        /// <inheritdoc cref="IStreamNamespacePredicate"/>
+        /// <inheritdoc />
         public bool IsMatch(string streamNameSpace)
         {
             return regex.IsMatch(streamNameSpace);

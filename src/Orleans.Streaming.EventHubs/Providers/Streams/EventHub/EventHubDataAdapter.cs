@@ -181,13 +181,13 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
         }
 
-        /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
+        /// <inheritdoc />
         public DateTime? GetMessageEnqueueTimeUtc(ref CachedEventHubMessage message)
         {
             return message.EnqueueTimeUtc;
         }
 
-        /// <inheritdoc cref="ICacheDataAdapter{TQueueMessage,TCachedMessage}"/>
+        /// <inheritdoc />
         public DateTime? GetMessageDequeueTimeUtc(ref CachedEventHubMessage message)
         {
             return message.DequeueTimeUtc;

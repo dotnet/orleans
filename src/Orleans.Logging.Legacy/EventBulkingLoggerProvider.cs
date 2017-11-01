@@ -26,13 +26,13 @@ namespace Orleans.Logging.Legacy
             this.bulkingConfig = bulkingConfig == null? new EventBulkingOptions() : bulkingConfig;
         }
 
-        /// <inheritdoc cref="ILoggerProvider"/>
+        /// <inheritdoc />
         public ILogger CreateLogger(string categoryName)
         {
             return new EventBulkingDecoratorLogger(this.bulkingConfig, provider.CreateLogger(categoryName));
         }
 
-        /// <inheritdoc cref="IDisposable"/>
+        /// <inheritdoc />
         public void Dispose()
         {
             provider.Dispose();

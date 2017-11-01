@@ -134,18 +134,19 @@ namespace Orleans.Logging
             this.output = output;
         }
 
-        /// <inheritdoc cref="ILogger"/>
+        /// <inheritdoc />
         public IDisposable BeginScope<TState>(TState state)
         {
             //TODO: implemente scope 
             return NullScope.Instance;
         }
-        /// <inheritdoc cref="ILogger"/>
+
+        /// <inheritdoc />
         public bool IsEnabled(LogLevel logLevel)
         {
             return true;
         }
-        /// <inheritdoc cref="ILogger"/>
+        /// <inheritdoc />
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
             this.output.Log(logLevel, eventId, state, exception, formatter, this.category);

@@ -82,12 +82,8 @@ namespace Microsoft.Orleans.ServiceFabric
                     AddStandardServices(serviceCollection);
 
                     // Use Service Fabric for cluster membership.
-                    serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
-                        sp =>
-                            new FabricServiceSiloResolver(
-                                serviceName,
-                                sp.GetService<IFabricQueryManager>(),
-                                sp.GetService<ILoggerFactory>()));
+                    serviceCollection.AddSingleton<IFabricServiceSiloResolver>(sp => ActivatorUtilities.CreateInstance<FabricServiceSiloResolver>(sp, serviceName));
+
                     serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
                 });
 
@@ -115,11 +111,7 @@ namespace Microsoft.Orleans.ServiceFabric
         {
             // Use Service Fabric for cluster membership.
             services.AddSingleton<IFabricServiceSiloResolver>(
-                sp =>
-                    new FabricServiceSiloResolver(
-                        context.ServiceName,
-                        sp.GetService<IFabricQueryManager>(),
-                        sp.GetService<ILoggerFactory>()));
+                    sp => ActivatorUtilities.CreateInstance<FabricServiceSiloResolver>(sp, context.ServiceName));
             services.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
             services.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             services.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());

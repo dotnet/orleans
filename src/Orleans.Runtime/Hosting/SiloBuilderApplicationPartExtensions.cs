@@ -33,7 +33,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="assembly">The assembly</param>
-        public static IClientBuilder AddApplicationPartsFromReferences(this IClientBuilder builder, Assembly assembly)
+        public static ISiloHostBuilder AddApplicationPartsFromReferences(this ISiloHostBuilder builder, Assembly assembly)
         {
             builder.GetApplicationPartManager().AddApplicationPartsFromReferences(assembly);
             return builder;

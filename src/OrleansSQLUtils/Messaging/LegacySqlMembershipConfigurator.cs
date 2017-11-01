@@ -5,7 +5,7 @@ using Orleans.Hosting;
 
 namespace OrleansSQLUtils
 {
-    /// <inheritdoc cref="ILegacyMembershipConfigurator"/>
+    /// <inheritdoc />
     public class LegacySqlMembershipConfigurator : ILegacyMembershipConfigurator
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
