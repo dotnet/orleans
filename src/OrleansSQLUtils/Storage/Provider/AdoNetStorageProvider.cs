@@ -429,7 +429,7 @@ namespace Orleans.Storage
                     command.AddParameter("PayloadJson", (string)(serializer.Serializer.Tag == UseJsonFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                     command.AddParameter("PayloadXml", (string)(serializer.Serializer.Tag == UseXmlFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                 }, (selector, resultSetCount, token) =>
-                { return Task.FromResult(selector.GetValueOrDefault<int?>("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
+                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
             catch(Exception ex)
