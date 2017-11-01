@@ -365,7 +365,7 @@ namespace Orleans.Storage
                             storageState = choice.Deserializer.Deserialize(payload, grainStateType);
                         }
 
-                        version = selector.GetValue<int?>("Version");
+                        version = selector.GetNullableInt32("Version");
                     }
 
                     return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
