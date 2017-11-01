@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Runtime.Configuration
@@ -202,7 +203,7 @@ namespace Orleans.Runtime.Configuration
             if (timeSpan < TimeSpan.Zero) throw new ArgumentOutOfRangeException(paramName);
         }
 
-        internal void ValidateConfiguration(Logger logger)
+        internal void ValidateConfiguration(ILogger logger)
         {
             foreach (GrainTypeConfiguration config in classSpecific.Values)
             {
@@ -342,7 +343,7 @@ namespace Orleans.Runtime.Configuration
             throw new InvalidOperationException(string.Format("empty GrainTypeConfiguration for {0}", fullTypeName == null ? "defaults" : fullTypeName));
         }
 
-        internal void ValidateConfiguration(Logger logger)
+        internal void ValidateConfiguration(ILogger logger)
         {
             if (AreDefaults) return;
 

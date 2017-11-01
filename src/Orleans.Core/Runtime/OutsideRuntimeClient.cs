@@ -145,13 +145,6 @@ namespace Orleans
 
             try
             {
-                //init logger for UnobservedExceptionsHandlerClass
-                UnobservedExceptionsHandlerClass.InitLogger(this.loggerFactory);
-                if (!UnobservedExceptionsHandlerClass.TrySetUnobservedExceptionHandler(UnhandledException))
-                {
-                    logger.Warn(ErrorCode.Runtime_Error_100153, "Unable to set unobserved exception handler because it was already set.");
-                }
-
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
@@ -745,12 +738,7 @@ namespace Orleans
                     logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
-
-            try
-            {
-                UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
-            }
-            catch (Exception) { }
+            
             try
             {
                 AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
