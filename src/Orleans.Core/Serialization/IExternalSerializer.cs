@@ -1,5 +1,4 @@
 using System;
-using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -12,12 +11,6 @@ namespace Orleans.Serialization
     /// </summary>
     public interface IExternalSerializer
     {
-        /// <summary>
-        /// Initializes the external serializer. Called once when the serialization manager creates 
-        /// an instance of this type
-        /// </summary>
-        void Initialize(Logger logger);
-
         /// <summary>
         /// Informs the serialization manager whether this serializer supports the type for serialization.
         /// </summary>

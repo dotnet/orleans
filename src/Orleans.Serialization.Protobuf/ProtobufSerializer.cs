@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using Google.Protobuf;
-using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Serialization
 {
@@ -12,17 +12,6 @@ namespace Orleans.Serialization
     public class ProtobufSerializer : IExternalSerializer
     {
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, MessageParser>();
-
-        private Logger logger;
-
-        /// <summary>
-        /// Initializes the external serializer
-        /// </summary>
-        /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(Logger logger)
-        {
-            this.logger = logger;
-        }
 
         /// <summary>
         /// Determines whether this serializer has the ability to serialize a particular type.
