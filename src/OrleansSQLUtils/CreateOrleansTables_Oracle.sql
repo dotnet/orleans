@@ -147,7 +147,7 @@ ALTER TRIGGER "ORLEANSSTATISTICSTABLE_TRG" ENABLE;
 CREATE OR REPLACE TYPE ORLEANS_MEMBERSHIP_TABLE IS TABLE OF ORLEANS_MEMBERSHIP;
 /
 
-CREATE TYPE ORLEANS_MEMBERSHIP IS OBJECT(
+CREATE OR REPLACE TYPE ORLEANS_MEMBERSHIP IS OBJECT(
       DEPLOYMENTID NVARCHAR2(150), 
       ADDRESS VARCHAR2(45 BYTE), 
       PORT NUMBER, 
@@ -196,6 +196,42 @@ CREATE OR REPLACE FUNCTION MembershipReadRowKey(PARAM_DEPLOYMENTID IN NVARCHAR2,
   END;
 /
 
+
+
+CREATE OR REPLACE TYPE ORLEANS_REMINDER IS OBJECT(
+      GRAINID VARCHAR2(150 BYTE),
+      REMINDERNAME NVARCHAR2(150),
+      STARTTIME TIMESTAMP (6), 
+      PERIOD NUMBER,
+      VERSION NUMBER
+);
+/
+
+CREATE OR REPLACE TYPE ORLEANS_REMINDER_TABLE IS TABLE OF ORLEANS_REMINDER;
+/
+
+CREATE OR REPLACE FUNCTION ReadRangeRows1Key(PARAM_SERVICEID IN NVARCHAR2, PARAM_BEGINHASH IN NUMBER,
+                                PARAM_ENDHASH IN NUMBER) 
+  RETURN ORLEANS_REMINDER_TABLE IS
+    tbl ORLEANS_REMINDER_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_REMINDER(
+        GrainId,
+		ReminderName,
+		StartTime,
+		Period,
+		Version
+    )
+    BULK COLLECT INTO tbl
+    FROM OrleansRemindersTable
+    WHERE
+		ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
+		AND GrainHash > PARAM_BEGINHASH AND PARAM_BEGINHASH IS NOT NULL
+		AND GrainHash <= PARAM_ENDHASH AND PARAM_ENDHASH IS NOT NULL;
+    RETURN tbl;
+  END;
+  /
 
 
 CREATE OR REPLACE FUNCTION InsertMembershipKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
@@ -642,19 +678,193 @@ BEGIN
 END;
 /
 
+CREATE OR REPLACE FUNCTION UpdateIAmAlivetimeKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS in VARCHAR2, PARAM_PORT IN NUMBER, 
+                                                 PARAM_GENERATION IN NUMBER, PARAM_IAMALIVE IN TIMESTAMP)
+RETURN NUMBER IS
+rowcount NUMBER;
+PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+    UPDATE OrleansMembershipTable
+        SET
+            IAmAliveTime = PARAM_IAMALIVE
+        WHERE
+            DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+            AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
+            AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
+            AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL;
+      COMMIT;
+      RETURN(0);
+END;
+/
+
+SELECT PayloadBinary, PayloadXml, PayloadJson, Version FROM Storage
+    WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
+      AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
+      AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
+      AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
+      AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
+      AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
+      AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL;
+      
+      
+CREATE OR REPLACE TYPE ORLEANS_STORAGE IS OBJECT(
+    PAYLOADBINARY BLOB, 
+    PAYLOADXML NCLOB, 
+    PAYLOADJSON NCLOB, 
+     VERSION NUMBER
+);
+/
+
+CREATE OR REPLACE TYPE ORLEANS_STORAGE_TABLE IS TABLE OF ORLEANS_STORAGE;
+/
+
+CREATE OR REPLACE FUNCTION ReadFromStorageKey(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER,
+                                PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
+                                PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN NVARCHAR2) 
+  RETURN ORLEANS_STORAGE_TABLE IS
+    tbl ORLEANS_STORAGE_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_STORAGE(PayloadBinary, PayloadXml, PayloadJson, Version)
+    BULK COLLECT INTO tbl
+    FROM Storage
+    WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
+      AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
+      AND (GrainIdN1 = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
+      AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
+      AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
+      AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
+      AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL;
+    RETURN tbl;
+END;
+/
+
+CREATE OR REPLACE FUNCTION ReadReminderRowsKey(PARAM_SERVICEID IN NVARCHAR2, PARAM_GRAINID IN VARCHAR2) 
+  RETURN ORLEANS_REMINDER_TABLE IS
+    tbl ORLEANS_REMINDER_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_REMINDER(
+        GrainId,
+		ReminderName,
+		StartTime,
+		Period,
+		Version
+    )
+    BULK COLLECT INTO tbl
+    FROM OrleansRemindersTable
+    WHERE
+        ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
+		AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL;
+    RETURN tbl;
+  END;
+/
+
+CREATE OR REPLACE FUNCTION ReadReminderRowKey(PARAM_SERVICEID IN NVARCHAR2, PARAM_GRAINID IN VARCHAR2, PARAM_REMINDERNAME IN NVARCHAR2) 
+  RETURN ORLEANS_REMINDER_TABLE IS
+    tbl ORLEANS_REMINDER_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_REMINDER(
+        GrainId,
+		ReminderName,
+		StartTime,
+		Period,
+		Version
+    )
+    BULK COLLECT INTO tbl
+    FROM OrleansRemindersTable
+    WHERE
+        ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
+		AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL
+        AND ReminderName = PARAM_REMINDERNAME AND PARAM_REMINDERNAME IS NOT NULL;
+    RETURN tbl;
+  END;
+/
+
+CREATE OR REPLACE FUNCTION ReadRangeRows2Key(PARAM_SERVICEID IN NVARCHAR2, PARAM_BEGINHASH IN NUMBER,
+                                             PARAM_ENDHASH IN NUMBER) 
+  RETURN ORLEANS_REMINDER_TABLE IS
+    tbl ORLEANS_REMINDER_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_REMINDER(
+        GrainId,
+		ReminderName,
+		StartTime,
+		Period,
+		Version
+    )
+    BULK COLLECT INTO tbl
+    FROM OrleansRemindersTable
+    WHERE
+		ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
+		AND ((GrainHash > PARAM_BEGINHASH AND PARAM_BEGINHASH IS NOT NULL)
+		OR (GrainHash <= PARAM_ENDHASH AND PARAM_ENDHASH IS NOT NULL));
+    RETURN tbl;
+END;
+/
+
+
+create or replace TYPE ORLEANS_GATEWAY IS OBJECT(
+      ADDRESS VARCHAR2(45 BYTE), 
+      PROXYPORT NUMBER, 
+      GENERATION NUMBER
+);
+/
+
+create or replace TYPE ORLEANS_GATEWAY_TABLE IS TABLE OF ORLEANS_GATEWAY;
+/
+
+CREATE OR REPLACE FUNCTION GatewaysQueryKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_STATUS IN NUMBER) 
+  RETURN ORLEANS_GATEWAY_TABLE IS
+    tbl ORLEANS_GATEWAY_TABLE;
+  BEGIN
+    SELECT ORLEANS_GATEWAY(Address, ProxyPort, Generation)
+    BULK COLLECT INTO tbl
+    FROM OrleansMembershipTable
+    WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+      AND Status = PARAM_STATUS AND PARAM_STATUS IS NOT NULL
+      AND ProxyPort > 0;
+    RETURN tbl;
+END;
+/
+
+
+CREATE OR REPLACE FUNCTION MembershipReadAllKey(PARAM_DEPLOYMENTID IN NVARCHAR2) 
+  RETURN ORLEANS_MEMBERSHIP_TABLE IS
+    tbl ORLEANS_MEMBERSHIP_TABLE;
+  BEGIN
+    SELECT 
+    ORLEANS_MEMBERSHIP(
+		v.DeploymentId,
+		m.Address,
+		m.Port,
+		m.Generation,
+		m.SiloName,
+		m.HostName,
+		m.Status,
+		m.ProxyPort,
+		m.SuspectTimes,
+		m.StartTime,
+		m.IAmAliveTime,
+		v.Version)
+    BULK COLLECT INTO tbl
+	FROM
+		OrleansMembershipVersionTable v
+		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+	WHERE
+		v.DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL;
+    
+    RETURN tbl;
+END;
+/
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpdateIAmAlivetimeKey','
-	UPDATE OrleansMembershipTable
-	SET
-		IAmAliveTime = :IAmAliveTime
-	WHERE
-		DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
-		AND Address = :Address AND :Address IS NOT NULL
-		AND Port = :Port AND :Port IS NOT NULL
-		AND Generation = :Generation AND :Generation IS NOT NULL
+	SELECT UpdateIAmAlivetimeKey(:PARAM_DEPLOYMENTID, :PARAM_ADDRESS, :PARAM_PORT, :PARAM_GENERATION, :PARAM_IAMALIVE) AS RESULT FROM DUAL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -709,10 +919,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'GatewaysQueryKey','
-	SELECT Address, ProxyPort, Generation FROM OrleansMembershipTable
-    WHERE DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
-      AND Status = :STATUS AND :STATUS IS NOT NULL
-      AND ProxyPort > 0
+	SELECT * FROM TABLE(GatewaysQueryKey(:PARAM_DEPLOYMENTID, :PARAM_STATUS))
 ');
 /
 
@@ -728,24 +935,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'MembershipReadAllKey','
-	SELECT
-		v.DeploymentId,
-		m.Address,
-		m.Port,
-		m.Generation,
-		m.SiloName,
-		m.HostName,
-		m.Status,
-		m.ProxyPort,
-		m.SuspectTimes,
-		m.StartTime,
-		m.IAmAliveTime,
-		v.Version
-	FROM
-		OrleansMembershipVersionTable v LEFT OUTER JOIN OrleansMembershipTable m
-		ON v.DeploymentId = m.DeploymentId
-	WHERE
-		v.DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
+	SELECT * FROM TABLE(MembershipReadAllKey(:PARAM_DEPLOYMENTID))
 ');
 /
 
@@ -765,67 +955,28 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadReminderRowsKey','
-  SELECT
-		GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-	FROM OrleansRemindersTable
-	WHERE
-		ServiceId = :ServiceId AND :ServiceId IS NOT NULL
-		AND GrainId = :GrainId AND :GrainId IS NOT NULL
+     SELECT * FROM TABLE(ReadReminderRowsKey(:PARAM_SERVICEID, :PARAM_GRAINID))
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadReminderRowKey','
-		SELECT
-		GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-	FROM OrleansRemindersTable
-	WHERE
-		ServiceId = :ServiceId AND :ServiceId IS NOT NULL
-		AND GrainId = :GrainId AND :GrainId IS NOT NULL
-		AND ReminderName = :ReminderName AND :ReminderName IS NOT NULL
+    SELECT * FROM TABLE(ReadReminderRowKey(:PARAM_SERVICEID, :PARAM_GRAINID, :PARAM_REMINDERNAME))L
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadRangeRows1Key','
-	SELECT
-		GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-	FROM OrleansRemindersTable
-	WHERE
-		ServiceId = :ServiceId AND :ServiceId IS NOT NULL
-		AND GrainHash > :BeginHash AND :BeginHash IS NOT NULL
-		AND GrainHash <= :EndHash AND :EndHash IS NOT NULL
+	SELECT * FROM TABLE(ReadRangeRows1Key(:PARAM_SERVICEID, :PARAM_BEGINHASH, :PARAM_ENDHASH))
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadRangeRows2Key','
-	SELECT
-		GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-	FROM OrleansRemindersTable
-	WHERE
-		ServiceId = :ServiceId AND :ServiceId IS NOT NULL
-		AND ((GrainHash > :BeginHash AND :BeginHash IS NOT NULL)
-		OR (GrainHash <= :EndHash AND :EndHash IS NOT NULL))
+	SELECT * FROM TABLE(ReadRangeRows2Key(:PARAM_SERVICEID, :PARAM_BEGINHASH, :PARAM_ENDHASH))
 ');
 /
 
@@ -895,14 +1046,9 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadFromStorageKey',
-	'SELECT PayloadBinary, PayloadXml, PayloadJson, Version FROM Storage
-    WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
-      AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
-      AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
-      AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
-      AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
-      AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
-      AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL'
+	'SELECT * FROM TABLE(ReadFromStorageKey(:PARAM_GRAINIDHASH, :PARAM_GRAINIDN0,
+                                :PARAM_GRAINIDN1, :PARAM_GRAINTYPEHASH, :PARAM_GRAINTYPESTRING,
+                                :PARAM_GRAINIDEXTENSIONSTRING, :PARAM_SERVICEID))'
 );
 /
   
