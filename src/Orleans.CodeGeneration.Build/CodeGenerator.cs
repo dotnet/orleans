@@ -158,7 +158,7 @@ namespace Orleans.CodeGeneration
             var referencedAssemblies = options.ReferencedAssemblies;
 
             // Set up assembly resolver
-            var refResolver = new AssemblyResolver(inputAssembly, referencedAssemblies, true);
+            var refResolver = new AssemblyResolver(inputAssembly, referencedAssemblies, false);
 
             try
             {

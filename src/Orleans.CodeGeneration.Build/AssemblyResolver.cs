@@ -23,7 +23,7 @@ namespace Orleans.CodeGeneration
         /// </summary>
         public Dictionary<string, string> ReferenceAssemblyPaths { get; } = new Dictionary<string, string>();
 
-        private readonly bool usedByCodeGenerator;
+        private readonly bool installDefaultResolveHandler;
         private readonly ICompilationAssemblyResolver assemblyResolver;
 
         private readonly DependencyContext dependencyContext;
@@ -32,9 +32,9 @@ namespace Orleans.CodeGeneration
         private readonly AssemblyLoadContext loadContext;
 #endif
 
-        public AssemblyResolver(string path, List<string> referencedAssemblies, bool usedByCodeGenerator = false)
+        public AssemblyResolver(string path, List<string> referencedAssemblies, bool installDefaultResolveHandler = true)
         {
-            this.usedByCodeGenerator = usedByCodeGenerator;
+            this.installDefaultResolveHandler = installDefaultResolveHandler;
 
             if (Path.GetFileName(path) == "Orleans.Core.dll")
                 this.Assembly = typeof(RuntimeVersion).Assembly;
@@ -58,7 +58,7 @@ namespace Orleans.CodeGeneration
 
             if (this.loadContext == AssemblyLoadContext.Default)
             {
-                if (!this.usedByCodeGenerator)
+                if (this.installDefaultResolveHandler)
                 {
                     AssemblyLoadContext.Default.Resolving += this.AssemblyLoadContextResolving;
                 }
@@ -68,7 +68,7 @@ namespace Orleans.CodeGeneration
                 this.loadContext.Resolving += this.AssemblyLoadContextResolving;
             }
 #else
-            if (!this.usedByCodeGenerator)
+            if (this.installDefaultResolveHandler)
             {
                 AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
             }
@@ -91,7 +91,7 @@ namespace Orleans.CodeGeneration
 
             if (this.loadContext == AssemblyLoadContext.Default)
             {
-                if (!this.usedByCodeGenerator)
+                if (this.installDefaultResolveHandler)
                 {
                     AssemblyLoadContext.Default.Resolving -= this.AssemblyLoadContextResolving;
                 }
@@ -101,7 +101,7 @@ namespace Orleans.CodeGeneration
                 this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
             }
 #else
-            if (!this.usedByCodeGenerator)
+            if (this.installDefaultResolveHandler)
             {
                 AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
             }
