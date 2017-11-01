@@ -21,7 +21,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private readonly Logger log;
+        private readonly ILogger log;
 
         /// <summary>
         /// The types to process.
@@ -42,7 +42,7 @@ namespace Orleans.CodeGenerator
             typesToProcess = new HashSet<Type>();
             processedTypes = new HashSet<Type>();
 
-            log = new LoggerWrapper<SerializerGenerationManager>(loggerFactory);
+            log = loggerFactory.CreateLogger<SerializerGenerationManager>();
         }
 
         internal bool IsTypeRecorded(Type type)

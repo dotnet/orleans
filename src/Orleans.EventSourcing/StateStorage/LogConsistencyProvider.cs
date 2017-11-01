@@ -9,6 +9,8 @@ using Orleans.LogConsistency;
 using Orleans.Runtime;
 using Orleans.Storage;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 
 namespace Orleans.EventSourcing.StateStorage
@@ -23,6 +25,7 @@ namespace Orleans.EventSourcing.StateStorage
     /// </summary>
     public class LogConsistencyProvider : ILogConsistencyProvider
     {
+        private ILogger logger;
         /// <inheritdoc/>
         public string Name { get; private set; }
 
@@ -38,15 +41,6 @@ namespace Orleans.EventSourcing.StateStorage
             }
         }
 
-        private static int counter; // used for constructing a unique id
-        private int id;
-
-        /// <inheritdoc/>
-        protected virtual string GetLoggerName()
-        {
-            return string.Format("LogViews.{0}.{1}", GetType().Name, id);
-        }
-
         /// <summary>
         /// Init method
         /// </summary>
@@ -56,10 +50,13 @@ namespace Orleans.EventSourcing.StateStorage
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            id = Interlocked.Increment(ref counter); // unique id for this provider; matters only for tracing
 
-            Log = providerRuntime.GetLogger(GetLoggerName());
-            Log.Info("Init (Severity={0})", Log.SeverityLevel);
+            var loggerName = $"{this.GetType().FullName}.{Name}";
+            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            this.logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
+
+            logger.Info("Init");
 
             return Task.CompletedTask;
         }
