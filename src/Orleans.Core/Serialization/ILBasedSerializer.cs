@@ -75,14 +75,6 @@
         }
 
         /// <summary>
-        /// Initializes the external serializer. Called once when the serialization manager creates 
-        /// an instance of this type
-        /// </summary>
-        public void Initialize(Logger logger)
-        {
-        }
-
-        /// <summary>
         /// Informs the serialization manager whether this serializer supports the type for serialization.
         /// </summary>
         /// <param name="t">The type of the item to be serialized</param>
