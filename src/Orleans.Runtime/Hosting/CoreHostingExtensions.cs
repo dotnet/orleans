@@ -1,4 +1,6 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -10,6 +12,32 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        /// <summary>
+        /// Configures the name of this silo.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="siloName">The silo name.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder)
+        {
+            // Configure the container to use Orleans, including the default silo name & services.
+            builder.ConfigureServices((context, services) =>
+            {
+                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
+                {
+                    services.PostConfigure<SiloIdentityOptions>(options => options.SiloName = options.SiloName
+                                           ?? context.HostingEnvironment.ApplicationName
+                                           ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+
+                    services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
+                    DefaultSiloServices.AddDefaultServices(context, services);
+
+                    context.Properties.Add("OrleansServicesAdded", true);
+                }
+            });
+            return builder;
+        }
+
         /// <summary>
         /// Configures the name of this silo.
         /// </summary>

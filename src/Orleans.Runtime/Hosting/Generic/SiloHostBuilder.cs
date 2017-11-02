@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -29,28 +27,20 @@ namespace Orleans.Hosting
         public ISiloHost Build()
         {
             if (this.built)
-                throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(SiloHostBuilder)} instance.");
+                throw new InvalidOperationException($"{nameof(this.Build)} can only be called once per {nameof(SiloHostBuilder)} instance.");
             this.built = true;
-            
-            // Configure the container, including the default silo name & services.
-            this.Configure<SiloIdentityOptions>(
-                options => options.SiloName = options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
-            this.serviceProviderBuilder.ConfigureServices(
-                (context, services) =>
-                {
-                    services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
-                    services.AddSingleton(this.hostingEnvironment);
-                    services.AddSingleton(this.hostBuilderContext);
-                    services.AddSingleton(this.appConfiguration);
-                });
-            this.serviceProviderBuilder.ConfigureServices(DefaultSiloServices.AddDefaultServices);
 
+            // Automatically configure Orleans if it wasn't configured before. 
+            // This will not happen once we use the generic host builder from Microsoft.Extensions.Hosting
+            this.ConfigureOrleans();
+            
             BuildHostConfiguration();
             CreateHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
-            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(this.hostBuilderContext);
-            
+
+            var serviceProvider = CreateServiceProvider();
+
             // Construct and return the silo.
             return serviceProvider.GetRequiredService<ISiloHost>();
         }
@@ -138,5 +128,20 @@ namespace Orleans.Hosting
             this.appConfiguration = configBuilder.Build();
             this.hostBuilderContext.Configuration = this.appConfiguration;
         }
+
+        private IServiceProvider CreateServiceProvider()
+        {
+            this.ConfigureServices(services =>
+            {
+                services.AddSingleton(this.hostingEnvironment);
+                services.AddSingleton(this.hostBuilderContext);
+                services.AddSingleton(this.appConfiguration);
+                services.AddOptions();
+                services.AddLogging();
+            });
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(this.hostBuilderContext);
+            return serviceProvider;
+        }
+
     }
 }
