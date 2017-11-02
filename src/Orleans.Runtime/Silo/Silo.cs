@@ -36,6 +36,7 @@ using Orleans.Versions;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -190,6 +191,8 @@ namespace Orleans.Runtime
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
+
+            services.GetService<SerializationManager>().SetApplicationPartManager(services.GetService<ApplicationPartManager>());
 
             this.Services = services;
             //set PropagateActivityId flag from node cofnig

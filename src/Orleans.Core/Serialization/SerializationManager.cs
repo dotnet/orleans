@@ -99,12 +99,11 @@ namespace Orleans.Serialization
 
         #endregion
 
-        #region Static initialization
+        #region initialization
 
         public SerializationManager(
             IServiceProvider serviceProvider,
             IOptions<SerializationProviderOptions> serializatonProviderOptions,
-            ApplicationPartManager applicationPartManager,
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver)
         {
@@ -124,12 +123,6 @@ namespace Orleans.Serialization
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
-
-            var serializerFeature = applicationPartManager.CreateAndPopulateFeature<SerializerFeature>();
-            this.RegisterSerializers(serializerFeature);
-
-            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
-            this.RegisterGrainReferenceSerializers(grainInterfaceFeature);
 
             var serializatonProviderOptionsValue = serializatonProviderOptions.Value;
 
@@ -171,6 +164,15 @@ namespace Orleans.Serialization
             }
 
             RegisterSerializationProviders(serializatonProviderOptionsValue.SerializationProviders);
+        }
+
+        public void SetApplicationPartManager(ApplicationPartManager applicationPartManager)
+        {
+            var serializerFeature = applicationPartManager.CreateAndPopulateFeature<SerializerFeature>();
+            this.RegisterSerializers(serializerFeature);
+
+            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
+            this.RegisterGrainReferenceSerializers(grainInterfaceFeature);
         }
 
         private void RegisterGrainReferenceSerializers(GrainInterfaceFeature grainInterfaceFeature)

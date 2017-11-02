@@ -44,6 +44,7 @@ namespace Orleans
            
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
 
+            serviceProvider.GetService<SerializationManager>().SetApplicationPartManager(serviceProvider.GetService<ApplicationPartManager>());
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
 
             // Construct and return the cluster client.
