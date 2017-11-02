@@ -109,17 +109,40 @@ namespace Orleans.CodeGenerator
         {
             var body = new List<StatementSyntax>();
 
+            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
             Expression<Action<IFieldUtils>> getGetter = _ => _.GetGetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getReferenceSetter = _ => _.GetReferenceSetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getValueSetter = _ => _.GetValueSetter(default(FieldInfo));
+
+            // Expressions for specifying binding flags.
+            var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
+                   SyntaxKind.BitwiseOrExpression,
+                   BindingFlags.Instance,
+                   BindingFlags.NonPublic,
+                   BindingFlags.Public);
 
             var fieldUtils = SF.IdentifierName("fieldUtils");
 
             foreach (var field in fields)
             {
+                // Get the field
                 var fieldInfoField = SF.IdentifierName(field.InfoFieldName);
+                var fieldInfo =
+                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
+                        .AddArgumentListArguments(
+                            SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
+                            SF.Argument(bindingFlags));
+                var fieldInfoVariable =
+                    SF.VariableDeclarator(field.InfoFieldName).WithInitializer(SF.EqualsValueClause(fieldInfo));
 
-                // Declare the getter for this field.
+                if (!field.IsGettableProperty || !field.IsSettableProperty)
+                {
+                    body.Add(SF.LocalDeclarationStatement(
+                            SF.VariableDeclaration(typeof(FieldInfo).GetTypeSyntax()).AddVariables(fieldInfoVariable)));
+                }
+
+                // Set the getter/setter of the field
                 if (!field.IsGettableProperty)
                 {
                     var getterType =
@@ -368,39 +391,9 @@ namespace Orleans.CodeGenerator
         {
             var result = new List<MemberDeclarationSyntax>();
 
-            // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
-            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
-
-            // Expressions for specifying binding flags.
-            var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
-                   SyntaxKind.BitwiseOrExpression,
-                   BindingFlags.Instance,
-                   BindingFlags.NonPublic,
-                   BindingFlags.Public);
-
             // Add each field and initialize it.
             foreach (var field in fields)
             {
-                var fieldInfo =
-                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
-                        .AddArgumentListArguments(
-                            SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
-                            SF.Argument(bindingFlags));
-                var fieldInfoVariable =
-                    SF.VariableDeclarator(field.InfoFieldName).WithInitializer(SF.EqualsValueClause(fieldInfo));
-                var fieldInfoField = SF.IdentifierName(field.InfoFieldName);
-
-                if (!field.IsGettableProperty || !field.IsSettableProperty)
-                {
-                    result.Add(
-                        SF.FieldDeclaration(
-                            SF.VariableDeclaration(typeof(FieldInfo).GetTypeSyntax()).AddVariables(fieldInfoVariable))
-                            .AddModifiers(
-                                SF.Token(SyntaxKind.PrivateKeyword),
-                                SF.Token(SyntaxKind.ReadOnlyKeyword)));
-                }
-
                 // Declare the getter for this field.
                 if (!field.IsGettableProperty)
                 {
