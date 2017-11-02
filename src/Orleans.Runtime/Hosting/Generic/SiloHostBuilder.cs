@@ -16,8 +16,11 @@ namespace Orleans.Hosting
 
         private bool built;
         private HostBuilderContext hostBuilderContext;
-        private readonly List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
+        private List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
+        private List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
+        private IConfiguration hostConfiguration;
         private IConfiguration appConfiguration;
+        private IHostingEnvironment hostingEnvironment;
 
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
@@ -36,15 +39,27 @@ namespace Orleans.Hosting
                 (context, services) =>
                 {
                     services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
+                    services.AddSingleton(this.hostingEnvironment);
+                    services.AddSingleton(this.hostBuilderContext);
+                    services.AddSingleton(this.appConfiguration);
                 });
             this.serviceProviderBuilder.ConfigureServices(DefaultSiloServices.AddDefaultServices);
 
-            this.CreateHostBuilderContext();
-            this.BuildAppConfiguration();
+            BuildHostConfiguration();
+            CreateHostingEnvironment();
+            CreateHostBuilderContext();
+            BuildAppConfiguration();
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(this.hostBuilderContext);
             
             // Construct and return the silo.
             return serviceProvider.GetRequiredService<ISiloHost>();
+        }
+
+        /// <inheritdoc />
+        public ISiloHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
+        {
+            this.configureHostConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+            return this;
         }
 
         /// <inheritdoc />
@@ -80,13 +95,42 @@ namespace Orleans.Hosting
         {
             this.hostBuilderContext = new HostBuilderContext(this.Properties)
             {
-                Configuration = null
+                HostingEnvironment = this.hostingEnvironment,
+                Configuration = this.hostConfiguration
             };
         }
-        
+
+        private void BuildHostConfiguration()
+        {
+            var configBuilder = new ConfigurationBuilder();
+            foreach (var buildAction in this.configureHostConfigActions)
+            {
+                buildAction(configBuilder);
+            }
+            this.hostConfiguration = configBuilder.Build();
+        }
+
+        private void CreateHostingEnvironment()
+        {
+            this.hostingEnvironment = new HostingEnvironment()
+            {
+                ApplicationName = this.hostConfiguration[HostDefaults.ApplicationKey],
+                EnvironmentName = this.hostConfiguration[HostDefaults.EnvironmentKey] ?? EnvironmentName.Production,
+            };
+        }
+
         private void BuildAppConfiguration()
         {
             var configBuilder = new ConfigurationBuilder();
+
+            // replace with: configBuilder.AddConfiguration(this.hostConfiguration);
+            // This method was added post v2.0.0 of Microsoft.Extensions.Configuration
+            foreach (var buildAction in this.configureHostConfigActions)
+            {
+                buildAction(configBuilder);
+            }
+            // end replace
+
             foreach (var buildAction in this.configureAppConfigActions)
             {
                 buildAction(this.hostBuilderContext, configBuilder);
