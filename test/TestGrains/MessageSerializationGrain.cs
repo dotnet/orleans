@@ -58,10 +58,6 @@
     {
         public const string FailureMessage = "Can't do it, sorry.";
 
-        public void Initialize(Logger logger)
-        {
-        }
-
         public bool IsSupportedType(Type itemType) => itemType == typeof(SimpleType);
 
         public object DeepCopy(object source, ICopyContext context)

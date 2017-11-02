@@ -125,10 +125,6 @@ namespace UnitTests.Grains
             IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
         }
 
-        public void Initialize(Logger logger)
-        {
-        }
-
         public bool IsSupportedType(Type itemType)
         {
             IsSupportedTypeCalled = true;
@@ -168,10 +164,6 @@ namespace UnitTests.Grains
         public static void Reset()
         {
             IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
-        }
-
-        public void Initialize(Logger logger)
-        {
         }
 
         public bool IsSupportedType(Type itemType)
