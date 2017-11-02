@@ -13,22 +13,26 @@ namespace Orleans.SqlUtils
                     AdoNetInvariants.InvariantNameSqlServer,
                     new DbConstants(startEscapeIndicator: '[',
                                     endEscapeIndicator: ']',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    supportsBooleanParameters: true)
                 },
                 {AdoNetInvariants.InvariantNameMySql, new DbConstants(
                                     startEscapeIndicator: '`',
                                     endEscapeIndicator: '`',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    supportsBooleanParameters: true)
                 },
                 {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
                                     startEscapeIndicator: '"',
                                     endEscapeIndicator: '"',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    supportsBooleanParameters: true)
                 },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
                                     endEscapeIndicator: '\"',
-                                    unionAllSelectTemplate: " UNION ALL SELECT FROM DUAL ")},
+                                    unionAllSelectTemplate: " UNION ALL SELECT FROM DUAL ",
+                                    supportsBooleanParameters: false)},
             };
 
         public static DbConstants GetDbConstants(string invariantName)
@@ -110,7 +114,18 @@ namespace Orleans.SqlUtils
             //at https://github.com/dotnet/orleans/pull/2949.
             return adoNetProvider.Equals(AdoNetInvariants.InvariantNameMySql, StringComparison.OrdinalIgnoreCase)
                 || adoNetProvider.Equals(AdoNetInvariants.InvariantNamePostgreSql, StringComparison.OrdinalIgnoreCase);
-        }        
+        }
+
+
+        /// <summary>
+        /// Whether the ADO.net provider supports boolean parameters. 
+        /// </summary>
+        /// <param name="invariantName">The ADO.NET provider invariant string.</param>
+        /// <returns>True if the ADO.net data provider supports boolean parameters else false.</returns>
+        public static bool SupportsBooleanParameters(string invariantName)
+        {
+            return invariantNameToConsts[invariantName].SupportsBooleanParameters;
+        }
     }
 
 
@@ -122,6 +137,11 @@ namespace Orleans.SqlUtils
         public readonly string UnionAllSelectTemplate;
 
         /// <summary>
+        /// Indicates whether the ADO.net provider supports boolean parameters.
+        /// </summary>
+        public readonly bool SupportsBooleanParameters;
+
+        /// <summary>
         /// The character that indicates a start escape key for columns and tables that are reserved words.
         /// </summary>
         public readonly char StartEscapeIndicator;
@@ -131,11 +151,12 @@ namespace Orleans.SqlUtils
         /// </summary>
         public readonly char EndEscapeIndicator;
 
-        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate)
+        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate, bool supportsBooleanParameters)
         {
             StartEscapeIndicator = startEscapeIndicator;
             EndEscapeIndicator = endEscapeIndicator;
             UnionAllSelectTemplate = unionAllSelectTemplate;
+            SupportsBooleanParameters = supportsBooleanParameters;
         }
     }
 }
