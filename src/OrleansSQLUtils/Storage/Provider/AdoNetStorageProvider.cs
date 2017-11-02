@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 
 namespace Orleans.Storage
@@ -67,6 +68,7 @@ namespace Orleans.Storage
         /// </summary>
         private string ServiceId { get; set; }
 
+        private ILogger logger;
         /// <summary>
         /// The storage used for back-end operations.
         /// </summary>
@@ -200,10 +202,12 @@ namespace Orleans.Storage
                 queries.Single(i => i.Item1 == "ReadFromStorageKey").Item2,
                 queries.Single(i => i.Item1 == "ClearStorageKey").Item2);
 
-            Log = providerRuntime.GetLogger(GetType().FullName);
+            var loggerFactory = providerRuntime.ServiceProvider.GetService<ILoggerFactory>();
+            this.logger = loggerFactory.CreateLogger<AdoNetStorageProvider>();
+            Log = new LoggerWrapper(this.logger, this.GetType().FullName, loggerFactory);
             Name = name;
 
-            Log.Info((int)RelationalStorageProviderCodes.RelationalProviderInitProvider, $"Initialized storage provider: ServiceId={ServiceId} ProviderName={Name} Invariant={Storage.InvariantName} ConnectionString={Storage.ConnectionString}.");
+            logger.Info((int)RelationalStorageProviderCodes.RelationalProviderInitProvider, $"Initialized storage provider: ServiceId={ServiceId} ProviderName={Name} Invariant={Storage.InvariantName} ConnectionString={Storage.ConnectionString}.");
         }
 
 
@@ -224,9 +228,9 @@ namespace Orleans.Storage
             //even if not as clear as when using explicitly checked parameters.
             var grainId = GrainIdAndExtensionAsString(grainReference);
             var baseGrainType = ExtractBaseClass(grainType);
-            if(Log.IsVerbose3)
+            if(logger.IsEnabled(LogLevel.Trace))
             {
-                Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderClearing, LogString("Clearing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderClearing, LogString("Clearing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             string storageVersion = null;
@@ -249,7 +253,7 @@ namespace Orleans.Storage
             }
             catch(Exception ex)
             {
-                Log.Error((int)RelationalStorageProviderCodes.RelationalProviderDeleteError, LogString("Error clearing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderDeleteError, LogString("Error clearing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
                 throw;
             }
 
@@ -262,9 +266,9 @@ namespace Orleans.Storage
 
             //No errors found, the version of the state held by the grain can be updated and also the state.
             grainState.ETag = storageVersion;
-            if(Log.IsVerbose3)
+            if(logger.IsEnabled(LogLevel.Trace))
             {
-                Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderCleared, LogString("Cleared grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderCleared, LogString("Cleared grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
         }
 
@@ -277,9 +281,9 @@ namespace Orleans.Storage
             //as with explicitly checked parameters.
             var grainId = GrainIdAndExtensionAsString(grainReference);
             var baseGrainType = ExtractBaseClass(grainType);
-            if(Log.IsVerbose3)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderReading, LogString("Reading grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderReading, LogString("Reading grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             try
@@ -288,7 +292,7 @@ namespace Orleans.Storage
                 if(choice.Deserializer == null)
                 {
                     var errorString = LogString("No deserializer found", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString());
-                    Log.Error((int)RelationalStorageProviderCodes.RelationalProviderNoDeserializer, errorString);
+                    logger.Error((int)RelationalStorageProviderCodes.RelationalProviderNoDeserializer, errorString);
                     throw new InvalidOperationException(errorString);
                 }
 
@@ -375,20 +379,20 @@ namespace Orleans.Storage
                 string etag = readRecords != null ? readRecords.Item2 : null;
                 if(state == null)
                 {
-                    Log.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                    logger.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
                     state = Activator.CreateInstance(grainStateType);
                 }
 
                 grainState.State = state;
                 grainState.ETag = etag;
-                if(Log.IsVerbose3)
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderRead, LogString("Read grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                    logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderRead, LogString("Read grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
                 }
             }
             catch(Exception ex)
             {
-                Log.Error((int)RelationalStorageProviderCodes.RelationalProviderReadError, LogString("Error reading grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderReadError, LogString("Error reading grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
                 throw;
             }
         }
@@ -403,9 +407,9 @@ namespace Orleans.Storage
             var data = grainState.State;
             var grainId = GrainIdAndExtensionAsString(grainReference);
             var baseGrainType = ExtractBaseClass(grainType);
-            if(Log.IsVerbose3)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderWriting, LogString("Writing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderWriting, LogString("Writing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             string storageVersion = null;
@@ -434,7 +438,7 @@ namespace Orleans.Storage
             }
             catch(Exception ex)
             {
-                Log.Error((int)RelationalStorageProviderCodes.RelationalProviderWriteError, LogString("Error writing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
+                logger.Error((int)RelationalStorageProviderCodes.RelationalProviderWriteError, LogString("Error writing grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString(), ex.Message), ex);
                 throw;
             }
 
@@ -448,9 +452,9 @@ namespace Orleans.Storage
             //No errors found, the version of the state held by the grain can be updated.
             grainState.ETag = storageVersion;
 
-            if(Log.IsVerbose3)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                Log.Verbose3((int)RelationalStorageProviderCodes.RelationalProviderWrote, LogString("Wrote grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderWrote, LogString("Wrote grain state", ServiceId, Name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
         }
 

@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Net;
-using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
@@ -19,7 +15,6 @@ namespace Orleans.Serialization
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly JsonSerializerSettings settings;
-        private Logger logger;
 
         public OrleansJsonSerializer(SerializationManager serializationManager, IGrainFactory grainFactory)
         {
@@ -94,12 +89,6 @@ namespace Orleans.Serialization
                 }
             }
             return settings;
-        }
-
-        /// <inheritdoc />
-        public void Initialize(Logger logger)
-        {
-            this.logger = logger;
         }
 
         /// <inheritdoc />

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
@@ -26,7 +27,7 @@ namespace Orleans.Providers.SqlServer
         private bool isSilo;
         private long generation;                
         private RelationalOrleansQueries orleansQueries;
-        private Logger logger;
+        private ILogger logger;
         private IGrainReferenceConverter grainReferenceConverter;
 
         /// <summary>
@@ -44,7 +45,7 @@ namespace Orleans.Providers.SqlServer
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            logger = providerRuntime.GetLogger("SqlStatisticsPublisher");
+            logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<SqlStatisticsPublisher>>();
             this.grainReferenceConverter = providerRuntime.ServiceProvider.GetRequiredService<IGrainReferenceConverter>();
 
             string adoInvariant = AdoNetInvariants.InvariantNameSqlServer;
@@ -115,14 +116,14 @@ namespace Orleans.Providers.SqlServer
         /// <returns>Task for database operation</returns>
         public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
-            if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
+            if(logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
                 await orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                if (logger != null && logger.IsVerbose) logger.Verbose("SqlStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
                 throw;
             }
         }
@@ -140,14 +141,14 @@ namespace Orleans.Providers.SqlServer
         /// <returns>Task for database operation</returns>
         public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
-            if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
                 await orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                if (logger != null && logger.IsVerbose) logger.Verbose("SqlStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
                 throw;
             }
         }
@@ -167,7 +168,7 @@ namespace Orleans.Providers.SqlServer
         {
             var siloOrClientName = (isSilo) ? siloName : clientId;
             var id = (isSilo) ? siloAddress.ToLongString() : string.Format("{0}:{1}", siloOrClientName, generation);
-            if (logger != null && logger.IsVerbose3) logger.Verbose3("ReportStats called with {0} counters, name: {1}, id: {2}", statsCounters.Count, siloOrClientName, id);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ReportStats called with {0} counters, name: {1}, id: {2}", statsCounters.Count, siloOrClientName, id);
             var insertTasks = new List<Task>();
             try
             {                                    
@@ -186,16 +187,16 @@ namespace Orleans.Providers.SqlServer
             }
             catch(Exception ex)
             {
-                if (logger != null && logger.IsVerbose) logger.Verbose("ReportStats faulted: {0}", ex.ToString());                
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReportStats faulted: {0}", ex.ToString());                
                 foreach(var faultedTask in insertTasks.Where(t => t.IsFaulted))
                 {
-                    if (logger != null && logger.IsVerbose) logger.Verbose("Faulted task exception: {0}", faultedTask.ToString());
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Faulted task exception: {0}", faultedTask.ToString());
                 }
 
                 throw;
             }
 
-            if (logger != null && logger.IsVerbose) logger.Verbose("ReportStats SUCCESS");           
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReportStats SUCCESS");           
         }
                
 
