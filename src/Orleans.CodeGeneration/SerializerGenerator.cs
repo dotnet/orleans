@@ -412,7 +412,8 @@ namespace Orleans.CodeGenerator
                     result.Add(
                         SF.FieldDeclaration(SF.VariableDeclaration(getterType).AddVariables(fieldGetterVariable))
                             .AddModifiers(
-                                SF.Token(SyntaxKind.PrivateKeyword)));
+                                SF.Token(SyntaxKind.PrivateKeyword),
+                                SF.Token(SyntaxKind.ReadOnlyKeyword)));
                 }
 
                 if (!field.IsSettableProperty)
@@ -429,7 +430,8 @@ namespace Orleans.CodeGenerator
                         result.Add(
                             SF.FieldDeclaration(SF.VariableDeclaration(setterType).AddVariables(fieldSetterVariable))
                                 .AddModifiers(
-                                    SF.Token(SyntaxKind.PrivateKeyword)));
+                                    SF.Token(SyntaxKind.PrivateKeyword),
+                                    SF.Token(SyntaxKind.ReadOnlyKeyword)));
                     }
                     else
                     {
@@ -442,7 +444,8 @@ namespace Orleans.CodeGenerator
                         result.Add(
                             SF.FieldDeclaration(SF.VariableDeclaration(setterType).AddVariables(fieldSetterVariable))
                                 .AddModifiers(
-                                    SF.Token(SyntaxKind.PrivateKeyword)));
+                                    SF.Token(SyntaxKind.PrivateKeyword),
+                                    SF.Token(SyntaxKind.ReadOnlyKeyword)));
                     }
                 }
             }
