@@ -17,6 +17,7 @@ namespace OrleansSQLUtils.Storage
     internal class DbStoredQueries
     {
         private readonly Dictionary<string, string> queries;
+
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
             var fields = typeof (DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
@@ -244,6 +245,7 @@ namespace OrleansSQLUtils.Storage
             internal Columns(IDbCommand cmd)
             {
                 command = cmd;
+               
             }
 
             private void Add<T>(string paramName, T paramValue, DbType? dbType = null)
@@ -319,18 +321,21 @@ namespace OrleansSQLUtils.Storage
                 }
             }
 
-            internal ISiloPerformanceMetrics SiloMetrics
+            internal void SetSiloMetrics(ISiloPerformanceMetrics siloPerformanceMetrics, bool mapIsOverloadedAsBoolean)
             {
-                set
-                {
-                    AddCoreMetricsParams(value);
-                    Add(nameof(value.ActivationCount), value.ActivationCount);
-                    Add(nameof(value.RecentlyUsedActivationCount), value.RecentlyUsedActivationCount);
-                    Add(nameof(value.RequestQueueLength), value.RequestQueueLength);
-                    Add(nameof(value.IsOverloaded), value.IsOverloaded);
-                    Add(nameof(value.ClientCount), value.ClientCount);
-                }
+                AddCoreMetricsParams(siloPerformanceMetrics);
+                Add(nameof(siloPerformanceMetrics.ActivationCount), siloPerformanceMetrics.ActivationCount);
+                Add(nameof(siloPerformanceMetrics.RecentlyUsedActivationCount), siloPerformanceMetrics.RecentlyUsedActivationCount);
+                Add(nameof(siloPerformanceMetrics.RequestQueueLength), siloPerformanceMetrics.RequestQueueLength);
+
+                //Yet another fix for Oracle Data Provider: ODP.net doesn´t support boolean parameters
+                if(mapIsOverloadedAsBoolean)
+                    Add(nameof(siloPerformanceMetrics.IsOverloaded), siloPerformanceMetrics.IsOverloaded);
+                else
+                    Add(nameof(siloPerformanceMetrics.IsOverloaded), siloPerformanceMetrics.IsOverloaded ? 1 : 0);
+                Add(nameof(siloPerformanceMetrics.ClientCount), siloPerformanceMetrics.ClientCount);
             }
+
 
             internal IClientPerformanceMetrics ClientMetrics
             {
