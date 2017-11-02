@@ -229,6 +229,7 @@ namespace Orleans.Serialization
             if (this.ServiceProvider == null)
                 return null;
 
+            // If the type lacks a Serializer attribute then it's a self-serializing type and all serialization methods must be static
             if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
                 return null;
 
@@ -446,12 +447,12 @@ namespace Orleans.Serialization
                 }
                 else
                 {
-                    var target = this.InitializeSerializer(serializerType);
+                    var serializerInstance = this.InitializeSerializer(serializerType);
                     this.Register(
                         type,
-                        CreateDelegate<DeepCopier>(copier, target),
-                        CreateDelegate<Serializer>(serializer, target),
-                        CreateDelegate<Deserializer>(deserializer, target),
+                        CreateDelegate<DeepCopier>(copier, serializerInstance),
+                        CreateDelegate<Serializer>(serializer, serializerInstance),
+                        CreateDelegate<Deserializer>(deserializer, serializerInstance),
                         true);
                 }
             }
@@ -564,10 +565,10 @@ namespace Orleans.Serialization
             }
 
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
-            var target = this.InitializeSerializer(concreteSerializerType);
-            var concreteCopier = CreateDelegate<DeepCopier>(copier, target);
-            var concreteSerializer = CreateDelegate<Serializer>(serializer, target);
-            var concreteDeserializer = CreateDelegate<Deserializer>(deserializer, target);
+            var serializerInstance = this.InitializeSerializer(concreteSerializerType);
+            var concreteCopier = CreateDelegate<DeepCopier>(copier, serializerInstance);
+            var concreteSerializer = CreateDelegate<Serializer>(serializer, serializerInstance);
+            var concreteDeserializer = CreateDelegate<Deserializer>(deserializer, serializerInstance);
 
             this.Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
 
