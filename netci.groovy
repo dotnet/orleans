@@ -5,36 +5,60 @@ import jobs.generation.Utilities;
 def project = GithubProject
 def branch = GithubBranchName
 
-[true, false].each { isPR ->
-    ['bvt', 'functional'].each { testCategory ->
-        def newJobName = "${testCategory}"
-        def testScript = "Test.cmd";
-        if (testCategory == 'functional') { testScript = "TestAll.cmd" }
+def platformList = ['Linux', 'Windows_NT']
 
-        def newJob = job(Utilities.getFullJobName(project, newJobName, isPR)) {
+platformList.each { platform ->
+    if (platform == 'Linux') {
+        def os = 'Linux'
+        def architecture = 'x64'
+        def configuration = 'Release'
+        def isPR = true
+        def osUsedForMachineAffinity = 'Ubuntu16.04';
+        def buildCommand = "./build.sh --skip-prereqs --configuration ${configuration} --docker ubuntu.14.04 --targets Default"
+
+        def newJob = job(Utilities.getFullJobName(project, platform, isPR)) {
             steps {
-                batchFile("SET BuildConfiguration=Release&&set VersionSuffix=ci-%BUILD_ID%&& call Build.cmd && SET OrleansDataConnectionString= && ${testScript}")
+                shell(buildCommand)
             }
         }
 
-        // need to use a machine that has .NET 4.6.2 installed in the system for now.
-        Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
-
+        Utilities.setMachineAffinity(newJob, osUsedForMachineAffinity, 'latest-or-auto')
         Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
-        Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results*.xml')
-        // Archive only on commit builds.
-        if (!isPR) {
-            if (testCategory == 'bvt') {
-                // no reason to archive for every kind of test run
-                Utilities.addArchival(newJob, '**/Binaries/**')
-            }
-            Utilities.addGithubPushTrigger(newJob)
-        }
-        else {
-            Utilities.addGithubPRTriggerForBranch(newJob, branch, newJobName)
-        }
+        Utilities.addGithubPRTriggerForBranch(newJob, branch, "${os} ${architecture} ${configuration} Build")
+    }
+    else if (platform == 'Windows_NT') {
+        [true, false].each { isPR ->
+            ['bvt', 'functional'].each { testCategory ->
+                def newJobName = "${testCategory}"
+                def testScript = "Test.cmd";
+                if (testCategory == 'functional') { testScript = "TestAll.cmd" }
 
-        // args: archive *.binlog, don't exclude anything, don't fail if there are no files, archive in case of failure too
-        Utilities.addArchival(newJob, '*.binlog', '', true, false)
+                def newJob = job(Utilities.getFullJobName(project, newJobName, isPR)) {
+                    steps {
+                        batchFile("SET BuildConfiguration=Release&&set VersionSuffix=ci-%BUILD_ID%&& call Build.cmd && SET OrleansDataConnectionString= && ${testScript}")
+                    }
+                }
+
+                // need to use a machine that has .NET 4.6.2 installed in the system for now.
+                Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
+
+                Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
+                Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results*.xml')
+                // Archive only on commit builds.
+                if (!isPR) {
+                    if (testCategory == 'bvt') {
+                        // no reason to archive for every kind of test run
+                        Utilities.addArchival(newJob, '**/Binaries/**')
+                    }
+                    Utilities.addGithubPushTrigger(newJob)
+                }
+                else {
+                    Utilities.addGithubPRTriggerForBranch(newJob, branch, newJobName)
+                }
+
+                // args: archive *.binlog, don't exclude anything, don't fail if there are no files, archive in case of failure too
+                Utilities.addArchival(newJob, '*.binlog', '', true, false)
+            }
+        }
     }
 }
