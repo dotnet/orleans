@@ -22,6 +22,15 @@ namespace Orleans.Hosting
         ISiloHost Build();
 
         /// <summary>
+        /// Set up the configuration for the builder itself. This will be used to initialize the <see cref="IHostingEnvironment"/>
+        /// for use later in the build process. This can be called multiple times and the results will be additive.
+        /// </summary>
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
+        /// to construct the <see cref="IConfiguration"/> for the host.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        ISiloHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate);
+
+        /// <summary>
         /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
         /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
         /// subsequent operations, as well as in <see cref="ISiloHost.Services"/>.

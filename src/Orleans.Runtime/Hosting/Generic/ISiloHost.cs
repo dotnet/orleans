@@ -7,7 +7,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Represents a silo instance.
     /// </summary>
-    public interface ISiloHost
+    public interface ISiloHost : IDisposable
     {
         /// <summary>
         /// Starts this silo.
