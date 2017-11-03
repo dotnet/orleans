@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
     <meta property="docfx:tocrel" content="../toc.html">
+    
     <meta property="docfx:rel" content="../../">
     
   </head>
@@ -79,6 +80,8 @@ For fast development iterations, it is convenient to use a single process that c
 Similarly, debugger can be attached to the Worker/Web Role instance process when running inside the Azure Compute Emulator.</p>
 <p>In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.
 Hence, in productions tracing is the primary &#39;debugging&#39; mechanism.</p>
+<h3 id="source-link">Source Link</h3>
+<p>Starting with the 2.0.0-beta1 release we added <a href="https://github.com/ctaggart/SourceLink">Source Link</a> support to our Symbols. It means that if a project consumes the Orleans NuGet packages, when debugging the application code, they can step into the Orleans source code. In Steve Gordon&#39;s <a href="https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source">blog post</a>, you can see what steps are needed to configure it.</p>
 <h3 id="symbols">Symbols</h3>
 <p>Starting with 1.3.0 release, symbols for Orleans binaries are published to Microsoft symbol servers.
 Make sure you enable <code>Microsoft Symbol Servers</code> in Visual Studio in Tools/Options/Debugging/Symbols for debugging Orleans code.</p>

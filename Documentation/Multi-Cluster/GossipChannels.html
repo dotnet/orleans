@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
     <meta property="docfx:tocrel" content="../toc.html">
+    
     <meta property="docfx:rel" content="../../">
     
   </head>
@@ -79,7 +80,7 @@
 <h3 id="cluster-id">Cluster Id</h3>
 <p>Each cluster has its own unique cluster id. The cluster id must be specified in the global configuration. </p>
 <p>Cluster ids may not be empty, nor may they contain commas. Also, if using Azure Table Storage, cluster ids may not contain the characters forbidden for row keys 
-(/, \, #, ?).</p>
+(/, , #, ?).</p>
 <p>We recommend using very short strings for the cluster ids, because cluster ids are transmitted frequently and may be stored in storage by some log-view providers.</p>
 <h3 id="cluster-gateways">Cluster Gateways</h3>
 <p>Each cluster automatically designates a subset of its active silos to serve as <em>cluster gateways</em>. Cluster gateways directly advertise their IP addresses to other clusters, and can thus serve as  &quot;points of first contact&quot;. By default, at most 10 silos (or whatever number is configured as <code>MaxMultiClusterGateways</code>) are designated as cluster gateways.</p>
