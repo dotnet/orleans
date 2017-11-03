@@ -1097,10 +1097,6 @@ namespace UnitTests.Serialization
 
         public class SupportsNothingSerializer : IExternalSerializer
         {
-            public void Initialize(Logger logger)
-            {
-            }
-
             public bool IsSupportedType(Type itemType) => false;
 
             public object DeepCopy(object source, ICopyContext context)

@@ -39,7 +39,7 @@ namespace Orleans.Hosting
             if (typedDelegate == null)
             {
                 var msg = $"Type of configuration delegate requires builder of type {typeof(TBuilder)} which does not match previously configured container builder type {typeof(TContainerBuilder)}.";
-                throw new ArgumentException(msg, nameof(configureContainer));
+                throw new InvalidCastException(msg);
             }
 
             this.configureContainerDelegates.Add(typedDelegate);

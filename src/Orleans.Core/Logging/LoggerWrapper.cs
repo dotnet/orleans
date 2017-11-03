@@ -39,6 +39,15 @@ namespace Orleans.Runtime
         private readonly Severity maxSeverityLevel;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
+
+        public LoggerWrapper(ILogger logger, string name, ILoggerFactory loggerFactory)
+        {
+            this.logger = logger;
+            this.name = name;
+            this.loggerFactory = loggerFactory;
+            this.maxSeverityLevel = FindSeverityForLogger(this.logger);
+        }
+
         public LoggerWrapper(string name, ILoggerFactory loggerFactory)
         {
             this.name = Name;

@@ -48,5 +48,10 @@ namespace Orleans.Hosting
 
             await this.Stopped;
         }
+
+        public void Dispose()
+        {
+            (this.Services as IDisposable)?.Dispose();
+        }
     }
 }

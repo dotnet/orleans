@@ -175,7 +175,6 @@ namespace Tester.AzureUtils.Persistence
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
-            storage.InitLogger(logger);
             await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
@@ -202,7 +201,6 @@ namespace Tester.AzureUtils.Persistence
             }
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
-            storage.InitLogger(logger);
             await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);

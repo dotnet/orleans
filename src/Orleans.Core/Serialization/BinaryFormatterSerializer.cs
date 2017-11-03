@@ -4,18 +4,11 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
     {
-        private Logger logger;
-        public void Initialize(Logger logger)
-        {
-            this.logger = logger;
-        }
-
         public bool IsSupportedType(Type itemType)
         {
             return itemType.GetTypeInfo().IsSerializable;

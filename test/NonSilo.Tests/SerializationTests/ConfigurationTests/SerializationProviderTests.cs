@@ -84,7 +84,7 @@ namespace UnitTests.Serialization
 
         public static bool DeepCopyCalled { get; set; }
 
-        public void Initialize(Logger logger)
+        public AbstractFakeSerializer()
         {
             Initialized = true;
         }

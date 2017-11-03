@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.TestingHost;
 
 namespace TestExtensions
 {
@@ -15,11 +16,7 @@ namespace TestExtensions
         public SerializationTestEnvironment(ClientConfiguration config = null)
         {
             if (config == null) config = this.DefaultConfig();
-            this.Client = new ClientBuilder()
-                .UseConfiguration(config)
-                .AddApplicationPartsFromAppDomain()
-                .AddApplicationPartsFromBasePath()
-                .Build();
+            this.Client = TestClusterOptions.DefaultClientBuilderFactory(config).Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 

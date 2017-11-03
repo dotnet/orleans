@@ -46,7 +46,7 @@ namespace TestServiceFabric
             var resolver = new FabricServiceSiloResolver(
                 this.serviceName,
                 this.queryManager,
-                loggerFactory);
+                loggerFactory.CreateLogger<FabricServiceSiloResolver>());
             await resolver.Refresh();
         }
     }
