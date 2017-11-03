@@ -50,6 +50,7 @@ namespace Orleans.Runtime
         private readonly List<IGrainCallFilter> siloInterceptors;
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
+        private IGrainCancellationTokenRuntime cancellationTokenRuntime;
         
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -63,7 +64,8 @@ namespace Orleans.Runtime
             IEnumerable<IGrainCallFilter> registeredInterceptors,
             Factory<ITransactionAgent> transactionAgent,
             ILoggerFactory loggerFactory,
-            IOptions<SiloMessagingOptions> messagingOptions)
+            IOptions<SiloMessagingOptions> messagingOptions,
+            IGrainCancellationTokenRuntime cancellationTokenRuntime)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -86,6 +88,7 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.callbackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+            this.cancellationTokenRuntime = cancellationTokenRuntime;
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -305,12 +308,12 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContext.Import(message.RequestContextData);
+                RequestContextExtensions.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
-                    // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
+                    // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
 
                 bool startNewTransaction = false;
@@ -337,7 +340,7 @@ namespace Orleans.Runtime
                     var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager);
                     if (request.Arguments != null)
                     {
-                        CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this);
+                        CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
                     }
 
                     var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);

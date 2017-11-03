@@ -61,7 +61,7 @@ namespace AWSUtils.Tests.Streaming
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, new LoggerWrapper<SQSAdapter>(NullLoggerFactory.Instance), this.fixture.Services);
+            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
@@ -128,7 +128,7 @@ namespace AWSUtils.Tests.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export(this.fixture.SerializationManager)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

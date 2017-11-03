@@ -141,6 +141,12 @@ namespace UnitTests.Serialization
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(EventHubSequenceTokenV2)),
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
+        }
+
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Serialization"), TestCategory("CodeGen")]
+        public void ValueTupleTypesHasSerializer()
+        {
+            var environment = InitializeSerializer(SerializerToUse.NoFallback);
             Assert.True(
                 environment.SerializationManager.HasSerializer(typeof(ValueTuple<int, AddressAndTag>)),
                 $"Should be able to serialize internal type {nameof(ValueTuple<int, AddressAndTag>)}.");
@@ -358,30 +364,6 @@ namespace UnitTests.Serialization
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
             Dictionary<int, DateTime> result2 = (Dictionary<int, DateTime>)deserialized;
             Assert.Equal<DateTime>(source2[3], result2[13]);  //Round trip for case insensitive int/DateTime dictionary lost the custom comparer"
-        }
-
-        public enum IntEnum
-        {
-            Value1,
-            Value2,
-            Value3
-        }
-
-        public enum UShortEnum : ushort
-        {
-            Value1,
-            Value2,
-            Value3
-        }
-
-        public enum CampaignEnemyType : sbyte
-        {
-            None = -1,
-            Brute = 0,
-            Enemy1,
-            Enemy2,
-            Enemy3,
-            Enemy4,
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -615,18 +597,6 @@ namespace UnitTests.Serialization
             ValidateReadOnlyCollectionList(collection, deserialized, "string/string");
         }
 
-        public class UnserializableException : Exception
-        {
-            public UnserializableException(string message) : base(message)
-            { }
-
-            [CopierMethod]
-            static private object Copy(object input, ICopyContext context)
-            {
-                return input;
-            }
-        }
-
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.Default)]
         [InlineData(SerializerToUse.BinaryFormatterFallbackSerializer)]
@@ -691,13 +661,6 @@ namespace UnitTests.Serialization
             Assert.Same(list1, list2); //Object identity lost after round trip of string/list dict
             Assert.NotSame(list2, list3); //Object identity gained after round trip of string/list dict
             Assert.NotSame(list1, list3); //Object identity gained after round trip of string/list dict
-        }
-
-        [Serializable]
-        public class Unrecognized
-        {
-            public int A { get; set; }
-            public int B { get; set; }
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -1134,10 +1097,6 @@ namespace UnitTests.Serialization
 
         public class SupportsNothingSerializer : IExternalSerializer
         {
-            public void Initialize(Logger logger)
-            {
-            }
-
             public bool IsSupportedType(Type itemType) => false;
 
             public object DeepCopy(object source, ICopyContext context)

@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -83,7 +85,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class EvictionStrategy : ChronologicalEvictionStrategy<TestCachedMessage>
         {
-            public EvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            public EvictionStrategy(ILogger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
                 : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {
             }
@@ -199,8 +201,8 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
+            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 
@@ -216,8 +218,8 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
+            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 

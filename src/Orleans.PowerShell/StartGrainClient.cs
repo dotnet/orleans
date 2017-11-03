@@ -39,49 +39,51 @@ namespace OrleansPSUtils
         {
             try
             {
-                WriteVerbose($"[{DateTime.UtcNow}] Initializing Orleans Grain Client");
+                this.WriteVerbose($"[{DateTime.UtcNow}] Initializing Orleans Grain Client");
                 var builder = new ClientBuilder();
-                switch (ParameterSetName)
+                switch (this.ParameterSetName)
                 {
                     case FilePathSet:
-                        WriteVerbose($"[{DateTime.UtcNow}] Using config file at '{ConfigFilePath}'...");
-                        if (string.IsNullOrWhiteSpace(ConfigFilePath))
-                            throw new ArgumentNullException(nameof(ConfigFilePath));
-                        builder.LoadConfiguration(ConfigFilePath);
+                        this.WriteVerbose($"[{DateTime.UtcNow}] Using config file at '{this.ConfigFilePath}'...");
+                        if (string.IsNullOrWhiteSpace(this.ConfigFilePath))
+                            throw new ArgumentNullException(nameof(this.ConfigFilePath));
+                        builder.LoadConfiguration(this.ConfigFilePath);
                         break;
                     case FileSet:
-                        WriteVerbose($"[{DateTime.UtcNow}] Using provided config file...");
-                        if (ConfigFile == null)
-                            throw new ArgumentNullException(nameof(ConfigFile));
-                        builder.LoadConfiguration(ConfigFile);
+                        this.WriteVerbose($"[{DateTime.UtcNow}] Using provided config file...");
+                        if (this.ConfigFile == null)
+                            throw new ArgumentNullException(nameof(this.ConfigFile));
+                        builder.LoadConfiguration(this.ConfigFile);
                         break;
                     case ConfigSet:
-                        WriteVerbose($"[{DateTime.UtcNow}] Using provided 'ClientConfiguration' object...");
-                        if (Config == null)
-                            throw new ArgumentNullException(nameof(Config));
-                        builder.UseConfiguration(Config);
+                        this.WriteVerbose($"[{DateTime.UtcNow}] Using provided 'ClientConfiguration' object...");
+                        if (this.Config == null)
+                            throw new ArgumentNullException(nameof(this.Config));
+                        builder.UseConfiguration(this.Config);
                         break;
                     case EndpointSet:
-                        WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
-                        if (GatewayAddress == null)
-                            throw new ArgumentNullException(nameof(GatewayAddress));
+                        this.WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
+                        if (this.GatewayAddress == null)
+                            throw new ArgumentNullException(nameof(this.GatewayAddress));
                         var config = this.GetOverriddenConfig();
                         builder.UseConfiguration(config);
                         break;
                     default:
-                        WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
+                        this.WriteVerbose($"[{DateTime.UtcNow}] Using default Orleans Grain Client initializer");
                         builder.LoadConfiguration();
                         break;
                 }
 
-                this.client = builder.Build();
+                this.client = builder
+                    .AddApplicationPartsFromAppDomain()
+                    .Build();
                 this.client.Connect().GetAwaiter().GetResult();
                 this.SetClient(this.client);
                 this.WriteObject(this.client);
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(ex, ex.GetType().Name, ErrorCategory.InvalidOperation, this));
+                this.WriteError(new ErrorRecord(ex, ex.GetType().Name, ErrorCategory.InvalidOperation, this));
             }
         }
 

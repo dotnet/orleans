@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -25,7 +26,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
             services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
             services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
-            services.TryAddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.TryAddSingleton<Factory<NodeConfiguration>>(
                 sp =>
                 {
@@ -51,8 +51,33 @@ namespace Orleans.Hosting
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
 
+            services.Configure<IOptions<SiloIdentityOptions>, GrainClassOptions>((identityOptions, options) =>
+            {
+                var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(identityOptions.Value.SiloName);
+                options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
+            });
+
             LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
             return services;
+        }
+
+        internal static void Configure<TService, TOptions>(this IServiceCollection services, Action<TService, TOptions> configure) where TOptions : class
+        {
+            services.AddTransient<IConfigureOptions<TOptions>>(sp => new ServiceBasedConfigurator<TService, TOptions>(sp.GetRequiredService<TService>(), configure));
+        }
+
+        private class ServiceBasedConfigurator<TService, TOptions> : IConfigureOptions<TOptions> where TOptions : class
+        {
+            private readonly Action<TService, TOptions> configure;
+            private readonly TService service;
+
+            public ServiceBasedConfigurator(TService service, Action<TService, TOptions> configure)
+            {
+                this.service = service;
+                this.configure = configure;
+            }
+
+            public void Configure(TOptions options) => this.configure(this.service, options);
         }
     }
 }

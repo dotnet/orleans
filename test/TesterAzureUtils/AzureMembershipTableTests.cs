@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using OrleansAzureUtils.Options;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
@@ -47,7 +49,11 @@ namespace Tester.AzureUtils
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new AzureGatewayListProvider(loggerFactory);
+            var options = new AzureTableGatewayListProviderOptions()
+            {
+                ConnectionString = this.connectionString
+            };
+            return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this.clientConfiguration);
         }
 
         protected override Task<string> GetConnectionString()

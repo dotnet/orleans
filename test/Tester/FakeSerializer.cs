@@ -21,7 +21,7 @@ namespace Tester.Serialization
 
         public static bool DeepCopyCalled { get; set; }
 
-        public void Initialize(Logger logger)
+        public FakeSerializer()
         {
             Initialized = true;
         }

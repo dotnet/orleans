@@ -124,16 +124,17 @@ namespace Orleans.CodeGeneration
         /// <returns>A suitable conversion method.</returns>
         private static MethodInfo GetTaskConversionMethod(Type taskType)
         {
-            if (taskType == typeof(Task)) return TypeUtils.Method((Task task) => task.Box());
+            if (taskType == typeof(Task)) return TypeUtils.Method((Task task) => task.ToUntypedTask());
+            if (taskType == typeof(Task<object>)) return TypeUtils.Method((Task<object> task) => task.ToUntypedTask());
             if (taskType == typeof(void)) return TypeUtils.Property(() => Task.CompletedTask).GetMethod;
 
             if (taskType.GetGenericTypeDefinition() != typeof(Task<>))
                 throw new ArgumentException($"Unsupported return type {taskType}.");
             var innerType = taskType.GenericTypeArguments[0];
-            var methods = typeof(PublicOrleansTaskExtensions).GetMethods(BindingFlags.Static | BindingFlags.Public);
+            var methods = typeof(OrleansTaskExtentions).GetMethods(BindingFlags.Static | BindingFlags.Public);
             foreach (var method in methods)
             {
-                if (method.Name != nameof(PublicOrleansTaskExtensions.Box) || !method.ContainsGenericParameters) continue;
+                if (method.Name != nameof(OrleansTaskExtentions.ToUntypedTask) || !method.ContainsGenericParameters) continue;
                 return method.MakeGenericMethod(innerType);
             }
 
@@ -210,7 +211,7 @@ namespace Orleans.CodeGeneration
             }
 
             throw new ArgumentException(
-                $"Could not find generic method {declaringType}.{methodName}<{new string(',', typeParameterCount)}>(...).");
+                $"Could not find generic method {declaringType}.{methodName}<{new string(',', typeParameterCount - 1)}>(...).");
         }
     }
 }

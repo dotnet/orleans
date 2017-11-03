@@ -25,6 +25,9 @@ namespace Orleans.Runtime
             this.IncludeGlobal = includeGlobal;
         }
 
+        internal static TypeFormattingOptions Default { get; } = new TypeFormattingOptions();
+        internal static TypeFormattingOptions LogFormat { get; } = new TypeFormattingOptions(includeGlobal: false);
+
         /// <summary>
         /// Gets a value indicating whether or not to include the fully-qualified namespace of the class in the result.
         /// </summary>

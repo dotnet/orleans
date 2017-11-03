@@ -85,7 +85,7 @@ namespace Orleans.ServiceBus.Providers
         {
             if (GetPayload().RequestContext != null)
             {
-                RequestContext.Import(GetPayload().RequestContext);
+                RequestContextExtensions.Import(GetPayload().RequestContext);
                 return true;
             }
             return false;

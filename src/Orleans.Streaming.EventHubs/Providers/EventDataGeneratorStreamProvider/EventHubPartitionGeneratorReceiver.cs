@@ -23,7 +23,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         {
             this.generator = generator;
         }
-        /// <inheritdoc cref="IEventHubReceiver"/>
+        /// <inheritdoc />
         public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
             IEnumerable<EventData> events;
@@ -38,19 +38,19 @@ namespace Orleans.ServiceBus.Providers.Testing
             return new List<EventData>().AsEnumerable();
         }
 
-        /// <inheritdoc cref="IEventHubReceiver"/>
+        /// <inheritdoc />
         public void StopProducingOnStream(IStreamIdentity streamId)
         {
             (this.generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
         }
 
-        /// <inheritdoc cref="IEventHubReceiver"/>
+        /// <inheritdoc />
         public void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
         {
             (this.generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
         }
 
-        /// <inheritdoc cref="IEventHubReceiver"/>
+        /// <inheritdoc />
         public Task CloseAsync()
         {
             return Task.CompletedTask;

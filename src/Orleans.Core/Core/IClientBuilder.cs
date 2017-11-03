@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.ApplicationParts;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans
@@ -9,6 +11,11 @@ namespace Orleans
     /// </summary>
     public interface IClientBuilder
     {
+        /// <summary>
+        /// A central location for sharing state between components during the client building process.
+        /// </summary>
+        IDictionary<object, object> Properties { get; }
+
         /// <summary>
         /// Builds the client.
         /// </summary>

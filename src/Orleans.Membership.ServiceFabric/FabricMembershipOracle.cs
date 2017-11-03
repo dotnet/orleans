@@ -19,7 +19,6 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();
         private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> subscribers =
             new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>();
-
         private readonly AutoResetEvent notificationEvent = new AutoResetEvent(false);
         private readonly BlockingCollection<StatusChangeNotification> notifications = new BlockingCollection<StatusChangeNotification>();
         private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(5);
@@ -27,6 +26,7 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly GlobalConfiguration globalConfig;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
         private readonly ILogger log;
+        private readonly UnknownSiloMonitor unknownSiloMonitor;
 
         // Cached collection of active silos.
         private volatile Dictionary<SiloAddress, SiloStatus> activeSilosCache;
@@ -47,48 +47,38 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <param name="globalConfig">The cluster configuration.</param>
         /// <param name="fabricServiceSiloResolver">The service resolver which this instance will use.</param>
         /// <param name="logger">The logger.</param>
+        /// <param name="unknownSiloMonitor">The unknown silo monitor.</param>
         public FabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
             GlobalConfiguration globalConfig,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
-            ILogger<FabricMembershipOracle> logger)
+            ILogger<FabricMembershipOracle> logger,
+            UnknownSiloMonitor unknownSiloMonitor)
         {
             this.log = logger;
             this.localSiloDetails = localSiloDetails;
             this.globalConfig = globalConfig;
             this.fabricServiceSiloResolver = fabricServiceSiloResolver;
+            this.unknownSiloMonitor = unknownSiloMonitor;
             this.silos[this.SiloAddress] = new SiloEntry(SiloStatus.Created, this.SiloName);
         }
 
-        /// <summary>
-        /// Status of this silo.
-        /// </summary>
+        /// <inheritdoc />
         public SiloStatus CurrentStatus => this.GetApproximateSiloStatus(this.SiloAddress);
 
-        /// <summary>
-        /// Address of this silo.
-        /// </summary>
+        /// <inheritdoc />
         public SiloAddress SiloAddress => this.localSiloDetails.SiloAddress;
 
-        /// <summary>
-        /// Name of this silo.
-        /// </summary>
+        /// <inheritdoc />
         public string SiloName => this.localSiloDetails.Name;
 
-        /// <summary>
-        /// Returns a value indicating the health of this instance.
-        /// </summary>
-        /// <param name="lastCheckTime">The last time which this participant's health was checked.</param>
-        /// <returns><see langword="true"/> if the participant is healthy, <see langword="false"/> otherwise.</returns>
+        /// <inheritdoc />
         public bool CheckHealth(DateTime lastCheckTime)
         {
             return this.lastRefreshTime.Add(this.refreshPeriod + this.refreshPeriod) > DateTime.UtcNow;
         }
 
-        /// <summary>
-        /// Get a list of silos that are designated to function as gateways.
-        /// </summary>
-        /// <returns></returns>
+        /// <inheritdoc />
         public IReadOnlyList<SiloAddress> GetApproximateMultiClusterGateways()
         {
             var result = this.multiClusterSilosCache;
@@ -117,28 +107,20 @@ namespace Microsoft.Orleans.ServiceFabric
             return result;
         }
 
-        /// <summary>
-        /// Get the status of a given silo. 
-        /// This method returns an approximate view on the status of a given silo. 
-        /// In particular, this oracle may think the given silo is alive, while it may already have failed.
-        /// If this oracle thinks the given silo is dead, it has been authoritatively told so by ISiloDirectory.
-        /// </summary>
-        /// <param name="siloAddress">A silo whose status we are interested in.</param>
-        /// <returns>The status of a given silo.</returns>
+        /// <inheritdoc />
         public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress)
         {
-            SiloStatus status;
             var allSilos = this.GetApproximateSiloStatuses(onlyActive: false);
-            var exists = allSilos.TryGetValue(siloAddress, out status);
+            var exists = allSilos.TryGetValue(siloAddress, out var status);
+            if (!exists)
+            {
+                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
+            }
+
             return exists ? status : SiloStatus.None;
         }
 
-        /// <summary>
-        /// Get the statuses of all silo. 
-        /// This method returns an approximate view on the statuses of all silo.
-        /// </summary>
-        /// <param name="onlyActive">Include only silo who are currently considered to be active. If false, include all.</param>
-        /// <returns>A list of silo statuses.</returns>
+        /// <inheritdoc />
         public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
         {
             if (onlyActive)
@@ -170,10 +152,7 @@ namespace Microsoft.Orleans.ServiceFabric
             }
         }
 
-        /// <summary>
-        /// Determine if the current silo is dead.
-        /// </summary>
-        /// <returns>The silo so ask about.</returns>
+        /// <inheritdoc />
         public bool IsDeadSilo(SiloAddress address)
         {
             if (address.Equals(this.SiloAddress)) return false;
@@ -181,21 +160,16 @@ namespace Microsoft.Orleans.ServiceFabric
             return status == SiloStatus.Dead;
         }
 
-        /// <summary>
-        /// Determine if the current silo is valid for creating new activations on or for directory lookups.
-        /// </summary>
-        /// <returns>The silo so ask about.</returns>
+        /// <inheritdoc />
         public bool IsFunctionalDirectory(SiloAddress siloAddress)
         {
             if (siloAddress.Equals(this.SiloAddress)) return true;
 
             var status = this.GetApproximateSiloStatus(siloAddress);
-            return !status.IsTerminating();
+            return !status.IsUnavailable();
         }
 
-        /// <summary>
-        /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
-        /// </summary>
+        /// <inheritdoc />
         public Task Start()
         {
             // Start processing notifications.
@@ -203,7 +177,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 this.ProcessNotifications,
                 CancellationToken.None,
                 TaskCreationOptions.None,
-                TaskScheduler.Current);
+                TaskScheduler.Current).Ignore();
 
             this.timer = new Timer(
                 self => ((FabricMembershipOracle)self).RefreshAsync().Ignore(),
@@ -213,39 +187,32 @@ namespace Microsoft.Orleans.ServiceFabric
             this.fabricServiceSiloResolver.Subscribe(this);
             this.RefreshAsync().Ignore();
             this.UpdateStatus(SiloStatus.Joining);
+            
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Turns this oracle into an Active state. Will update this silo in the SiloDirectory with SiloStatus.Active status.
-        /// </summary>
+        /// <inheritdoc />
         public Task BecomeActive()
         {
             this.UpdateStatus(SiloStatus.Active);
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// ShutDown this oracle. Will update this silo in the SiloDirectory with SiloStatus.ShuttingDown status. 
-        /// </summary>
+        /// <inheritdoc />
         public Task ShutDown()
         {
             this.UpdateStatus(SiloStatus.ShuttingDown);
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Stop this oracle. Will update this silo in the SiloDirectory with SiloStatus.Stopping status. 
-        /// </summary>
+        /// <inheritdoc />
         public Task Stop()
         {
             this.UpdateStatus(SiloStatus.Stopping);
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Completely kill this oracle. Will update this silo in the SiloDirectory with SiloStatus.Dead status. 
-        /// </summary>
+        /// <inheritdoc />
         public Task KillMyself()
         {
             this.UpdateStatus(SiloStatus.Dead);
@@ -253,46 +220,34 @@ namespace Microsoft.Orleans.ServiceFabric
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Get the name of a silo. 
-        /// Silo name is assumed to be static and does not change across restarts of the same silo.
-        /// </summary>
-        /// <param name="siloAddress">A silo whose name we are interested in.</param>
-        /// <param name="siloName">A silo name.</param>
-        /// <returns>TTrue if could return the requested name, false otherwise.</returns>
+        /// <inheritdoc />
         public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
         {
-            SiloEntry entry;
-            var result = this.silos.TryGetValue(siloAddress, out entry);
+            var result = this.silos.TryGetValue(siloAddress, out var entry);
             siloName = entry?.Name;
+            if (!result)
+            {
+                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
+            }
+
             return result;
         }
 
-        /// <summary>
-        /// Subscribe to status events about all silos. 
-        /// </summary>
-        /// <param name="observer">An observer async interface to receive silo status notifications.</param>
-        /// <returns>bool value indicating that subscription succeeded or not.</returns>
+        /// <inheritdoc />
         public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer)
         {
             this.subscribers[observer] = observer;
             return true;
         }
 
-        /// <summary>
-        /// UnSubscribe from status events about all silos. 
-        /// </summary>
-        /// <returns>bool value indicating that subscription succeeded or not.</returns>
+        /// <inheritdoc />
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer)
         {
             this.subscribers.TryRemove(observer, out observer);
             return true;
         }
 
-        /// <summary>
-        /// Notifies this instance of an update to one or more partitions.
-        /// </summary>
-        /// <param name="partitions">The updated set of partitions.</param>
+        /// <inheritdoc />
         public void OnUpdate(FabricSiloInfo[] partitions)
         {
             var hasChanges = false;
@@ -302,8 +257,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 {
                     // Update the silo if it was not previously seen or if the existing entry's status
                     // does not match the updated status.
-                    SiloEntry existing;
-                    if (this.silos.TryGetValue(updatedSilo.SiloAddress, out existing))
+                    if (this.silos.TryGetValue(updatedSilo.SiloAddress, out var existing))
                     {
                         // Mark the existing silo as being refreshed.
                         existing.Refreshed = true;
@@ -319,14 +273,13 @@ namespace Microsoft.Orleans.ServiceFabric
                     {
                         // Add the new silo.
                         this.notifications.Add(new StatusChangeNotification(updatedSilo.SiloAddress, SiloStatus.Active));
-                        var siloEntry = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
+                        this.silos[updatedSilo.SiloAddress] = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
                         {
                             Refreshed = true
                         };
-                        this.silos[updatedSilo.SiloAddress] = siloEntry;
                         hasChanges = true;
 
-                        this.log.Info($"Silo {updatedSilo.SiloAddress} ({siloEntry.Name}) transitioned from {SiloStatus.None} to {siloEntry.Status}.");
+                        this.log.Info($"Silo {updatedSilo.SiloAddress} ({updatedSilo.Name}) transitioned from {SiloStatus.None} to {SiloStatus.Active}.");
                     }
                 }
 
@@ -349,14 +302,30 @@ namespace Microsoft.Orleans.ServiceFabric
                     // Reset the refresh flag.
                     silo.Value.Refreshed = false;
                 }
-            }
 
-            // If anything was updated, clear the cache before notifying clients.
-            if (hasChanges)
-            {
                 // Clear the caches.
                 this.ClearCaches();
 
+                // Determine dead silos which this silo has seen queries for but have never been seen in an update from Service Fabric.
+                foreach (var deadSilo in this.unknownSiloMonitor.DetermineDeadSilos(this.GetApproximateSiloStatuses(true)))
+                {
+                    if (this.silos.TryGetValue(deadSilo, out var entry))
+                    {
+                        entry.Status = SiloStatus.Dead;
+                    }
+                    else
+                    {
+                        this.silos[deadSilo] = new SiloEntry(SiloStatus.Dead, "unknown");
+                    }
+
+                    this.notifications.Add(new StatusChangeNotification(deadSilo, SiloStatus.Dead));
+                    hasChanges = true;
+                }
+            }
+            
+            // If anything was updated, clear the cache before notifying clients.
+            if (hasChanges)
+            {
                 this.log.Info($"Current cluster members: {string.Join(", ", this.GetApproximateSiloStatuses(true))}");
 
                 // Notify all subscribers.
@@ -379,8 +348,7 @@ namespace Microsoft.Orleans.ServiceFabric
             while (!this.notifications.IsAddingCompleted)
             {
                 await this.notificationEvent.WaitAsync(TimeSpan.FromMinutes(1));
-                StatusChangeNotification notification;
-                while (this.notifications.TryTake(out notification))
+                while (this.notifications.TryTake(out var notification))
                 {
                     foreach (var subscriber in this.subscribers.Values)
                     {
@@ -445,7 +413,7 @@ namespace Microsoft.Orleans.ServiceFabric
             }
         }
 
-        /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
+        /// <inheritdoc />
         public void Dispose()
         {
             this.StopInternal();

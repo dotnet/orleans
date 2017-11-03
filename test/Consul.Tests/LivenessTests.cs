@@ -1,6 +1,8 @@
-﻿using Orleans.Runtime.Configuration;
+﻿using System;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
 using UnitTests.MembershipTests;
@@ -25,10 +27,17 @@ namespace Consul.Tests
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
-            options.ClientConfiguration.CustomGatewayProviderAssemblyName = "OrleansConsulUtils";
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
+                .UseClientBuilderFactory(clientBuilderFactory);
         }
+
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseConsulGatewayListProvider(gatewayOptions =>
+            {
+                gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);;
+            })
+            .AddApplicationPartsFromAppDomain()
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {
@@ -39,9 +48,9 @@ namespace Consul.Tests
                     .UseConfiguration(clusterConfiguration)
                     .UseConsulMembership(options =>
                     {
-                        options.ConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                        options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
                     })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
         }
 

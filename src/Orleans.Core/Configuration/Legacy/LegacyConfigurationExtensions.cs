@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
@@ -18,7 +19,6 @@ namespace Orleans.Configuration
             // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
             services.TryAddSingleton(configuration);
             services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
-            services.TryAddFromExisting<ITraceConfiguration, ClientConfiguration>();
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>
@@ -34,6 +34,8 @@ namespace Orleans.Configuration
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
 
+            // GatewayProvider
+            LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
             return services;
         }
 

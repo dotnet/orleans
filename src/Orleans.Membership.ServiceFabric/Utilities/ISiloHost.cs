@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Microsoft.Orleans.ServiceFabric.Utilities
 {
     using System;
@@ -25,5 +28,10 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
         /// Stops the silo.
         /// </summary>
         void Stop();
+
+        /// <summary>
+        /// Shuts down the silo (async).
+        /// </summary>
+        Task ShutdownAsync(CancellationToken cancellationToken);
     }
 }

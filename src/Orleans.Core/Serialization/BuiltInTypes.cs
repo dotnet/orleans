@@ -1924,19 +1924,31 @@ namespace Orleans.Serialization
 
         #region Type
 
-        internal static void SerializeType(object obj, ISerializationContext context, Type expected)
+        internal class DefaultTypeSerializer
         {
-            context.StreamWriter.Write(RuntimeTypeNameFormatter.Format((Type)obj));
-        }
+            private readonly ITypeResolver typeResolver;
 
-        internal static object DeserializeType(Type expected, IDeserializationContext context)
-        {
-            return Type.GetType(context.StreamReader.ReadString());
-        }
+            public DefaultTypeSerializer(ITypeResolver typeResolver)
+            {
+                this.typeResolver = typeResolver;
+            }
 
-        internal static object CopyType(object obj, ICopyContext context)
-        {
-            return obj; // Type objects are effectively immutable
+            internal void SerializeType(object obj, ISerializationContext context, Type expected)
+            {
+                var typeSpecification = RuntimeTypeNameFormatter.Format((Type) obj);
+                context.StreamWriter.Write(typeSpecification);
+            }
+
+            internal object DeserializeType(Type expected, IDeserializationContext context)
+            {
+                var typeSpecification = context.StreamReader.ReadString();
+                return this.typeResolver.ResolveType(typeSpecification);
+            }
+
+            internal object CopyType(object obj, ICopyContext context)
+            {
+                return obj; // Type objects are effectively immutable
+            }
         }
 
         #endregion Type

@@ -276,8 +276,7 @@ namespace Orleans.Runtime.Configuration
             </Globals>
             <Defaults>
                 <LoadShedding Enabled=""?"" LoadLimit=""?""/>
-                <Tracing DefaultTraceLevel=""?"" PropagateActivityId=""?"">
-                    <TraceLevelOverride LogPrefix=""?"" TraceLevel=""?""/>
+                <Tracing PropagateActivityId=""?"">
                 </Tracing>
             </Defaults>
         </OrleansConfiguration>"));

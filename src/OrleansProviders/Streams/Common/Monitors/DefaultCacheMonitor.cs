@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
                 {"HostName", dimensions.NodeConfig.HostNameOrIPAddress}
             };
         }
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)
         {
@@ -40,13 +40,13 @@ namespace Orleans.Providers.Streams.Common
                 this.TelemetryProducer.TrackMetric($"{pressureMonitorType}-CurrentPressure", currentPressure.Value, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void ReportCacheSize(long totalCacheSizeInByte)
         {
             this.TelemetryProducer.TrackMetric("TotalCacheSizeInByte", totalCacheSizeInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
         {
             if (oldestMessageEnqueueTimeUtc.HasValue && newestMessageEnqueueTimeUtc.HasValue)
@@ -58,25 +58,25 @@ namespace Orleans.Providers.Streams.Common
             this.TelemetryProducer.TrackMetric("TotalMessageCount", totalMessageCount, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void TrackMemoryAllocated(int memoryInByte)
         {
             this.TelemetryProducer.TrackMetric("MemoryAllocatedInByte", memoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void TrackMemoryReleased(int memoryInByte)
         {
             this.TelemetryProducer.TrackMetric("MemoryReleasedInByte", memoryInByte, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void TrackMessagesAdded(long mesageAdded)
         {
             this.TelemetryProducer.TrackMetric("MessageAdded", mesageAdded, this.LogProperties);
         }
 
-        /// <inheritdoc cref="ICacheMonitor"/>
+        /// <inheritdoc />
         public void TrackMessagesPurged(long messagePurged)
         {
             this.TelemetryProducer.TrackMetric("MessagePurged", messagePurged, this.LogProperties);

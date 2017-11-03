@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.EventHubs;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -34,10 +35,10 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionSettings settings;
-        private readonly Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryProducer, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
-        private readonly Logger baseLogger;
-        private readonly Logger logger;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly ITelemetryProducer telemetryProducer;
 
@@ -45,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, Logger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory;
+        private Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
@@ -63,25 +64,25 @@ namespace Orleans.ServiceBus.Providers
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, Logger, ITelemetryProducer, IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
-            Logger baseLogger,
+            ILoggerFactory loggerFactory,
             IQueueAdapterReceiverMonitor monitor,
             Factory<NodeConfiguration> getNodeConfig,
             ITelemetryProducer telemetryProducer,
-            Func<EventHubPartitionSettings, string, Logger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
+            Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
-            if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
+            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
             if (monitor == null) throw new ArgumentNullException(nameof(monitor));
             if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
-            this.baseLogger = baseLogger;
-            this.logger = baseLogger.GetSubLogger("receiver", "-");
+            this.loggerFactory = loggerFactory;
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
             this.monitor = monitor;
             this.getNodeConfig = getNodeConfig;
             this.telemetryProducer = telemetryProducer;
@@ -113,10 +114,10 @@ namespace Orleans.ServiceBus.Providers
                     this.cache.Dispose();
                     this.cache = null;
                 }
-                this.cache = cacheFactory(settings.Partition, checkpointer, baseLogger, this.telemetryProducer);
+                this.cache = cacheFactory(settings.Partition, checkpointer, this.loggerFactory, this.telemetryProducer);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(getNodeConfig) };
                 string offset = await checkpointer.Load();
-                this.receiver = await this.eventHubReceiverFactory(settings, offset, logger, this.telemetryProducer);
+                this.receiver = await this.eventHubReceiverFactory(settings, offset, this.logger, this.telemetryProducer);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
@@ -268,7 +269,7 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger, ITelemetryProducer telemetryProducer)
+        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
             bool offsetInclusive = true;
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)

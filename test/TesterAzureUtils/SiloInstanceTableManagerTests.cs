@@ -25,7 +25,7 @@ namespace Tester.AzureUtils
         public class Fixture : IDisposable
         {
             public ILoggerFactory LoggerFactory { get; set; } =
-                TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+                TestingUtils.CreateDefaultLoggerFactory("SiloInstanceTableManagerTests.log");
 
             public void Dispose()
             {

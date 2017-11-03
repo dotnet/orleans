@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OrleansZooKeeperUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
@@ -23,20 +25,21 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
-        public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger)
+        public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger, ClientConfiguration clientConfiguration,
+            IOptions<ZooKeeperGatewayListProviderOptions> options)
         {
             watcher = new ZooKeeperWatcher(logger);
+
+            deploymentPath = "/" + clientConfiguration.DeploymentId;
+            deploymentConnectionString = options.Value.ConnectionString + deploymentPath;
+            maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 
         /// <summary>
         /// Initializes the ZooKeeper based gateway provider
         /// </summary>
-        /// <param name="config">The given client configuration.</param>
-        public Task InitializeGatewayListProvider(ClientConfiguration config)
+        public Task InitializeGatewayListProvider()
         {
-            deploymentPath = "/" + config.DeploymentId;
-            deploymentConnectionString = config.DataConnectionString + deploymentPath;
-            maxStaleness = config.GatewayListRefreshPeriod;
             return Task.CompletedTask;
         }
 

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric.Description;
-using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric
@@ -118,8 +117,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public Task CloseAsync(CancellationToken cancellationToken)
         {
-            this.SiloHost.Stop();
-            return Task.CompletedTask;
+            return this.SiloHost.ShutdownAsync(cancellationToken);
         }
 
         /// <summary>

@@ -7,13 +7,14 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
     public class EventHubQueueCacheForTesting : EventHubQueueCache
     {
         public EventHubQueueCacheForTesting(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
-            ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
+            ICacheDataComparer<CachedEventHubMessage> comparer, ILogger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
             :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, null, null)
             { }
 
@@ -21,7 +22,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     }
     public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy
     {
-        public EHEvictionStrategyForTesting(Logger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
+        public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
             :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
         { }
 

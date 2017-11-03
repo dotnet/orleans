@@ -1,8 +1,10 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Reflection;
-
+using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
+using Orleans.Metadata;
 
 namespace Orleans.Runtime
 {
@@ -11,43 +13,29 @@ namespace Orleans.Runtime
     /// </summary>
     internal class TypeMetadataCache
     {
-        private readonly CodeGeneratorManager codeGeneratorManager;
-
         /// <summary>
         /// The mapping between grain types and the corresponding type for the <see cref="IGrainMethodInvoker"/> implementation.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Type> grainToInvokerMapping = new ConcurrentDictionary<Type, Type>();
+        private readonly Dictionary<Type, Type> grainToInvokerMapping = new Dictionary<Type, Type>();
 
         /// <summary>
         /// The mapping between grain types and the corresponding type for the <see cref="GrainReference"/> implementation.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Type> grainToReferenceMapping = new ConcurrentDictionary<Type, Type>();
+        private readonly Dictionary<Type, Type> grainToReferenceMapping = new Dictionary<Type, Type>();
 
-        public TypeMetadataCache(CodeGeneratorManager codeGeneratorManager)
+        public TypeMetadataCache(ApplicationPartManager applicationPartManager)
         {
-            this.codeGeneratorManager = codeGeneratorManager;
-        }
-
-        public void FindSupportClasses(Type type)
-        {
-            var typeInfo = type.GetTypeInfo();
-            var invokerAttr = typeInfo.GetCustomAttribute<MethodInvokerAttribute>(false);
-            if (invokerAttr != null)
+            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
+            foreach (var grain in grainInterfaceFeature.Interfaces)
             {
-                this.grainToInvokerMapping.TryAdd(invokerAttr.TargetType, type);
-            }
-
-            var grainReferenceAttr = typeInfo.GetCustomAttribute<GrainReferenceAttribute>(false);
-            if (grainReferenceAttr != null)
-            {
-                this.grainToReferenceMapping.TryAdd(grainReferenceAttr.TargetType, type);
+                this.grainToInvokerMapping[grain.InterfaceType] = grain.InvokerType;
+                this.grainToReferenceMapping[grain.InterfaceType] = grain.ReferenceType;
             }
         }
 
         public Type GetGrainReferenceType(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo();
-            codeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
             var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
@@ -84,7 +72,6 @@ namespace Orleans.Runtime
         public Type GetGrainMethodInvokerType(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo();
-            codeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
             var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;

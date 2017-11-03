@@ -1,10 +1,10 @@
 #/bin/bash
 
 dotnet restore
-dotnet publish
+dotnet build --no-restore
 
 # Run the 2 console apps in different windows
 
-dotnet ./src/SiloHost/bin/Debug/netcoreapp2.0/publish/SiloHost.dll & 
+dotnet run --project ./src/SiloHost --no-build & 
 sleep 10
-dotnet ./src/OrleansClient/bin/Debug/netcoreapp2.0/publish/OrleansClient.dll &
+dotnet run --project ./src/OrleansClient --no-build &

@@ -5,8 +5,9 @@ using System.Net;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
-
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Host
 {
@@ -29,19 +30,6 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public string ConfigFileName { get; set; }
 
-        /// <summary>
-        /// Directory to use for the trace log file written by this silo.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// <para>
-        /// When deciding The values of <c>null</c> or <c>"None"</c> mean no log file will be written by Orleans Logger manager.
-        /// </para>
-        /// </remarks>
-        public string TraceFilePath { get; set; }
-
         /// <summary> Configuration data for the Orleans system. </summary>
         public ClusterConfiguration Config { get; set; }
 
@@ -62,13 +50,13 @@ namespace Orleans.Runtime.Host
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private static ILoggerFactory defaultLoggerFactory = CreateDefaultLoggerFactory();
+        private ILoggerProvider loggerProvider;
         private ILogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
         private bool disposed;
-
+        private const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
         /// <summary>
         /// Constructor
         /// </summary>
@@ -76,16 +64,11 @@ namespace Orleans.Runtime.Host
         public SiloHost(string siloName)
         {
             Name = siloName;
-            this.logger = defaultLoggerFactory.CreateLogger<SiloHost>();
+            this.loggerProvider =
+                new FileLoggerProvider($"SiloHost-{siloName}-{DateTime.UtcNow.ToString(dateFormat)}.log");
+            this.logger = this.loggerProvider.CreateLogger(this.GetType().FullName);
             Type = Silo.SiloType.Secondary; // Default
             IsStarted = false;
-        }
-
-        private static ILoggerFactory CreateDefaultLoggerFactory()
-        {
-            var factory = new LoggerFactory();
-            factory.AddProvider(new FileLoggerProvider("SiloHost.log"));
-            return factory;
         }
 
         /// <summary> Constructor </summary>
@@ -131,7 +114,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void UnInitializeOrleansSilo()
         {
-            Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
+            //currently an empty method, keep this method for backward-compatibility
         }
 
         /// <summary>
@@ -249,6 +232,39 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
+        /// Returns a task that will resolve when the silo has finished shutting down, or the cancellation token is cancelled.
+        /// </summary>
+        /// <param name="millisecondsTimeout">Timeout, or -1 for infinite.</param>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <returns></returns>
+        public Task ShutdownOrleansSiloAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        {
+            if (orleans == null || !IsStarted)
+                return Task.CompletedTask;
+
+            IsStarted = false;
+
+            var shutdownThread = new Thread(o =>
+            {
+                orleans.Shutdown();
+            });
+            shutdownThread.IsBackground = true;
+            shutdownThread.Start();
+
+            return WaitForOrleansSiloShutdownAsync(millisecondsTimeout, cancellationToken);
+        }
+
+        /// <summary>
+        /// /// Returns a task that will resolve when the silo has finished shutting down, or the cancellation token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <returns></returns>
+        public Task ShutdownOrleansSiloAsync(CancellationToken cancellationToken)
+        {
+            return ShutdownOrleansSiloAsync(Timeout.Infinite, cancellationToken);
+        }
+
+        /// <summary>
         /// Wait for this silo to shutdown.
         /// </summary>
         /// <remarks>
@@ -272,6 +288,40 @@ namespace Orleans.Runtime.Host
         public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
         {
             WaitForOrleansSiloShutdownImpl(cancellationToken);
+        }
+
+        /// <summary>
+        /// Waits for the SiloTerminatedEvent to fire or cancellation token to be cancelled.
+        /// </summary>
+        /// <param name="millisecondsTimeout">Timeout, or -1 for infinite.</param>
+        /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
+        /// <remarks>
+        /// This is essentially an async version of WaitForOrleansSiloShutdown.
+        /// </remarks>
+        public async Task<bool> WaitForOrleansSiloShutdownAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        {
+            RegisteredWaitHandle registeredHandle = null;
+            CancellationTokenRegistration tokenRegistration = default(CancellationTokenRegistration);
+            try
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                registeredHandle = ThreadPool.RegisterWaitForSingleObject(
+                    orleans.SiloTerminatedEvent,
+                    (state, timedOut) => ((TaskCompletionSource<bool>)state).TrySetResult(!timedOut),
+                    tcs,
+                    millisecondsTimeout,
+                    true);
+                tokenRegistration = cancellationToken.Register(
+                    state => ((TaskCompletionSource<bool>)state).TrySetCanceled(),
+                    tcs);
+                return await tcs.Task;
+            }
+            finally
+            {
+                if (registeredHandle != null)
+                    registeredHandle.Unregister(null);
+                tokenRegistration.Dispose();
+            }
         }
 
         /// <summary>
@@ -412,7 +462,7 @@ namespace Orleans.Runtime.Host
 
             // Dump Startup error to a log file
             var now = DateTime.UtcNow;
-            const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
+           
             var dateString = now.ToString(dateFormat, CultureInfo.InvariantCulture);
             var startupLog = Name + "-StartupError-" + dateString + ".txt";
 
@@ -466,13 +516,6 @@ namespace Orleans.Runtime.Host
 
             NodeConfig = Config.GetOrCreateNodeConfigurationForSilo(Name);
             Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
-
-            if (TraceFilePath != null)
-            {
-                var traceFileName = NodeConfig.TraceFileName;
-                if (traceFileName != null && !Path.IsPathRooted(traceFileName))
-                    NodeConfig.TraceFileName = TraceFilePath + "\\" + traceFileName;
-            }
 
             ConfigLoaded = true;
         }
@@ -533,6 +576,8 @@ namespace Orleans.Runtime.Host
             {
                 if (disposing)
                 {
+                    this.loggerProvider?.Dispose();
+                    this.loggerProvider = null;
                     if (startupEvent != null)
                     {
                         startupEvent.Dispose();

@@ -8,17 +8,7 @@
     </StorageProviders>
   </Globals>
   <Defaults>
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
-      <!--
-      <TraceLevelOverride LogPrefix="Storage" TraceLevel="Verbose3" />
-      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />
-      <TraceLevelOverride LogPrefix="Runtime.Message" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Catalog" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
-      <TraceLevelOverride LogPrefix="ReminderService" TraceLevel="Verbose3" />
-      -->
-    </Tracing>
+    <Tracing PropagateActivityId="false" />
     <Statistics MetricsTableWriteInterval="1000m" PerfCounterWriteInterval="1000m" LogWriteInterval="1000m" StatisticsCollectionLevel="Verbose"/>
   </Defaults>
   <Override Node="Primary">

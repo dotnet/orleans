@@ -1,71 +1,70 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using Microsoft.Extensions.Logging;
+using System.Text;
+using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
-using Orleans.Runtime.Providers;
+using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Serialization;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime
 {
     internal class GrainTypeManager
     {
-        private IDictionary<string, GrainTypeData> grainTypes;
         private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
         private readonly Logger logger;
         private readonly GrainInterfaceMap grainInterfaceMap;
-        private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
-        private readonly SiloAssemblyLoader loader;
+        private readonly Dictionary<string, GrainTypeData> grainTypes;
+        private readonly Dictionary<int, InvokerData> invokers;
         private readonly SerializationManager serializationManager;
         private readonly MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager;
 		private readonly PlacementStrategy defaultPlacementStrategy;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
 
-        internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
-        {
-            get { return grainInterfaceMapsBySilo; }
-        }
+        internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo => this.grainInterfaceMapsBySilo;
 
-        public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData { get { return grainTypes; } }
+        public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData => this.grainTypes;
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
-        
-        public GrainTypeManager(ILocalSiloDetails siloDetails, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy, SerializationManager serializationManager, MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager
-            , LoggerWrapper<GrainTypeManager> logger)
+
+        public GrainTypeManager(
+            ILocalSiloDetails siloDetails,
+            ApplicationPartManager applicationPartManager,
+            DefaultPlacementStrategy defaultPlacementStrategy,
+            SerializationManager serializationManager,
+            MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
+            LoggerWrapper<GrainTypeManager> logger,
+            IOptions<GrainClassOptions> grainClassOptions)
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
             this.logger = logger;
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
-            this.loader = loader;
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
+
+            var grainClassFeature = applicationPartManager.CreateAndPopulateFeature<GrainClassFeature>();
+            this.grainTypes = CreateGrainTypeMap(grainClassFeature, grainClassOptions.Value);
+
+            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
+            this.invokers = CreateInvokerMap(grainInterfaceFeature);
+            this.InitializeInterfaceMap();
         }
 
         public void Start()
         {
-            // loading application assemblies now occurs in four phases.
-            // 1. We scan the file system for assemblies meeting pre-determined criteria, specified in SiloAssemblyLoader.LoadApplicationAssemblies (called by the constructor).
-            // 2. We load those assemblies into memory. In the official distribution of Orleans, this is usually 4 assemblies.
-
-            // (no more assemblies should be loaded into memory, so now is a good time to log all types registered with the serialization manager)
+            LogGrainTypesFound(this.logger, this.grainTypes);
             this.serializationManager.LogRegisteredTypes();
-
-            // 3. We scan types in memory for GrainTypeData objects that describe grain classes and their corresponding grain state classes.
-            InitializeGrainClassData(loader);
-
-            // 4. We scan types in memory for grain method invoker objects.
-            InitializeInvokerMap(loader);
-
-            InitializeInterfaceMap();
+            CrashUtils.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
         public Dictionary<string, string> GetGrainInterfaceToClassMap()
@@ -176,21 +175,21 @@ namespace Orleans.Runtime
             return grainInterfaceMap.GetInterfaceVersion(ifaceId);
         }
 
-        private void InitializeGrainClassData(SiloAssemblyLoader loader)
+        private static Dictionary<int, InvokerData> CreateInvokerMap(GrainInterfaceFeature grainInterfaceFeature)
         {
-            grainTypes = loader.GetGrainClassTypes();
-            CrashUtils.GrainTypes = this.grainTypes.Keys.ToList();
-        }
+            var result = new Dictionary<int, InvokerData>();
 
-        private void InitializeInvokerMap(SiloAssemblyLoader loader)
-        {
-            IEnumerable<KeyValuePair<int, Type>> types = loader.GetGrainMethodInvokerTypes();
-            foreach (var i in types)
+            foreach (var grainInterfaceMetadata in grainInterfaceFeature.Interfaces)
             {
-                int ifaceId = i.Key;
-                Type type = i.Value;
-                AddInvokerClass(ifaceId, type);
+                int ifaceId = grainInterfaceMetadata.InterfaceId;
+
+                if (result.ContainsKey(ifaceId))
+                    throw new InvalidOperationException($"Grain method invoker classes {result[ifaceId]} and {grainInterfaceMetadata.InvokerType.FullName} use the same interface id {ifaceId}");
+
+                result[ifaceId] = new InvokerData(grainInterfaceMetadata.InvokerType);
             }
+
+            return result;
         }
 
         private void InitializeInterfaceMap()
@@ -310,49 +309,107 @@ namespace Orleans.Runtime
             supportedSilosByInterface = newSupportedSilosByInterface;
         }
 
+        private static Dictionary<string, GrainTypeData> CreateGrainTypeMap(GrainClassFeature grainClassFeature, GrainClassOptions grainClassOptions)
+        {
+            var result = new Dictionary<string, GrainTypeData>();
+
+            var excluded = grainClassOptions.ExcludedGrainTypes;
+            foreach (var grainClassMetadata in grainClassFeature.Classes)
+            {
+                var grainType = grainClassMetadata.ClassType;
+                var className = TypeUtils.GetFullName(grainType);
+
+                if (excluded != null && excluded.Contains(className)) continue;
+
+                var typeData = grainType.GetTypeInfo().IsGenericTypeDefinition ?
+                    new GenericGrainTypeData(grainType) :
+                    new GrainTypeData(grainType);
+                result[className] = typeData;
+            }
+
+            return result;
+        }
+
+        internal static void LogGrainTypesFound(Logger logger, IDictionary<string, GrainTypeData> grainTypeData)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));
+
+            foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.FullName))
+            {
+                // Skip system targets and Orleans grains
+                var assemblyName = grainType.Type.GetTypeInfo().Assembly.FullName.Split(',')[0];
+                if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
+                {
+                    int grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainType.Type);
+                    sb.AppendFormat("Grain class {0}.{1} [{2} (0x{3})] from {4}.dll implementing interfaces: ",
+                        grainType.Type.Namespace,
+                        TypeUtils.GetTemplatedName(grainType.Type),
+                        grainClassTypeCode,
+                        grainClassTypeCode.ToString("X"),
+                        assemblyName);
+                    var first = true;
+
+                    foreach (var iface in grainType.RemoteInterfaceTypes)
+                    {
+                        if (!first)
+                            sb.Append(", ");
+
+                        sb.Append(TypeUtils.GetTemplatedName(iface));
+
+                        if (CodeGeneration.GrainInterfaceUtils.IsGrainType(iface))
+                        {
+                            int ifaceTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainInterfaceId(iface);
+                            sb.AppendFormat(" [{0} (0x{1})]", ifaceTypeCode, ifaceTypeCode.ToString("X"));
+                        }
+                        first = false;
+                    }
+                    sb.AppendLine();
+                }
+            }
+
+            var report = sb.ToString();
+            logger.Info(ErrorCode.Loader_GrainTypeFullList, report);
+        }
+
         private class InvokerData
         {
             private readonly Type baseInvokerType;
+            private readonly CachedReadConcurrentDictionary<string, IGrainMethodInvoker> cachedGenericInvokers;
+            private readonly bool isGeneric;
             private IGrainMethodInvoker invoker;
-            private readonly Dictionary<string, IGrainMethodInvoker> cachedGenericInvokers;
-            private readonly object cachedGenericInvokersLockObj;
 
             public InvokerData(Type invokerType)
             {
                 baseInvokerType = invokerType;
-                if (invokerType.GetTypeInfo().IsGenericType)
+                this.isGeneric = invokerType.GetTypeInfo().IsGenericType;
+                if (this.isGeneric)
                 {
-                    cachedGenericInvokers = new Dictionary<string, IGrainMethodInvoker>();
-                    cachedGenericInvokersLockObj = new object(); ;
+                    cachedGenericInvokers = new CachedReadConcurrentDictionary<string, IGrainMethodInvoker>();
                 }
             }
 
             public IGrainMethodInvoker GetInvoker(string genericGrainType = null)
             {
                 // if the grain class is non-generic
-                if (cachedGenericInvokersLockObj == null)
+                if (!this.isGeneric)
                 {
                     return invoker ?? (invoker = (IGrainMethodInvoker)Activator.CreateInstance(baseInvokerType));
                 }
-                else
-                {
-                    lock (cachedGenericInvokersLockObj)
-                    {
-                        if (cachedGenericInvokers.ContainsKey(genericGrainType))
-                            return cachedGenericInvokers[genericGrainType];
-                    }
-                    var typeArgs = TypeUtils.GenericTypeArgsFromArgsString(genericGrainType);
-                    var concreteType = baseInvokerType.MakeGenericType(typeArgs);
-                    var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
 
-                    lock (cachedGenericInvokersLockObj)
-                    {
-                        if (!cachedGenericInvokers.ContainsKey(genericGrainType))
-                            cachedGenericInvokers[genericGrainType] = inv;
-                    }
+                if (this.cachedGenericInvokers.TryGetValue(genericGrainType, out IGrainMethodInvoker result)) return result;
 
-                    return inv;
-                }
+                var typeArgs = TypeUtils.GenericTypeArgsFromArgsString(genericGrainType);
+                var concreteType = this.baseInvokerType.MakeGenericType(typeArgs);
+                var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
+                this.cachedGenericInvokers.TryAdd(genericGrainType, inv);
+
+                return inv;
+            }
+
+            public override string ToString()
+            {
+                return $"InvokerType: {this.baseInvokerType}";
             }
         }
     }

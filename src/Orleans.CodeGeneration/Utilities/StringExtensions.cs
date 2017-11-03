@@ -1,3 +1,6 @@
+using System;
+using Orleans.Runtime;
+
 namespace Orleans.CodeGenerator.Utilities
 {
     using Microsoft.CodeAnalysis;
@@ -31,11 +34,16 @@ namespace Orleans.CodeGenerator.Utilities
         public static SyntaxToken ToIdentifier(this string identifier)
         {
             identifier = identifier.TrimStart('@');
-            return SyntaxFactory.VerbatimIdentifier(
-                SyntaxTriviaList.Empty,
-                identifier,
-                identifier,
-                SyntaxTriviaList.Empty);
+            if (TypeUtils.IsCSharpKeyword(identifier))
+            {
+                return SyntaxFactory.VerbatimIdentifier(
+                    SyntaxTriviaList.Empty,
+                    identifier,
+                    identifier,
+                    SyntaxTriviaList.Empty);
+            }
+
+            return SyntaxFactory.Identifier(SyntaxTriviaList.Empty, identifier, SyntaxTriviaList.Empty);
         }
 
         public static IdentifierNameSyntax ToIdentifierName(this string identifier)

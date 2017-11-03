@@ -660,6 +660,13 @@ namespace Orleans.Serialization
             return temp;
         }
 
+        /// <summary> Read a <c>bool</c> value from the stream. </summary>
+        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
+        public bool ReadBoolean()
+        {
+            return ReadToken() == SerializationTokenType.True;
+        }
+
         /// <summary> Read an <c>Int32</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public int ReadInt()

@@ -12,22 +12,18 @@ namespace Orleans.Runtime
         // We assume that clock skew between silos and between clients and silos is always less than 1 second
         public static readonly TimeSpan MAXIMUM_CLOCK_SKEW = TimeSpan.FromSeconds(1);
 
-        public const string DEFAULT_STORAGE_PROVIDER_NAME = "Default";
         public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
         public const string ADO_INVARIANT_NAME = "AdoInvariant";
         public const string DATA_CONNECTION_FOR_REMINDERS_STRING_NAME = "DataConnectionStringForReminders";
         public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
 
-        public const string DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME = "Default";
-
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
         public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
 
-        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
-
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "Orleans.Membership.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);

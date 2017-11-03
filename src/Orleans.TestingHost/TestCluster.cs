@@ -13,6 +13,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Orleans.TestingHost
 {
@@ -39,9 +40,7 @@ namespace Orleans.TestingHost
         public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-
-        private readonly IDictionary<string, GeneratedAssembly> additionalAssemblies = new ConcurrentDictionary<string, GeneratedAssembly>();
-
+        
         /// <summary>
         /// Client configuration to use when initializing the client
         /// </summary>
@@ -102,6 +101,16 @@ namespace Orleans.TestingHost
             return this;
         }
 
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory;
+        /// <summary>
+        /// Set client builder factory, which would create a client builder to build the <see cref="TestCluster"/> client.
+        /// </summary>
+        public TestCluster UseClientBuilderFactory(Func<ClientConfiguration, IClientBuilder> clientBuilderFactory)
+        {
+            this.clientBuilderFactory = clientBuilderFactory;
+            return this;
+        }
+
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -117,6 +126,7 @@ namespace Orleans.TestingHost
             : this(options.ClusterConfiguration, options.ClientConfiguration)
         {
             this.siloBuilderFactoryType = options.SiloBuilderFactoryType;
+            this.clientBuilderFactory = options.ClientBuilderFactory;
         }
 
         /// <summary>
@@ -136,6 +146,7 @@ namespace Orleans.TestingHost
             this.ClusterConfiguration = clusterConfiguration;
             this.ClientConfiguration = clientConfiguration;
             this.UseSiloBuilderFactory<DefaultSiloBuilderFactory>();
+            this.UseClientBuilderFactory(TestClusterOptions.DefaultClientBuilderFactory);
         }
 
         /// <summary>
@@ -457,10 +468,7 @@ namespace Orleans.TestingHost
                 // Test is running inside debugger - Make timeout ~= infinite
                 clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
             }
-
-            this.InternalClient = (IInternalClusterClient)new ClientBuilder()
-                .UseConfiguration(clientConfig)
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clientConfig.TraceFileName)).Build();
+            this.InternalClient = (IInternalClusterClient)this.clientBuilderFactory(clientConfig).Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
@@ -542,7 +550,7 @@ namespace Orleans.TestingHost
 
         private SiloHandle LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, NodeConfiguration nodeConfiguration)
         {
-            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration, this.additionalAssemblies);
+            return AppDomainSiloHandle.Create(siloName, type, this.siloBuilderFactoryType, config, nodeConfiguration);
         }
 
         #endregion

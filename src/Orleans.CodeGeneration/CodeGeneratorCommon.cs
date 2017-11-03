@@ -1,24 +1,18 @@
-using Microsoft.Extensions.Logging;
-
 namespace Orleans.CodeGenerator
 {
     using System;
     using System.CodeDom.Compiler;
     using System.Collections.Generic;
-    using System.IO;
     using System.Linq;
     using System.Reflection;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
-    using Orleans;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-    using Microsoft.CodeAnalysis.Emit;
 
     /// <summary>
     /// Methods common to multiple code generators.
@@ -39,108 +33,6 @@ namespace Orleans.CodeGenerator
         /// The current version.
         /// </summary>
         private static readonly string CodeGeneratorVersion = RuntimeVersion.FileVersion;
-
-        /// <summary>
-        /// Generates and compiles an assembly for the provided grains.
-        /// </summary>
-        /// <param name="generatedSyntax">
-        /// The generated code.
-        /// </param>
-        /// <param name="assemblyName">
-        /// The name for the generated assembly.
-        /// </param>
-        /// <param name="emitDebugSymbols">
-        /// Whether or not to emit debug symbols for the generated assembly.
-        /// </param>
-        /// <param name="logger"> logger to use </param>
-        /// <returns>
-        /// The raw assembly.
-        /// </returns>
-        /// <exception cref="CodeGenerationException">
-        /// An error occurred generating code.
-        /// </exception>
-        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols, Logger logger)
-        {
-            // Add the generated code attribute.
-            var code = AddGeneratedCodeAttribute(generatedSyntax);
-
-            // Reference everything which can be referenced.
-            var assemblies =
-                AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
-                    .Select(asm => MetadataReference.CreateFromFile(asm.Location))
-                    .Cast<MetadataReference>()
-                    .ToArray();
-
-            // Generate the code.
-            var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
-
-#if NETSTANDARD2_0
-            // CoreFX bug https://github.com/dotnet/corefx/issues/5540 
-            // to workaround it, we are calling internal WithTopLevelBinderFlags(BinderFlags.IgnoreCorLibraryDuplicatedTypes) 
-            // TODO: this API will be public in the future releases of Roslyn. 
-            // This work is tracked in https://github.com/dotnet/roslyn/issues/5855 
-            // Once it's public, we should replace the internal reflection API call by the public one. 
-            var method = typeof(CSharpCompilationOptions).GetMethod("WithTopLevelBinderFlags", BindingFlags.NonPublic | BindingFlags.Instance);
-            // we need to pass BinderFlags.IgnoreCorLibraryDuplicatedTypes, but it's an internal class 
-            // http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/BinderFlags.cs,00f268571bb66b73 
-            options = (CSharpCompilationOptions)method.Invoke(options, new object[] { 1u << 26 });
-#endif
-
-            string source = null;
-            if (logger.IsVerbose3)
-            {
-                source = GenerateSourceCode(code);
-
-                // Compile the code and load the generated assembly.
-                logger.Verbose3(
-                    ErrorCode.CodeGenSourceGenerated,
-                    "Generating assembly {0} with source:\n{1}",
-                    assemblyName,
-                    source);
-            }
-            
-            var compilation =
-                CSharpCompilation.Create(assemblyName)
-                    .AddSyntaxTrees(code.SyntaxTree)
-                    .AddReferences(assemblies)
-                    .WithOptions(options);
-
-            using (var outputStream = new MemoryStream())
-            {
-                var emitOptions = new EmitOptions()
-                    .WithEmitMetadataOnly(false)
-                    .WithIncludePrivateMembers(true);
-
-                if (emitDebugSymbols)
-                {
-                    emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.Embedded);
-                }
-
-                var compilationResult = compilation.Emit(outputStream, options: emitOptions);
-                if (!compilationResult.Success)
-                {
-                    source = source ?? GenerateSourceCode(code);
-                    var errors = string.Join("\n", compilationResult.Diagnostics.Select(_ => _.ToString()));
-                    logger.Warn(
-                        ErrorCode.CodeGenCompilationFailed,
-                        "Compilation of assembly {0} failed with errors:\n{1}\nGenerated Source Code:\n{2}",
-                        assemblyName,
-                        errors,
-                        source);
-                    throw new CodeGenerationException(errors);
-                }
-
-                logger.Verbose(
-                    ErrorCode.CodeGenCompilationSucceeded,
-                    "Compilation of assembly {0} succeeded.",
-                    assemblyName);
-                return new GeneratedAssembly
-                {
-                    RawBytes = outputStream.ToArray()
-                };
-            }
-        }
 
         public static CompilationUnitSyntax AddGeneratedCodeAttribute(GeneratedSyntax generatedSyntax)
         {

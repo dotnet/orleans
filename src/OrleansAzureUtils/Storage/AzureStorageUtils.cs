@@ -1,11 +1,13 @@
 using System;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.AzureUtils
 {
@@ -185,7 +187,7 @@ namespace Orleans.AzureUtils
             string storageConnectionString,
             IRetryPolicy retryPolicy,
             TimeSpan timeout,
-            Logger logger)
+            ILogger logger)
         {
             try
             {
@@ -297,7 +299,7 @@ namespace Orleans.AzureUtils
                     message.AsString);
         }
 
-        internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, Logger logger)
+        internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, ILogger logger)
         {
             bool isLastErrorRetriable;
             var we = exc as WebException;
@@ -317,7 +319,7 @@ namespace Orleans.AzureUtils
                 {
                     if (StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus))
                     {
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.AzureTable_DataNotFound,
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.AzureTable_DataNotFound,
                             "DataNotFound reading Azure storage table {0}:{1} HTTP status code={2} REST status code={3} Exception={4}",
                             tableName,
                             iteration == 0 ? "" : (" Repeat=" + iteration),

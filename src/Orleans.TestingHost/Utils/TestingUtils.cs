@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
-using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace Orleans.TestingHost.Utils
@@ -25,6 +24,26 @@ namespace Orleans.TestingHost.Utils
         public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
         {
             builder.AddFile(filePath);
+        }
+
+        /// <summary>
+        /// Create trace file name for a specific node or client in a specific deployment
+        /// </summary>
+        /// <param name="nodeName"></param>
+        /// <param name="deploymentId"></param>
+        /// <returns></returns>
+        public static string CreateTraceFileName(string nodeName, string deploymentId)
+        {
+            const string traceFileFolder = "logs";
+
+            if (!Directory.Exists(traceFileFolder))
+            {
+                Directory.CreateDirectory(traceFileFolder);
+            }
+
+            var traceFileName = $"{traceFileFolder}\\{deploymentId}_{nodeName}.log";
+
+            return traceFileName;
         }
 
         /// <summary>

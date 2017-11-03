@@ -53,7 +53,8 @@ namespace Orleans.Runtime
             InvokeMethodRequest request,
             ILoggerFactory loggerFactory,
             ILogger logger,
-            ISiloRuntimeClient siloRuntimeClient)
+            ISiloRuntimeClient siloRuntimeClient,
+            IGrainCancellationTokenRuntime cancellationTokenRuntime)
         {
             for (var i = 0; i < request.Arguments.Length; i++)
             {
@@ -75,18 +76,18 @@ namespace Orleans.Runtime
                 }
 
                 // Replacing the half baked GrainCancellationToken that came from the wire with locally fully created one.
-                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested);
+                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested, cancellationTokenRuntime);
             }
         }
 
-        private GrainCancellationToken RecordCancellationToken(Guid tokenId, bool isCancellationRequested)
+        private GrainCancellationToken RecordCancellationToken(Guid tokenId, bool isCancellationRequested, IGrainCancellationTokenRuntime cancellationTokenRuntime)
         {
             GrainCancellationToken localToken;
             if (_cancellationTokens.TryFind(tokenId, out localToken))
             {
                 return localToken;
             }
-            return _cancellationTokens.Intern(tokenId, new GrainCancellationToken(tokenId, isCancellationRequested));
+            return _cancellationTokens.Intern(tokenId, new GrainCancellationToken(tokenId, isCancellationRequested, cancellationTokenRuntime));
         }
     }
 }

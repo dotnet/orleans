@@ -18,16 +18,19 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
+            IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IInternalGrainFactory internalGrainFactory,
             SerializationManager serializationManager)
         {
             this.responseCallbackDelegate = this.ResponseCallback;
             this.logger = logger;
             this.RuntimeClient = runtimeClient;
+            this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;
         }
@@ -67,14 +70,14 @@ namespace Orleans.Runtime
                 if (typeof(T) == typeof(object))
                 {
                     // optimize for most common case when using one way calls.
-                    return PublicOrleansTaskExtensions.CompletedTask as Task<T>;
+                    return OrleansTaskExtentions.CompletedTask as Task<T>;
                 }
 
                 return Task.FromResult(default(T));
             }
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return resultTask.Unbox<T>();
+            return resultTask.ToTypedTask<T>();
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
@@ -224,12 +227,12 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="arguments"> Grain method arguments list</param>
         /// <param name="target"> Target grain reference</param>
-        private static void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
+        private void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
         {
             if (arguments == null) return;
             foreach (var argument in arguments)
             {
-                (argument as GrainCancellationToken)?.AddGrainReference(target);
+                (argument as GrainCancellationToken)?.AddGrainReference(this.cancellationTokenRuntime, target);
             }
         }
 

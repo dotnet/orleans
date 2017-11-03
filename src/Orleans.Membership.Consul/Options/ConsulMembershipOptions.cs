@@ -10,8 +10,8 @@ namespace Orleans.ConsulUtils.Configuration
     public class ConsulMembershipOptions
     {
         /// <summary>
-        /// Connection string for Consul Storage
+        /// Address for consul client
         /// </summary>
-        public string ConnectionString { get; set; }
+        public Uri Address { get; set; }
     }
 }

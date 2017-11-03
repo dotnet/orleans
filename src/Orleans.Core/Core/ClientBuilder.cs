@@ -1,12 +1,12 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.CodeGeneration;
+using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Messaging;
+using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -24,13 +24,16 @@ namespace Orleans
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
         private bool clientConfigurationRegistered;
+        
+        /// <inheritdoc />
+        public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
 
         /// <inheritdoc />
         public IClusterClient Build()
         {
             if (this.built) throw new InvalidOperationException($"{nameof(this.Build)} may only be called once per {nameof(ClientBuilder)} instance.");
             this.built = true;
-            
+
             // Configure default services and build the container.
             if (!this.clientConfigurationRegistered)
             {
@@ -38,8 +41,8 @@ namespace Orleans
             }
 
             this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
-
-            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(null);
+           
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
 
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
 
@@ -90,18 +93,16 @@ namespace Orleans
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();
-            services.TryAddSingleton<AssemblyProcessor>();
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
             services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
             services.TryAddSingleton<GrainFactory>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
+            services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
-            services.TryAddSingleton<IGatewayListProvider>(
-                sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<StreamProviderManager>();
@@ -110,9 +111,16 @@ namespace Orleans
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
-            services.TryAddSingleton<CodeGeneratorManager>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+            services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
+            // Application parts
+            var parts = context.GetApplicationPartManager();
+            services.TryAddSingleton<ApplicationPartManager>(parts);
+            parts.AddApplicationPart(typeof(RuntimeVersion).Assembly);
+            parts.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
+            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
+            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -12,7 +13,7 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly IStreamIdentity streamIdentity;
         private readonly SimpleQueueCache cache;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private IBatchContainer current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
 
         // This is a pointer to the NEXT element in the cache.
@@ -43,7 +44,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cache"></param>
         /// <param name="streamIdentity"></param>
         /// <param name="logger"></param>
-        public SimpleQueueCacheCursor(SimpleQueueCache cache, IStreamIdentity streamIdentity, Logger logger)
+        public SimpleQueueCacheCursor(SimpleQueueCache cache, IStreamIdentity streamIdentity, ILogger logger)
         {
             if (cache == null)
             {

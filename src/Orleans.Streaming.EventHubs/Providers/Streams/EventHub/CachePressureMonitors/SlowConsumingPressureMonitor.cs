@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -35,7 +36,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public double FlowControlThreshold { get; set; }
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private double biggestPressureInCurrentWindow;
         private DateTime nextCheckedTime;
         private bool wasUnderPressure;
@@ -45,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(Logger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(ILogger logger, ICacheMonitor monitor = null)
             : this(DefaultFlowControlThreshold, DefaultPressureWindowSize, logger, monitor)
         { }
 
@@ -55,7 +56,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="pressureWindowSize"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(TimeSpan pressureWindowSize, Logger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(TimeSpan pressureWindowSize, ILogger logger, ICacheMonitor monitor = null)
             : this(DefaultFlowControlThreshold, pressureWindowSize, logger, monitor)
         {
         }
@@ -66,7 +67,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(double flowControlThreshold, Logger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor monitor = null)
             : this(flowControlThreshold, DefaultPressureWindowSize, logger, monitor)
         {
         }
@@ -78,10 +79,10 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="pressureWindowSzie"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan pressureWindowSzie, Logger logger, ICacheMonitor monitor = null)
+        public SlowConsumingPressureMonitor(double flowControlThreshold, TimeSpan pressureWindowSzie, ILogger logger, ICacheMonitor monitor = null)
         {
             this.FlowControlThreshold = flowControlThreshold;
-            this.logger = logger.GetSubLogger(this.GetType().Name);
+            this.logger = logger;
             this.nextCheckedTime = DateTime.MinValue;
             this.biggestPressureInCurrentWindow = 0;
             this.wasUnderPressure = false;
@@ -109,7 +110,8 @@ namespace Orleans.ServiceBus.Providers
                 this.wasUnderPressure = underPressure;
                 this.nextCheckedTime = utcNow + this.PressureWindowSize;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
-                logger.Verbose($"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                if(logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug($"Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
                 this.biggestPressureInCurrentWindow = 0;
             }
 
@@ -122,7 +124,8 @@ namespace Orleans.ServiceBus.Providers
                 if (this.wasUnderPressure && !underPressure)
                 {
                     this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
-                    logger.Verbose($"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"Message ingestion is healthy. BiggestPressureInCurrentPeriod: {biggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}");
                 }
                 this.wasUnderPressure = underPressure;
             }

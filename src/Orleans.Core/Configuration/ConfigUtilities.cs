@@ -77,9 +77,17 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseTracing(ITraceConfiguration config, XmlElement root, string nodeName)
+        internal static bool TryParsePropagateActivityId(XmlElement root, string nodeName, out bool propagateActivityId)
         {
-            SetTraceFileName(config, nodeName, DateTime.UtcNow);
+            //set default value to make compiler happy, progateActivityId is only used when this method return true
+            propagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            if (root.HasAttribute("PropagateActivityId"))
+            {
+                propagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),
+                    "Invalid boolean value for PropagateActivityId attribute on Tracing element for " + nodeName);
+                return true;
+            }
+            return false;
         }
 
         internal static void ParseStatistics(IStatisticsConfiguration config, XmlElement root, string nodeName)
@@ -135,43 +143,6 @@ namespace Orleans.Runtime.Configuration
                             "Invalid integer value for the HardLimit attribute on the Limit element") : 0,
                     });
                 }
-            }
-        }
-
-        internal static void SetTraceFileName(ITraceConfiguration config, string nodeName, DateTime timestamp)
-        {
-            const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
-
-            if (config == null) throw new ArgumentNullException("config");
-
-            if (config.TraceFilePattern == null
-                || string.IsNullOrWhiteSpace(config.TraceFilePattern)
-                || config.TraceFilePattern.Equals("false", StringComparison.OrdinalIgnoreCase)
-                || config.TraceFilePattern.Equals("none", StringComparison.OrdinalIgnoreCase))
-            {
-                config.TraceFileName = null;
-            }
-            else if (string.Empty.Equals(config.TraceFileName))
-            {
-                config.TraceFileName = null; // normalize
-            }
-            else
-            {
-                string traceFileDir = Path.GetDirectoryName(config.TraceFilePattern);
-                if (!String.IsNullOrEmpty(traceFileDir) && !Directory.Exists(traceFileDir))
-                {
-                    string traceFileName = Path.GetFileName(config.TraceFilePattern);
-                    string[] alternateDirLocations = { "appdir", "." };
-                    foreach (var d in alternateDirLocations)
-                    {
-                        if (Directory.Exists(d))
-                        {
-                            config.TraceFilePattern = Path.Combine(d, traceFileName);
-                            break;
-                        }
-                    }
-                }
-                config.TraceFileName = String.Format(config.TraceFilePattern, nodeName, timestamp.ToUniversalTime().ToString(dateFormat), Dns.GetHostName());
             }
         }
 
@@ -378,14 +349,6 @@ namespace Orleans.Runtime.Configuration
             IPAddress addr = await ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
             int port = ParseInt(root.GetAttribute("Port"), "Invalid Port attribute for " + root.LocalName + " element");
             return new IPEndPoint(addr, port);
-        }
-
-        internal static string TraceConfigurationToString(ITraceConfiguration config)
-        {
-            var sb = new StringBuilder();
-            sb.Append("   Tracing: ").AppendLine();
-            sb.Append("     Trace File Name: ").Append(string.IsNullOrWhiteSpace(config.TraceFileName) ? "" : Path.GetFullPath(config.TraceFileName)).AppendLine();
-            return sb.ToString();
         }
 
         internal static string IStatisticsConfigurationToString(IStatisticsConfiguration config)

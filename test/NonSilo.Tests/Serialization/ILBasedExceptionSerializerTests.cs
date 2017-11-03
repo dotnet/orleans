@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using TestExtensions;
 
 namespace UnitTests.Serialization
@@ -152,7 +153,7 @@ namespace UnitTests.Serialization
         {
             var expected = GetNewException();
 
-            var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer());
+            var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer(new CachedTypeResolver()));
             
             var writer = new SerializationContext(this.environment.SerializationManager)
             {
@@ -171,7 +172,7 @@ namespace UnitTests.Serialization
             };
 
             // Ensure that the deserialized object has the fallback type.
-            var doesNotKnowException = new ILBasedExceptionSerializer(this.serializerGenerator, new TestTypeSerializer());
+            var doesNotKnowException = new ILBasedExceptionSerializer(this.serializerGenerator, new TestTypeSerializer(new CachedTypeResolver()));
             var untypedActual = doesNotKnowException.Deserialize(null, reader);
             Assert.IsType<RemoteNonDeserializableException>(untypedActual);
 
@@ -234,6 +235,10 @@ namespace UnitTests.Serialization
             {
                 if (throwOnError) throw new TypeLoadException($"Type {assemblyQualifiedTypeName} could not be loaded");
                 return null;
+            }
+
+            public TestTypeSerializer(ITypeResolver typeResolver) : base(typeResolver)
+            {
             }
         }
     }
