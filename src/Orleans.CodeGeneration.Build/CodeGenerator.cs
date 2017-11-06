@@ -158,14 +158,15 @@ namespace Orleans.CodeGeneration
             var referencedAssemblies = options.ReferencedAssemblies;
 
             // Set up assembly resolver
-            var refResolver = new AssemblyResolver(inputAssembly, referencedAssemblies);
+            var refResolver = new AssemblyResolver(inputAssembly, referencedAssemblies, false);
 
             try
             {
                 // Set up assembly resolution.
-                AppDomain.CurrentDomain.AssemblyResolve += refResolver.ResolveAssembly;
 #if NETCOREAPP2_0
                 AssemblyLoadContext.Default.Resolving += refResolver.AssemblyLoadContextResolving;
+#else
+                AppDomain.CurrentDomain.AssemblyResolve += refResolver.ResolveAssembly;
 #endif
 
                 return GenerateSourceForAssembly(refResolver.Assembly);
@@ -173,9 +174,10 @@ namespace Orleans.CodeGeneration
             finally
             {
                 refResolver.Dispose();
-                AppDomain.CurrentDomain.AssemblyResolve -= refResolver.ResolveAssembly;
 #if NETCOREAPP2_0
                 AssemblyLoadContext.Default.Resolving -= refResolver.AssemblyLoadContextResolving;
+#else
+                AppDomain.CurrentDomain.AssemblyResolve -= refResolver.ResolveAssembly;
 #endif
             }
         }
