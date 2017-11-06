@@ -6,7 +6,6 @@ namespace Orleans.CodeGenerator.Utilities
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-    using System.IO;
 
     /// <summary>
     /// Extensions to the <see cref="string"/> class to support code generation.
