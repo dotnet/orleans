@@ -16,47 +16,33 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-# Some things depend on HOME and it may not be set. We should fix those things, but until then, we just patch a value in
-if [ -z "$HOME" ]; then
-    export HOME=$DIR/artifacts/home
+cd "$DIR/.."
 
-    [ ! -d "$HOME" ] || rm -Rf $HOME
-    mkdir -p $HOME
-fi
-
-args=( "$@" )
-
-while [[ $# > 0 ]]; do
-    lowerI="$(echo $1 | awk '{print tolower($0)}')"
-    case $lowerI in
-        --docker)
-            export BUILD_IN_DOCKER=1
-            export DOCKER_IMAGENAME=$2
-            # remove docker args
-            args=( "${args[@]/$1}" )
-            args=( "${args[@]/$2}" )
-            shift
-            ;;
-        *)
-    esac
-    shift
-done
+DOCKER_IMAGENAME=microsoft/dotnet/2.0-sdk-2.0.2
 
 # $args array may have empty elements in it.
 # The easiest way to remove them is to cast to string and back to array.
-# This will actually break quoted arguments, arguments like 
+# This will actually break quoted arguments, arguments like
 # -test "hello world" will be broken into three arguments instead of two, as it should.
 temp="${args[@]}"
 args=($temp)
 
-dockerbuild()
-{
-    BUILD_COMMAND=/opt/code/run-build.sh $DIR/scripts/dockerrun.sh --non-interactive "$@"
-}
+BUILD_COMMAND=/opt/code/run-build.sh $DIR/scripts/dockerrun.sh --non-interactive "${args[@]}"
 
-# Check if we need to build in docker
-if [ ! -z "$BUILD_IN_DOCKER" ]; then
-    dockerbuild "${args[@]}"
-else
-    $DIR/run-build.sh "${args[@]}"
-fi
+[ -z "$DOCKER_HOST_SHARE_DIR" ] && DOCKER_HOST_SHARE_DIR=$(pwd)
+
+# Make container names CI-specific if we're running in CI
+#  Jenkins
+[ ! -z "$BUILD_TAG" ] && DOTNET_BUILD_CONTAINER_NAME="$BUILD_TAG"
+#  VSO
+[ ! -z "$BUILD_BUILDID" ] && DOTNET_BUILD_CONTAINER_NAME="$BUILD_BUILDID"
+
+# Run the build in the container
+echo "Launching build in Docker Container"
+echo "Running command: $BUILD_COMMAND"
+echo "Using code from: $DOCKER_HOST_SHARE_DIR"
+
+docker run -t --rm --sig-proxy=true \
+    --name $DOCKER_IMAGENAME \
+    -v $DOCKER_HOST_SHARE_DIR:/opt/code \
+    $BUILD_COMMAND "$@"
