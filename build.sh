@@ -16,7 +16,7 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-DOCKER_IMAGENAME=microsoft/dotnet/2.0-sdk-2.0.2
+DOCKER_IMAGENAME=microsoft/dotnet:2.0-sdk
 
 # $args array may have empty elements in it.
 # The easiest way to remove them is to cast to string and back to array.
@@ -41,6 +41,6 @@ echo "Running command: $BUILD_COMMAND"
 echo "Using code from: $DOCKER_HOST_SHARE_DIR"
 
 docker run -t --rm --sig-proxy=true \
-    --name $DOCKER_IMAGENAME \
+    --name docker-orleansbuild \
     -v $DOCKER_HOST_SHARE_DIR:/opt/code \
-    $BUILD_COMMAND "$@"
+    $DOCKER_IMAGENAME $BUILD_COMMAND "$@"
