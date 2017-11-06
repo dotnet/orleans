@@ -14,7 +14,7 @@ platformList.each { platform ->
         def configuration = 'Release'
         def isPR = true
         def osUsedForMachineAffinity = 'Ubuntu16.04';
-        def buildCommand = "./build.sh --skip-prereqs --configuration ${configuration} --docker ubuntu.14.04 --targets Default"
+        def buildCommand = "./build.sh --configuration ${configuration} --targets Default"
 
         def newJob = job(Utilities.getFullJobName(project, platform, isPR)) {
             steps {
