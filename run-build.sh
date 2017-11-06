@@ -15,10 +15,6 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 REPOROOT="$DIR"
 
-source "$REPOROOT/scripts/common/_prettyprint.sh"
-
-BUILD=1
-
 # Set nuget package cache under the repo
 [ -z $NUGET_PACKAGES ] && export NUGET_PACKAGES="$REPOROOT/.nuget/packages"
 

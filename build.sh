@@ -16,8 +16,6 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-cd "$DIR/.."
-
 DOCKER_IMAGENAME=microsoft/dotnet/2.0-sdk-2.0.2
 
 # $args array may have empty elements in it.
@@ -27,7 +25,7 @@ DOCKER_IMAGENAME=microsoft/dotnet/2.0-sdk-2.0.2
 temp="${args[@]}"
 args=($temp)
 
-BUILD_COMMAND=/opt/code/run-build.sh $DIR/scripts/dockerrun.sh --non-interactive "${args[@]}"
+BUILD_COMMAND=/opt/code/run-build.sh "${args[@]}"
 
 [ -z "$DOCKER_HOST_SHARE_DIR" ] && DOCKER_HOST_SHARE_DIR=$(pwd)
 
