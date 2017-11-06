@@ -6,6 +6,7 @@ namespace Orleans.CodeGenerator.Utilities
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
+    using System.IO;
 
     /// <summary>
     /// Extensions to the <see cref="string"/> class to support code generation.
@@ -25,7 +26,7 @@ namespace Orleans.CodeGenerator.Utilities
         {
             var syntaxToken = SyntaxFactory.Literal(
                 SyntaxFactory.TriviaList(),
-                @"""" + str + @"""",
+                @"@""" + str + @"""",
                 str,
                 SyntaxFactory.TriviaList());
             return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
