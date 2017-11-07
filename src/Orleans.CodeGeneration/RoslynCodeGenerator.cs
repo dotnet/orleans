@@ -368,8 +368,10 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in this.typeCollector.EncounteredTypes)
             {
+                // Skip types which can not or should not be referenced.
                 if (!IsAssemblyReferenced(type)) continue;
-                
+                if (type.IsNestedPrivate) continue;
+                if (type.GetCustomAttribute<CompilerGeneratedAttribute>() != null) continue;
                 if (type.GetCustomAttribute<GeneratedCodeAttribute>() != null) continue;
 
                 var qualifiedTypeName = RuntimeTypeNameFormatter.Format(type);
