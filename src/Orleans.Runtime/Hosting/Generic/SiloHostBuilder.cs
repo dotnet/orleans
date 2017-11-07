@@ -1,7 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -12,13 +17,19 @@ namespace Orleans.Hosting
     {
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
 
-        private bool built;
+        private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
+        private readonly List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
         private HostBuilderContext hostBuilderContext;
-        private List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
-        private List<Action<HostBuilderContext, IConfigurationBuilder>> configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
         private IConfiguration hostConfiguration;
         private IConfiguration appConfiguration;
         private IHostingEnvironment hostingEnvironment;
+        private bool built;
+
+        /// <summary>
+        /// Returns a new default silo builder.
+        /// </summary>
+        /// <returns>A new default silo builder.</returns>
+        public static ISiloHostBuilder CreateDefault() => new SiloHostBuilder().ConfigureOrleans();
 
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
@@ -33,13 +44,15 @@ namespace Orleans.Hosting
             // Automatically configure Orleans if it wasn't configured before. 
             // This will not happen once we use the generic host builder from Microsoft.Extensions.Hosting
             this.ConfigureOrleans();
-            
+
             BuildHostConfiguration();
             CreateHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
 
             var serviceProvider = CreateServiceProvider();
+
+            ValidateSystemConfiguration(serviceProvider);
 
             // Construct and return the silo.
             return serviceProvider.GetRequiredService<ISiloHost>();
@@ -131,17 +144,26 @@ namespace Orleans.Hosting
 
         private IServiceProvider CreateServiceProvider()
         {
-            this.ConfigureServices(services =>
-            {
-                services.AddSingleton(this.hostingEnvironment);
-                services.AddSingleton(this.hostBuilderContext);
-                services.AddSingleton(this.appConfiguration);
-                services.AddOptions();
-                services.AddLogging();
-            });
+            this.ConfigureServices(
+                services =>
+                {
+                    services.AddSingleton(this.hostingEnvironment);
+                    services.AddSingleton(this.hostBuilderContext);
+                    services.AddSingleton(this.appConfiguration);
+                    services.AddOptions();
+                    services.AddLogging();
+                });
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(this.hostBuilderContext);
             return serviceProvider;
         }
 
+        private static void ValidateSystemConfiguration(IServiceProvider serviceProvider)
+        {
+            var validators = serviceProvider.GetServices<IConfigurationValidator>();
+            foreach (var validator in validators)
+            {
+                validator.ValidateConfiguration();
+            }
+        }
     }
 }

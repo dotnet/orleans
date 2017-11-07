@@ -25,6 +25,11 @@ namespace Orleans.ApplicationParts
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether or not this assembly is an Orleans framework assembly.
+        /// </summary>
+        public bool IsFrameworkAssembly { get; set; }
+
+        /// <summary>
         /// Gets the <see cref="Assembly"/> of the <see cref="IApplicationPart"/>.
         /// </summary>
         public Assembly Assembly { get; }

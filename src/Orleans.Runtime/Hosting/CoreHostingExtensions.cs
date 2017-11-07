@@ -13,14 +13,12 @@ namespace Orleans.Hosting
     public static class CoreHostingExtensions
     {
         /// <summary>
-        /// Configures the name of this silo.
+        /// Configure the container to use Orleans, including the default silo name & services.
         /// </summary>
         /// <param name="builder">The host builder.</param>
-        /// <param name="siloName">The silo name.</param>
-        /// <returns>The silo builder.</returns>
+        /// <returns>The host builder.</returns>
         public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder)
         {
-            // Configure the container to use Orleans, including the default silo name & services.
             builder.ConfigureServices((context, services) =>
             {
                 if (!context.Properties.ContainsKey("OrleansServicesAdded"))
@@ -59,6 +57,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
             return builder.ConfigureServices((context, services) =>
             {
                 services.AddLegacyClusterConfigurationSupport(configuration);
