@@ -93,7 +93,7 @@ namespace UnitTests.General
             // This grain method reads the context and returns it
             var context = await grain.GetRequestContext();
             Assert.NotNull(context);
-            Assert.Equal("123456", context);
+            Assert.Equal("1234", context);
         }
         
         /// <summary>
@@ -245,17 +245,6 @@ namespace UnitTests.General
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
 #pragma warning disable 618
-            providerRuntime.SetInvokeInterceptor((method, request, grain, invoker) =>
-#pragma warning restore 618
-            {
-                if (string.Equals(method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
-                {
-                    var value = RequestContext.Get(GrainCallFilterTestConstants.Key) as string;
-                    if (value != null) RequestContext.Set(GrainCallFilterTestConstants.Key, value + '3');
-                }
-
-                return invoker.Invoke(grain, request);
-            });
 
             return Task.FromResult(0);
         }

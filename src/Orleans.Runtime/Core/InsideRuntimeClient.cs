@@ -364,11 +364,8 @@ namespace Orleans.Runtime
 
                         throw exc;
                     }
-
-#pragma warning disable 618
-                    var invokeInterceptor = this.CurrentStreamProviderRuntime?.GetInvokeInterceptor();
-#pragma warning restore 618
-                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping, invokeInterceptor);
+                    
+                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping);
                     await requestInvoker.Invoke();
                     resultObject = requestInvoker.Result;
                 }

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Providers;
 
 namespace Orleans.Runtime
 {
@@ -15,7 +14,6 @@ namespace Orleans.Runtime
         private readonly InvokeMethodRequest request;
         private readonly IGrainMethodInvoker rootInvoker;
         private readonly List<IGrainCallFilter> filters;
-        private readonly InvokeInterceptor deprecatedInvokeInterceptor;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private int stage;
 
@@ -33,14 +31,12 @@ namespace Orleans.Runtime
             InvokeMethodRequest request,
             IGrainMethodInvoker rootInvoker,
             List<IGrainCallFilter> filters,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            InvokeInterceptor invokeInterceptor)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
         {
             this.request = request;
             this.rootInvoker = rootInvoker;
             this.Grain = grain;
             this.filters = filters;
-            this.deprecatedInvokeInterceptor = invokeInterceptor;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
         }
 
@@ -54,9 +50,8 @@ namespace Orleans.Runtime
             {
                 // Determine if the object being invoked is a grain or a grain extension.
                 Type implementationType;
-                var extensionMap = this.rootInvoker as IGrainExtensionMap;
-                IGrainExtension extension;
-                if (extensionMap != null && extensionMap.TryGetExtension(request.InterfaceId, out extension))
+                if (this.rootInvoker is IGrainExtensionMap extensionMap
+                    && extensionMap.TryGetExtension(request.InterfaceId, out var extension))
                 {
                     implementationType = extension.GetType();
                 }
@@ -71,8 +66,7 @@ namespace Orleans.Runtime
                     request.InterfaceId);
 
                 // Get the method info for the method being invoked.
-                MethodInfo methodInfo;
-                implementationMap.TryGetValue(request.MethodId, out methodInfo);
+                implementationMap.TryGetValue(request.MethodId, out var methodInfo);
                 return methodInfo;
             }
         }
@@ -102,45 +96,15 @@ namespace Orleans.Runtime
             {
                 stage++;
 
-                // Deprecated silo-level invoker, if present.
-                var grain = this.Grain as IGrain;
-                if (grain != null && deprecatedInvokeInterceptor != null)
-                {
-                    this.Result =
-                        await deprecatedInvokeInterceptor.Invoke(this.Method, this.request, grain, this);
-                    return;
-                }
-            }
-
-            if (stage == numFilters + 1)
-            {
-                stage++;
-
                 // Grain-level invoker, if present.
-                var grainClassLevelFilter = this.Grain as IGrainCallFilter;
-                if (grainClassLevelFilter != null)
+                if (this.Grain is IGrainCallFilter grainClassLevelFilter)
                 {
                     await grainClassLevelFilter.Invoke(this);
                     return;
                 }
             }
 
-#pragma warning disable 618
-            if (stage == numFilters + 2)
-            {
-                stage++;
-
-                // Deprecated grain-level invoker, if present.
-                var intercepted = this.Grain as IGrainInvokeInterceptor;
-                if (intercepted != null)
-                {
-                    this.Result = await intercepted.Invoke(this.Method, this.request, this);
-                    return;
-                }
-            }
-#pragma warning restore 618
-
-            if (stage == numFilters + 3)
+            if (stage == numFilters + 1)
             {
                 // Finally call the root-level invoker.
                 stage++;
