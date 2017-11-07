@@ -64,19 +64,6 @@ namespace Orleans.Runtime.Storage
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
-        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
-        {
-#pragma warning disable 618
-            providerRuntime.SetInvokeInterceptor(interceptor);
-#pragma warning restore 618
-        }
-
-        public InvokeInterceptor GetInvokeInterceptor()
-        {
-#pragma warning disable 618
-            return providerRuntime.GetInvokeInterceptor();
-#pragma warning restore 618
-        }
 
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension
         {

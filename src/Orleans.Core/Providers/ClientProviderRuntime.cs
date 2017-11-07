@@ -16,7 +16,6 @@ namespace Orleans.Providers
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
-        private InvokeInterceptor invokeInterceptor;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
@@ -35,16 +34,6 @@ namespace Orleans.Providers
 
         public IGrainFactory GrainFactory => this.grainFactory;
         public IServiceProvider ServiceProvider { get; }
-
-        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
-        {
-            this.invokeInterceptor = interceptor;
-        }
-
-        public InvokeInterceptor GetInvokeInterceptor()
-        {
-            return this.invokeInterceptor;
-        }
 
         public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
