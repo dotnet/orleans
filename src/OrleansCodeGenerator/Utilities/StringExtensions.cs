@@ -22,7 +22,7 @@ namespace Orleans.CodeGenerator.Utilities
         {
             var syntaxToken = SyntaxFactory.Literal(
                 SyntaxFactory.TriviaList(),
-                @"""" + str + @"""",
+                @"@""" + str + @"""",
                 str,
                 SyntaxFactory.TriviaList());
             return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
