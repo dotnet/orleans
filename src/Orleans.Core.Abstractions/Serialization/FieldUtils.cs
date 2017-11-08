@@ -45,7 +45,7 @@ namespace Orleans.Serialization
                 field.Name + "Get",
                 field.FieldType,
                 parameterTypes,
-                field.FieldType.GetTypeInfo().Module,
+                typeof(FieldUtils).Module,
                 true);
 
             // Emit IL to return the value of the Transaction property.
@@ -104,7 +104,7 @@ namespace Orleans.Serialization
             }
 
             // Create a method to hold the generated IL.
-            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, field.FieldType.GetTypeInfo().Module, true);
+            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, typeof(FieldUtils).Module, true);
 
             // Emit IL to return the value of the Transaction property.
             var emitter = method.GetILGenerator();

@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+    <PackageReference Include="NodaTime" Version="$(NodaTimeVersion)" />
   </ItemGroup>
 
   <ItemGroup>
