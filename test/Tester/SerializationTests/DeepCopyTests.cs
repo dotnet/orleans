@@ -1,7 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.FSharp.Collections;
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using TestExtensions;
+using UnitTests.FSharpTypes;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -149,5 +152,98 @@ namespace UnitTests.Serialization
             }
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void DeepCopyTests_FSharp_Collections()
+        {
+            // F# list
+            {
+                var original = FSharpList<int>.Empty;
+                var copy = (FSharpList<int>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = ListModule.OfSeq(new List<int> { 0, 1, 2 });
+                var copy = (FSharpList<int>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+
+            // F# set
+            {
+                var original = new FSharpSet<int>(new List<int>());
+                var copy = (FSharpSet<int>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var elements = new List<int>() { 0, 1, 2 };
+                var original = SetModule.OfSeq(elements);
+                var copy = (FSharpSet<int>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+
+            // F# map
+            {
+                var original = new FSharpMap<int, string>(new List<Tuple<int, string>>());
+                var copy = (FSharpMap<int, string>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var elements = new List<Tuple<int, string>>(){
+                    new Tuple<int, string>(0, "zero"),
+                    new Tuple<int, string>(1, "one")
+                };
+                var original = MapModule.OfSeq(elements);
+                var copy = (FSharpMap<int, string>)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void DeepCopyTests_FSharp_Types()
+        {
+            // discriminated union case with an array field
+            {
+                var original = DiscriminatedUnion.nonEmptyArray();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = DiscriminatedUnion.emptyArray();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            // discriminated union case with an F# list field
+            {
+                var original = DiscriminatedUnion.emptyList();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = DiscriminatedUnion.nonEmptyList();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            // discriminated union case with an F# set field
+            {
+                var original = DiscriminatedUnion.emptySet();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = DiscriminatedUnion.nonEmptySet();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            // discriminated union case with an F# map field
+            {
+                var original = DiscriminatedUnion.emptyMap();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = DiscriminatedUnion.nonEmptyMap();
+                var copy = (DiscriminatedUnion)this.fixture.SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+        }
     }
 }
