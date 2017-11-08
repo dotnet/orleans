@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
@@ -11,49 +12,49 @@ using Xunit;
 namespace NonSilo.Tests
 {
     /// <summary>
-    /// Tests for <see cref="ClientBuilder"/>.
+    /// Tests for <see cref="SiloHostBuilder"/>.
     /// </summary>
     [TestCategory("BVT")]
-    [TestCategory("ClientBuilder")]
-    public class ClientBuilderTests
+    [TestCategory("SiloHostBuilder")]
+    public class SiloHostBuilderTests
     {
         /// <summary>
-        /// Tests that the client builder will fail if no assemblies are configured.
+        /// Tests that the silo builder will fail if no assemblies are configured.
         /// </summary>
         [Fact]
-        public void ClientBuilder_AssembliesTest()
+        public void SiloHostBuilder_AssembliesTest()
         {
-            var builder = ClientBuilder.CreateDefault();
+            var builder = SiloHostBuilder.CreateDefault();
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
             // Adding an application assembly causes the 
-            builder = ClientBuilder.CreateDefault().AddApplicationPart(typeof(IAccountGrain).Assembly);
-            using (var client = builder.Build())
+            builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).AddApplicationPart(typeof(IAccountGrain).Assembly);
+            using (var silo = builder.Build())
             {
-                Assert.NotNull(client);
+                Assert.NotNull(silo);
             }
         }
 
         /// <summary>
-        /// Tests that a client can be created without specifying configuration.
+        /// Tests that a silo can be created without specifying configuration.
         /// </summary>
         [Fact]
-        public void ClientBuilder_NoSpecifiedConfigurationTest()
+        public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
-            using (var client = builder.Build())
+            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            using (var silo = builder.Build())
             {
-                Assert.NotNull(client);
+                Assert.NotNull(silo);
             }
         }
 
         /// <summary>
-        /// Tests that a builder can not be used to build more than one client.
+        /// Tests that a builder can not be used to build more than one silo.
         /// </summary>
         [Fact]
-        public void ClientBuilder_DoubleBuildTest()
+        public void SiloHostBuilder_DoubleBuildTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
             using (builder.Build())
             {
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -64,34 +65,34 @@ namespace NonSilo.Tests
         /// Tests that configuration cannot be specified twice.
         /// </summary>
         [Fact]
-        public void ClientBuilder_DoubleSpecifyConfigurationTest()
+        public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClientConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.UseConfiguration(new ClientConfiguration()));
+            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClusterConfiguration()).UseConfiguration(new ClusterConfiguration());
+            Assert.Throws<InvalidOperationException>(() => builder.Build());
         }
 
         /// <summary>
-        /// Tests that a client can be created without specifying configuration.
+        /// Tests that a silo can be created without specifying configuration.
         /// </summary>
         [Fact]
-        public void ClientBuilder_NullConfigurationTest()
+        public void SiloHostBuilder_NullConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
-        
+
         /// <summary>
-        /// Tests that the <see cref="IClientBuilder.ConfigureServices"/> delegate works as expected.
+        /// Tests that the <see cref="ISiloHostBuilder.ConfigureServices"/> delegate works as expected.
         /// </summary>
         [Fact]
-        public void ClientBuilder_ServiceProviderTest()
+        public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
 
             var registeredFirst = new int[1];
-            
+
             var one = new MyService { Id = 1 };
             builder.ConfigureServices(
                 services =>
@@ -108,11 +109,11 @@ namespace NonSilo.Tests
                     services.AddSingleton(two);
                 });
 
-            using (var client = builder.Build())
+            using (var silo = builder.Build())
             {
-                var services = client.ServiceProvider.GetServices<MyService>()?.ToList();
+                var services = silo.Services.GetServices<MyService>()?.ToList();
                 Assert.NotNull(services);
-                
+
                 // Both services should be registered.
                 Assert.Equal(2, services.Count);
                 Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 1));
@@ -122,7 +123,7 @@ namespace NonSilo.Tests
                 Assert.Equal(1, registeredFirst[0]);
 
                 // The last registered service should be provided by default.
-                Assert.Equal(2, client.ServiceProvider.GetRequiredService<MyService>().Id);
+                Assert.Equal(2, silo.Services.GetRequiredService<MyService>().Id);
             }
         }
 

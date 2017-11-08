@@ -2,11 +2,9 @@ using System;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Configuration.Options;
 using Orleans.Hosting;
-using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Configuration;
 
@@ -17,6 +15,27 @@ namespace Orleans
     /// </summary>
     public static class ClientBuilderExtensions
     {
+        /// <summary>
+        /// Configures default client services.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="siloName">The silo name.</param>
+        /// <returns>The silo builder.</returns>
+        public static IClientBuilder ConfigureDefaults(this IClientBuilder builder)
+        {
+            // Configure the container to use an Orleans client.
+            builder.ConfigureServices(services =>
+            {
+                const string key = "OrleansClientServicesAdded";
+                if (!builder.Properties.ContainsKey(key))
+                {
+                    DefaultClientServices.AddDefaultServices(builder, services);
+                    builder.Properties.Add(key, true);
+                }
+            });
+            return builder;
+        }
+
         /// <summary>
         /// Loads configuration from the standard client configuration locations.
         /// </summary>
