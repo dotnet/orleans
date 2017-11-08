@@ -76,7 +76,7 @@ namespace Orleans.Hosting
             services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
             services.TryAddSingleton<ProviderManagerSystemTarget>();
-
+            services.TryAddSingleton<SiloUnobservedExceptionsHandler>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
 
@@ -218,12 +218,13 @@ namespace Orleans.Hosting
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
             services.TryAddSingleton<ApplicationPartManager>(applicationPartManager);
-            applicationPartManager.AddApplicationPart(typeof(RuntimeVersion).Assembly);
-            applicationPartManager.AddApplicationPart(typeof(Silo).Assembly);
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+            services.TryAddTransient<IConfigurationValidator, ApplicationPartValidator>();
         }
     }
 }

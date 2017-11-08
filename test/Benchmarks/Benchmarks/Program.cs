@@ -63,6 +63,7 @@ namespace Benchmarks
             benchmarkAction(bench);
             Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
             tearDown(bench);
+            Console.WriteLine("Press any key to continue ...");
             Console.ReadLine();
         }
     }

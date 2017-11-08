@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Orleans.Serialization
 {
     using System;
@@ -21,7 +23,19 @@ namespace Orleans.Serialization
         private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer> SerializerDictionary;
         private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer> DeserializerDictionary;
 
-        private Logger logger;
+        private ILogger logger;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="logger"></param>
+        public BondSerializer(ILogger<BondSerializer> logger)
+        {
+            ClonerInfoDictionary = new ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo>();
+            SerializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer>();
+            DeserializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer>();
+            this.logger = logger;
+        }
 
         /// <summary>
         /// Determines whether this serializer has the ability to serialize a particular type.
@@ -95,15 +109,6 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public void Initialize(Logger logger)
-        {
-            ClonerInfoDictionary = new ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo>();
-            SerializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer>();
-            DeserializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer>();
-            this.logger = logger;
-        }
-
-        /// <inheritdoc />
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             if (context == null)
@@ -158,24 +163,10 @@ namespace Orleans.Serialization
             return value;
         }
 
-        private void LogWarning(int code, Exception e, string format, params object[] parameters)
-        {
-            if (logger.IsWarning == false)
-            {
-                return;
-            }
-
-            logger.Warn(code, string.Format(format, parameters), e);
-        }
-
         private void LogWarning(int code, string format, params object[] parameters)
         {
-            if (logger.IsWarning == false)
-            {
-                return;
-            }
-
-            logger.Warn(code, format, parameters);
+            if(logger.IsEnabled(LogLevel.Warning))
+                logger.Warn(code, format, parameters);
         }
 
         private void Register(Type type)

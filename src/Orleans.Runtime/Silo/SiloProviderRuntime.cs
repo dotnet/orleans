@@ -24,7 +24,6 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
-        private InvokeInterceptor invokeInterceptor;
 
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
@@ -57,16 +56,6 @@ namespace Orleans.Runtime.Providers
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
-        }
-
-        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
-        {
-            this.invokeInterceptor = interceptor;
-        }
-
-        public InvokeInterceptor GetInvokeInterceptor()
-        {
-            return this.invokeInterceptor;
         }
 
         public Logger GetLogger(string loggerName)

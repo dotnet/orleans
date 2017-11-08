@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.AzureUtils
 {
@@ -24,7 +25,7 @@ namespace Orleans.AzureUtils
         public string TableName { get; private set; }
 
         /// <summary> Logger for this table manager instance. </summary>
-        protected internal Logger Logger { get; private set; }
+        protected internal ILogger Logger { get; private set; }
 
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
@@ -41,7 +42,7 @@ namespace Orleans.AzureUtils
         /// <param name="loggerFactory">Logger factory to use.</param>
         public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            Logger = new LoggerWrapper<AzureTableDataManager<T>>(loggerFactory);
+            Logger = loggerFactory.CreateLogger<AzureTableDataManager<T>>();
             TableName = tableName;
             ConnectionString = storageConnectionString;
 
@@ -136,7 +137,7 @@ namespace Orleans.AzureUtils
             const string operation = "CreateTableEntry";
             var startTime = DateTime.UtcNow;
 
-            if (Logger.IsVerbose2) Logger.Verbose2("Creating {0} table entry: {1}", TableName, data);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", TableName, data);
 
             try
             {
@@ -173,7 +174,7 @@ namespace Orleans.AzureUtils
         {
             const string operation = "UpsertTableEntry";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} entry {1} into table {2}", operation, data, TableName);
 
             try
             {
@@ -210,7 +211,7 @@ namespace Orleans.AzureUtils
         {
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} entry {1} into table {2}", operation, data, TableName);
 
             try
             {
@@ -250,7 +251,7 @@ namespace Orleans.AzureUtils
         {
             const string operation = "UpdateTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} table {1}  entry {2}", operation, TableName, data);
 
             try
             {
@@ -285,7 +286,7 @@ namespace Orleans.AzureUtils
         {            
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} table {1}  entry {2}", operation, TableName, data);
 
             try
             {   
@@ -319,7 +320,7 @@ namespace Orleans.AzureUtils
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} partitionKey {2} rowKey = {3}", operation, TableName, partitionKey, rowKey);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} table {1} partitionKey {2} rowKey = {3}", operation, TableName, partitionKey, rowKey);
             T retrievedResult = default(T);
 
             try
@@ -338,7 +339,7 @@ namespace Orleans.AzureUtils
                 }
                 //The ETag of data is needed in further operations.                                        
                 if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag);
-                if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
                 return null;  // No data
             }
             finally
@@ -380,7 +381,7 @@ namespace Orleans.AzureUtils
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(collection));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(collection));
 
             if (collection == null) throw new ArgumentNullException("collection");
 
@@ -510,7 +511,7 @@ namespace Orleans.AzureUtils
             }
 
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Bulk inserting {0} entries to {1} table", collection.Count, TableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Bulk inserting {0} entries to {1} table", collection.Count, TableName);
 
             try
             {
@@ -553,7 +554,7 @@ namespace Orleans.AzureUtils
             string data2Str = (data2 == null ? "null" : data2.ToString());
             var startTime = DateTime.UtcNow;
 
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} into table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} into table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
 
             try
             {                                
@@ -598,7 +599,7 @@ namespace Orleans.AzureUtils
             const string operation = "UpdateTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
 
             try
             {
@@ -691,7 +692,7 @@ namespace Orleans.AzureUtils
             if(AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus) && AzureStorageUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if(Logger.IsVerbose) Logger.Verbose(ErrorCode.AzureTable_13,
+                if(Logger.IsEnabled(LogLevel.Debug)) Logger.Debug(ErrorCode.AzureTable_13,
                     $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
 
             }

@@ -1655,8 +1655,6 @@ namespace Orleans.Serialization
             {
                 serializer = new BinaryFormatterSerializer();
             }
-
-            serializer.Initialize(this.logger);
             return serializer;
         }
 
@@ -1819,8 +1817,7 @@ namespace Orleans.Serialization
                 {
                     try
                     {
-                        var serializer = Activator.CreateInstance(typeInfo.AsType()) as IExternalSerializer;
-                        serializer.Initialize(logger);
+                        var serializer = ActivatorUtilities.CreateInstance(serviceProvider, typeInfo.AsType()) as IExternalSerializer;
                         externalSerializers.Add(serializer);
                     }
                     catch (Exception exception)

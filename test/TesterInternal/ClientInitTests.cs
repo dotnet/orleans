@@ -8,6 +8,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.Logging;
 
+#pragma warning disable CS0618 // Type or member is obsolete
 namespace UnitTests
 {
     public class ClientInitTests : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
@@ -106,3 +107,5 @@ namespace UnitTests
         }
     }
 }
+
+#pragma warning restore CS0618 // Type or member is obsolete

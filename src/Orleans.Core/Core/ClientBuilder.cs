@@ -1,18 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Messaging;
-using Orleans.Metadata;
-using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.ApplicationParts;
 using Orleans.Serialization;
-using Orleans.Streams;
-using Orleans.Streams.Core;
 
 namespace Orleans
 {
@@ -28,6 +21,12 @@ namespace Orleans
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
 
+        /// <summary>
+        /// Returns a new default client builder.
+        /// </summary>
+        /// <returns>A new default client builder.</returns>
+        public static IClientBuilder CreateDefault() => new ClientBuilder().ConfigureDefaults();
+
         /// <inheritdoc />
         public IClusterClient Build()
         {
@@ -40,14 +39,14 @@ namespace Orleans
                 this.UseConfiguration(ClientConfiguration.StandardLoad());
             }
 
-            this.serviceProviderBuilder.ConfigureServices(AddDefaultServices);
-           
-            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
+            this.ConfigureDefaults();
 
-            serviceProvider.GetService<SerializationManager>().SetApplicationPartManager(serviceProvider.GetService<ApplicationPartManager>());
-            serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
+            var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
+            ValidateSystemConfiguration(serviceProvider);
 
             // Construct and return the cluster client.
+            serviceProvider.GetService<SerializationManager>().SetApplicationPartManager(serviceProvider.GetService<ApplicationPartManager>());
+            serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
             return serviceProvider.GetRequiredService<IClusterClient>();
         }
 
@@ -84,46 +83,13 @@ namespace Orleans
             return this;
         }
 
-        private static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
+        private static void ValidateSystemConfiguration(IServiceProvider serviceProvider)
         {
-            services.TryAddSingleton<TelemetryManager>();
-            services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
-			services.AddLogging();
-            //temporary change until runtime moved away from Logger
-            services.TryAddSingleton(typeof(LoggerWrapper<>));
-            services.TryAddSingleton<LoadedProviderTypeLoaders>();
-            services.TryAddSingleton<StatisticsProviderManager>();
-            services.TryAddSingleton<TypeMetadataCache>();
-            services.TryAddSingleton<OutsideRuntimeClient>();
-            services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
-            services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
-            services.TryAddSingleton<GrainFactory>();
-            services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
-            services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
-            services.TryAddFromExisting<IGrainFactory, GrainFactory>();
-            services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
-            services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
-            services.TryAddSingleton<ClientProviderRuntime>();
-            services.TryAddSingleton<SerializationManager>();
-            services.TryAddSingleton<IFieldUtils, FieldUtils>();
-            services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<StreamProviderManager>();
-            services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();
-            services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
-            services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
-            services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
-            services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
-            services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
-
-            // Application parts
-            var parts = context.GetApplicationPartManager();
-            services.TryAddSingleton<ApplicationPartManager>(parts);
-            parts.AddApplicationPart(typeof(RuntimeVersion).Assembly);
-            parts.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
-            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
-            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+            var validators = serviceProvider.GetServices<IConfigurationValidator>();
+            foreach (var validator in validators)
+            {
+                validator.ValidateConfiguration();
+            }
         }
     }
 }

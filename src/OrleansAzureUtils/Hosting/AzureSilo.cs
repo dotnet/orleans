@@ -48,7 +48,7 @@ namespace Orleans.Runtime.Host
         private SiloHost host;
         private OrleansSiloInstanceManager siloInstanceManager;
         private SiloInstanceTableEntry myEntry;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IServiceRuntimeWrapper serviceRuntimeWrapper;
         //TODO: hook this up with SiloBuilder when SiloBuilder supports create AzureSilo
         private static ILoggerFactory DefaultLoggerFactory = CreateDefaultLoggerFactory("AzureSilo.log");
@@ -88,7 +88,7 @@ namespace Orleans.Runtime.Host
             MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
 
             this.loggerFactory = loggerFactory;
-            logger = new LoggerWrapper<AzureSilo>(loggerFactory);
+            logger = loggerFactory.CreateLogger<AzureSilo>();
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.Host
                 {
                     var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(deploymentId, connectionString, loggerFactory);
                     var instances = await manager.DumpSiloInstanceTable();
-                    logger.Verbose(instances);
+                    logger.Debug(instances);
                 }
                 catch (Exception exc)
                 {

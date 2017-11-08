@@ -17,6 +17,11 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
+        /// The <see cref="IHostingEnvironment" /> initialized by the host.
+        /// </summary>
+        public IHostingEnvironment HostingEnvironment { get; set; }
+
+        /// <summary>
         /// The <see cref="IConfiguration" /> containing the merged configuration of the application and the host.
         /// </summary>
         public IConfiguration Configuration { get; set; }

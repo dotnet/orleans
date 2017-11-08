@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>BenchmarkGrainInterfaces</RootNamespace>
     <AssemblyName>BenchmarkGrainInterfaces</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
