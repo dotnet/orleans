@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
 using TestExtensions;
 using Orleans.Runtime.Configuration;
@@ -54,7 +55,7 @@ namespace Tester.EventSourcingTests
             {
                 TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
                 builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
-                builder.AddFilter("LogViews", LogLevel.Debug);
+                builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
             }
         }
 
