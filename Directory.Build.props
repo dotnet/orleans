@@ -95,6 +95,7 @@
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
     <xUnitVersion>2.3.0</xUnitVersion>
+    <NodaTimeVersion>2.2.2</NodaTimeVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.5.0</SourceLinkVersion>
