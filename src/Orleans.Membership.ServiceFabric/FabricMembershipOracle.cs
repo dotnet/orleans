@@ -12,6 +12,9 @@ using Orleans.ServiceFabric;
 
 namespace Orleans.Membership.ServiceFabric
 {
+    /// <summary>
+    /// Cluster membership implementation which uses Serivce Fabric's service discovery system.
+    /// </summary>
     internal class FabricMembershipOracle : IMembershipOracle, IFabricServiceStatusListener, IDisposable
     {
         private readonly object updateLock = new object();

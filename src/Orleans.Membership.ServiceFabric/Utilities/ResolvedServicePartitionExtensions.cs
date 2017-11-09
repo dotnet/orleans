@@ -24,7 +24,7 @@ namespace Orleans.Membership.ServiceFabric.Utilities
 
                 // Read the endpoint details.
                 var endpoints = JsonConvert.DeserializeObject<ServicePartitionEndpoints>(silo.Address);
-                var orleansEndpoint = endpoints.Endpoints[FabricServiceConfiguration.ListenerName];
+                var orleansEndpoint = endpoints.Endpoints[ServiceFabricConstants.ListenerName];
                 results.Add(JsonConvert.DeserializeObject<FabricSiloInfo>(orleansEndpoint));
             }
 

@@ -19,7 +19,7 @@ namespace Orleans.Hosting.ServiceFabric
         {
             return new ServiceInstanceListener(
                 context => new OrleansCommunicationListener(builder => configure(context, builder)),
-                FabricServiceConfiguration.ListenerName);
+                ServiceFabricConstants.ListenerName);
         }
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace Orleans.Hosting.ServiceFabric
         {
             return new ServiceReplicaListener(
                 context => new OrleansCommunicationListener(builder => configure(context, builder)),
-                FabricServiceConfiguration.ListenerName);
+                ServiceFabricConstants.ListenerName);
         }
     }
 }

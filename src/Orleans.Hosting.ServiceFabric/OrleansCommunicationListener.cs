@@ -30,7 +30,7 @@ namespace Orleans.Hosting.ServiceFabric
         /// Gets or sets the underlying <see cref="ISiloHost"/>.
         /// </summary>
         /// <remarks>Only valid after <see cref="OpenAsync"/> has been invoked. Exposed for testability.</remarks>
-        public ISiloHost SiloHost { get; private set; }
+        public ISiloHost Host { get; private set; }
 
         /// <inheritdoc />
         public async Task<string> OpenAsync(CancellationToken cancellationToken)
@@ -45,8 +45,8 @@ namespace Orleans.Hosting.ServiceFabric
                     });
                 this.configure(builder);
 
-                this.SiloHost = builder.Build();
-                await this.SiloHost.StartAsync(cancellationToken);
+                this.Host = builder.Build();
+                await this.Host.StartAsync(cancellationToken);
             }
             catch
             {
@@ -54,26 +54,26 @@ namespace Orleans.Hosting.ServiceFabric
                 throw;
             }
             
-            var endpoint = this.SiloHost.Services.GetRequiredService<IOptions<FabricSiloInfo>>().Value;
+            var endpoint = this.Host.Services.GetRequiredService<IOptions<FabricSiloInfo>>().Value;
             return JsonConvert.SerializeObject(endpoint);
         }
 
         /// <inheritdoc />
         public async Task CloseAsync(CancellationToken cancellationToken)
         {
-            var siloHost = this.SiloHost;
+            var siloHost = this.Host;
             if (siloHost != null)
             {
                 await siloHost.StopAsync(cancellationToken);
             }
 
-            this.SiloHost = null;
+            this.Host = null;
         }
 
         /// <inheritdoc />
         public void Abort()
         {
-            var host = this.SiloHost;
+            var host = this.Host;
             if (host == null) return;
 
             var cancellation = new CancellationTokenSource();
@@ -89,7 +89,7 @@ namespace Orleans.Hosting.ServiceFabric
             }
             finally
             {
-                this.SiloHost = null;
+                this.Host = null;
             }
         }
 

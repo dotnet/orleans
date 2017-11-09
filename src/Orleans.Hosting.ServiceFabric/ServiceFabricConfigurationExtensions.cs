@@ -8,7 +8,10 @@ using NodeConfiguration = Orleans.Runtime.Configuration.NodeConfiguration;
 
 namespace Orleans.Hosting
 {
-    public static class ConfigurationExtensions
+    /// <summary>
+    /// Extension methods for configuring silos hosted on Service Fabric.
+    /// </summary>
+    public static class ServiceFabricConfigurationExtensions
     {
         /// <summary>
         /// Configures silo and gateway endpoints from the provided Service Fabric service's configuration.
@@ -21,8 +24,8 @@ namespace Orleans.Hosting
             // Gather configuration from Service Fabric.
             var activation = context.CodePackageActivationContext;
             var endpoints = activation.GetEndpoints();
-            var siloEndpoint = GetEndpoint(endpoints, FabricServiceConfiguration.SiloEndpointName);
-            var gatewayEndpoint = GetEndpoint(endpoints, FabricServiceConfiguration.GatewayEndpointName);
+            var siloEndpoint = GetEndpoint(endpoints, ServiceFabricConstants.SiloEndpointName);
+            var gatewayEndpoint = GetEndpoint(endpoints, ServiceFabricConstants.GatewayEndpointName);
 
             // Set the endpoints according to Service Fabric configuration.
             if (string.IsNullOrWhiteSpace(configuration.HostNameOrIPAddress))

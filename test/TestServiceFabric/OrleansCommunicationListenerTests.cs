@@ -51,8 +51,8 @@ namespace TestServiceFabric
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(FabricServiceConfiguration.SiloEndpointName, 9082),
-                CreateEndpoint(FabricServiceConfiguration.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
@@ -74,7 +74,7 @@ namespace TestServiceFabric
             
             var result = await listener.OpenAsync(CancellationToken.None);
 
-            var siloHost = listener.SiloHost;
+            var siloHost = listener.Host;
             var publishedEndpoints = JsonConvert.DeserializeObject<FabricSiloInfo>(result);
 
             var siloAddress = publishedEndpoints.SiloAddress;
@@ -102,13 +102,13 @@ namespace TestServiceFabric
 
             // Check for the silo endpoint.
             var exception = Assert.Throws<KeyNotFoundException>(() => this.clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext));
-            var siloEndpointName = FabricServiceConfiguration.SiloEndpointName;
+            var siloEndpointName = ServiceFabricConstants.SiloEndpointName;
             Assert.Contains(siloEndpointName, exception.Message);
 
             // Check for the proxy endpoint.
             endpoints.Add(CreateEndpoint(siloEndpointName, 9082));
             exception = Assert.Throws<KeyNotFoundException>(() => clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext));
-            Assert.Contains(FabricServiceConfiguration.GatewayEndpointName, exception.Message);
+            Assert.Contains(ServiceFabricConstants.GatewayEndpointName, exception.Message);
         }
 
         [Fact]
@@ -116,8 +116,8 @@ namespace TestServiceFabric
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(FabricServiceConfiguration.SiloEndpointName, 9082),
-                CreateEndpoint(FabricServiceConfiguration.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
@@ -137,7 +137,7 @@ namespace TestServiceFabric
                 });
 
             await listener.OpenAsync(CancellationToken.None);
-            var siloHost = listener.SiloHost;
+            var siloHost = listener.Host;
             siloHost.ClearReceivedCalls();
 
             listener.Abort();
@@ -150,8 +150,8 @@ namespace TestServiceFabric
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(FabricServiceConfiguration.SiloEndpointName, 9082),
-                CreateEndpoint(FabricServiceConfiguration.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
@@ -171,7 +171,7 @@ namespace TestServiceFabric
                 });
 
             await listener.OpenAsync(CancellationToken.None);
-            var siloHost = listener.SiloHost;
+            var siloHost = listener.Host;
             siloHost.ClearReceivedCalls();
             await listener.CloseAsync(CancellationToken.None);
             await siloHost.ReceivedWithAnyArgs(1).StopAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));

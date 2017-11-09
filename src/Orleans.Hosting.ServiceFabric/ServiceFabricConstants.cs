@@ -1,6 +1,9 @@
 ﻿namespace Orleans.ServiceFabric
 {
-    public static class FabricServiceConfiguration
+    /// <summary>
+    /// Constants used for silos hosted on Service Fabric
+    /// </summary>
+    public static class ServiceFabricConstants
     {
         /// <summary>
         /// The Service Fabric listener name used by Orleans silos.
