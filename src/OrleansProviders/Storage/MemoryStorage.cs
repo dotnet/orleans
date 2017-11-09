@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage.Internal;
@@ -42,11 +44,9 @@ namespace Orleans.Storage
         /// </summary>
         public const string NumStorageGrainsPropertyName = "NumStorageGrains";
         private int numStorageGrains;
-        private static int counter;
-        private readonly int id;
         private const string STATE_STORE_NAME = "MemoryStorage";
         private Lazy<IMemoryStorageGrain>[] storageGrains;
-
+        private ILogger logger;
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
@@ -65,13 +65,7 @@ namespace Orleans.Storage
         /// <param name="numStoreGrains">Number of store grains to use.</param>
         protected MemoryStorage(int numStoreGrains)
         {
-            id = Interlocked.Increment(ref counter);
             numStorageGrains = numStoreGrains;
-        }
-
-        private string GetLoggerName()
-        {
-            return string.Format("Storage.{0}.{1}", GetType().Name, id);
         }
 
         #region IStorageProvider methods
@@ -81,13 +75,16 @@ namespace Orleans.Storage
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            Log = providerRuntime.GetLogger(GetLoggerName());
+            var loggerName = $"{this.GetType().FullName}.{Name}";
+            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            this.logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             string numStorageGrainsStr;
             if (config.Properties.TryGetValue(NumStorageGrainsPropertyName, out numStorageGrainsStr))
                 numStorageGrains = Int32.Parse(numStorageGrainsStr);
             
-            Log.Info("Init: Name={0} NumStorageGrains={1}", Name, numStorageGrains);
+            logger.Info("Init: Name={0} NumStorageGrains={1}", Name, numStorageGrains);
 
             storageGrains = new Lazy<IMemoryStorageGrain>[numStorageGrains];
             for (int i = 0; i < numStorageGrains; i++)
@@ -113,7 +110,7 @@ namespace Orleans.Storage
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
 
-            if (Log.IsVerbose2) Log.Verbose2("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
             
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
@@ -131,7 +128,7 @@ namespace Orleans.Storage
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
-            if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -148,7 +145,7 @@ namespace Orleans.Storage
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
-            if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
