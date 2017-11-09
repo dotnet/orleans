@@ -452,7 +452,7 @@ namespace Orleans.Runtime
 
                 if (exc2 is OrleansTransactionInDoubtException)
                 {
-                    // TODO: log an error message?
+                    this.logger.LogError(exc2, "Transaction failed due to in doubt transaction");
                 }
                 else if (TransactionContext.GetTransactionInfo() != null)
                 {

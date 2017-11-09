@@ -17,7 +17,7 @@ namespace Orleans.Transactions
 
         Transactions_IdAllocationFailed = OrleansTransactions + 1,
         Transactions_PrepareFailed      = Transactions_IdAllocationFailed+1,
-
+        
         // transaction manager errors
         TransactionManagerErrorCodes = OrleansTransactions + 1000,
         TransactionManager_GroupCommitError = TransactionManagerErrorCodes,
