@@ -69,7 +69,7 @@ namespace Orleans.Serialization
                 return true;
             }
 
-            if (typeInfo.IsAssignableFrom(typeof(Exception)))
+            if (typeof(Exception).IsAssignableFrom(typeInfo))
             {
                 shallowCopyableTypes[t] = true;
                 return true;

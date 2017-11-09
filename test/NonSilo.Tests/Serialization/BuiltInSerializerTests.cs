@@ -908,7 +908,7 @@ namespace UnitTests.Serialization
                 typeof(DateTime),
                 typeof(Immutable<Dictionary<string, object>>),
                 typeof(ShallowCopyableValueType),
-                typeof(Exception)
+                typeof(ArgumentNullException)
             };
 
             foreach (var shallowCopyableType in shallowCopyableTypes)
