@@ -891,23 +891,30 @@ namespace UnitTests.Serialization
         public void SerializationTests_IsOrleansShallowCopyable(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            Type t = typeof(Dictionary<string, object>);
-            Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+            var nonShallowCopyableTypes = new[]
+            {
+                typeof(Dictionary<string, object>),
+                typeof(Dictionary<string, int>)
+            };
 
-            t = typeof(Dictionary<string, int>);
-            Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+            foreach (var nonShallowCopyableType in nonShallowCopyableTypes)
+            {
+                Assert.False(nonShallowCopyableType.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {nonShallowCopyableType.Name}");
+            }
 
-            t = typeof(int);
-            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+            var shallowCopyableTypes = new[]
+            {
+                typeof(int),
+                typeof(DateTime),
+                typeof(Immutable<Dictionary<string, object>>),
+                typeof(ShallowCopyableValueType),
+                typeof(Exception)
+            };
 
-            t = typeof(DateTime);
-            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
-
-            t = typeof(Immutable<Dictionary<string, object>>);
-            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
-
-            t = typeof(ShallowCopyableValueType);
-            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+            foreach (var shallowCopyableType in shallowCopyableTypes)
+            {
+                Assert.True(shallowCopyableType.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {shallowCopyableType.Name}");
+            }
         }
 
         public struct ShallowCopyableValueType
