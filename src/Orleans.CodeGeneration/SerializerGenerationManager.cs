@@ -103,7 +103,7 @@ namespace Orleans.CodeGenerator
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
                               + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
-                log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                log.Debug(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
                 return false;
             }
 
