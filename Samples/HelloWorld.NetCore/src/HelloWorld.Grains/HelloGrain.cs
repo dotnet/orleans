@@ -11,9 +11,9 @@ namespace HelloWorld.Grains
     {
         private readonly ILogger logger;
 
-        public HelloGrain(ILoggerFactory loggerFactory)
+        public HelloGrain(ILogger<HelloGrain> logger)
         {
-            this.logger = loggerFactory.CreateLogger("HelloWorld.Grains.HelloGrain");
+            this.logger = logger;
         }  
 
         Task<string> IHello.SayHello(string greeting)
