@@ -25,16 +25,16 @@ namespace AccountTransfer.Grains
             this.balance = balance ?? throw new ArgumentNullException(nameof(balance));
         }
 
-        Task IAccountGrain.Deposit(uint ammount)
+        Task IAccountGrain.Deposit(uint amount)
         {
-            this.balance.State.Value += ammount;
+            this.balance.State.Value += amount;
             this.balance.Save();
             return Task.CompletedTask;
         }
 
-        Task IAccountGrain.Withdrawal(uint ammount)
+        Task IAccountGrain.Withdraw(uint amount)
         {
-            this.balance.State.Value -= ammount;
+            this.balance.State.Value -= amount;
             this.balance.Save();
             return Task.CompletedTask;
         }

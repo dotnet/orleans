@@ -9,11 +9,11 @@ namespace AccountTransfer.Grains
     [StatelessWorker]
     public class ATMGrain : Grain, IATMGrain
     {
-        Task IATMGrain.Transfer(Guid fromAccount, Guid toAccount, uint ammountToTransfer)
+        Task IATMGrain.Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer)
         {
             return Task.WhenAll(
-                this.GrainFactory.GetGrain<IAccountGrain>(fromAccount).Withdrawal(ammountToTransfer),
-                this.GrainFactory.GetGrain<IAccountGrain>(toAccount).Deposit(ammountToTransfer));
+                this.GrainFactory.GetGrain<IAccountGrain>(fromAccount).Withdraw(amountToTransfer),
+                this.GrainFactory.GetGrain<IAccountGrain>(toAccount).Deposit(amountToTransfer));
         }
     }
 }
