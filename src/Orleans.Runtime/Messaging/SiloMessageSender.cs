@@ -18,12 +18,11 @@ namespace Orleans.Runtime.Messaging
         internal static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
 
         
-        internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager, ILoggerFactory loggerFactory)
-            : base(nameSuffix, serializationManager, loggerFactory)
+        internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
+            : base(nameSuffix, serializationManager, executorService, loggerFactory)
         {
             messageCenter = msgCtr;
             lastConnectionFailure = new Dictionary<SiloAddress, DateTime>();
-
             OnFault = FaultBehavior.RestartOnFault;
         }
 

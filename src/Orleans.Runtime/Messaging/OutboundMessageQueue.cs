@@ -31,11 +31,11 @@ namespace Orleans.Runtime.Messaging
 
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
-        internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
             messageCenter = mc;
-            pingSender = new SiloMessageSender("PingSender", messageCenter, serializationManager, loggerFactory);
-            systemSender = new SiloMessageSender("SystemSender", messageCenter, serializationManager, loggerFactory);
+            pingSender = new SiloMessageSender("PingSender", messageCenter, serializationManager, executorService, loggerFactory);
+            systemSender = new SiloMessageSender("SystemSender", messageCenter, serializationManager, executorService, loggerFactory);
             senders = new Lazy<SiloMessageSender>[options.Value.SiloSenderQueues];
 
             for (int i = 0; i < senders.Length; i++)
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<SiloMessageSender>(() =>
                 {
-                    var sender = new SiloMessageSender("AppMsgsSender_" + capture, messageCenter, serializationManager, loggerFactory);
+                    var sender = new SiloMessageSender("AppMsgsSender_" + capture, messageCenter, serializationManager, executorService, loggerFactory);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);

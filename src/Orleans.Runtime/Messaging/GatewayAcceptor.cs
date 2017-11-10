@@ -16,13 +16,14 @@ namespace Orleans.Runtime.Messaging
 
         internal GatewayAcceptor(
             MessageCenter msgCtr,
-            Gateway gateway,
+            Gateway gateway, 
             IPEndPoint gatewayAddress,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             GlobalConfiguration globalConfig,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, loggerFactory)
+            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
