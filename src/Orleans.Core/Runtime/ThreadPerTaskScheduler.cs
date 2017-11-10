@@ -11,9 +11,9 @@ namespace Orleans.Runtime
     {
         private readonly Func<Task, string> threadNameProvider;
 
-        public ThreadPerTaskScheduler(Func<Task, string> threadProvider)
+        public ThreadPerTaskScheduler(Func<Task, string> threadNameProvider)
         {
-            this.threadNameProvider = threadProvider;
+            this.threadNameProvider = threadNameProvider;
         }
 
         /// <summary>Gets the tasks currently scheduled to this scheduler.</summary>
