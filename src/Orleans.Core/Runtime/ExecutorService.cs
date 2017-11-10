@@ -3,7 +3,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    class ExecutorService : ITaskScheduler
+    internal class ExecutorService : ITaskScheduler
     {
         private readonly TaskScheduler taskScheduler = new ThreadPerTaskScheduler(task => (task as AsynchAgentTask)?.Name);
 

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime
 {
     /// <summary>Provides a task scheduler that dedicates a thread per task.</summary>
-    public class ThreadPerTaskScheduler : TaskScheduler
+    internal class ThreadPerTaskScheduler : TaskScheduler
     {
         private readonly Func<Task, string> threadNameProvider;
 
