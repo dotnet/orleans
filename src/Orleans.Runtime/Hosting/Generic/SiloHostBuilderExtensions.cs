@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,23 @@ namespace Orleans.Hosting
     /// </summary>
     public static class SiloHostBuilderExtensions
     {
+        /// <summary>
+        /// Specify the environment to be used by the host.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder to configure.</param>
+        /// <param name="environment">The environment to host the application in.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder UseEnvironment(this ISiloHostBuilder hostBuilder, string environment)
+        {
+            return hostBuilder.ConfigureHostConfiguration(configBuilder =>
+            {
+                configBuilder.AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string, string>(HostDefaults.EnvironmentKey,
+                        environment  ?? throw new ArgumentNullException(nameof(environment)))
+                });
+            });
+        }
         /// <summary>
         /// Adds services to the container. This can be called multiple times and the results will be additive.
         /// </summary>
@@ -75,9 +93,20 @@ namespace Orleans.Hosting
         /// <param name="builder">The <see cref="ISiloHostBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
         /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
+        public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<HostBuilderContext, ILoggingBuilder> configureLogging)
+        {
+            return builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
+        }
+
+        /// <summary>
+        /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
+        /// </summary>
+        /// <param name="builder">The <see cref="ISiloHostBuilder" /> to configure.</param>
+        /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
+        /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
         public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
-            return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
+            return builder.ConfigureServices(collection => collection.AddLogging(configureLogging));
         }
     }
 }

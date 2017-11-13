@@ -60,7 +60,7 @@ namespace Orleans.Transactions
             this.copier = copier;
             this.transactionAgent = transactionAgent;
             this.runtime = runtime;
-            this.logger = loggerFactory.CreateLogger($"{this.context.GrainIdentity}+{this.config.StateName}");
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.context.GrainIdentity}.{this.config.StateName}");
             this.transactionCopy = new Dictionary<long, TState>();
             this.storageExecutor = new AsyncSerialExecutor<bool>();
             this.log = new SortedDictionary<long, LogRecord<TState>>();
@@ -132,6 +132,7 @@ namespace Orleans.Transactions
         async Task<bool> ITransactionalResource.Prepare(long transactionId, TransactionalResourceVersion? writeVersion,
             TransactionalResourceVersion? readVersion)
         {
+            
             this.transactionCopy.Remove(transactionId);
 
             long wlb = 0;
@@ -143,6 +144,7 @@ namespace Orleans.Transactions
 
             if (!ValidateWrite(writeVersion))
             {
+
                 return false;
             }
 
@@ -399,7 +401,10 @@ namespace Orleans.Transactions
                 return true;
 
             // Validate that we still have all of the transaction's writes.
-            return this.log.TryGetValue(writeVersion.Value.TransactionId, out LogRecord<TState> logRecord) && logRecord.Version == writeVersion.Value;
+            var validate  = this.log.TryGetValue(writeVersion.Value.TransactionId, out LogRecord<TState> logRecord) && logRecord.Version == writeVersion.Value;
+            if(!validate && this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug($"ValidateWrite failed, because version is not the same as recorded in state log record of the same transaction, write version in the log record is {logRecord.Version}, version to be validated is {writeVersion.Value}");
+            return validate;
         }
 
         private bool ValidateRead(long transactionId, TransactionalResourceVersion? readVersion)
@@ -416,15 +421,31 @@ namespace Orleans.Transactions
 
                 if (key > readVersion.Value.TransactionId && key < transactionId)
                 {
+                    if(this.logger.IsEnabled(LogLevel.Debug))
+                        this.logger.LogDebug($"ValidateRead failed, due to one of the log record has larger transaction Id than the one in read version {readVersion.Value.TransactionId}, and smaller than transaction {transactionId}");
                     return false;
                 }
             }
 
             if (readVersion.Value.TransactionId == 0) return readVersion.Value.WriteNumber == 0;
             // If version read by the transaction is lost, return false.
-            if (!this.log.TryGetValue(readVersion.Value.TransactionId, out LogRecord<TState> logRecord)) return false;
+            if (!this.log.TryGetValue(readVersion.Value.TransactionId, out LogRecord<TState> logRecord))
+            {
+                if(this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug($"ValidateRead failed, due to version read by the transaction lost");
+                return false;
+            }
+        
+            
             // If version is not same it was overridden by the same transaction that originally wrote it.
-            return logRecord.Version == readVersion.Value;
+            if (logRecord.Version != readVersion.Value)
+            {
+                if(this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug($"ValidateRead failed, because version is not same as recorded by state log record of the same transaction.");
+                return false;
+            }
+
+            return true;
         }
 
         private async Task DoRecovery()

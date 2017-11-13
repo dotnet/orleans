@@ -28,7 +28,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private readonly Logger Logger;
+        private readonly ILogger Logger;
 
         /// <summary>
         /// The serializer generation manager.
@@ -47,7 +47,7 @@ namespace Orleans.CodeGenerator
         {
             this.knownTypes = GetKnownTypes();
             this.serializerGenerationManager = new SerializerGenerationManager(serializationManager, loggerFactory);
-            Logger = new LoggerWrapper<RoslynCodeGenerator>(loggerFactory);
+            Logger = loggerFactory.CreateLogger<RoslynCodeGenerator>();
 
             HashSet<string> GetKnownTypes()
             {
@@ -113,9 +113,9 @@ namespace Orleans.CodeGenerator
             // Expand the list of included assemblies and types.
             var (includedTypes, assemblies) = this.GetIncludedTypes(targetAssembly, runtime);
 
-            if (Logger.IsVerbose)
+            if (Logger.IsEnabled(LogLevel.Debug))
             {
-                Logger.Verbose(
+                Logger.Debug(
                     "Generating code for assemblies: {0}",
                     string.Join(", ", assemblies.Select(_ => _.FullName)));
             }
@@ -141,16 +141,16 @@ namespace Orleans.CodeGenerator
                         this.serializerGenerationManager.RecordTypeToGenerate(encounteredType, targetAssembly);
                     }
 
-                    if (Logger.IsVerbose2)
+                    if (Logger.IsEnabled(LogLevel.Trace))
                     {
-                        Logger.Verbose2("Generating code for: {0}", type.GetParseableName());
+                        Logger.Trace("Generating code for: {0}", type.GetParseableName());
                     }
 
                     if (GrainInterfaceUtils.IsGrainInterface(type))
                     {
-                        if (Logger.IsVerbose2)
+                        if (Logger.IsEnabled(LogLevel.Trace))
                         {
-                            Logger.Verbose2(
+                            Logger.Trace(
                                 "Generating GrainReference and MethodInvoker for {0}",
                                 type.GetParseableName());
                         }
@@ -195,9 +195,9 @@ namespace Orleans.CodeGenerator
                             "\ttype " + toGen.FullName + " in namespace " + toGen.Namespace
                             + " defined in Assembly " + toGen.GetTypeInfo().Assembly.GetName());
 
-                        if (Logger.IsVerbose2)
+                        if (Logger.IsEnabled(LogLevel.Trace))
                         {
-                            Logger.Verbose2(
+                            Logger.Trace(
                                 "Generating serializer for type {0}",
                                 toGen.GetParseableName());
                         }
@@ -216,9 +216,9 @@ namespace Orleans.CodeGenerator
 
                 if (namespaceMembers.Count == 0)
                 {
-                    if (Logger.IsVerbose)
+                    if (Logger.IsEnabled(LogLevel.Trace))
                     {
-                        Logger.Verbose2("Skipping namespace: {0}", namespaceName);
+                        Logger.Trace("Skipping namespace: {0}", namespaceName);
                     }
 
                     continue;
@@ -368,8 +368,10 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in this.typeCollector.EncounteredTypes)
             {
+                // Skip types which can not or should not be referenced.
                 if (!IsAssemblyReferenced(type)) continue;
-                
+                if (type.IsNestedPrivate) continue;
+                if (type.GetCustomAttribute<CompilerGeneratedAttribute>() != null) continue;
                 if (type.GetCustomAttribute<GeneratedCodeAttribute>() != null) continue;
 
                 var qualifiedTypeName = RuntimeTypeNameFormatter.Format(type);
@@ -442,7 +444,7 @@ namespace Orleans.CodeGenerator
                 // If code generation is being performed at runtime, the interface must be accessible to the generated code.
                 if (!runtime || TypeUtilities.IsAccessibleFromAssembly(type, targetAssembly))
                 {
-                    if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Will generate code for: {0}", type.GetParseableName());
 
                     includedTypes.Add(type);
                 }

@@ -364,11 +364,8 @@ namespace Orleans.Runtime
 
                         throw exc;
                     }
-
-#pragma warning disable 618
-                    var invokeInterceptor = this.CurrentStreamProviderRuntime?.GetInvokeInterceptor();
-#pragma warning restore 618
-                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping, invokeInterceptor);
+                    
+                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping);
                     await requestInvoker.Invoke();
                     resultObject = requestInvoker.Result;
                 }
@@ -455,7 +452,7 @@ namespace Orleans.Runtime
 
                 if (exc2 is OrleansTransactionInDoubtException)
                 {
-                    // TODO: log an error message?
+                    this.logger.LogError(exc2, "Transaction failed due to in doubt transaction");
                 }
                 else if (TransactionContext.GetTransactionInfo() != null)
                 {

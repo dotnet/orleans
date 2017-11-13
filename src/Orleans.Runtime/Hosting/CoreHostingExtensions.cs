@@ -1,4 +1,6 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -10,6 +12,30 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        /// <summary>
+        /// Configure the container to use Orleans, including the default silo name & services.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder)
+        {
+            builder.ConfigureServices((context, services) =>
+            {
+                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
+                {
+                    services.PostConfigure<SiloIdentityOptions>(options => options.SiloName = options.SiloName
+                                           ?? context.HostingEnvironment.ApplicationName
+                                           ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+
+                    services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
+                    DefaultSiloServices.AddDefaultServices(context, services);
+
+                    context.Properties.Add("OrleansServicesAdded", true);
+                }
+            });
+            return builder;
+        }
+
         /// <summary>
         /// Configures the name of this silo.
         /// </summary>
@@ -31,6 +57,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
             return builder.ConfigureServices((context, services) =>
             {
                 services.AddLegacyClusterConfigurationSupport(configuration);

@@ -1,4 +1,6 @@
-﻿using Orleans.Serialization;
+﻿using System;
+using NodaTime;
+using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -50,6 +52,31 @@ namespace DefaultCluster.Tests
 
             Assert.IsAssignableFrom<ValueTypeTestData>(copy);
             Assert.Equal<int>(4, ((ValueTypeTestData)copy).GetValue());
+        }
+
+        [Serializable]
+        public class NodaTimeTestPoco
+        {
+            public LocalDate Date { get; }
+
+            public NodaTimeTestPoco(LocalDate date)
+            {
+                this.Date = date;
+            }
+        }
+
+        /// <summary>
+        /// Regression test for https://github.com/dotnet/orleans/issues/2979.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void Serialization_NodaTime()
+        {
+            var data = new NodaTimeTestPoco(new LocalDate(2010, 10, 14));
+
+            object obj = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(data);
+
+            Assert.IsAssignableFrom<NodaTimeTestPoco>(obj);
+            Assert.Equal<LocalDate>(new LocalDate(2010, 10, 14), ((NodaTimeTestPoco)obj).Date);
         }
     }
 }

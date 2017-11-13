@@ -14,6 +14,8 @@ namespace Orleans.Hosting
     {
         public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
         {
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+
             if (services.Any(service => service.ServiceType == typeof(ClusterConfiguration)))
             {
                 throw new InvalidOperationException("Cannot configure legacy ClusterConfiguration support twice");

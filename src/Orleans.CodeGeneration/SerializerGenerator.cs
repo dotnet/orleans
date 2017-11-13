@@ -420,7 +420,7 @@ namespace Orleans.CodeGenerator
                 // Use the default value.
                 result = SF.DefaultExpression(typeInfo.AsType().GetTypeSyntax());
             }
-            else if (typeInfo.GetConstructor(Type.EmptyTypes) != null)
+            else if (GetEmptyConstructor(typeInfo) != null)
             {
                 // Use the default constructor.
                 result = SF.ObjectCreationExpression(typeInfo.AsType().GetTypeSyntax()).AddArgumentListArguments();
@@ -436,6 +436,36 @@ namespace Orleans.CodeGenerator
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
                             SF.Argument(SF.TypeOfExpression(typeInfo.AsType().GetTypeSyntax()))));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Return a parameterless ctor if found. Since typeInfo.GetConstructor can throw BadImageFormatException, 
+        /// we have to do the manual filtering here.
+        /// </summary>
+        /// <param name="typeInfo">The typeInfo</param>
+        /// <returns>Given ctor or null if not found.</returns>
+        private static ConstructorInfo GetEmptyConstructor(TypeInfo typeInfo)
+        {
+            var result = default(ConstructorInfo);
+            var ctors = typeInfo.GetConstructors();
+
+            foreach (var ctor in ctors)
+            {
+                try
+                {
+                    if (ctor.GetParameters().Length==0)
+                    {
+                        result = ctor;
+                        break;
+                    }
+                }
+                catch (BadImageFormatException)
+                {
+                    // Intentionally left blank
+                }
             }
 
             return result;

@@ -21,7 +21,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private readonly Logger log;
+        private readonly ILogger log;
 
         /// <summary>
         /// The types to process.
@@ -42,7 +42,7 @@ namespace Orleans.CodeGenerator
             typesToProcess = new HashSet<Type>();
             processedTypes = new HashSet<Type>();
 
-            log = new LoggerWrapper<SerializerGenerationManager>(loggerFactory);
+            log = loggerFactory.CreateLogger<SerializerGenerationManager>();
         }
 
         internal bool IsTypeRecorded(Type type)
@@ -103,7 +103,7 @@ namespace Orleans.CodeGenerator
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
                               + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
-                log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                log.Debug(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
                 return false;
             }
 

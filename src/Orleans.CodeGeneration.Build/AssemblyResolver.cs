@@ -22,7 +22,8 @@ namespace Orleans.CodeGeneration
         /// Needs to be public so can be serialized accross the the app domain.
         /// </summary>
         public Dictionary<string, string> ReferenceAssemblyPaths { get; } = new Dictionary<string, string>();
-        
+
+        private readonly bool installDefaultResolveHandler;
         private readonly ICompilationAssemblyResolver assemblyResolver;
 
         private readonly DependencyContext dependencyContext;
@@ -31,10 +32,14 @@ namespace Orleans.CodeGeneration
         private readonly AssemblyLoadContext loadContext;
 #endif
 
-        public AssemblyResolver(string path, List<string> referencedAssemblies)
+        public AssemblyResolver(string path, List<string> referencedAssemblies, bool installDefaultResolveHandler = true)
         {
-            if (Path.GetFileName(path) == "Orleans.Core.dll")  this.Assembly = typeof(RuntimeVersion).Assembly;
-            else this.Assembly = Assembly.LoadFrom(path);
+            this.installDefaultResolveHandler = installDefaultResolveHandler;
+
+            if (Path.GetFileName(path) == "Orleans.Core.dll")
+                this.Assembly = typeof(RuntimeVersion).Assembly;
+            else
+                this.Assembly = Assembly.LoadFrom(path);
 
             this.dependencyContext = DependencyContext.Load(this.Assembly);
             this.resolverRependencyContext = DependencyContext.Load(typeof(AssemblyResolver).Assembly);
@@ -48,16 +53,27 @@ namespace Orleans.CodeGeneration
                     new PackageCompilationAssemblyResolver()
                 });
 
-            AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
 #if NETCOREAPP2_0
             this.loadContext = AssemblyLoadContext.GetLoadContext(this.Assembly);
-            this.loadContext.Resolving += this.AssemblyLoadContextResolving;
-            if (this.loadContext != AssemblyLoadContext.Default)
+
+            if (this.loadContext == AssemblyLoadContext.Default)
             {
-                AssemblyLoadContext.Default.Resolving += this.AssemblyLoadContextResolving;
+                if (this.installDefaultResolveHandler)
+                {
+                    AssemblyLoadContext.Default.Resolving += this.AssemblyLoadContextResolving;
+                }
+            }
+            else
+            {
+                this.loadContext.Resolving += this.AssemblyLoadContextResolving;
+            }
+#else
+            if (this.installDefaultResolveHandler)
+            {
+                AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
             }
 #endif
-            
+
             foreach (var assemblyPath in referencedAssemblies)
             {
                 var libName = Path.GetFileNameWithoutExtension(assemblyPath);
@@ -71,13 +87,23 @@ namespace Orleans.CodeGeneration
 
         public void Dispose()
         {
-            AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
-
 #if NETCOREAPP2_0
-            this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
-            if (this.loadContext != AssemblyLoadContext.Default)
+
+            if (this.loadContext == AssemblyLoadContext.Default)
             {
-                AssemblyLoadContext.Default.Resolving -= this.AssemblyLoadContextResolving;
+                if (this.installDefaultResolveHandler)
+                {
+                    AssemblyLoadContext.Default.Resolving -= this.AssemblyLoadContextResolving;
+                }
+            }
+            else
+            {
+                this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
+            }
+#else
+            if (this.installDefaultResolveHandler)
+            {
+                AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
             }
 #endif
         }
@@ -92,15 +118,16 @@ namespace Orleans.CodeGeneration
         /// </returns>
         public Assembly ResolveAssembly(object sender, ResolveEventArgs args)
         {
+            var context = default(AssemblyLoadContext);
+
 #if NETCOREAPP2_0
-            var context = AssemblyLoadContext.GetLoadContext(args.RequestingAssembly);
-#else
-            AssemblyLoadContext context = null;
+            context = AssemblyLoadContext.GetLoadContext(args.RequestingAssembly);
 #endif
+
             return this.AssemblyLoadContextResolving(context, new AssemblyName(args.Name));
         }
 
-        public Assembly AssemblyLoadContextResolving(AssemblyLoadContext context, AssemblyName name)
+            public Assembly AssemblyLoadContextResolving(AssemblyLoadContext context, AssemblyName name)
         {
             // Attempt to resolve the library from one of the dependency contexts.
             var library = this.resolverRependencyContext?.RuntimeLibraries?.FirstOrDefault(NamesMatch)
@@ -127,20 +154,27 @@ namespace Orleans.CodeGeneration
                 }
             }
 
-            if (this.ReferenceAssemblyPaths.TryGetValue(name.FullName, out string path))
+            if (this.ReferenceAssemblyPaths.TryGetValue(name.FullName, out var pathByFullName))
             {
-                var assembly = TryLoadAssemblyFromPath(path);
+                var assembly = TryLoadAssemblyFromPath(pathByFullName);
                 if (assembly != null) return assembly;
             }
 
-            if (this.ReferenceAssemblyPaths.TryGetValue(name.Name, out path))
+            if (this.ReferenceAssemblyPaths.TryGetValue(name.Name, out var pathByName))
             {
-                var assembly = TryLoadAssemblyFromPath(path);
-                if (assembly != null) return assembly;
+                //
+                // Only try to load it if the resolved path is different than from before
+                //
+
+                if (String.Compare(pathByFullName, pathByName, StringComparison.OrdinalIgnoreCase) != 0)
+                {
+                    var assembly = TryLoadAssemblyFromPath(pathByName);
+                    if (assembly != null) return assembly;
+                }
             }
-                
+
             return null;
-            
+
             bool NamesMatch(RuntimeLibrary runtime)
             {
                 return string.Equals(runtime.Name, name.Name, StringComparison.OrdinalIgnoreCase);

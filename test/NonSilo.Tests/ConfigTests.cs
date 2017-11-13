@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -560,7 +561,10 @@ namespace UnitTests
         {
             const string filename = "ClientConfig_NewAzure.xml";
 
-            var client = new ClientBuilder().LoadConfiguration(filename).Build();
+            var client = new ClientBuilder()
+                .AddApplicationPart(typeof(ISimpleGrain).Assembly)
+                .LoadConfiguration(filename)
+                .Build();
             try
             {
                 ClientConfiguration config = client.Configuration;

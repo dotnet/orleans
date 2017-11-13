@@ -6,6 +6,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
@@ -174,7 +175,7 @@ namespace Orleans.Runtime
             {
                 return GetParameterizedTemplateName(GetSimpleTypeName(typeInfo, fullName), typeInfo, applyRecursively, fullName);
             }
-            
+
             var t = typeInfo.AsType();
             if (fullName != null && fullName(t) == true)
             {
@@ -190,7 +191,7 @@ namespace Orleans.Runtime
                 fullName = tt => false;
 
             if (!typeInfo.IsGenericType) return baseName;
-            
+
             string s = baseName;
             s += "<";
             bool first = true;
@@ -401,7 +402,7 @@ namespace Orleans.Runtime
             }
 
             if (grainType == type || grainChevronType == type) return false;
-            
+
             if (!grainType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
@@ -504,7 +505,7 @@ namespace Orleans.Runtime
 
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
-        
+
 
         private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {
@@ -548,7 +549,7 @@ namespace Orleans.Runtime
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, ILogger logger)
         {
             try
             {
@@ -556,13 +557,13 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                if (logger != null && logger.IsWarning)
+                if (logger != null && logger.IsEnabled(LogLevel.Warning))
                 {
                     var message =
                         $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
                     logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
                 }
-                
+
                 var typeLoadException = exception as ReflectionTypeLoadException;
                 if (typeLoadException != null)
                 {
@@ -573,7 +574,53 @@ namespace Orleans.Runtime
                 return Enumerable.Empty<TypeInfo>();
             }
         }
-        
+
+        //TODO: delete this one after runtime migrate off Logger
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger = null)
+        {
+            try
+            {
+                return assembly.DefinedTypes;
+            }
+            catch (Exception exception)
+            {
+                var typeLoadException = exception as ReflectionTypeLoadException;
+
+                if (typeLoadException != null)
+                {
+                    if (typeLoadException.LoaderExceptions != null)
+                    {
+                        //
+                        // If we've only BadImageFormatExceptions in LoaderExceptions, then it's ok to not to log, otherwise log
+                        // as a warning.
+                        //
+
+                        if (logger != null && logger.IsWarning)
+                        {
+                            if (typeLoadException.LoaderExceptions.Any(ex => !(ex is BadImageFormatException)) || logger.IsVerbose)
+                            {
+                                var message =
+                                    $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
+                                logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                            }
+                        }
+                    }
+
+                    return typeLoadException.Types?.Where(type => type != null).Select(type => type.GetTypeInfo()) ??
+                           Enumerable.Empty<TypeInfo>();
+                }
+
+                if (logger != null && logger.IsWarning)
+                {
+                    var message =
+                        $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
+                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+
+                return Enumerable.Empty<TypeInfo>();
+            }
+        }
+
         /// <summary>
         /// Returns a value indicating whether or not the provided <paramref name="methodInfo"/> is a grain method.
         /// </summary>
@@ -879,7 +926,7 @@ namespace Orleans.Runtime
 
             throw new ArgumentException("Expression type unsupported.");
         }
-        
+
         /// <summary>
         /// Returns the <see cref="PropertyInfo"/> for the simple member access in the provided <paramref name="expression"/>.
         /// </summary>

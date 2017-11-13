@@ -69,6 +69,12 @@ namespace Orleans.Serialization
                 return true;
             }
 
+            if (typeof(Exception).IsAssignableFrom(typeInfo))
+            {
+                shallowCopyableTypes[t] = true;
+                return true;
+            }
+
             if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
             {
                 result = IsValueTypeFieldsShallowCopyable(typeInfo);
