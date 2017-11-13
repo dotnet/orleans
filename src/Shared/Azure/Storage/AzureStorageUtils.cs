@@ -9,7 +9,11 @@ using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
+#if CLUSTERING_AZURESTORAGE
+namespace Orleans.Clustering.AzureStorage
+#else
 namespace Orleans.AzureUtils
+#endif
 {
     /// <summary>
     /// General utility functions related to Azure storage.
@@ -41,17 +45,6 @@ namespace Orleans.AzureUtils
                     return true;
                 }
                 return StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus);
-            }
-            return false;
-        }
-
-        internal static bool IsServerBusy(Exception exc)
-        {
-            HttpStatusCode httpStatusCode;
-            string restStatus;
-            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
-            {
-                return StorageErrorCodeStrings.ServerBusy.Equals(restStatus);
             }
             return false;
         }
@@ -133,7 +126,7 @@ namespace Orleans.AzureUtils
                 || httpStatusCode == HttpStatusCode.ServiceUnavailable  /* 503 */
                 || httpStatusCode == HttpStatusCode.GatewayTimeout      /* 504 */
                 || (httpStatusCode == HttpStatusCode.InternalServerError /* 500 */
-                    && !String.IsNullOrEmpty(restStatusCode) 
+                    && !String.IsNullOrEmpty(restStatusCode)
                     && StorageErrorCodeStrings.OperationTimedOut.Equals(restStatusCode, StringComparison.OrdinalIgnoreCase))
             );
         }
@@ -221,13 +214,13 @@ namespace Orleans.AzureUtils
 
             if (!Char.IsLetterOrDigit(queueName.Last()))
             {
-                // The first and last letters in the queue name must be alphanumeric. The dash (-) character cannot be the first or last character. 
+                // The first and last letters in the queue name must be alphanumeric. The dash (-) character cannot be the first or last character.
                 throw new ArgumentException(String.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), queueName);
             }
 
             if (!queueName.All(c => Char.IsLetterOrDigit(c) || c.Equals('-')))
             {
-                // A queue name can only contain letters, numbers, and the dash (-) character. 
+                // A queue name can only contain letters, numbers, and the dash (-) character.
                 throw new ArgumentException(String.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
             }
 
@@ -256,13 +249,13 @@ namespace Orleans.AzureUtils
 
             if (Char.IsDigit(tableName.First()))
             {
-                // Table names cannot begin with a numeric character. 
+                // Table names cannot begin with a numeric character.
                 throw new ArgumentException(String.Format("A table name cannot begin with a numeric character, while your tableName is {0}.", tableName), tableName);
             }
 
             if (!tableName.All(Char.IsLetterOrDigit))
             {
-                // Table names may contain only alphanumeric characters. 
+                // Table names may contain only alphanumeric characters.
                 throw new ArgumentException(String.Format("A table name can only contain alphanumeric characters, while your tableName is {0}.", tableName), tableName);
             }
         }
@@ -307,7 +300,7 @@ namespace Orleans.AzureUtils
             {
                 isLastErrorRetriable = true;
                 var statusCode = we.Status;
-                logger.Warn(ErrorCode.AzureTable_10,
+                logger.Warn((int)Utilities.ErrorCode.AzureTable_10,
                     $"Intermediate issue reading Azure storage table {tableName}: HTTP status code={statusCode} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                     exc);
             }
@@ -319,7 +312,7 @@ namespace Orleans.AzureUtils
                 {
                     if (StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus))
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.AzureTable_DataNotFound,
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug((int)Utilities.ErrorCode.AzureTable_DataNotFound,
                             "DataNotFound reading Azure storage table {0}:{1} HTTP status code={2} REST status code={3} Exception={4}",
                             tableName,
                             iteration == 0 ? "" : (" Repeat=" + iteration),
@@ -333,14 +326,14 @@ namespace Orleans.AzureUtils
                     {
                         isLastErrorRetriable = IsRetriableHttpError(httpStatusCode, restStatus);
 
-                        logger.Warn(ErrorCode.AzureTable_11,
+                        logger.Warn((int)Utilities.ErrorCode.AzureTable_11,
                             $"Intermediate issue reading Azure storage table {tableName}:{(iteration == 0 ? "" : (" Repeat=" + iteration))} IsRetriable={isLastErrorRetriable} HTTP status code={httpStatusCode} REST status code={restStatus} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                                 exc);
                     }
                 }
                 else
                 {
-                    logger.Error(ErrorCode.AzureTable_12,
+                    logger.Error((int)Utilities.ErrorCode.AzureTable_12,
                         $"Unexpected issue reading Azure storage table {tableName}: Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                                  exc);
                     isLastErrorRetriable = false;

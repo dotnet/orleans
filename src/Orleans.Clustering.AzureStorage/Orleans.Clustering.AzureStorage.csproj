@@ -1,15 +1,16 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
-    <Title>Microsoft Orleans Azure Utilities</Title>
-    <Description>Support library for hosting Orleans on Microsoft Azure.</Description>
+    <PackageId>Microsoft.Orleans.Clustering.AzureStorage</PackageId>
+    <Title>Microsoft Orleans Membership Azure Table Storage</Title>
+    <Description>Membership provider for Azure Table Storage of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Azure</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>OrleansAzureUtils</AssemblyName>
-    <RootNamespace>OrleansAzureUtils</RootNamespace>
+    <AssemblyName>Orleans.Clustering.AzureStorage</AssemblyName>
+    <RootNamespace>Orleans.Clustering.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);CLUSTERING_AZURESTORAGE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,18 +23,15 @@
   <ItemGroup>
     <PackageReference Include="System.Net.Requests" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Utilities\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 </Project>

@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Host
                 {
                     var error = String.Format("Connecting to the storage table has failed with {0}", LogFormatter.PrintException(exc));
                     Trace.TraceError(error);
-                    logger.Error(ErrorCode.AzureTable_34, error, exc);
+                    logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_34, error, exc);
                     return false;
                 }
             }
@@ -261,7 +261,7 @@ namespace Orleans.Runtime.Host
                 var error = String.Format("Failed to create OrleansSiloInstanceManager. This means CreateTableIfNotExist for silo instance table has failed with {0}",
                     LogFormatter.PrintException(exc));
                 Trace.TraceError(error);
-                logger.Error(ErrorCode.AzureTable_34, error, exc);
+                logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_34, error, exc);
                 throw new OrleansException(error, exc);
             }
 

@@ -3,8 +3,11 @@ using System.Diagnostics;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Orleans.Runtime;
 
-
+#if CLUSTERING_AZURESTORAGE
+namespace Orleans.Clustering.AzureStorage
+#else
 namespace Orleans.AzureUtils
+#endif
 {
     /// <summary>
     /// Utility class for default retry / timeout settings for Azure storage.
@@ -41,14 +44,14 @@ namespace Orleans.AzureUtils
 
             MaxBusyRetries = 120;
             PauseBetweenBusyRetries = TimeSpan.FromMilliseconds(500);
-            
+
             if (Debugger.IsAttached)
             {
                 PauseBetweenTableCreationRetries = PauseBetweenTableCreationRetries.Multiply(100);
                 PauseBetweenTableOperationRetries = PauseBetweenTableOperationRetries.Multiply(100);
                 PauseBetweenBusyRetries = PauseBetweenBusyRetries.Multiply(10);
             }
-            
+
             TableCreationRetryPolicy = new LinearRetry(PauseBetweenTableCreationRetries, MaxTableCreationRetries); // 60 x 1s
             TableCreationTimeout = PauseBetweenTableCreationRetries.Multiply(MaxTableCreationRetries).Multiply(3);    // 3 min
 

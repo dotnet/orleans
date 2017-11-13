@@ -61,7 +61,7 @@ namespace Orleans.AzureUtils
         private IPAddress address;
         private string myHostName;
 
-        private AzureTableDataManager<ClientMetricsData> storage;
+        private Orleans.AzureUtils.AzureTableDataManager<ClientMetricsData> storage;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;

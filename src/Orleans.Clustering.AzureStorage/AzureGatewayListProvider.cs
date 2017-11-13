@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OrleansAzureUtils.Options;
+using Orleans.AzureUtils.Options;
 
 namespace Orleans.AzureUtils
 {
@@ -17,6 +16,7 @@ namespace Orleans.AzureUtils
         private readonly AzureTableGatewayListProviderOptions options;
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
+
         public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, ClientConfiguration clientConfiguration)
         {
             this.loggerFactory = loggerFactory;
@@ -38,7 +38,7 @@ namespace Orleans.AzureUtils
             return siloInstanceManager.FindAllGatewayProxyEndpoints();
         }
 
-        public TimeSpan MaxStaleness 
+        public TimeSpan MaxStaleness
         {
             get { return this.maxStaleness; }
         }

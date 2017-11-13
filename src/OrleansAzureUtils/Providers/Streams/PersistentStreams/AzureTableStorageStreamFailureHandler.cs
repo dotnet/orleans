@@ -17,7 +17,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         private static readonly Func<TEntity> DefaultCreateEntity = () => new TEntity();
         private readonly SerializationManager serializationManager;
         private readonly string deploymentId;
-        private readonly AzureTableDataManager<TEntity> dataManager;
+        private readonly Orleans.AzureUtils.AzureTableDataManager<TEntity> dataManager;
         private readonly Func<TEntity> createEntity;
 
         /// <summary>
