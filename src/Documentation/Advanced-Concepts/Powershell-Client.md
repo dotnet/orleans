@@ -32,14 +32,14 @@ Powershell modules today are easily shared just as Nuget packages but instead of
 * To install it on a specific folder just run:
 
 ``` powershell
-PS> Save-Module -Name OrleansPSUtil -Path <path>
+PS> Save-Module -Name OrleansPSUtils -Path <path>
 
 ```
 
 * To install it on your PowerShell modules path (**the recommended way**), just run:
 
 ``` powershell
-PS> Install-Module -Name OrleansPSUtil
+PS> Install-Module -Name OrleansPSUtils
 
 ```
 
