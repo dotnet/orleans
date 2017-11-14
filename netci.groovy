@@ -10,8 +10,6 @@ def platformList = ['Linux', 'Windows_NT']
 platformList.each { platform ->
     if (platform == 'Linux') {
         [true, false].each { isPR ->
-            def os = 'Linux'
-            def architecture = 'x64'
             def configuration = 'Release'
             def osUsedForMachineAffinity = 'Ubuntu16.04';
             def buildCommand = "./build.sh --configuration ${configuration} --targets Default"
@@ -24,7 +22,13 @@ platformList.each { platform ->
 
             Utilities.setMachineAffinity(newJob, osUsedForMachineAffinity, 'latest-or-auto')
             Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
-            Utilities.addGithubPRTriggerForBranch(newJob, branch, "${os} ${architecture} ${configuration} Build")
+
+            if (!isPR) {
+                Utilities.addGithubPushTrigger(newJob)
+            }
+            else {
+                Utilities.addGithubPRTriggerForBranch(newJob, branch, "${osUsedForMachineAffinity} ${configuration} Build")
+            }
         }
     }
     else if (platform == 'Windows_NT') {
