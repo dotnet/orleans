@@ -23,29 +23,15 @@ namespace Orleans.Hosting
         public Task Stopped { get; }
 
         /// <inheritdoc />
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public Task StartAsync(CancellationToken cancellationToken)
         {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                this.silo.Start();
-            }
-
-            // Await to avoid compiler warnings.
-            await Task.CompletedTask;
+            return this.silo.StartAsync(cancellationToken);
         }
 
         /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                this.silo.Stop();
-            }
-            else
-            {
-                this.silo.Shutdown();
-            }
-
+            await silo.StopAsync(cancellationToken);
             await this.Stopped;
         }
 

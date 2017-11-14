@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -10,12 +11,12 @@ namespace Orleans
     public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private int highStage;
 
-        public LifecycleObservable(Logger logger)
+        public LifecycleObservable(ILoggerFactory loggerFactory)
         {
-            this.logger = logger?.GetLogger(GetType().Name);
+            this.logger = loggerFactory?.CreateLogger(GetType().FullName);
             this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
