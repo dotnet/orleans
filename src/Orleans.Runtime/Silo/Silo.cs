@@ -191,7 +191,7 @@ namespace Orleans.Runtime
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
             }
 
-            services.GetService<SerializationManager>().SetApplicationPartManager(services.GetService<ApplicationPartManager>());
+            services.GetService<SerializationManager>().RegisterSerializers(services.GetService<ApplicationPartManager>());
 
             this.Services = services;
             this.Services.InitializeSiloUnobservedExceptionsHandler();
