@@ -58,14 +58,5 @@ then
     ulimit -n 1024
 fi
 
-echo "Source: $SOURCE"
-echo "Dir: $DIR"
-echo "Repo root: $REPOROOT"
-echo "Args: ${args[@]}"
-
-ls
-
-dotnet --version
-
-dotnet build ./OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}
-dotnet pack ./OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}
+dotnet build OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}
+dotnet pack OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}

@@ -43,4 +43,5 @@ echo "Using code from: $DOCKER_HOST_SHARE_DIR"
 docker run -t --rm --sig-proxy=true \
     --name docker-orleansbuild \
     -v $DOCKER_HOST_SHARE_DIR:/opt/code \
+    -w /opt/code \
     $DOCKER_IMAGENAME $BUILD_COMMAND "$@"
