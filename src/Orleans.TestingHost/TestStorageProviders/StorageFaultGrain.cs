@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.TestingHost
 {
@@ -11,7 +13,7 @@ namespace Orleans.TestingHost
     /// </summary>
     public class StorageFaultGrain : Grain, IStorageFaultGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private Dictionary<GrainReference, Exception> readFaults;
         private Dictionary<GrainReference, Exception> writeFaults;
         private Dictionary<GrainReference, Exception> clearfaults;
@@ -24,7 +26,7 @@ namespace Orleans.TestingHost
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
-            logger = GetLogger($"{typeof (StorageFaultGrain).Name}-{IdentityString}-{RuntimeIdentity}");
+            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
             readFaults = new Dictionary<GrainReference, Exception>();
             writeFaults = new Dictionary<GrainReference, Exception>();
             clearfaults = new Dictionary<GrainReference, Exception>();

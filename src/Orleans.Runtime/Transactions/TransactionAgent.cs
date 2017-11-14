@@ -22,7 +22,7 @@ namespace Orleans.Transactions
         private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> commitCompletions;
         private readonly HashSet<long> outstandingCommits;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private IGrainTimer requestProcessor;
         private Task startTransactionsTask = Task.CompletedTask;
@@ -33,7 +33,7 @@ namespace Orleans.Transactions
         public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService, ILoggerFactory loggerFactory)
             : base(Constants.TransactionAgentSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
-            logger = new LoggerWrapper<TransactionAgent>(loggerFactory);
+            logger = loggerFactory.CreateLogger<TransactionAgent>();
             this.tmService = tmService;
             ReadOnlyTransactionId = 0;
             //abortSequenceNumber = 0;
@@ -185,14 +185,14 @@ namespace Orleans.Transactions
 
                 if (startingTransactions.Count > 0 && startTransactionsTask.IsCompleted)
                 {
-                    logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to start {0} transactions", startingTransactions.Count);
+                    logger.Debug(ErrorCode.Transactions_SendingTMRequest, "Calling TM to start {0} transactions", startingTransactions.Count);
 
                     startTransactionsTask = this.StartTransactions(startingTransactions, startCompletions);
                 }
 
                 if ((committingTransactions.Count > 0 || outstandingCommits.Count > 0) && commitTransactionsTask.IsCompleted)
                 {
-                    logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to commit {0} transactions", committingTransactions.Count);
+                    logger.Debug(ErrorCode.Transactions_SendingTMRequest, "Calling TM to commit {0} transactions", committingTransactions.Count);
 
                     commitTransactionsTask = this.tmService.CommitTransactions(committingTransactions, outstandingCommits).ContinueWith(
                         async commitRequest =>
@@ -234,11 +234,11 @@ namespace Orleans.Transactions
                                 // Refresh cached values using new values from TM.
                                 this.ReadOnlyTransactionId = Math.Max(this.ReadOnlyTransactionId, commitResponse.ReadOnlyTransactionId);
                                 this.abortLowerBound = Math.Max(this.abortLowerBound, commitResponse.AbortLowerBound);
-                                logger.Verbose(ErrorCode.Transactions_ReceivedTMResponse, "{0} transactions committed. readOnlyTransactionId {1}, abortLowerBound {2}", committingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
+                                logger.Debug(ErrorCode.Transactions_ReceivedTMResponse, "{0} transactions committed. readOnlyTransactionId {1}, abortLowerBound {2}", committingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
                             }
                             catch (Exception e)
                             {
-                                logger.Error(ErrorCode.Transactions_TMError, "", e);
+                                logger.Error(ErrorCode.Transactions_TMError, "TM Error", e);
                                 
                                 // Propagate the exception to every transaction in the request.
                                 foreach (var tx in committingTransactions)
@@ -291,7 +291,7 @@ namespace Orleans.Transactions
                 // Refresh cached values using new values from TM.
                 this.ReadOnlyTransactionId = Math.Max(this.ReadOnlyTransactionId, startResponse.ReadOnlyTransactionId);
                 this.abortLowerBound = Math.Max(this.abortLowerBound, startResponse.AbortLowerBound);
-                logger.Verbose(ErrorCode.Transactions_ReceivedTMResponse, "{0} Transactions started. readOnlyTransactionId {1}, abortLowerBound {2}", startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
+                logger.Debug(ErrorCode.Transactions_ReceivedTMResponse, "{0} Transactions started. readOnlyTransactionId {1}, abortLowerBound {2}", startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
             }
             catch (Exception e)
             {

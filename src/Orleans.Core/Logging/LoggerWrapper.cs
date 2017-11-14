@@ -15,6 +15,11 @@ namespace Orleans.Runtime
             logger = new LoggerWrapper(typeof(T).FullName, loggerFactory);
         }
 
+        public LoggerWrapper(ILogger logger, ILoggerFactory loggerFactory)
+        {
+            this.logger = new LoggerWrapper(logger, typeof(T).FullName, loggerFactory);
+        }
+
         public override Severity SeverityLevel => this.logger.SeverityLevel;
 
         public override string Name => this.logger.Name;

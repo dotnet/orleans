@@ -6,6 +6,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
@@ -548,7 +549,34 @@ namespace Orleans.Runtime
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, ILogger logger)
+        {
+            try
+            {
+                return assembly.DefinedTypes;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null && logger.IsEnabled(LogLevel.Warning))
+                {
+                    var message =
+                        $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
+                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+
+                var typeLoadException = exception as ReflectionTypeLoadException;
+                if (typeLoadException != null)
+                {
+                    return typeLoadException.Types?.Where(type => type != null).Select(type => type.GetTypeInfo()) ??
+                           Enumerable.Empty<TypeInfo>();
+                }
+
+                return Enumerable.Empty<TypeInfo>();
+            }
+        }
+
+        //TODO: delete this one after runtime migrate off Logger
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger = null)
         {
             try
             {

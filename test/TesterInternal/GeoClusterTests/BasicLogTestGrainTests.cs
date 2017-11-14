@@ -13,6 +13,7 @@ using Xunit;
 using TestExtensions;
 using Tester;
 using Microsoft.Extensions.Logging;
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.TestingHost.Utils;
 
 namespace Tests.GeoClusterTests
@@ -60,7 +61,7 @@ namespace Tests.GeoClusterTests
                     services.AddLogging(builder =>
                     {
                         TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                        builder.AddFilter("LogViews", LogLevel.Trace);
+                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Trace);
                     });
                 }
             }

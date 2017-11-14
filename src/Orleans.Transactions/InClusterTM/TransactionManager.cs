@@ -130,7 +130,6 @@ namespace Orleans.Transactions
         public long StartTransaction(TimeSpan timeout)
         {
             var transactionId = activeTransactionsTracker.GetNewTransactionId();
-
             Transaction tx = new Transaction(transactionId)
             {
                 State = TransactionState.Started,
@@ -144,6 +143,7 @@ namespace Orleans.Transactions
 
         public void AbortTransaction(long transactionId, OrleansTransactionAbortedException reason)
         {
+            if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Abort transaction {transactionId} due to reason {reason}");
             if (transactionsTable.TryGetValue(transactionId, out Transaction tx))
             {
                 bool justAborted = false;
@@ -200,6 +200,7 @@ namespace Orleans.Transactions
                             if (!transactionsTable.TryGetValue(dependentId, out Transaction dependentTx))
                             {
                                 abort = true;
+                                if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Will abort transaction {transactionInfo.TransactionId} because it doesn't exist in the transaction table");
                                 cascadingDependentId = dependentId;
                                 break;
                             }
@@ -212,6 +213,7 @@ namespace Orleans.Transactions
                                 if (dependentTx.State == TransactionState.Aborted)
                                 {
                                     abort = true;
+                                    if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Will abort transaction {transactionInfo.TransactionId} because one of its dependent transaction {dependentTx.TransactionId} has aborted");
                                     cascadingDependentId = dependentId;
                                     break;
                                 }
