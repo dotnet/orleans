@@ -14,10 +14,14 @@ namespace Orleans.Serialization
 
     internal static class TypeUtilities
     {
-        internal static bool IsOrleansPrimitive(this TypeInfo typeInfo)
+        internal static bool IsOrleansPrimitive(this Type t)
         {
-            var t = typeInfo.AsType();
-            return typeInfo.IsPrimitive || typeInfo.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) || (typeInfo.IsArray && typeInfo.GetElementType().GetTypeInfo().IsOrleansPrimitive());
+            return t.IsPrimitive ||
+                   t.IsEnum ||
+                   t == typeof(string) ||
+                   t == typeof(DateTime) ||
+                   t == typeof(Decimal) ||
+                   (t.IsArray && t.GetElementType().GetTypeInfo().IsOrleansPrimitive());
         }
 
         static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
@@ -214,6 +218,13 @@ namespace Orleans.Serialization
         /// <returns></returns>
         public static bool IsAccessibleFromAssembly(Type type, Assembly assembly)
         {
+            if (type.IsSpecialName) return false;
+            if (type.GetCustomAttribute<CompilerGeneratedAttribute>() != null) return false;
+
+            // Obsolete types can be accessed, however obsolete types which have IsError set cannot.
+            var obsoleteAttr = type.GetCustomAttribute<ObsoleteAttribute>();
+            if (obsoleteAttr != null && obsoleteAttr.IsError) return false;
+
             // Arrays are accessible if their element type is accessible.
             if (type.IsArray) return IsAccessibleFromAssembly(type.GetElementType(), assembly);
 
@@ -231,12 +242,12 @@ namespace Orleans.Serialization
             }
             else if (typeInfo.IsGenericTypeDefinition)
             {
-                // Guard against invalid type constraints, which appear when generating code for some languages, such as F#.
+                // Guard against unrepresentable type constraints, which appear when generating code for some languages, such as F#.
                 foreach (var parameter in typeInfo.GenericTypeParameters)
                 {
                     foreach (var constraint in parameter.GetTypeInfo().GetGenericParameterConstraints())
                     {
-                        if (IsSpecialClass(constraint)) return false;
+                        if (constraint == typeof(Array) || constraint == typeof(Delegate) || constraint == typeof(Enum)) return false;
                     }
                 }
             }
@@ -288,12 +299,6 @@ namespace Orleans.Serialization
             }
 
             return false;
-        }
-
-        private static bool IsSpecialClass(Type type)
-        {
-            return type == typeof(object) || type == typeof(Array) || type == typeof(Delegate) ||
-                   type == typeof(Enum) || type == typeof(ValueType);
         }
     }
 }

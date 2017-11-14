@@ -16,10 +16,10 @@ namespace NetCore.Tests
 
         public ExceptionTests()
         {
-            this.silo = SiloHostBuilder.CreateDefault().AddApplicationPartsFromAppDomain().ConfigureLocalHostPrimarySilo().Build();
+            this.silo = SiloHostBuilder.CreateDefault().ConfigureApplicationPartManager(parts => parts.AddFromAppDomain()).ConfigureLocalHostPrimarySilo().Build();
             this.silo.StartAsync().GetAwaiter().GetResult();
 
-            this.client = ClientBuilder.CreateDefault().AddApplicationPartsFromAppDomain().UseConfiguration(ClientConfiguration.LocalhostSilo()).Build();
+            this.client = ClientBuilder.CreateDefault().ConfigureApplicationPartManager(parts => parts.AddFromAppDomain()).UseConfiguration(ClientConfiguration.LocalhostSilo()).Build();
             this.client.Connect().GetAwaiter().GetResult();
         }
 

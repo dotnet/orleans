@@ -24,11 +24,11 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_AssembliesTest()
         {
-            var builder = SiloHostBuilder.CreateDefault();
+            var builder = (ISiloHostBuilder) new SiloHostBuilder();
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
             // Adding an application assembly causes the 
-            builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).AddApplicationPart(typeof(IAccountGrain).Assembly);
+            builder = new SiloHostBuilder().UseConfiguration(new ClusterConfiguration()).ConfigureApplicationPartManager(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly));
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
@@ -41,7 +41,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault()
+                                         .ConfigureApplicationPartManager(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+                                         .UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
@@ -54,7 +56,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleBuildTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault()
+                                         .ConfigureApplicationPartManager(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+                                         .UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
             using (builder.Build())
             {
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -67,7 +71,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClusterConfiguration()).UseConfiguration(new ClusterConfiguration());
+            var builder = SiloHostBuilder.CreateDefault()
+                                         .ConfigureApplicationPartManager(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+                                         .ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClusterConfiguration()).UseConfiguration(new ClusterConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.Build());
         }
 
@@ -77,7 +83,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NullConfigurationTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault()
+                                         .ConfigureApplicationPartManager(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+                                         .ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
 
@@ -87,7 +95,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = SiloHostBuilder.CreateDefault()
+                                         .ConfigureApplicationPartManager(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+                                         .UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
 

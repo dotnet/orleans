@@ -35,8 +35,7 @@ namespace Orleans.TestingHost
             ISiloHostBuilder builder = builderFactory
                 .CreateSiloBuilder(name, config)
                 .ConfigureServices(services => services.AddSingleton<TestHooksSystemTarget>())
-                .AddApplicationPartsFromAppDomain()
-                .AddApplicationPartsFromBasePath();
+                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
             this.host = builder.Build();
             InitializeTestHooksSystemTarget();
             this.AppDomainTestHook = new AppDomainTestHooks(this.host);

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -7,6 +8,9 @@ using Orleans.Configuration.Options;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Configuration;
+using Orleans.ApplicationParts;
+using Orleans.CodeGeneration;
+using Orleans.Messaging;
 
 namespace Orleans
 {
@@ -172,6 +176,47 @@ namespace Orleans
         {
             return builder.ConfigureServices(collection =>
                 collection.UseStaticGatewayListProvider(configureOptions));
+        }
+
+        /// <summary>
+        /// Returns the <see cref="ApplicationPartManager"/> for this builder.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The <see cref="ApplicationPartManager"/> for this builder.</returns>
+        public static ApplicationPartManager GetApplicationPartManager(this IClientBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
+
+        /// <summary>
+        /// Adds an <see cref="IApplicationPart"/> to the <see cref="ApplicationPartManager"/>.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="assembly">The assembly.</param>
+        /// <returns>The builder.</returns>
+        public static IClientBuilder AddApplicationPart(this IClientBuilder builder, Assembly assembly)
+        {
+            builder.GetApplicationPartManager().AddApplicationPart(new AssemblyPart(assembly));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configures the <see cref="ApplicationPartManager"/> for this builder.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configure">The configuration delegate.</param>
+        /// <returns>The builder.</returns>
+        public static IClientBuilder ConfigureApplicationPartManager(this IClientBuilder builder, Action<IApplicationPartManager> configure)
+        {
+            if (builder == null)
+            {
+                throw new ArgumentNullException(nameof(builder));
+            }
+
+            if (configure == null)
+            {
+                throw new ArgumentNullException(nameof(configure));
+            }
+
+            configure(builder.GetApplicationPartManager());
+            return builder;
         }
     }
 }

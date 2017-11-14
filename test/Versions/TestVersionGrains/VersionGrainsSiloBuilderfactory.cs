@@ -1,7 +1,5 @@
-﻿using System;
-using System.IO;
-using System.Net;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Runtime.Placement;
 using UnitTests.GrainInterfaces;
 using Orleans.Hosting;
@@ -20,8 +18,7 @@ namespace TestVersionGrains
                 .ConfigureSiloName(siloName)
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureServices(this.ConfigureServices)
-                .AddApplicationPartsFromAppDomain()
-                .AddApplicationPartsFromBasePath()
+                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
         }
 

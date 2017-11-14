@@ -23,11 +23,11 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_AssembliesTest()
         {
-            var builder = ClientBuilder.CreateDefault();
+            var builder = (IClientBuilder)new ClientBuilder();
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
-            // Adding an application assembly causes the 
-            builder = ClientBuilder.CreateDefault().AddApplicationPart(typeof(IAccountGrain).Assembly);
+            // Adding an application assembly allows the builder to build successfully.
+            builder = new ClientBuilder().AddApplicationPart(typeof(IAccountGrain).Assembly);
             using (var client = builder.Build())
             {
                 Assert.NotNull(client);

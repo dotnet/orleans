@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.ApplicationParts;
 
 namespace Orleans.Hosting
 {
@@ -107,6 +109,47 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices(collection => collection.AddLogging(configureLogging));
+        }
+
+        /// <summary>
+        /// Returns the <see cref="ApplicationPartManager"/> for this instance.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
+        public static ApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
+
+        /// <summary>
+        /// Adds an <see cref="IApplicationPart"/> to the <see cref="ApplicationPartManager"/>.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="assembly">The assembly.</param>
+        /// <returns>The builder.</returns>
+        public static ISiloHostBuilder AddApplicationPart(this ISiloHostBuilder builder, Assembly assembly)
+        {
+            builder.GetApplicationPartManager().AddApplicationPart(new AssemblyPart(assembly));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configure">The configuration delegate.</param>
+        /// <returns>The builder.</returns>
+        public static ISiloHostBuilder ConfigureApplicationPartManager(this ISiloHostBuilder builder, Action<IApplicationPartManager> configure)
+        {
+            if (builder == null)
+            {
+                throw new ArgumentNullException(nameof(builder));
+            }
+
+            if (configure == null)
+            {
+                throw new ArgumentNullException(nameof(configure));
+            }
+
+            configure(builder.GetApplicationPartManager());
+            return builder;
         }
     }
 }
