@@ -9,22 +9,23 @@ def platformList = ['Linux', 'Windows_NT']
 
 platformList.each { platform ->
     if (platform == 'Linux') {
-        def os = 'Linux'
-        def architecture = 'x64'
-        def configuration = 'Release'
-        def isPR = true
-        def osUsedForMachineAffinity = 'Ubuntu16.04';
-        def buildCommand = "./build.sh --configuration ${configuration} --targets Default"
+        [true, false].each { isPR ->
+            def os = 'Linux'
+            def architecture = 'x64'
+            def configuration = 'Release'
+            def osUsedForMachineAffinity = 'Ubuntu16.04';
+            def buildCommand = "./build.sh --configuration ${configuration} --targets Default"
 
-        def newJob = job(Utilities.getFullJobName(project, platform, isPR)) {
-            steps {
-                shell(buildCommand)
+            def newJob = job(Utilities.getFullJobName(project, platform, isPR)) {
+                steps {
+                    shell(buildCommand)
+                }
             }
-        }
 
-        Utilities.setMachineAffinity(newJob, osUsedForMachineAffinity, 'latest-or-auto')
-        Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
-        Utilities.addGithubPRTriggerForBranch(newJob, branch, "${os} ${architecture} ${configuration} Build")
+            Utilities.setMachineAffinity(newJob, osUsedForMachineAffinity, 'latest-or-auto')
+            Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
+            Utilities.addGithubPRTriggerForBranch(newJob, branch, "${os} ${architecture} ${configuration} Build")
+        }
     }
     else if (platform == 'Windows_NT') {
         [true, false].each { isPR ->
