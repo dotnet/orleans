@@ -21,6 +21,7 @@ namespace Orleans
             services.AddLogging();
             //temporary change until runtime moved away from Logger
             services.TryAddSingleton(typeof(LoggerWrapper<>));
+            services.TryAddSingleton<ExecutorService>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();

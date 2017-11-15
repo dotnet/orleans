@@ -34,8 +34,9 @@ namespace Orleans.Runtime.GrainDirectory
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            :base(loggerFactory)
+            :base(executorService, loggerFactory)
         {
             this.router = router;
             this.logger = logger;

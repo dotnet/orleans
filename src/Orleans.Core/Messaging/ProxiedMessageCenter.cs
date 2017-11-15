@@ -94,6 +94,7 @@ namespace Orleans.Messaging
         private readonly IClusterConnectionStatusListener connectionStatusListener;
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan openConnectionTimeout;
+        private readonly ExecutorService executorService;
 
         public ProxiedMessageCenter(
             ClientConfiguration config,
@@ -105,12 +106,14 @@ namespace Orleans.Messaging
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,
             IClusterConnectionStatusListener connectionStatusListener,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> messagingOptions)
         {
             this.loggerFactory = loggerFactory;
             this.openConnectionTimeout = messagingOptions.Value.OpenConnectionTimeout;
             this.SerializationManager = serializationManager;
+            this.executorService = executorService;
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
@@ -189,7 +192,7 @@ namespace Orleans.Messaging
                 {
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory, this.openConnectionTimeout);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, executorService, this.loggerFactory, this.openConnectionTimeout);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
@@ -220,7 +223,7 @@ namespace Orleans.Messaging
                     Uri addr = gatewayNames[msgNumber % numGateways];
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory, this.openConnectionTimeout);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
@@ -256,7 +259,7 @@ namespace Orleans.Messaging
                         if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
-                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.loggerFactory, this.openConnectionTimeout);
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
                             gatewayConnections[addr] = gatewayConnection;
                             if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));

@@ -98,6 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory)
         {
             this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
@@ -126,9 +127,10 @@ namespace Orleans.Runtime.GrainDirectory
                     this,
                     this.DirectoryCache,
                     activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly(),
-                    grainFactory,
+                    grainFactory, 
+                    executorService,
                     loggerFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, loggerFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, loggerFactory);
 
             if (globalConfig.SeedNodes.Count > 0)
             {

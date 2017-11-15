@@ -37,14 +37,14 @@ namespace Orleans.Messaging
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
-            : base("GatewayClientSender_" + address, mc.SerializationManager, loggerFactory)
+        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ExecutorService executorService, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
+            : base("GatewayClientSender_" + address, mc.SerializationManager, executorService, loggerFactory)
         {
             this.messageFactory = messageFactory;
             this.openConnectionTimeout = openConnectionTimeout;
             Address = address;
             MsgCenter = mc;
-            receiver = new GatewayClientReceiver(this, mc.SerializationManager, loggerFactory);
+            receiver = new GatewayClientReceiver(this, mc.SerializationManager, executorService, loggerFactory);
             lastConnect = new DateTime();
             IsLive = true;
         }

@@ -68,6 +68,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
+            services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
             services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();

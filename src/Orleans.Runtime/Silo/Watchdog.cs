@@ -18,8 +18,8 @@ namespace Orleans.Runtime
         private readonly CounterStatistic watchdogChecks;
         private CounterStatistic watchdogFailedChecks;
 
-        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILoggerFactory loggerFactory)
-            :base(loggerFactory)
+        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ExecutorService executorService, ILoggerFactory loggerFactory)
+            :base(executorService, loggerFactory)
         {
             logger = new LoggerWrapper<Watchdog>(loggerFactory);
             healthCheckPeriod = watchdogPeriod;

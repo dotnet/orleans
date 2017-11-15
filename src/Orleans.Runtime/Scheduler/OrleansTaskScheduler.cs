@@ -39,18 +39,20 @@ namespace Orleans.Runtime.Scheduler
                 NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
                 LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
                 performanceMetrics,
+                new ExecutorService(), 
                 loggerFactory);
         }
 
-        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
+        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
                     config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
-                    performanceMetrics, loggerFactory)
+                    performanceMetrics, executorService, loggerFactory)
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, 
+            ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
             this.logger = new LoggerWrapper<OrleansTaskScheduler>(loggerFactory);
             this.loggerFactory = loggerFactory;
@@ -63,7 +65,7 @@ namespace Orleans.Runtime.Scheduler
             RunQueue = new WorkQueue();
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
-            Pool = new WorkerPool(this, performanceMetrics, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
+            Pool = new WorkerPool(this, performanceMetrics, executorService, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
