@@ -89,7 +89,8 @@ namespace Orleans.CodeGeneration
                 applicationPartManager.AddApplicationPart(typeof(RuntimeVersion).Assembly);
                 applicationPartManager.AddApplicationPartsFromReferences(grainAssembly);
                 applicationPartManager.AddApplicationPartsFromReferences(typeof(RuntimeVersion).Assembly);
-                var serializationManager = new SerializationManager(null, serializationProviderOptions, applicationPartManager, loggerFactory, new CachedTypeResolver());
+                var serializationManager = new SerializationManager(null, serializationProviderOptions, loggerFactory, new CachedTypeResolver());
+                serializationManager.RegisterSerializers(applicationPartManager);
                 var codeGenerator = new RoslynCodeGenerator(serializationManager, applicationPartManager, loggerFactory);
                 return codeGenerator.GenerateSourceForAssembly(grainAssembly);
             }

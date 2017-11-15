@@ -34,6 +34,7 @@ namespace Orleans
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
+            services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<StreamProviderManager>();
