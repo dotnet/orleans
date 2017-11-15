@@ -237,7 +237,7 @@ namespace Orleans.Serialization
             if (constructors == null || constructors.Length < 1)
                 return null;
 
-            var serializer = ActivatorUtilities.CreateInstance(this.ServiceProvider, serializerType);
+            var serializer = ActivatorUtilities.GetServiceOrCreateInstance(this.ServiceProvider, serializerType);
             return serializer;
         }
 

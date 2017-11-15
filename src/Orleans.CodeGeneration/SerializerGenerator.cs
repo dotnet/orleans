@@ -21,31 +21,31 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Code generator which generates serializers.
     /// Sample of generated serializer:
-    //[global::System.CodeDom.Compiler.GeneratedCodeAttribute("Orleans-CodeGenerator", "2.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute, global::Orleans.CodeGeneration.SerializerAttribute(typeof(global::MyType))]
-    //internal sealed class OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer
-    //{
-    //    private readonly global::System.Func<global::MyType, global::System.Int32> getField0;
-    //    private readonly global::System.Action<global::MyType, global::System.Int32> setField0;
-    //    public OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer(global::Orleans.Serialization.IFieldUtils fieldUtils)
-    //    {
-    //        [...]
-    //    }
-    //    [global::Orleans.CodeGeneration.CopierMethodAttribute]
-    //    public global::System.Object DeepCopier(global::System.Object original, global::Orleans.Serialization.ICopyContext context)
-    //    {
-    //            [...]
-    //    }
-    //    [global::Orleans.CodeGeneration.SerializerMethodAttribute]
-    //    public void Serializer(global::System.Object untypedInput, global::Orleans.Serialization.ISerializationContext context, global::System.Type expected)
-    //    {
-    //            [...]
-    //    }
-    //    [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
-    //    public global::System.Object Deserializer(global::System.Type expected, global::Orleans.Serialization.IDeserializationContext context)
-    //    {
-    //            [...]
-    //    }
-    //}
+    /// [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Orleans-CodeGenerator", "2.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute, global::Orleans.CodeGeneration.SerializerAttribute(typeof(global::MyType))]
+    /// internal sealed class OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer
+    /// {
+    ///    private readonly global::System.Func<global::MyType, global::System.Int32> getField0;
+    ///    private readonly global::System.Action<global::MyType, global::System.Int32> setField0;
+    ///    public OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer(global::Orleans.Serialization.IFieldUtils fieldUtils)
+    ///    {
+    ///        [...]
+    ///    }
+    ///    [global::Orleans.CodeGeneration.CopierMethodAttribute]
+    ///    public global::System.Object DeepCopier(global::System.Object original, global::Orleans.Serialization.ICopyContext context)
+    ///    {
+    ///            [...]
+    ///    }
+    ///    [global::Orleans.CodeGeneration.SerializerMethodAttribute]
+    ///    public void Serializer(global::System.Object untypedInput, global::Orleans.Serialization.ISerializationContext context, global::System.Type expected)
+    ///    {
+    ///            [...]
+    ///    }
+    ///    [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
+    ///    public global::System.Object Deserializer(global::System.Type expected, global::Orleans.Serialization.IDeserializationContext context)
+    ///    {
+    ///            [...]
+    ///    }
+    ///}
     /// </summary>
     public static class SerializerGenerator
     {
