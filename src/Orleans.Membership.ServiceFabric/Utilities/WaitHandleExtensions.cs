@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.Orleans.ServiceFabric.Utilities
+namespace Orleans.Membership.ServiceFabric.Utilities
 {
     internal static class WaitHandleExtensions
     {

@@ -1,17 +1,14 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Fabric;
+using System.Fabric.Query;
 using System.Threading;
-using Microsoft.Orleans.ServiceFabric.Models;
+using System.Threading.Tasks;
+using Microsoft.ServiceFabric.Services.Client;
 
-namespace Microsoft.Orleans.ServiceFabric.Utilities
+namespace Orleans.Membership.ServiceFabric.Utilities
 {
-    using System;
-    using System.Fabric;
-    using System.Fabric.Query;
-    using System.Threading.Tasks;
-
-    using Microsoft.ServiceFabric.Services.Client;
-
     internal class FabricQueryManager : IFabricQueryManager
     {
         private readonly ConcurrentDictionary<Uri, ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition>> previousResolves =

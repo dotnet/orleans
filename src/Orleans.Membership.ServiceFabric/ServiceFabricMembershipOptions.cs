@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
     /// <summary>
     /// Options for Service Fabric cluster membership.
