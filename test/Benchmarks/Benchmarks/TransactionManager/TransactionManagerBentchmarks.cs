@@ -16,7 +16,7 @@ using TestExtensions;
 
 namespace Benchmarks.TransactionManager
 {
-    public class TransactionManagerBentchmarks
+    public class TransactionManagerBenchmarks
     {
         private const int TransactionsPerRun = 500000;
         private const int ConcurrentTransactionsTransactions = TransactionsPerRun/10;

@@ -36,7 +36,7 @@ namespace Benchmarks
                 "Running Azure TransactionManager benchmark",
                 () =>
                 {
-                    return new TransactionManagerBentchmarks();
+                    return new TransactionManagerBenchmarks();
                 },
                 benchmark => benchmark.RunAgainstAzure(),
                 benchmark => { });
@@ -47,7 +47,7 @@ namespace Benchmarks
                 "Running Azure TransactionManager benchmark",
                 () =>
                 {
-                    return new TransactionManagerBentchmarks();
+                    return new TransactionManagerBenchmarks();
                 },
                 benchmark => benchmark.RunAgainstMemory(),
                 benchmark => { });
