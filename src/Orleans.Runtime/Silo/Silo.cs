@@ -687,7 +687,6 @@ namespace Orleans.Runtime
         /// </summary>
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            this.gracefully = !cancellationToken.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
             bool stopAlreadyInProgress = false;
             lock (lockable)
