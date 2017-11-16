@@ -8,11 +8,20 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Observable lifecycle
+    /// Notes:
+    /// - Single use, does not support multiple start/stop cycles.
+    /// - Once started, no other observers can be subscribed.
+    /// - OnStart starts stages in order until first failure or cancelation.
+    /// - OnStop stops states in reverse order starting from highest started stage.
+    /// - OnStop stops all stages regardless of errors unless canceled.
+    /// </summary>
     public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
         private readonly ILogger logger;
-        private int highStage;
+        private int? highStage = null;
 
         public LifecycleObservable(ILoggerFactory loggerFactory)
         {
@@ -22,6 +31,7 @@ namespace Orleans
 
         public async Task OnStart(CancellationToken ct)
         {
+            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
                 foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
@@ -46,6 +56,8 @@ namespace Orleans
 
         public async Task OnStop(CancellationToken ct)
         {
+            // if not started, do nothing
+            if (!this.highStage.HasValue) return;
             foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key)
@@ -71,6 +83,7 @@ namespace Orleans
         public IDisposable Subscribe(int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
+            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);
             this.subscribers.TryAdd(orderedObserver, orderedObserver);

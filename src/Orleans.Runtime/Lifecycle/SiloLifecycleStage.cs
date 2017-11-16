@@ -9,21 +9,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initialize silo runtime
         /// </summary>
-        RuntimeInitialize = (1 << 10),
+        RuntimeInitialize = 1000,
 
         /// <summary>
         /// Start runtime services
         /// </summary>
-        RuntimeServices = RuntimeInitialize + (1 << 10),
+        RuntimeServices = 2000,
 
         /// <summary>
         /// Start application layer services
         /// </summary>
-        ApplicationServices = RuntimeServices + (1 << 10),
+        ApplicationServices = 3000,
 
         /// <summary>
         /// Silo is active and available to service requests
         /// </summary>
-        SiloActive = ApplicationServices + (1 << 10),
+        SiloActive = 4000,
     }
 }
