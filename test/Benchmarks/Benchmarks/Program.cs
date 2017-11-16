@@ -5,6 +5,7 @@ using System.Linq;
 using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
+using Benchmarks.TransactionManager;
 
 namespace Benchmarks
 {
@@ -28,7 +29,29 @@ namespace Benchmarks
             ["Serialization"] = () =>
             {
                 BenchmarkRunner.Run<SerializationBenchmarks>();
-            }
+            },
+            ["TransactionManager.Azure"] = () =>
+            {
+                RunBenchmark(
+                "Running Azure TransactionManager benchmark",
+                () =>
+                {
+                    return new TransactionManagerBenchmarks();
+                },
+                benchmark => benchmark.RunAgainstAzure(),
+                benchmark => { });
+            },
+            ["TransactionManager.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running Azure TransactionManager benchmark",
+                () =>
+                {
+                    return new TransactionManagerBenchmarks();
+                },
+                benchmark => benchmark.RunAgainstMemory(),
+                benchmark => { });
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
