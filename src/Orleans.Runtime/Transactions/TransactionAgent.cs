@@ -14,36 +14,21 @@ namespace Orleans.Transactions
     internal class TransactionAgentMetrics
     {
         //TPS in current monitor window
-        private const string BatchStartTransanctionsDeltaTPS = "TransactionAgent.BatchStartTransactions.Delta.TPS";
+        private const string BatchStartTransanctionsTPS = "TransactionAgent.BatchStartTransactions.TPS";
         //avg latency in current monitor window
-        private const string AvgBatchStartTransactionsDeltaLatency = "TransactionAgent.BatchStartTransactions.Delta.AvgLatency";
-        private const string BatchCommitTransactionsDeltaTPS = "TransactionAgent.BatchCommitTransactions.Delta.TPS";
-        private const string AvgBatchCommitTransactionsDeltaLatency = "TransactionAgent.BatchCommitTransactions.Delta.AvgLatency";
-
+        private const string AvgBatchStartTransactionsLatency = "TransactionAgent.BatchStartTransactions.AvgLatency";
+        private const string AvgBatchStartTransactionsBatchSize = "TransactionAgent.BatchStartTransactions.AvgBatchSize";
+        private const string BatchCommitTransactionsTPS = "TransactionAgent.BatchCommitTransactions.TPS";
+        private const string AvgBatchCommitTransactionsLatency = "TransactionAgent.BatchCommitTransactions.AvgLatency";
+        private const string AvgBatchCommitTransactionsSize = "TransactionAgent.BatchCommitTransactions.AvgBatchSize";
         internal int BatchStartTransactionsRequestCounter { get; set; }
 
         internal int BatchCommitTransactionsRequestsCounter { get; set; }
-        private TimeSpan batchStartTransactionsRequestLatencyCounter = TimeSpan.Zero;
-        internal TimeSpan BatchStartTransactionsRequestLatencyCounter
-        {
-            get { return batchStartTransactionsRequestLatencyCounter; }
-            set
-            {
-                batchStartTransactionsRequestLatencyCounter = value;
-                this.periodicMonitor.TryAction(DateTime.UtcNow);
-            }
-        }
-        private TimeSpan batchCommitTransactionsRequestLatencyCounter = TimeSpan.Zero;
+        internal TimeSpan BatchStartTransactionsRequestLatencyCounter { get; set; } = TimeSpan.Zero;
 
-        internal TimeSpan BatchCommitTransactionsRequestLatencyCounter
-        {
-            get { return batchCommitTransactionsRequestLatencyCounter; }
-            set
-            {
-                batchCommitTransactionsRequestLatencyCounter = value;
-                this.periodicMonitor.TryAction(DateTime.UtcNow);
-            }
-        }
+        internal TimeSpan BatchCommitTransactionsRequestLatencyCounter { get; set; } = TimeSpan.Zero;
+        internal int BatchStartTransactionsRequestSizeCounter { get; set; }
+        internal int BatchCommitTransactionsRequestSizeCounter { get; set; }
         private DateTime lastReportTime = DateTime.UtcNow;
         private ITelemetryProducer telemetryProducer;
         private PeriodicAction periodicMonitor;
@@ -54,40 +39,52 @@ namespace Orleans.Transactions
             this.periodicMonitor = new PeriodicAction(interval, this.ReportMetrics);
         }
 
+        public void TryReportMetrics()
+        {
+            this.periodicMonitor.TryAction(DateTime.UtcNow);
+        }
+
         private void ResetCounters(DateTime lastReportTimeStamp)
         {
             //record last report time stamp
             lastReportTime = lastReportTimeStamp;
             this.BatchStartTransactionsRequestCounter = 0;
             this.BatchCommitTransactionsRequestsCounter = 0;
-            this.batchStartTransactionsRequestLatencyCounter = TimeSpan.Zero;
-            this.batchCommitTransactionsRequestLatencyCounter = TimeSpan.Zero;
+            this.BatchStartTransactionsRequestLatencyCounter = TimeSpan.Zero;
+            this.BatchCommitTransactionsRequestLatencyCounter = TimeSpan.Zero;
+            this.BatchCommitTransactionsRequestSizeCounter = 0;
+            this.BatchStartTransactionsRequestSizeCounter = 0;
         }
 
         private void ReportMetrics()
         {
             var now = DateTime.UtcNow;
-           
+            var timeSinceLastReportInSeconds = Math.Max(1, (now - this.lastReportTime).TotalSeconds);
             //batch start metrics
-            var batchStartTransactionTPS = BatchStartTransactionsRequestCounter / (now - lastReportTime).TotalSeconds;
-            this.telemetryProducer.TrackMetric(BatchStartTransanctionsDeltaTPS, batchStartTransactionTPS);
+            var batchStartTransactionTPS = BatchStartTransactionsRequestCounter / timeSinceLastReportInSeconds;
+            this.telemetryProducer.TrackMetric(BatchStartTransanctionsTPS, batchStartTransactionTPS);
             if (BatchStartTransactionsRequestCounter > 0)
             {
-                var avgBatchStartTransactionLatency = batchStartTransactionsRequestLatencyCounter.Divide(BatchStartTransactionsRequestCounter);
-                this.telemetryProducer.TrackMetric(AvgBatchStartTransactionsDeltaLatency,
+                var avgBatchStartTransactionLatency = BatchStartTransactionsRequestLatencyCounter.Divide(BatchStartTransactionsRequestCounter);
+                this.telemetryProducer.TrackMetric(AvgBatchStartTransactionsLatency,
                     avgBatchStartTransactionLatency);
+                var avgBatchStartSize = BatchStartTransactionsRequestSizeCounter / BatchStartTransactionsRequestCounter;
+                this.telemetryProducer.TrackMetric(AvgBatchStartTransactionsBatchSize, avgBatchStartSize);
             }
 
             //batch commit metrics
-            var batchCommitTransactionTPS = BatchCommitTransactionsRequestsCounter / (now - lastReportTime).TotalSeconds;
-            this.telemetryProducer.TrackMetric(BatchCommitTransactionsDeltaTPS, batchCommitTransactionTPS);
+            var batchCommitTransactionTPS = BatchCommitTransactionsRequestsCounter / timeSinceLastReportInSeconds;
+            this.telemetryProducer.TrackMetric(BatchCommitTransactionsTPS, batchCommitTransactionTPS);
+           
             if (BatchCommitTransactionsRequestsCounter > 0)
             {
                 var avgBatchCommitTransactionLatency =
-                batchCommitTransactionsRequestLatencyCounter.Divide(BatchCommitTransactionsRequestsCounter);
-                this.telemetryProducer.TrackMetric(AvgBatchCommitTransactionsDeltaLatency,
+                BatchCommitTransactionsRequestLatencyCounter.Divide(BatchCommitTransactionsRequestsCounter);
+                this.telemetryProducer.TrackMetric(AvgBatchCommitTransactionsLatency,
                     avgBatchCommitTransactionLatency);
-
+                var avgBatchCommitSzie =
+                    BatchCommitTransactionsRequestSizeCounter / BatchCommitTransactionsRequestsCounter;
+                this.telemetryProducer.TrackMetric(AvgBatchCommitTransactionsSize, avgBatchCommitSzie);
             }
             
             this.ResetCounters(now);
@@ -244,6 +241,7 @@ namespace Orleans.Transactions
             
             while (transactionCommitQueue.Count > 0 || transactionStartQueue.Count > 0 || outstandingCommits.Count > 0)
             {
+                this.metrics.TryReportMetrics();
                 var initialAbortLowerBound = this.abortLowerBound;
 
                 await Task.Yield();
@@ -299,6 +297,7 @@ namespace Orleans.Transactions
                     }
                 }
             }
+            this.metrics.TryReportMetrics();
 
         }
 
@@ -309,9 +308,18 @@ namespace Orleans.Transactions
             try
             {
                 metrics.BatchCommitTransactionsRequestsCounter++;
-                var commitResponse = await this.tmService.CommitTransactions(committingTransactions, outstandingCommits);
-                metrics.BatchCommitTransactionsRequestLatencyCounter += stopWatch.Elapsed;
-                stopWatch.Stop();
+                metrics.BatchCommitTransactionsRequestSizeCounter += committingTransactions.Count;
+                CommitTransactionsResponse commitResponse;
+                try
+                {
+                    commitResponse = await this.tmService.CommitTransactions(committingTransactions, outstandingCommits);
+                }
+                finally
+                {
+                    stopWatch.Stop();
+                    metrics.BatchCommitTransactionsRequestLatencyCounter += stopWatch.Elapsed;
+                }
+
                 var commitResults = commitResponse.CommitResult;
 
                 // reply to clients with the outcomes we received from the TM.
@@ -353,8 +361,6 @@ namespace Orleans.Transactions
             }
             catch (Exception e)
             {
-                metrics.BatchCommitTransactionsRequestLatencyCounter += stopWatch.Elapsed;
-                stopWatch.Stop();
                 logger.Error(ErrorCode.Transactions_TMError, "TM Error", e);
                 // Propagate the exception to every transaction in the request.
                 foreach (var tx in committingTransactions)
@@ -380,9 +386,17 @@ namespace Orleans.Transactions
             try
             {
                 metrics.BatchStartTransactionsRequestCounter++;
-                StartTransactionsResponse startResponse = await this.tmService.StartTransactions(startingTransactions);
-                metrics.BatchStartTransactionsRequestLatencyCounter += stopWatch.Elapsed;
-                stopWatch.Stop();
+                metrics.BatchStartTransactionsRequestSizeCounter += startingTransactions.Count;
+                StartTransactionsResponse startResponse;
+                try
+                {
+                    startResponse = await this.tmService.StartTransactions(startingTransactions);
+                }
+                finally
+                {
+                    stopWatch.Stop();
+                    metrics.BatchStartTransactionsRequestLatencyCounter += stopWatch.Elapsed;
+                }
                 List<long> startedIds = startResponse.TransactionId;
 
                 // reply to clients with results
@@ -395,14 +409,14 @@ namespace Orleans.Transactions
                 // Refresh cached values using new values from TM.
                 this.ReadOnlyTransactionId = Math.Max(this.ReadOnlyTransactionId, startResponse.ReadOnlyTransactionId);
                 this.abortLowerBound = Math.Max(this.abortLowerBound, startResponse.AbortLowerBound);
-                logger.Debug(ErrorCode.Transactions_ReceivedTMResponse, "{0} Transactions started. readOnlyTransactionId {1}, abortLowerBound {2}", startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
+                logger.Debug(ErrorCode.Transactions_ReceivedTMResponse,
+                    "{0} Transactions started. readOnlyTransactionId {1}, abortLowerBound {2}",
+                    startingTransactions.Count, ReadOnlyTransactionId, abortLowerBound);
             }
             catch (Exception e)
             {
-                metrics.BatchStartTransactionsRequestLatencyCounter += stopWatch.Elapsed;
-                stopWatch.Stop();
                 logger.Error(ErrorCode.Transactions_TMError, "Transaction manager failed to start transactions.", e);
-                
+
                 foreach (var completion in startCompletions)
                 {
                     TransactionsStatisticsGroup.OnTransactionStartFailed();
