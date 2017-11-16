@@ -2,7 +2,7 @@
 
 namespace Orleans
 {
-    internal class PeriodicAction
+    public class PeriodicAction
     {
         private readonly Action action;
         private readonly TimeSpan period;
