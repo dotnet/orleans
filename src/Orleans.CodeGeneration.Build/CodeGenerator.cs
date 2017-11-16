@@ -10,7 +10,6 @@ using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
 using Orleans.Hosting;
-using Orleans.Hosting;
 using Orleans.Metadata;
 #if NETCOREAPP2_0
 using System.Runtime.Loader;
