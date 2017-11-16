@@ -339,7 +339,7 @@ namespace Orleans
             }
         }
         
-        protected virtual Task OnSetupState(t)
+        protected virtual Task OnSetupState()
         {
             return this.ReadStateAsync();
         }
