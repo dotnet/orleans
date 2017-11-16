@@ -317,7 +317,7 @@ namespace Orleans
             lifecycle.Subscribe(GrainLifecycleStage.SetupState, SetupState);
         }
 
-        private virtual async Task SetupState(CancellationToken ct)
+        private async Task SetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return;
