@@ -314,10 +314,10 @@ namespace Orleans
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(GrainLifecycleStage.SetupState, SetupState);
         }
 
-        private async Task OnSetupState(CancellationToken ct)
+        private virtual async Task SetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return;
@@ -325,7 +325,7 @@ namespace Orleans
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
-                await this.ReadStateAsync();
+                await this.OnSetupState();
                 sw.Stop();
                 // TODO: find a way to reenable StorageStatisticsGroup here
                 //StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
@@ -337,6 +337,11 @@ namespace Orleans
                 //StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
                 throw;
             }
+        }
+        
+        protected virtual Task OnSetupState(CancellationToken ct)
+        {
+            return this.ReadStateAsync();
         }
     }
 }
