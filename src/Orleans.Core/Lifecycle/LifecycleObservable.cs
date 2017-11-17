@@ -15,7 +15,7 @@ namespace Orleans
     /// - Once started, no other observers can be subscribed.
     /// - OnStart starts stages in order until first failure or cancelation.
     /// - OnStop stops states in reverse order starting from highest started stage.
-    /// - OnStop stops all stages regardless of errors unless canceled.
+    /// - OnStop stops all stages regardless of errors even if canceled canceled.
     /// </summary>
     public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
@@ -67,10 +67,6 @@ namespace Orleans
                 this.highStage = observerGroup.Key;
                 try
                 {
-                    if (ct.IsCancellationRequested)
-                    {
-                        throw new OrleansLifecycleCanceledException("Lifecycle stop canceled by request");
-                    }
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                 }
                 catch (Exception ex)
