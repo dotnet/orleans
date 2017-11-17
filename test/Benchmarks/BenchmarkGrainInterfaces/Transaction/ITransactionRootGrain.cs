@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace BenchmarkGrainInterfaces.Transaction
 {
-    public interface ITransactioinRootGrain : IGrainWithGuidKey
+    public interface ITransactionRootGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.RequiresNew)]
         Task Run(List<int> grains);

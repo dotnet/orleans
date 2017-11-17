@@ -79,7 +79,7 @@ namespace BenchmarkGrains.Transaction
 
         private Task StartTransaction(int index)
         {
-            return GrainFactory.GetGrain<ITransactioinRootGrain>(Guid.Empty).Run(new List<int>() { index * 2, index * 2 + 1 });
+            return GrainFactory.GetGrain<ITransactionRootGrain>(Guid.Empty).Run(new List<int>() { index * 2, index * 2 + 1 });
         }
     }
 }

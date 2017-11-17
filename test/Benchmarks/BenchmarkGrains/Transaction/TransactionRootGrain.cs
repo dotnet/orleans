@@ -10,7 +10,7 @@ namespace BenchmarkGrains.Transaction
 {
     [Reentrant]
     [StatelessWorker]
-    public class TransactioinRootGrain : Grain, ITransactioinRootGrain
+    public class TransactionRootGrain : Grain, ITransactionRootGrain
     {
         public Task Run(List<int> grains)
         {
