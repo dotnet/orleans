@@ -66,6 +66,8 @@ namespace Orleans.Transactions
 
         private void ReportMetrics()
         {
+            if (this.telemetryProducer == null)
+                return;
             var now = DateTime.Now;
             var timeSinceLastReportInSeconds = Math.Max(1, (now - this.lastReportTime).TotalSeconds);
             var startTransactionTps = StartTransactionRequestCounter / timeSinceLastReportInSeconds;

@@ -9,6 +9,8 @@ namespace Orleans.TestingHost.Utils
     /// </summary>
     public class NullTelemetryProducer : ITelemetryProducer
     {
+        public static NullTelemetryProducer Instance = new NullTelemetryProducer();
+
         void ITelemetryProducer.DecrementMetric(string name)
         {
         }

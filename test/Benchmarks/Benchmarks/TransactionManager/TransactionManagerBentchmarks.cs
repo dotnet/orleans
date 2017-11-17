@@ -13,6 +13,7 @@ using Orleans.Transactions;
 using Orleans.Transactions.Development;
 using Orleans.Transactions.Azure;
 using TestExtensions;
+using Orleans.TestingHost.Utils;
 
 namespace Benchmarks.TransactionManager
 {
@@ -39,7 +40,7 @@ namespace Benchmarks.TransactionManager
 
         private async Task Run(Factory<Task<ITransactionLogStorage>> storageFactory)
         {
-            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, LogMaintenanceInterval);
+            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
             await tm.StartAsync();
             ITransactionManagerService tms = new TransactionManagerService(tm);
             Stopwatch sw;

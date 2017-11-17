@@ -58,6 +58,8 @@ namespace Orleans.Transactions
 
         private void ReportMetrics()
         {
+            if (this.telemetryProducer == null)
+                return;
             var now = DateTime.UtcNow;
             var timeSinceLastReportInSeconds = Math.Max(1, (now - this.lastReportTime).TotalSeconds);
             //batch start metrics
