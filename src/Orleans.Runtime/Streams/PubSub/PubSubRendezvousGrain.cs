@@ -316,7 +316,7 @@ namespace Orleans.Streams
             if (grainRef != null)
             {
                 List<StreamSubscription> subscriptions =
-                    State.Consumers.Where(c => !c.IsFaulted && c.Consumer.Equals(streamConsumer))
+                    State.Consumers.Where(c => !c.IsFaulted && c.consumerReference.Equals(streamConsumer))
                         .Select(
                             c =>
                                 new StreamSubscription(c.SubscriptionId.Guid, streamId.ProviderName, streamId,
