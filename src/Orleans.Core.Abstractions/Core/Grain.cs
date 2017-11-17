@@ -325,7 +325,7 @@ namespace Orleans
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
-                await this.ReadStateAsync();
+                await this.OnSetupStateAsync();
                 sw.Stop();
                 // TODO: find a way to reenable StorageStatisticsGroup here
                 //StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
@@ -337,6 +337,11 @@ namespace Orleans
                 //StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
                 throw;
             }
+        }
+        
+        protected virtual Task OnSetupStateAsync()
+        {
+            return this.ReadStateAsync();
         }
     }
 }
