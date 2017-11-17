@@ -314,10 +314,10 @@ namespace Orleans
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, SetupState);
+            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
         }
 
-        private async Task SetupState(CancellationToken ct)
+        private async Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return;
