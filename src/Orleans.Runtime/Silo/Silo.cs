@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Threading;
@@ -11,6 +10,7 @@ using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Hosting;
@@ -33,7 +33,7 @@ using Orleans.Streams;
 using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
-using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
 
