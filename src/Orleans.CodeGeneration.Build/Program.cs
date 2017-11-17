@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.CodeGeneration
 {
@@ -67,6 +69,18 @@ namespace Orleans.CodeGeneration
                             var outfile = arg.Substring(arg.IndexOf(':') + 1);
                             AssertWellFormed(outfile);
                             options.OutputFileName = outfile;
+                        }
+                        else if (arg.StartsWith("/loglevel:"))
+                        {
+                            var levelString = arg.Substring(arg.IndexOf(':') + 1);
+                            if (!Enum.TryParse(ignoreCase: true, value: levelString, result: out LogLevel level))
+                            {
+                                var validValues = string.Join(", ", Enum.GetNames(typeof(LogLevel)).Select(v => v.ToString()));
+                                Console.WriteLine($"ERROR: \"{levelString}\" is not a valid log level. Valid values are {validValues}");
+                                return 1;
+                            }
+
+                            options.LogLevel = level;
                         }
                     }
                     else
