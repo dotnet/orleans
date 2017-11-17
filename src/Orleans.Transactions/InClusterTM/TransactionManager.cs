@@ -18,6 +18,9 @@ namespace Orleans.Transactions
         private const string CommitTransactionRequestTPS = "TransactionManager.CommitTransaction.TPS";
        
         private const string AbortedTransactionDueToDependencyTPS = "Transaction.AbortedDueToDependency.TPS";
+
+        private const string AbortedTransactionDueToMissingInfoInTransactionTableTPS =
+            "Transaction.AbortedDueToMissingInfoInTransactionTable.TPS";
         private const string AbortedTransactionTPS = "Transaction.Aborted.TPS";
         //pending transaction produced TPS in the monitor window
         private const string PendingTransactionTPS = "Transaction.Pending.TPS";
@@ -29,6 +32,7 @@ namespace Orleans.Transactions
         internal long CommitTransactionRequestCounter { get; set; }
         internal long AbortedTransactionCounter { get; set; }
         internal long AbortedTransactionDueToDependencyCounter { get; set; }
+        internal long AbortedTransactionDueToMissingInfoInTransactionTableCounter { get; set; }
         internal long PendingTransactionCounter {get;set;}
         internal long ValidatedTransactionCounter { get; set; }
 
@@ -54,6 +58,7 @@ namespace Orleans.Transactions
             this.CommitTransactionRequestCounter = 0;
 
             this.AbortedTransactionDueToDependencyCounter = 0;
+            this.AbortedTransactionDueToMissingInfoInTransactionTableCounter = 0;
             this.PendingTransactionCounter = 0;
             this.ValidatedTransactionCounter = 0;
             this.AbortedTransactionCounter = 0;
@@ -74,6 +79,9 @@ namespace Orleans.Transactions
 
             var abortedTransactionDueToDependentTPS = AbortedTransactionDueToDependencyCounter / timeSinceLastReportInSeconds;
             this.telemetryProducer.TrackMetric(AbortedTransactionDueToDependencyTPS, abortedTransactionDueToDependentTPS);
+
+            var abortedTransactionDueToMissingInfoInTransactionTableTPS = AbortedTransactionDueToMissingInfoInTransactionTableCounter / timeSinceLastReportInSeconds;
+            this.telemetryProducer.TrackMetric(AbortedTransactionDueToMissingInfoInTransactionTableTPS, abortedTransactionDueToMissingInfoInTransactionTableTPS);
 
             var pendingTransactionTPS = PendingTransactionCounter / timeSinceLastReportInSeconds;
             this.telemetryProducer.TrackMetric(PendingTransactionTPS, pendingTransactionTPS);
@@ -287,6 +295,7 @@ namespace Orleans.Transactions
                                 abort = true;
                                 if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Will abort transaction {transactionInfo.TransactionId} because it doesn't exist in the transaction table");
                                 cascadingDependentId = dependentId;
+                                this.metrics.AbortedTransactionDueToMissingInfoInTransactionTableCounter++;
                                 break;
                             }
 
