@@ -116,7 +116,7 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            workQueue.Dispose();
+            // workQueue.Dispose();
         }
         
         internal sealed class QueueWorkItemCallback : ITimeInterval
