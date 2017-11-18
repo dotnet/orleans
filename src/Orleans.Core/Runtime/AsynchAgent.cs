@@ -14,7 +14,8 @@ namespace Orleans.Runtime
             IgnoreFault     // Allow the agent to stop if it faults, but take no other action (other than logging)
         }
 
-        protected readonly IExecutor executor;
+        protected readonly ExecutorService executorService;
+        protected IExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected Logger Log;
@@ -52,7 +53,7 @@ namespace Orleans.Runtime
             OnFault = FaultBehavior.IgnoreFault;
             Log = new LoggerWrapper(Name, loggerFactory);
 
-            executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
+            this.executorService = executorService;
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
 #if TRACK_DETAILED_STATS
@@ -93,6 +94,8 @@ namespace Orleans.Runtime
                 {
                     return;
                 }
+
+                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
 
                 if (State == ThreadState.Stopped)
                 {
