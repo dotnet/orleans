@@ -21,7 +21,7 @@ namespace Orleans.Runtime
 #endif
         }
 
-        public void QueueWorkItem(WaitCallback callBack, object state = null)
+        public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             new Thread(() =>
             {
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
                     threadTracking.OnStartExecution();
                 }
 #endif
-                callBack.Invoke(state);
+                callback.Invoke(state);
 
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)

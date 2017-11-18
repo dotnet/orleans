@@ -37,9 +37,10 @@ namespace Orleans.Runtime
 
         public int WorkQueueCount => workQueue.Count;
 
-        public void QueueWorkItem(WaitCallback callBack, object state = null)
+        public void QueueWorkItem(WaitCallback callback, object state = null)
         {
-            var workItemCallback = new QueueWorkItemCallback(callBack, state);
+            var workItemCallback = new QueueWorkItemCallback(callback, state);
+
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
             {

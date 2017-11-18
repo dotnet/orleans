@@ -7,7 +7,7 @@ namespace Orleans.Runtime
 {
     internal interface IExecutor
     {
-        void QueueWorkItem(WaitCallback callBack, object state = null);
+        void QueueWorkItem(WaitCallback callback, object state = null);
 
         int WorkQueueCount { get; }
     }
