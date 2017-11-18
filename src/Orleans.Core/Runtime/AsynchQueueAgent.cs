@@ -23,30 +23,7 @@ namespace Orleans.Runtime
         }
 
         protected abstract void Process(T request);
-
-        public override void Stop()
-        {
-            //   requestQueue?.CompleteAdding(); - ensured by CTS usage
-            base.Stop();
-        }
-
-        public int Count => executor.WorkQueueLength;
-
-        #region IDisposable Members
-
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposing) return;
-
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking.OnStopExecution();
-            }
-#endif
-            base.Dispose(disposing);
-        }
-
-        #endregion
+        
+        public int Count => executor.WorkQueueCount;
     }
 }

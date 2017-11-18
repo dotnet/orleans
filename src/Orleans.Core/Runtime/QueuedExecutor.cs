@@ -10,12 +10,13 @@ namespace Orleans.Runtime
 
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
         private readonly CancellationTokenSource cancellationTokenSource;
+        private readonly bool drainAfterCancel;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        public QueuedExecutor(string name, CancellationTokenSource cts)
+        public QueuedExecutor(string name, CancellationTokenSource cts, bool drainAfterCancel)
         {
             if (StatisticsCollector.CollectQueueStats)
             {
@@ -28,25 +29,25 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-
+            this.drainAfterCancel = drainAfterCancel;
             cancellationTokenSource = cts;
-
-
+            cancellationTokenSource.Token.Register(() => workQueue.CompleteAdding());
             new ThreadPerTaskExecutor(name).QueueWorkItem(_ => ProcessQueue());
         }
 
-        public int WorkQueueLength => workQueue.Count;
+        public int WorkQueueCount => workQueue.Count;
 
         public void QueueWorkItem(WaitCallback callBack, object state = null)
         {
+            var workItemCallback = new QueueWorkItemCallback(callBack, state);
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
             {
-                queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
+                queueTracking.OnEnQueueRequest(1, WorkQueueCount, workItemCallback);
             }
 #endif
 
-            workQueue.Add(new QueueWorkItemCallback(callBack, state));
+            workQueue.Add(workItemCallback);
         }
         
         public void Dispose()
@@ -82,23 +83,27 @@ namespace Orleans.Runtime
         {
             while (true)
             {
-                if (cancellationTokenSource.IsCancellationRequested)
+                if (!drainAfterCancel && cancellationTokenSource.IsCancellationRequested)
                 {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking.OnStopExecution();
-            }
-#endif
                     return;
                 }
 
-                var workItem = workQueue.Take();
+                QueueWorkItemCallback workItem;
+                try
+                {
+                    workItem = workQueue.Take();
+                }
+                catch (InvalidOperationException)
+                {
+                    break;
+                }
+
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
                 {
-                    queueTracking.OnDeQueueRequest(request);
+                    queueTracking.OnDeQueueRequest(workItem);
                 }
+
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     threadTracking.OnStartProcessing();
@@ -115,11 +120,13 @@ namespace Orleans.Runtime
             }
         }
 
-        internal sealed class QueueWorkItemCallback
+        internal sealed class QueueWorkItemCallback : ITimeInterval
         {
             private readonly WaitCallback callback;
 
             private readonly object state;
+
+            private ITimeInterval timeInterval;
 
             public QueueWorkItemCallback(WaitCallback callback, object state)
             {
@@ -131,6 +138,25 @@ namespace Orleans.Runtime
             {
                 callback.Invoke(state);
             }
+
+
+            public void Start()
+            {
+                timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
+                timeInterval.Start();
+            }
+
+            public void Stop()
+            {
+                timeInterval.Stop();
+            }
+
+            public void Restart()
+            {
+                timeInterval.Restart();
+            }
+
+            public TimeSpan Elapsed => timeInterval.Elapsed;
         }
     }
 }

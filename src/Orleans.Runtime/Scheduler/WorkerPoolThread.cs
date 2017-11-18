@@ -116,13 +116,6 @@ namespace Orleans.Runtime.Scheduler
                 RuntimeContext.InitializeThread(scheduler);
                 
                 int noWorkCount = 0;
-                
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartExecution();
-                }
-#endif
 
                 // Until we're cancelled...
                 while (!Cts.IsCancellationRequested)
@@ -273,13 +266,6 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (!IsSystem)
                     pool.RecordLeavingThread(this);
-                
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopExecution();
-                }
-#endif
                 CurrentWorkItem = null;
             }
         }

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -7,34 +9,45 @@ namespace Orleans.Runtime
     {
         void QueueWorkItem(WaitCallback callBack, object state = null);
 
-        int WorkQueueLength { get; }
+        int WorkQueueCount { get; }
     }
 
     internal class ExecutorService
     {
-        public IExecutor GetExecutor(GetExecutorRequest getExecutorRequest)
+        public IExecutor GetExecutor(GetExecutorRequest request)
         {
-            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(getExecutorRequest.StageType))
+            if (typeof(GatewayConnection).IsAssignableFrom(request.StageType))
             {
-                return new ThreadPerTaskExecutor(getExecutorRequest.Name);
+                // After stop GatewayConnection needs to reroute not yet sent messages to another gateway 
+                return ConstructQueuedExecutor()(true);
             }
 
-            return new QueuedExecutor(getExecutorRequest.Name, getExecutorRequest.CancellationTokenSource);
+            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(request.StageType))
+            {
+                return new ThreadPerTaskExecutor(request.StageName);
+            }
+
+            return ConstructQueuedExecutor()(false);
+
+            Func<bool, QueuedExecutor> ConstructQueuedExecutor()
+            {
+                return drainAfterCancel => new QueuedExecutor(request.StageName, request.CancellationTokenSource, drainAfterCancel);
+            }
         }
     }
 
     internal class GetExecutorRequest
     {
-        public GetExecutorRequest(Type stageType, string name, CancellationTokenSource cts)
+        public GetExecutorRequest(Type stageType, string stageName, CancellationTokenSource cts)
         {
             StageType = stageType;
-            Name = name;
+            StageName = stageName;
             CancellationTokenSource = cts;
         }
 
         public Type StageType { get; }
 
-        public string Name { get; }
+        public string StageName { get; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
     }

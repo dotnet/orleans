@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-
 namespace Orleans.Runtime
 {
-
     internal class Watchdog : SingleTaskAsynchAgent
     {
         private static readonly TimeSpan heartbeatPeriod = TimeSpan.FromMilliseconds(1000);
