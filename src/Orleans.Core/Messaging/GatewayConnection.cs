@@ -28,6 +28,7 @@ namespace Orleans.Messaging
                 Silo = addr.ToSiloAddress();
             }
         }
+
         internal SiloAddress Silo { get; private set; }
 
         private readonly GatewayClientReceiver receiver;
@@ -72,7 +73,6 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
-            DrainQueue(RerouteMessage);
             MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
@@ -83,6 +83,19 @@ namespace Orleans.Messaging
             if (s == null) return;
 
             CloseSocket(s);
+        }
+
+        protected override void Process(Message msg)
+        {
+            // not threadsafe check, but behavior is preserved
+            if (!IsLive)
+            {
+                RerouteMessage(msg);
+            }
+            else
+            {
+                base.Process(msg);
+            }
         }
 
         // passed the exact same socket on which it got SocketException. This way we prevent races between connect and disconnect.
@@ -98,7 +111,7 @@ namespace Orleans.Messaging
                     s = Socket;
                     Socket = null;
                     Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, String.Format("Marking gateway at address {0} as Disconnected", Address));
-                    if ( MsgCenter != null && MsgCenter.GatewayManager != null)
+                    if (MsgCenter != null && MsgCenter.GatewayManager != null)
                         // We need a refresh...
                         MsgCenter.GatewayManager.ExpediteUpdateLiveGatewaysSnapshot();
                 }

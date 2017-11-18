@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class WorkerPoolThread : AsynchAgent
+    internal class WorkerPoolThread : SingleTaskAsynchAgent
     {
         internal const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
