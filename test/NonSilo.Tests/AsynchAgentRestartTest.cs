@@ -16,16 +16,16 @@ namespace UnitTests.MessageCenterTests
             private readonly ITestOutputHelper output;
 
             public TestAgent(ITestOutputHelper output)
-                :base(NullLoggerFactory.Instance)
+                : base(new ExecutorService(), NullLoggerFactory.Instance)
             {
                 this.output = output;
             }
 
             protected override void Run()
             {
-                output.WriteLine("Agent running in thread " + this.ManagedThreadId);
+                output.WriteLine("Agent running in thread " + Thread.CurrentThread.Name);
                 Cts.Token.WaitHandle.WaitOne();
-                output.WriteLine("Agent stopping in thread " + this.ManagedThreadId);
+                output.WriteLine("Agent stopping in thread " + Thread.CurrentThread.Name);
             }
         }
 
@@ -78,7 +78,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception ex)
             {
-                Assert.True(false,"Exception while starting agent that is already started: " + ex.ToString());
+                Assert.True(false, "Exception while starting agent that is already started: " + ex.ToString());
                 throw;
             }
 
@@ -102,7 +102,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception ex)
             {
-                Assert.True(false,"Exception while stopping agent that is already stopped: " + ex.ToString());
+                Assert.True(false, "Exception while stopping agent that is already stopped: " + ex.ToString());
                 throw;
             }
         }

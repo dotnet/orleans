@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans
 {
     internal class PeriodicAction
     {

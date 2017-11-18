@@ -1,22 +1,17 @@
+using System;
 using System.Collections.Concurrent;
-using Orleans;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Messaging;
+using Orleans.Runtime;
+using Orleans.ServiceFabric;
 
-namespace Microsoft.Orleans.ServiceFabric
+namespace Orleans.Membership.ServiceFabric
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Threading;
-    using System.Threading.Tasks;
-
-    using global::Orleans.Messaging;
-    using global::Orleans.Runtime;
-    using global::Orleans.Runtime.Configuration;
-
-    using Microsoft.Orleans.ServiceFabric.Models;
-    using Microsoft.Orleans.ServiceFabric.Utilities;
-    using Microsoft.Extensions.Logging;
-
     /// <summary>
     /// Gateway provider which reads gateway information from Service Fabric's naming service.
     /// </summary>
@@ -24,16 +19,12 @@ namespace Microsoft.Orleans.ServiceFabric
     {
         private readonly ConcurrentDictionary<IGatewayListListener, IGatewayListListener> subscribers =
             new ConcurrentDictionary<IGatewayListListener, IGatewayListListener>();
-
         private readonly TimeSpan refreshPeriod;
-
+        private readonly ILogger log;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
 
         private List<Uri> gateways = new List<Uri>();
-
         private Timer timer;
-
-        private ILogger log;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricGatewayProvider"/> class.

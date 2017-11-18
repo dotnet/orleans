@@ -13,10 +13,12 @@
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="$(MicrosoftServiceFabricServicesVersion)" />
     <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Membership.ServiceFabric\Orleans.Membership.ServiceFabric.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>

@@ -48,6 +48,7 @@ namespace Orleans.Hosting
 
             // Register system services.
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
+            services.TryAddSingleton<SiloLifecycle>();
 
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -68,6 +69,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
+            services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
             services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
@@ -130,6 +132,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
+            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
@@ -208,6 +211,7 @@ namespace Orleans.Hosting
             // Serialization
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
+            services.TryAddSingleton<IFieldUtils, FieldUtils>();
             
             // Transactions
             services.TryAddSingleton<ITransactionAgent, TransactionAgent>();

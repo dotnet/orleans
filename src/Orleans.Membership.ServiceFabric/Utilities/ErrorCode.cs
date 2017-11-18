@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace Microsoft.Orleans.ServiceFabric.Utilities
+namespace Orleans.Membership.ServiceFabric.Utilities
 {
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal enum ErrorCode

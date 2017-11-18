@@ -20,6 +20,8 @@ namespace Orleans.Runtime.Scheduler
         private bool ownsSemaphore;
         internal bool IsSystem { get; private set; }
 
+        internal int ManagedThreadId => Thread.CurrentThread.ManagedThreadId;
+
         [ThreadStatic]
         private static WorkerPoolThread current;
         internal static WorkerPoolThread CurrentWorkerThread { get { return current; } }
@@ -88,8 +90,8 @@ namespace Orleans.Runtime.Scheduler
         internal readonly int WorkerThreadStatisticsNumber;
         private readonly ICorePerformanceMetrics performanceMetrics;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ILoggerFactory loggerFactory, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
-            : base((system ? "System." : "") + threadNumber, loggerFactory)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ExecutorService executorService, ILoggerFactory loggerFactory, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
+            : base((system ? "System." : "") + threadNumber, executorService, loggerFactory)
         {
             pool = gtp;
             scheduler = sched;

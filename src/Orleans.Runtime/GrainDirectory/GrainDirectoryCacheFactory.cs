@@ -28,11 +28,12 @@ namespace Orleans.Runtime.GrainDirectory
             IGrainDirectoryCache<TValue> cache,
             Func<List<ActivationAddress>, TValue> updateFunc,
             IInternalGrainFactory grainFactory,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory)
         {
             var adaptiveCache = cache as AdaptiveGrainDirectoryCache<TValue>;
             return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer<TValue>(router, adaptiveCache, updateFunc, grainFactory, loggerFactory)
+                ? new AdaptiveDirectoryCacheMaintainer<TValue>(router, adaptiveCache, updateFunc, grainFactory, executorService, loggerFactory)
                 : null;
         }
     }

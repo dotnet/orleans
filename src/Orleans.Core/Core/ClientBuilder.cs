@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
+using Orleans.ApplicationParts;
+using Orleans.Serialization;
 
 namespace Orleans
 {
@@ -41,8 +43,9 @@ namespace Orleans
 
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
             ValidateSystemConfiguration(serviceProvider);
-            
+
             // Construct and return the cluster client.
+            serviceProvider.GetService<SerializationManager>().RegisterSerializers(serviceProvider.GetService<ApplicationPartManager>());
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
             return serviceProvider.GetRequiredService<IClusterClient>();
         }

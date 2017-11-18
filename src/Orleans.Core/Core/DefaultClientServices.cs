@@ -21,6 +21,7 @@ namespace Orleans
             services.AddLogging();
             //temporary change until runtime moved away from Logger
             services.TryAddSingleton(typeof(LoggerWrapper<>));
+            services.TryAddSingleton<ExecutorService>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();
@@ -34,6 +35,7 @@ namespace Orleans
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
+            services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<StreamProviderManager>();

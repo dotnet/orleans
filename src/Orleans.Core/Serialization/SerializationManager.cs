@@ -99,12 +99,11 @@ namespace Orleans.Serialization
 
         #endregion
 
-        #region Static initialization
+        #region initialization
 
         public SerializationManager(
             IServiceProvider serviceProvider,
             IOptions<SerializationProviderOptions> serializatonProviderOptions,
-            ApplicationPartManager applicationPartManager,
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver)
         {
@@ -124,12 +123,6 @@ namespace Orleans.Serialization
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
-
-            var serializerFeature = applicationPartManager.CreateAndPopulateFeature<SerializerFeature>();
-            this.RegisterSerializers(serializerFeature);
-
-            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
-            this.RegisterGrainReferenceSerializers(grainInterfaceFeature);
 
             var serializatonProviderOptionsValue = serializatonProviderOptions.Value;
 
@@ -171,6 +164,15 @@ namespace Orleans.Serialization
             }
 
             RegisterSerializationProviders(serializatonProviderOptionsValue.SerializationProviders);
+        }
+
+        public void RegisterSerializers(ApplicationPartManager applicationPartManager)
+        {
+            var serializerFeature = applicationPartManager.CreateAndPopulateFeature<SerializerFeature>();
+            this.RegisterSerializers(serializerFeature);
+
+            var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
+            this.RegisterGrainReferenceSerializers(grainInterfaceFeature);
         }
 
         private void RegisterGrainReferenceSerializers(GrainInterfaceFeature grainInterfaceFeature)
@@ -220,6 +222,23 @@ namespace Orleans.Serialization
         public void Register(Type t, DeepCopier cop, Serializer ser, Deserializer deser)
         {
             Register(t, cop, ser, deser, false);
+        }
+
+        private object InitializeSerializer(Type serializerType)
+        {
+            if (this.ServiceProvider == null)
+                return null;
+
+            // If the type lacks a Serializer attribute then it's a self-serializing type and all serialization methods must be static
+            if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
+                return null;
+
+            var constructors = serializerType.GetConstructors();
+            if (constructors == null || constructors.Length < 1)
+                return null;
+
+            var serializer = ActivatorUtilities.GetServiceOrCreateInstance(this.ServiceProvider, serializerType);
+            return serializer;
         }
 
         /// <summary>
@@ -428,11 +447,12 @@ namespace Orleans.Serialization
                 }
                 else
                 {
+                    var serializerInstance = this.InitializeSerializer(serializerType);
                     this.Register(
                         type,
-                        copier?.CreateDelegate(typeof(DeepCopier)) as DeepCopier,
-                        serializer?.CreateDelegate(typeof(Serializer)) as Serializer,
-                        deserializer?.CreateDelegate(typeof(Deserializer)) as Deserializer,
+                        CreateDelegate<DeepCopier>(copier, serializerInstance),
+                        CreateDelegate<Serializer>(serializer, serializerInstance),
+                        CreateDelegate<Deserializer>(deserializer, serializerInstance),
                         true);
                 }
             }
@@ -545,10 +565,12 @@ namespace Orleans.Serialization
             }
 
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
-            var concreteCopier = (DeepCopier)copier.CreateDelegate(typeof(DeepCopier));
-            var concreteSerializer = (Serializer)serializer.CreateDelegate(typeof(Serializer));
-            var concreteDeserializer = (Deserializer)deserializer.CreateDelegate(typeof(Deserializer));
-            Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
+            var serializerInstance = this.InitializeSerializer(concreteSerializerType);
+            var concreteCopier = CreateDelegate<DeepCopier>(copier, serializerInstance);
+            var concreteSerializer = CreateDelegate<Serializer>(serializer, serializerInstance);
+            var concreteDeserializer = CreateDelegate<Deserializer>(deserializer, serializerInstance);
+
+            this.Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
 
             return new SerializerMethods(concreteCopier, concreteSerializer, concreteDeserializer);
         }
@@ -558,7 +580,7 @@ namespace Orleans.Serialization
             copier = null;
             serializer = null;
             deserializer = null;
-            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Any())
                 {
@@ -573,6 +595,19 @@ namespace Orleans.Serialization
                     deserializer = method;
                 }
             }
+        }
+
+        private T CreateDelegate<T>(MethodInfo methodInfo, object target) where T : class
+        {
+            if (this.ServiceProvider == null)
+                return default(T);
+
+            if (methodInfo == null)
+                return default(T);
+
+            return (methodInfo.IsStatic
+                ? methodInfo.CreateDelegate(typeof(T))
+                : methodInfo.CreateDelegate(typeof(T), target)) as T;
         }
 
         #endregion

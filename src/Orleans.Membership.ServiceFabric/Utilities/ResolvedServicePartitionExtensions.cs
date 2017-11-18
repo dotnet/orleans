@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Fabric;
-using Microsoft.Orleans.ServiceFabric.Models;
 using Newtonsoft.Json;
+using Orleans.ServiceFabric;
 
-namespace Microsoft.Orleans.ServiceFabric.Utilities
+namespace Orleans.Membership.ServiceFabric.Utilities
 {
     internal static class ResolvedServicePartitionExtensions
     {
@@ -24,7 +24,7 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
 
                 // Read the endpoint details.
                 var endpoints = JsonConvert.DeserializeObject<ServicePartitionEndpoints>(silo.Address);
-                var orleansEndpoint = endpoints.Endpoints[OrleansServiceListener.OrleansServiceFabricEndpointName];
+                var orleansEndpoint = endpoints.Endpoints[ServiceFabricConstants.ListenerName];
                 results.Add(JsonConvert.DeserializeObject<FabricSiloInfo>(orleansEndpoint));
             }
 

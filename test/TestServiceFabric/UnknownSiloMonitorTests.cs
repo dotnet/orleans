@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Orleans.ServiceFabric;
+using Orleans.Membership.ServiceFabric;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;

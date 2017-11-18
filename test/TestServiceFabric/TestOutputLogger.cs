@@ -6,7 +6,7 @@ namespace TestServiceFabric
 {
     public class TestOutputLogger<TCategoryName> : TestOutputLogger, ILogger<TCategoryName>
     {
-        public TestOutputLogger(ITestOutputHelper output, LogLevel level = LogLevel.Information) : base(output, nameof(TCategoryName), level)
+        public TestOutputLogger(ITestOutputHelper output, LogLevel level = LogLevel.Information) : base(output, typeof(TCategoryName).FullName, level)
         {
         }
     }

@@ -43,8 +43,8 @@ namespace Orleans.Runtime.Messaging
 
         // Used for holding enough info to handle receive completion
         internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager,
-            ILoggerFactory loggerFactory)
-            :base(loggerFactory)
+            ExecutorService executorService, ILoggerFactory loggerFactory)
+            :base(executorService, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             Log = new LoggerWrapper<IncomingMessageAcceptor>(loggerFactory);

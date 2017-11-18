@@ -25,14 +25,15 @@ namespace Orleans.Runtime.GrainDirectory
             AdaptiveGrainDirectoryCache<TValue> cache,
             Func<List<ActivationAddress>, TValue> updateFunc,
             IInternalGrainFactory grainFactory,
+            ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            :base(loggerFactory)
+            :base(executorService, loggerFactory)
         {
             this.updateFunc = updateFunc;
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
-            
+
             lastNumAccesses = 0;
             lastNumHits = 0;
             OnFault = FaultBehavior.RestartOnFault;
