@@ -87,7 +87,6 @@ namespace Orleans.Messaging
 
         protected override void Process(Message msg)
         {
-            // not threadsafe check, but behavior is preserved
             if (!IsLive)
             {
                 RerouteMessage(msg);
