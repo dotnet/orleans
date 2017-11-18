@@ -49,11 +49,6 @@ namespace Orleans.Runtime
 
             workQueue.Add(workItemCallback);
         }
-        
-        public void Dispose()
-        {
-            workQueue.Dispose();
-        }
 
         protected void ProcessQueue()
         {
@@ -77,8 +72,7 @@ namespace Orleans.Runtime
 #endif
             }
         }
-
-
+        
         protected void RunNonBatching()
         {
             while (true)
@@ -120,6 +114,11 @@ namespace Orleans.Runtime
             }
         }
 
+        public void Dispose()
+        {
+            workQueue.Dispose();
+        }
+        
         internal sealed class QueueWorkItemCallback : ITimeInterval
         {
             private readonly WaitCallback callback;
