@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class QueuedExecutor : IExecutor, IDisposable
+    internal class QueuedExecutor : IExecutor
     {
         private QueueTrackingStatistic queueTracking;
 
@@ -112,11 +112,6 @@ namespace Orleans.Runtime
                 }
 #endif
             }
-        }
-
-        public void Dispose()
-        {
-            // workQueue.Dispose();
         }
         
         internal sealed class QueueWorkItemCallback : ITimeInterval

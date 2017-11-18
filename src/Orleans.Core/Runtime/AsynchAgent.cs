@@ -153,11 +153,6 @@ namespace Orleans.Runtime
                 Cts.Dispose();
                 Cts = null;
             }
-
-            if (executor is IDisposable disposableExecutor)
-            {
-                disposableExecutor.Dispose();
-            }
         }
 
 #endregion
