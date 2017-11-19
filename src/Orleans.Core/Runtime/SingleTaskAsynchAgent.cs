@@ -16,13 +16,13 @@ namespace Orleans.Runtime
 
         public override void OnStart()
         {
-            executor.QueueWorkItem(_ => AgentThreadProc(this));
+            executor.QueueWorkItem(_ => AgentThreadProc());
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void AgentThreadProc(Object obj)
+        private void AgentThreadProc()
         {
-            var agent = obj as SingleTaskAsynchAgent;
+            var agent = this;
             if (agent == null)
             {
                 throw new InvalidOperationException("Agent thread started with incorrect parameter type");

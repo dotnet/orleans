@@ -12,7 +12,7 @@ namespace Orleans.Messaging
     /// 
     /// Note that both sends and receives are synchronous.
     /// </summary>
-    internal class GatewayConnection : OutgoingMessageSender
+    internal class GatewayConnection : OutgoingMessageSender, IQueueDrainable
     {
         private readonly MessageFactory messageFactory;
         internal bool IsLive { get; private set; }
@@ -87,6 +87,7 @@ namespace Orleans.Messaging
 
         protected override void Process(Message msg)
         {
+            // After stop GatewayConnection needs to reroute not yet sent messages to another gateway 
             if (!IsLive)
             {
                 RerouteMessage(msg);

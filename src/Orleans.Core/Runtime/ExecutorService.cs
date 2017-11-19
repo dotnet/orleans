@@ -12,27 +12,24 @@ namespace Orleans.Runtime
         int WorkQueueCount { get; }
     }
 
+    internal interface IStageAttribute { }
+
+    internal interface IQueueDrainable : IStageAttribute { }
+
     internal class ExecutorService
     {
         public IExecutor GetExecutor(GetExecutorRequest request)
         {
-            if (typeof(GatewayConnection).IsAssignableFrom(request.StageType))
-            {
-                // After stop GatewayConnection needs to reroute not yet sent messages to another gateway 
-                return ConstructQueuedExecutor()(true);
-            }
-
-            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(request.StageType))
+            var stageType = request.StageType;
+            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(stageType))
             {
                 return new ThreadPerTaskExecutor(request.StageName);
             }
-
-            return ConstructQueuedExecutor()(false);
-
-            Func<bool, QueuedExecutor> ConstructQueuedExecutor()
-            {
-                return drainAfterCancel => new QueuedExecutor(request.StageName, request.CancellationTokenSource, drainAfterCancel);
-            }
+            
+            return new QueuedExecutor(
+                request.StageName,
+                request.CancellationTokenSource,
+                typeof(IQueueDrainable).IsAssignableFrom(stageType));
         }
     }
 

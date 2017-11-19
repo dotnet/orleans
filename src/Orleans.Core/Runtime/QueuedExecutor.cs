@@ -31,7 +31,12 @@ namespace Orleans.Runtime
 #endif
             this.drainAfterCancel = drainAfterCancel;
             cancellationTokenSource = cts;
-            cancellationTokenSource.Token.Register(() => workQueue.CompleteAdding());
+            cancellationTokenSource.Token.Register(() =>
+            {
+                // allow threads to get a chance to exit gracefully.
+                workQueue.Add(QueueWorkItemCallback.NoOpQueueWorkItemCallback);
+                workQueue.CompleteAdding();
+            });
             new ThreadPerTaskExecutor(name).QueueWorkItem(_ => ProcessQueue());
         }
 
@@ -40,6 +45,7 @@ namespace Orleans.Runtime
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             var workItemCallback = new QueueWorkItemCallback(callback, state);
+
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
@@ -114,9 +120,11 @@ namespace Orleans.Runtime
 #endif
             }
         }
-        
-        internal sealed class QueueWorkItemCallback : ITimeInterval
+
+        internal  class QueueWorkItemCallback : ITimeInterval
         {
+            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => {}, null);
+
             private readonly WaitCallback callback;
 
             private readonly object state;
@@ -133,8 +141,7 @@ namespace Orleans.Runtime
             {
                 callback.Invoke(state);
             }
-
-
+            
             public void Start()
             {
                 timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
