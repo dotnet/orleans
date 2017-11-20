@@ -133,7 +133,7 @@ public Task<string> SayHello()
 ```
 
 OK, we're nearly done.
-All we need is a bit of client code, which we will return to _Program.cs_ in order to add.
+All we need is a bit of client code. This will go in the _Program.cs_ file in the _Host_ project.
 In place of the comment following the call to `GrainClient.Initialize()`, add these two lines:
 
 
