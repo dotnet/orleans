@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>TestInternalDtosRefOrleans</RootNamespace>
     <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

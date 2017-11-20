@@ -29,7 +29,7 @@
     <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' ">
+  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' and '$(TargetFramework)' == '$(TestProjectTargetFramework)' ">
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
   </ItemGroup>
 </Project>
