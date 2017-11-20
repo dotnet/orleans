@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Hosting;
@@ -8,7 +9,7 @@ using Xunit;
 namespace NetCore.Test
 {
     [Trait("Category", "BVT")]
-    public class ExceptionTests
+    public class ExceptionTests : IDisposable
     {
         private readonly ISiloHost silo;
         private readonly IClusterClient client;
@@ -28,6 +29,17 @@ namespace NetCore.Test
             var grain = this.client.GetGrain<UnitTests.GrainInterfaces.IExceptionGrain>(0);
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
             Assert.Equal("Test exception", exception.Message);
+        }
+
+        public void Dispose()
+        {
+            var cancel = new CancellationTokenSource();
+            cancel.Cancel();
+            this.silo?.StopAsync(cancel.Token).GetAwaiter().GetResult();
+            this.silo?.Dispose();
+
+            this.client?.Abort();
+            this.client?.Dispose();
         }
     }
 }
