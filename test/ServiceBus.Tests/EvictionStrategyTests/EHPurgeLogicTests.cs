@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             var oneKB = 1024;
             this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneKB));
-            this.telemetryProducer = new NullTelemetryProducer();
+            this.telemetryProducer = NullTelemetryProducer.Instance;
         }
 
         [Fact, TestCategory("BVT")]
