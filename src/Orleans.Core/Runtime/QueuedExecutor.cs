@@ -84,11 +84,12 @@ namespace Orleans.Runtime
         {
             while (true)
             {
-                if (!drainAfterCancel && cancellationTokenSource.IsCancellationRequested)
+                if (!drainAfterCancel && cancellationTokenSource.IsCancellationRequested ||
+                    workQueue.IsCompleted)
                 {
                     return;
                 }
-
+                
                 QueueWorkItemCallback workItem;
                 try
                 {
