@@ -210,6 +210,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
+            services.TryAddSingleton<ILBasedSerializer>();
+            services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
             
             // Transactions
             services.TryAddSingleton<ITransactionAgent, TransactionAgent>();

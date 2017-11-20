@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans.Serialization
 {
@@ -115,7 +116,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The assembly-qualified name of <paramref name="type"/>.</returns>
-        internal virtual string GetNameFromType(Type type) => type.AssemblyQualifiedName;
+        internal virtual string GetNameFromType(Type type) => RuntimeTypeNameFormatter.Format(type);
 
         /// <summary>
         /// Represents a named type for the purposes of serialization.

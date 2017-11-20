@@ -149,7 +149,7 @@ namespace Orleans.TestingHost
         /// Default client builder factory
         /// </summary>
         public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config =>
-            new ClientBuilder()
+            ClientBuilder.CreateDefault()
                 .UseConfiguration(config)
                 .AddApplicationPartsFromAppDomain()
                 .AddApplicationPartsFromBasePath()

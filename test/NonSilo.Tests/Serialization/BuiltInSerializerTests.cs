@@ -7,6 +7,7 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
@@ -91,12 +92,7 @@ namespace UnitTests.Serialization
 
                     var config = new ClientConfiguration
                     {
-                        FallbackSerializationProvider = fallback,
-                        GatewayProvider = ClientConfiguration.GatewayProviderType.Config,
-                        Gateways =
-                        {
-                            new IPEndPoint(0, 0)
-                        }
+                        FallbackSerializationProvider = fallback
                     };
 
                     return SerializationTestEnvironment.InitializeWithDefaults(config);
@@ -597,20 +593,22 @@ namespace UnitTests.Serialization
             ValidateReadOnlyCollectionList(collection, deserialized, "string/string");
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
-        [InlineData(SerializerToUse.BinaryFormatterFallbackSerializer)]
-        public void Serialize_UnserializableException(SerializerToUse serializerToUse)
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Serialize_UnserializableException()
         {
-            var environment = InitializeSerializer(serializerToUse);
-            const string Message = "This is a test message";
+            // Create an environment which has no keyed serializer. This will cause some exception types to be unserializable.
+            var environment = SerializationTestEnvironment.InitializeWithDefaults(
+                null,
+                builder => builder.ConfigureServices(
+                    services => services.RemoveAll(typeof(IKeyedSerializer))));
+            const string message = "This is a test message";
 
             // throw the exception so that stack trace is populated
-            Exception source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(Message); }));
+            Exception source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(message); }));
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, source);
             var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
             var expectedMessage = "Non-serializable exception of type " +
-                                    typeof(UnserializableException).OrleansTypeName() + ": " + Message;
+                                    typeof(UnserializableException).OrleansTypeName() + ": " + message;
             Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
         }
 

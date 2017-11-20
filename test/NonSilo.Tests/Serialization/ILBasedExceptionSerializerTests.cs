@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Utilities;
 using TestExtensions;
 
 namespace UnitTests.Serialization
@@ -116,7 +117,7 @@ namespace UnitTests.Serialization
 
             // Check for referential equality in the fields which happened to be reference-equals.
             Assert.Equal(actual.Object.BaseField, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
-            Assert.Equal(actual.Object, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
+            Assert.Equal(actual, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
             Assert.Equal(actual.SomeFunObject, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
         }
 
@@ -178,7 +179,7 @@ namespace UnitTests.Serialization
 
             // Ensure that the original type name is preserved correctly.
             var actualDeserialized = (RemoteNonDeserializableException) untypedActual;
-            Assert.Equal(typeof(ILExceptionSerializerTestException).AssemblyQualifiedName, actualDeserialized.OriginalTypeName);
+            Assert.Equal(RuntimeTypeNameFormatter.Format(typeof(ILExceptionSerializerTestException)), actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
             writer = new SerializationContext(this.environment.SerializationManager)
