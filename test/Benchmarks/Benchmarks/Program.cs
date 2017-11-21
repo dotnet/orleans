@@ -7,6 +7,7 @@ using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.TransactionManager;
 using Benchmarks.Ping;
+using Benchmarks.Transactions;
 
 namespace Benchmarks
 {
@@ -52,6 +53,19 @@ namespace Benchmarks
                 },
                 benchmark => benchmark.RunAgainstMemory(),
                 benchmark => { });
+            },
+            ["Transactions"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
             },
             ["Ping"] = () =>
             {
