@@ -6,7 +6,7 @@ using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Xunit;
 
-namespace NetCore.Test
+namespace NetCore.Tests
 {
     [Trait("Category", "BVT")]
     public class ExceptionTests : IDisposable

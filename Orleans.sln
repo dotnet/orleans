@@ -146,7 +146,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ServiceFabric", "ServiceFab
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ServiceFabric", "src\Orleans.ServiceFabric\Orleans.ServiceFabric.csproj", "{814FF01E-1466-4A71-A48F-F40143EF49AA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetCore.Test", "test\NetCore.Test\NetCore.Test.csproj", "{1F28D680-7B22-4EA7-BA92-163D4FD76F5E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetCore.Tests", "test\NetCore.Tests\NetCore.Tests.csproj", "{1F28D680-7B22-4EA7-BA92-163D4FD76F5E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
