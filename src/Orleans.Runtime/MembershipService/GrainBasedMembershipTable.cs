@@ -6,6 +6,8 @@ using Orleans.Concurrency;
 using Orleans.MultiCluster;
 using Orleans.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -27,9 +29,9 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<IMembershipTableGrain> GetMembershipTableGrain()
         {
-            // TODO: this could be replaced with strongly typed options for configuring grain based membership
-            var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();
-            var isPrimarySilo = siloDetails.Type == Silo.SiloType.Primary;
+            var options = this.serviceProvider.GetRequiredService<IOptions<GrainBasedMembershipOptions>>().Value;
+            var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
+            bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.SeedNode.ToIPEndPoint());
             if (isPrimarySilo)
             {
                 this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");

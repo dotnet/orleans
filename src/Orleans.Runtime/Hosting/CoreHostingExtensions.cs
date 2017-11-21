@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -92,17 +93,38 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use GrainBasedMembership
         /// </summary>
-        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder)
+        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder, Action<GrainBasedMembershipOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseGrainBasedMembership());
+            return builder.ConfigureServices(services => services.UseGrainBasedMembership(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use GrainBasedMembership
+        /// </summary>
+        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder, Action<OptionsBuilder<GrainBasedMembershipOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseGrainBasedMembership(configureOptions));
         }
 
         /// <summary>
         /// Configure silo to use Grain-based membership
         /// </summary>
-        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services)
+        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services, Action<GrainBasedMembershipOptions> configureOptions)
         {
-            return services.AddSingleton<IMembershipTable, GrainBasedMembershipTable>();
+            return services.UseGrainBasedMembership(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use Grain-based membership
+        /// </summary>
+        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services, Action<OptionsBuilder<GrainBasedMembershipOptions>> configureOptions)
+        {
+            configureOptions?.Invoke(services.AddOptions<GrainBasedMembershipOptions>());
+            services
+                .AddSingleton<GrainBasedMembershipTable>()
+                .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+
+            return services;
         }
     }
 }

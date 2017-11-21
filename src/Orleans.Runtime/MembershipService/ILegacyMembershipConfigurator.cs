@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Messaging;
@@ -56,7 +56,15 @@ namespace Orleans.Runtime.MembershipService
         {
             public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
             {
-                services.UseGrainBasedMembership();
+                services.UseGrainBasedMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
+            }
+
+            private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, GrainBasedMembershipOptions options)
+            {
+                if (configuration.SeedNodes?.Count > 0)
+                {
+                    options.SeedNode = configuration.SeedNodes?.FirstOrDefault()?.ToGatewayUri();
+                }
             }
         }
     }
