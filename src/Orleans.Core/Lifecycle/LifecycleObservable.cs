@@ -3,24 +3,35 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans
 {
+    /// <summary>
+    /// Observable lifecycle
+    /// Notes:
+    /// - Single use, does not support multiple start/stop cycles.
+    /// - Once started, no other observers can be subscribed.
+    /// - OnStart starts stages in order until first failure or cancelation.
+    /// - OnStop stops states in reverse order starting from highest started stage.
+    /// - OnStop stops all stages regardless of errors even if canceled canceled.
+    /// </summary>
     public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
-        private readonly Logger logger;
-        private int highStage;
+        private readonly ILogger logger;
+        private int? highStage = null;
 
-        public LifecycleObservable(Logger logger)
+        public LifecycleObservable(ILoggerFactory loggerFactory)
         {
-            this.logger = logger?.GetLogger(GetType().Name);
+            this.logger = loggerFactory?.CreateLogger(GetType().FullName);
             this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
         public async Task OnStart(CancellationToken ct)
         {
+            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
                 foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
@@ -45,6 +56,8 @@ namespace Orleans
 
         public async Task OnStop(CancellationToken ct)
         {
+            // if not started, do nothing
+            if (!this.highStage.HasValue) return;
             foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key)
@@ -54,10 +67,6 @@ namespace Orleans
                 this.highStage = observerGroup.Key;
                 try
                 {
-                    if (ct.IsCancellationRequested)
-                    {
-                        throw new OrleansLifecycleCanceledException("Lifecycle stop canceled by request");
-                    }
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                 }
                 catch (Exception ex)
@@ -70,6 +79,7 @@ namespace Orleans
         public IDisposable Subscribe(int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
+            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);
             this.subscribers.TryAdd(orderedObserver, orderedObserver);

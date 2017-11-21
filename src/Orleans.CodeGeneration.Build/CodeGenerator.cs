@@ -68,12 +68,12 @@ namespace Orleans.CodeGeneration
             return !string.IsNullOrWhiteSpace(generatedCode);
         }
 
-        private static string GenerateSourceForAssembly(Assembly grainAssembly)
+        private static string GenerateSourceForAssembly(Assembly grainAssembly, LogLevel logLevel)
         {
             using (var loggerFactory = new LoggerFactory())
             {
                 var config = new ClusterConfiguration();
-                loggerFactory.AddConsole(LogLevel.Warning);
+                loggerFactory.AddConsole(logLevel);
                 var serializationProviderOptions = Options.Create(
                     new SerializationProviderOptions
                     {
@@ -171,7 +171,7 @@ namespace Orleans.CodeGeneration
                 AppDomain.CurrentDomain.AssemblyResolve += refResolver.ResolveAssembly;
 #endif
 
-                return GenerateSourceForAssembly(refResolver.Assembly);
+                return GenerateSourceForAssembly(refResolver.Assembly, options.LogLevel);
             }
             finally
             {

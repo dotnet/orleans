@@ -12,11 +12,11 @@
         /// <summary>
         /// Setup grain state prior to activation 
         /// </summary>
-        SetupState = 1<<10,  
+        SetupState = 1000,  
 
         /// <summary>
         /// Activate grain
         /// </summary>
-        Activate = SetupState + 1<<10,
+        Activate = 2000
     }
 }
