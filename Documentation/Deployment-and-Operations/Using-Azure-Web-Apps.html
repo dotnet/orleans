@@ -99,6 +99,7 @@
 <h3 id="potential-issues">Potential Issues</h3>
 <p>If the Web App is having difficulty connecting to the Silo:</p>
 <ul>
+<li>Make sure you have at least <strong>two roles</strong>, or two instances of one role in your Azure Cloud Service, or the <code>InternalEndpoint</code> firewall rules may not be generated.</li>
 <li>Check that both the Web App and the Silo are using the same <code>DeploymentId</code>.</li>
 <li>Make sure the network security group is set up to allow internal virtual network connections. If you haven&#39;t got one you can create and assign one easily using the following <code>PowerShell</code>:</li>
 </ul>

@@ -228,6 +228,7 @@ await client.Connect();
   &lt;/Endpoints&gt;
 &lt;/WorkerRole&gt;
 </code></pre><p>That&#39;s it for the worker role hosting the Orleans runtime. However, when deploying to Azure, there is typically a front end of some sort, either a web site or a web service, since making the Orleans ports public is not a good idea. Therefore, the client configuration is configuration of the web or worker role (or web site) that sits in front of Orleans.</p>
+<p><strong>Important Note</strong> As of November 2017, there is a limitation in Azure Cloud Services which prevents firewall configuration of <code>InternalEndpoint</code>s if there is only 1 role in the Cloud Service. If you are connecting to your cloud service via a Virtual Network, you will have to scale your Cloud Services to two instances in order for the firewall rules to be created</p>
 <p> Assuming that the frontend is a web role, a simple ClientConfiguration file should be used:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Tracing DefaultTraceLevel=&quot;Info&quot;

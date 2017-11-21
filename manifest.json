@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
+  "source_base_path": "c:/GitHub/dotnet/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -198,7 +198,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Powershell-Client.html",
-          "hash": "VMIYe6dlS4BkCG50hGSjuw=="
+          "hash": "hYmw0NZhKUOJYLoXvJ4euQ=="
         }
       },
       "is_incremental": false,
@@ -378,7 +378,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.html",
-          "hash": "YMtHNQLdHorWGPl/urLXdw=="
+          "hash": "1k6LThP1ouqLRuukHTe+OA=="
         }
       },
       "is_incremental": false,
@@ -485,7 +485,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.html",
-          "hash": "/HKw8piKd4XJX/IVPgiE1Q=="
+          "hash": "ymg2nucxZhQNFUkhB4l01g=="
         }
       },
       "is_incremental": false,
@@ -1859,7 +1859,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/My-First-Orleans-Application.html",
-          "hash": "HNGwGirkBYpwr15d+rPbwg=="
+          "hash": "zIEPqdlmx/vAjqv5bbycmw=="
         }
       },
       "is_incremental": false,
@@ -1926,6 +1926,9 @@
       "version": ""
     },
     {
+      "log_codes": [
+        "InvalidYamlHeader"
+      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -1953,10 +1956,16 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
+        "RestApiDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor RestApiDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -1968,16 +1977,11 @@
           "incrementalPhase": "build"
         },
         "ManagedReferenceDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
-          "incrementalPhase": "build"
-        },
-        "RestApiDocumentProcessor": {
           "can_incremental": false,
-          "details": "Processor RestApiDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }

@@ -160,7 +160,7 @@ Just return the string as the contents of a Task:</p>
     return Task.FromResult(&quot;Hello World!&quot;);
 }
 </code></pre><p>OK, we&#39;re nearly done.
-All we need is a bit of client code, which we will return to <em>Program.cs</em> in order to add.
+All we need is a bit of client code. This will go in the <em>Program.cs</em> file in the <em>Host</em> project.
 In place of the comment following the call to <code>GrainClient.Initialize()</code>, add these two lines:</p>
 <pre><code class="lang-csharp">var friend = client.GetGrain&lt;MyGrainInterfaces1.IGrain1&gt;(0);
 Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello().Result);
