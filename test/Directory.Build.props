@@ -31,5 +31,6 @@
 
   <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' and '$(TargetFramework)' == '$(TestProjectTargetFramework)' ">
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 </Project>
