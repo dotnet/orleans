@@ -1,5 +1,5 @@
-// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Code from https://github.com/aspnet/Options/blob/fe3f1b15811958acfa0be7eb88656d4bd5943834/src/Microsoft.Extensions.Options.ConfigurationExtensions/OptionsBuilderConfigurationExtensions.cs
+// This will be removed and superseded Mirosoft.Extensions.Options v2.1.0.0 once it ships.
 
 using System;
 using Microsoft.Extensions.Configuration;

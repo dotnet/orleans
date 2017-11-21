@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
@@ -11,7 +10,7 @@ namespace Orleans.Hosting
     public static class ZooKeeperHostingExtensions
     {
         /// <summary>
-        /// Configure siloHostBuilder with ZooKeeperMembership
+        /// Configures the silo to use ZooKeeper for cluster membership
         /// </summary>
         public static ISiloHostBuilder UseZooKeeperMembership(this ISiloHostBuilder builder,
             Action<ZooKeeperMembershipOptions> configureOptions)
@@ -20,7 +19,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure siloHostBuilder with ZooKeeperMembership
+        /// Configures the silo to use ZooKeeper for cluster membership
         /// </summary>
         public static ISiloHostBuilder UseZooKeeperMembership(this ISiloHostBuilder builder,
             Action<OptionsBuilder<ZooKeeperMembershipOptions>> configureOptions)
@@ -29,7 +28,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure the client to use ZooKeeperGatewayListProvider
+        /// Configure the client to use ZooKeeper as the Gateway List provider
         /// </summary>
         public static IClientBuilder UseZooKeeperGatewayListProvider(this IClientBuilder builder,
             Action<ZooKeeperGatewayListProviderOptions> configureOptions)
@@ -38,7 +37,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure the client to use ZooKeeperGatewayListProvider
+        /// Configure the client to use ZooKeeper as the Gateway List provider
         /// </summary>
         public static IClientBuilder UseZooKeeperGatewayListProvider(this IClientBuilder builder,
             Action<OptionsBuilder<ZooKeeperGatewayListProviderOptions>> configureOptions)
@@ -47,7 +46,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeperMemebership
+        /// Configure DI container with ZooKeeper based Memebership
         /// </summary>
         public static IServiceCollection UseZooKeeperMembership(this IServiceCollection services,
             Action<ZooKeeperMembershipOptions> configureOptions)
@@ -56,7 +55,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeperMemebership
+        /// Configure DI container with ZooKeeper based Memebership
         /// </summary>
         public static IServiceCollection UseZooKeeperMembership(this IServiceCollection services,
             Action<OptionsBuilder<ZooKeeperMembershipOptions>> configureOptions)
