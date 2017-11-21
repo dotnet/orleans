@@ -37,7 +37,7 @@ namespace Orleans
         /// </summary>
         protected IServiceProvider ServiceProvider 
         {
-            get { return Data.ServiceProvider ?? Runtime?.ServiceProvider; }
+            get { return Data?.ServiceProvider ?? Runtime?.ServiceProvider; }
         }
 
         internal IGrainIdentity Identity;
