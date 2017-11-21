@@ -160,9 +160,10 @@ namespace Orleans.Runtime
             AsynchAgent.IsStarting = true;
 
             var startTime = DateTime.UtcNow;
-            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-            StatisticsCollector.Initialize(LocalConfig);
 
+            services?.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
+            StatisticsCollector.Initialize(LocalConfig.StatisticsCollectionLevel);
+            
             initTimeout = GlobalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {

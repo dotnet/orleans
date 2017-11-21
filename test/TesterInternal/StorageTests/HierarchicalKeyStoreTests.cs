@@ -7,7 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Xunit;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace UnitTests.StorageTests
 {

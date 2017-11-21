@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Configuration
 {
@@ -34,8 +35,14 @@ namespace Orleans.Configuration
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
 
+            services.Configure<StatisticsOptions>((options) =>
+            {
+                CopyStatisticsOptions(configuration, options);
+            });
+
             // GatewayProvider
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
+
             return services;
         }
 
@@ -50,6 +57,16 @@ namespace Orleans.Configuration
             options.BufferPoolBufferSize = configuration.BufferPoolBufferSize;
             options.BufferPoolMaxSize = configuration.BufferPoolMaxSize;
             options.BufferPoolPreallocationSize = configuration.BufferPoolPreallocationSize;
+        }
+
+        internal static void CopyStatisticsOptions(IStatisticsConfiguration configuration, StatisticsOptions options)
+        {
+            options.MetricsTableWriteInterval = configuration.StatisticsMetricsTableWriteInterval;
+            options.PerfCountersWriteInterval = configuration.StatisticsPerfCountersWriteInterval;
+            options.LogWriteInterval = configuration.StatisticsLogWriteInterval;
+            options.WriteLogStatisticsToTable = configuration.StatisticsWriteLogStatisticsToTable;
+            options.CollectionLevel = configuration.StatisticsCollectionLevel;
+            options.ProviderName = configuration.StatisticsProviderName;
         }
     }
 }

@@ -36,6 +36,9 @@ namespace Orleans.Hosting
                 });
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
 
+            // Add legacy node configuration, based from the instance returned from the above registered factory
+            services.AddLegacyNodeConfigurationSupport();
+
             // Translate legacy configuration to new Options
             services.Configure<SiloMessagingOptions>(options =>
             {
@@ -66,6 +69,16 @@ namespace Orleans.Hosting
         internal static void Configure<TService, TOptions>(this IServiceCollection services, Action<TService, TOptions> configure) where TOptions : class
         {
             services.AddTransient<IConfigureOptions<TOptions>>(sp => new ServiceBasedConfigurator<TService, TOptions>(sp.GetRequiredService<TService>(), configure));
+        }
+
+        private static IServiceCollection AddLegacyNodeConfigurationSupport(this IServiceCollection services)
+        {
+            services.Configure<NodeConfiguration, StatisticsOptions>((configuration, options) =>
+            {
+                LegacyConfigurationExtensions.CopyStatisticsOptions(configuration, options);
+            });
+
+            return services;
         }
 
         private class ServiceBasedConfigurator<TService, TOptions> : IConfigureOptions<TOptions> where TOptions : class

@@ -4,24 +4,28 @@ using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime
 {
     internal class ClientStatisticsManager : IDisposable
     {
         private readonly ClientConfiguration config;
+        private readonly StatisticsOptions statisticsOptions;
         private readonly IServiceProvider serviceProvider;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
         private readonly Logger logger;
         private readonly ILoggerFactory loggerFactory;
-        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
         {
             this.config = config;
+            this.statisticsOptions = statisticsOptions.Value;
             this.serviceProvider = serviceProvider;
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
-            logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false, serializationManager, loggerFactory);
+            logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
             logger = new LoggerWrapper<ClientStatisticsManager>(loggerFactory);
             this.loggerFactory = loggerFactory;
             MessagingStatisticsGroup.Init(false);
@@ -35,9 +39,9 @@ namespace Orleans.Runtime
 
             // Configure Metrics
             IProvider statsProvider = null;
-            if (!string.IsNullOrEmpty(config.StatisticsProviderName))
+            if (!string.IsNullOrEmpty(statisticsOptions.ProviderName))
             {
-                var extType = config.StatisticsProviderName;
+                var extType = statisticsOptions.ProviderName;
                 statsProvider = statsManager.GetProvider(extType);
                 var metricsDataPublisher = statsProvider as IClientMetricsDataPublisher;
                 if (metricsDataPublisher == null)
@@ -54,7 +58,7 @@ namespace Orleans.Runtime
                 }
                 tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats, this.loggerFactory)
                 {
-                    MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
+                    MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
                 };
             }
             else if (config.UseAzureSystemStore)
@@ -64,12 +68,12 @@ namespace Orleans.Runtime
                 await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
                 tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats, this.loggerFactory)
                 {
-                    MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
+                    MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
                 };
             }
 
             // Configure Statistics
-            if (config.StatisticsWriteLogStatisticsToTable)
+            if (statisticsOptions.WriteLogStatisticsToTable)
             {
                 if (statsProvider != null)
                 {

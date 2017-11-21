@@ -19,7 +19,6 @@ using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Utilities;
