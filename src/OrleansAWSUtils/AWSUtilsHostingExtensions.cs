@@ -33,9 +33,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ClientBuilder with DynamoDBGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseDynamoDBGatewayListProvider(this IClientBuilder builder,
             Action<DynamoDBGatewayListProviderOptions> configureOptions)
         {
@@ -45,9 +42,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ClientBuilder with DynamoDBGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseDynamoDBGatewayListProvider(this IClientBuilder builder,
             Action<OptionsBuilder<DynamoDBGatewayListProviderOptions>> configureOptions)
         {
@@ -57,8 +51,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container with DynamoDBMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
         public static IServiceCollection UseDynamoDBMembership(this IServiceCollection services,
             Action<DynamoDBMembershipOptions> configureOptions)
         {
@@ -68,8 +60,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container with DynamoDBMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
         public static IServiceCollection UseDynamoDBMembership(this IServiceCollection services,
             Action<OptionsBuilder<DynamoDBMembershipOptions>> configureOptions)
         {
@@ -80,9 +70,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Condifure client with DynamoDBGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseDynamoDBGatewayListProvider(this IServiceCollection services,
             Action<DynamoDBGatewayListProviderOptions> configureOptions)
         {
@@ -92,9 +79,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Condifure client with DynamoDBGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseDynamoDBGatewayListProvider(this IServiceCollection services,
             Action<OptionsBuilder<DynamoDBGatewayListProviderOptions>> configureOptions)
         {

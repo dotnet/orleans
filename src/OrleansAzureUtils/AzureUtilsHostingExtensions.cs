@@ -13,8 +13,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ISiloHostBuilder to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
         public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
             Action<AzureTableMembershipOptions> configureOptions)
         {
@@ -24,8 +22,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ISiloHostBuilder to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
         public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
             Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
         {
@@ -34,9 +30,6 @@ namespace Orleans.Hosting
 
         /// Configure client to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
             Action<AzureTableGatewayListProviderOptions> configureOptions)
         {
@@ -46,9 +39,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure client to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
             Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
         {
@@ -58,8 +48,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
         public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
             Action<AzureTableMembershipOptions> configureOptions)
         {
@@ -69,8 +57,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
         public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
             Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
         {
@@ -82,9 +68,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
             Action<AzureTableGatewayListProviderOptions> configureOptions)
         {
@@ -94,9 +77,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
             Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
         {
