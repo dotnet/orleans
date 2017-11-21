@@ -20,13 +20,15 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Configuration;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal class InsideRuntimeClient : ISiloRuntimeClient
+    internal class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly Logger callbackDataLogger;
@@ -688,7 +690,7 @@ namespace Orleans.Runtime
 
         #endregion
 
-        internal void Stop()
+        private Task OnRuntimeInitializeStop(CancellationToken tc)
         {
             lock (disposables)
             {
@@ -704,11 +706,14 @@ namespace Orleans.Runtime
                     }
                 }
             }
+            return Task.CompletedTask;
         }
 
-        internal void Start()
+        private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
+            typeManager.Start();
             GrainTypeResolver = typeManager.GetTypeCodeMap();
+            return Task.CompletedTask;
         }
 
         public IGrainTypeResolver GrainTypeResolver { get; private set; }
@@ -801,6 +806,11 @@ namespace Orleans.Runtime
             throw new ArgumentException(
                 $"Provider extension handler type {handlerType} was not found in the type manager",
                 nameof(handlerType));
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
     }
 }

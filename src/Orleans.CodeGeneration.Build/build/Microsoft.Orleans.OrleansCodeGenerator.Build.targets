@@ -30,6 +30,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <OrleansCodeGenLogLevel Condition="'$(OrleansCodeGenLogLevel)' == ''">Warning</OrleansCodeGenLogLevel>
     <CodeGenDirectory Condition="'$([System.IO.Path]::IsPathRooted($(IntermediateOutputPath)))' == 'true'">$(IntermediateOutputPath)</CodeGenDirectory>
     <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
     <OutputFileName>$(CodeGenDirectory)$(TargetName).orleans.g.cs</OutputFileName>
@@ -56,6 +57,7 @@
     <ItemGroup>
       <CodeGenArgs Include="/in:$(InputAssembly)"/>
       <CodeGenArgs Include="/out:$(OutputFileName)"/>
+      <CodeGenArgs Include="/loglevel:$(OrleansCodeGenLogLevel)"/>
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
     </ItemGroup>
     <MSBuild

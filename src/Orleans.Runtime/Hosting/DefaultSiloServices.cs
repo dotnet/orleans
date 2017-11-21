@@ -46,6 +46,7 @@ namespace Orleans.Hosting
 
             // Register system services.
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
+            services.TryAddSingleton<SiloLifecycle>();
 
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -129,6 +130,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
+            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
