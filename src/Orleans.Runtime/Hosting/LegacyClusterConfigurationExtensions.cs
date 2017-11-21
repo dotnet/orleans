@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,6 +49,11 @@ namespace Orleans.Hosting
                 options.GatewaySenderQueues = configuration.Globals.GatewaySenderQueues;
                 options.MaxForwardCount = configuration.Globals.MaxForwardCount;
                 options.ClientDropTimeout = configuration.Globals.ClientDropTimeout;
+            });
+
+            services.Configure<NetworkingOptions>(options =>
+            {
+                LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options);
             });
 
             services.Configure<SerializationProviderOptions>(options =>

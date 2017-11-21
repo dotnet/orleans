@@ -4,23 +4,23 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
     internal class SocketManager
     {
         private readonly LRU<IPEndPoint, Socket> cache;
-        private TimeSpan connectionTimeout;
-        private ILogger logger;
+        private readonly TimeSpan connectionTimeout;
+        private readonly ILogger logger;
         private const int MAX_SOCKETS = 200;
 
-        internal SocketManager(IOptions<MessagingOptions> options, ILoggerFactory loggerFactory)
+        internal SocketManager(IOptions<NetworkingOptions> options, ILoggerFactory loggerFactory)
         {
-            var messagingOptions = options.Value;
-            connectionTimeout = messagingOptions.OpenConnectionTimeout;
-            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, messagingOptions.MaxSocketAge, SendingSocketCreator);
+            var networkingOptions = options.Value;
+            connectionTimeout = networkingOptions.OpenConnectionTimeout;
+            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, networkingOptions.MaxSocketAge, SendingSocketCreator);
             this.logger = loggerFactory.CreateLogger<SocketManager>();
             cache.RaiseFlushEvent += FlushHandler;
         }
