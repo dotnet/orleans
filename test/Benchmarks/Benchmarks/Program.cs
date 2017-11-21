@@ -6,6 +6,7 @@ using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.TransactionManager;
+using Benchmarks.Ping;
 
 namespace Benchmarks
 {
@@ -51,6 +52,19 @@ namespace Benchmarks
                 },
                 benchmark => benchmark.RunAgainstMemory(),
                 benchmark => { });
+            },
+            ["Ping"] = () =>
+            {
+                RunBenchmark(
+                "Running Ping benchmark",
+                () =>
+                {
+                    var benchmark = new PingBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
             },
         };
 
