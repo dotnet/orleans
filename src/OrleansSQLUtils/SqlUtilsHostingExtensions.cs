@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
@@ -14,9 +13,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure SiloHostBuilder with SqlMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static ISiloHostBuilder UseSqlMembership(this ISiloHostBuilder builder,
             Action<SqlMembershipOptions> configureOptions)
         {
@@ -26,21 +22,15 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure SiloHostBuilder with SqlMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static ISiloHostBuilder UseSqlMembership(this ISiloHostBuilder builder,
-            IConfiguration configuration)
+            Action<OptionsBuilder<SqlMembershipOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseSqlMembership(configuration));
+            return builder.ConfigureServices(services => services.UseSqlMembership(configureOptions));
         }
 
         /// <summary>
         /// Configure client to use SqlGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseSqlGatewayListProvider(this IClientBuilder builder, Action<SqlGatewayListProviderOptions> configureOptions)
         {
             return builder.ConfigureServices(services => services.UseSqlGatewayListProvider(configureOptions));
@@ -49,64 +39,47 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure client to use SqlGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IClientBuilder UseSqlGatewayListProvider(this IClientBuilder builder, IConfiguration configuration)
+        public static IClientBuilder UseSqlGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<SqlGatewayListProviderOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseSqlGatewayListProvider(configuration));
+            return builder.ConfigureServices(services => services.UseSqlGatewayListProvider(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container with SqlMemebership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseSqlMembership(this IServiceCollection services,
             Action<SqlMembershipOptions> configureOptions)
         {
-            return services.Configure<SqlMembershipOptions>(configureOptions)
-                .AddSingleton<IMembershipTable, SqlMembershipTable>();
+            return services.UseSqlMembership(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container with SqlMemebership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IServiceCollection UseSqlMembership(this IServiceCollection services,
-            IConfiguration configuration)
+            Action<OptionsBuilder<SqlMembershipOptions>> configureOptions)
         {
-            return services.Configure<SqlMembershipOptions>(configuration)
-           .AddSingleton<IMembershipTable, SqlMembershipTable>();
+            configureOptions?.Invoke(services.AddOptions<SqlMembershipOptions>());
+            return services.AddSingleton<IMembershipTable, SqlMembershipTable>();
         }
 
         /// <summary>
         /// Configure DI container with SqlGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseSqlGatewayListProvider(this IServiceCollection services,
             Action<SqlGatewayListProviderOptions> configureOptions)
         {
-            return services.Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, SqlGatewayListProvider>();
+            return services.UseSqlGatewayListProvider(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container with SqlGatewayProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IServiceCollection UseSqlGatewayListProvider(this IServiceCollection services,
-            IConfiguration configuration)
+            Action<OptionsBuilder<SqlGatewayListProviderOptions>> configureOptions)
         {
-            return services.Configure<SqlGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, SqlGatewayListProvider>();
+            configureOptions?.Invoke(services.AddOptions<SqlGatewayListProviderOptions>());
+            return services.AddSingleton<IGatewayListProvider, SqlGatewayListProvider>();
         }
     }
 }

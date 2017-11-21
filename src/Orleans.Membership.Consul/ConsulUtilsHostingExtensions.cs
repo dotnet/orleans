@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.ConsulUtils.Configuration;
 using Orleans.Messaging;
@@ -13,9 +12,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure siloHostBuilder to use ConsulMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static ISiloHostBuilder UseConsulMembership(this ISiloHostBuilder builder,
             Action<ConsulMembershipOptions> configureOptions)
         {
@@ -25,21 +21,15 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure siloHostBuilder to use ConsulMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static ISiloHostBuilder UseConsulMembership(this ISiloHostBuilder builder,
-            IConfiguration configuration)
+            Action<OptionsBuilder<ConsulMembershipOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseConsulMembership(configuration));
+            return builder.ConfigureServices(services => services.UseConsulMembership(configureOptions));
         }
 
         /// <summary>
         /// Configure client to use ConsulGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseConsulGatewayListProvider(this IClientBuilder builder,
             Action<ConsulGatewayListProviderOptions> configureOptions)
         {
@@ -49,39 +39,28 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure client to use ConsulGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IClientBuilder UseConsulGatewayListProvider(this IClientBuilder builder,
-            IConfiguration configuration)
+            Action<OptionsBuilder<ConsulGatewayListProviderOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseConsulGatewayListProvider(configuration));
+            return builder.ConfigureServices(services => services.UseConsulGatewayListProvider(configureOptions));
         }
 
         /// <summary>
-        /// Configure DI container with ConsuleBasedMemebership
+        /// Configure DI container with Consul based Memebership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseConsulMembership(this IServiceCollection services,
             Action<ConsulMembershipOptions> configureOptions)
         {
-            services.Configure<ConsulMembershipOptions>(configureOptions);
-            services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
-            return services;
+            return services.UseConsulMembership(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
-        /// Configure DI container with ConsuleBasedMemebership
+        /// Configure DI container with Consul based Memebership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IServiceCollection UseConsulMembership(this IServiceCollection services,
-            IConfiguration configuration)
+            Action<OptionsBuilder<ConsulMembershipOptions>> configureOptions)
         {
-            services.Configure<ConsulMembershipOptions>(configuration);
+            configureOptions?.Invoke(services.AddOptions<ConsulMembershipOptions>());
             services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
             return services;
         }
@@ -89,27 +68,20 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container with ConsulGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseConsulGatewayListProvider(this IServiceCollection services,
             Action<ConsulGatewayListProviderOptions> configureOptions)
         {
-            return services.Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
+            return services.UseConsulGatewayListProvider(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container with ConsulGatewayProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IServiceCollection UseConsulGatewayListProvider(this IServiceCollection services,
-            IConfiguration configuration)
+            Action<OptionsBuilder<ConsulGatewayListProviderOptions>> configureOptions)
         {
-            return services.Configure<ConsulGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
+            configureOptions?.Invoke(services.AddOptions<ConsulGatewayListProviderOptions>());
+            return services.AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
         }
     }
 }

@@ -168,13 +168,10 @@ namespace Orleans
         /// <summary>
         /// Configure the client to use <see cref="StaticGatewayListProvider"/>
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, IConfiguration configuration)
+        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
             return builder.ConfigureServices(collection =>
-                collection.UseStaticGatewayListProvider(configuration));
+                collection.UseStaticGatewayListProvider(configureOptions));
         }
     }
 }

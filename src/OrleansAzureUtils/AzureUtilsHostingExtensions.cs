@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.AzureUtils;
 using Orleans.AzureUtils.Configuration;
@@ -14,8 +13,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ISiloHostBuilder to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
         public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
             Action<AzureTableMembershipOptions> configureOptions)
         {
@@ -25,19 +22,14 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure ISiloHostBuilder to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="config"></param>
-        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder, IConfiguration config)
+        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
+            Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableMembership(config));
+            return builder.ConfigureServices(services => services.UseAzureTableMembership(configureOptions));
         }
 
-        /// <summary>
         /// Configure client to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
             Action<AzureTableGatewayListProviderOptions> configureOptions)
         {
@@ -47,36 +39,28 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure client to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
-            IConfiguration configuration)
+            Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableGatewayListProvider(configuration));
+            return builder.ConfigureServices(services => services.UseAzureTableGatewayListProvider(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
         public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
             Action<AzureTableMembershipOptions> configureOptions)
         {
-            services.Configure<AzureTableMembershipOptions>(configureOptions);
-            services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
-            return services;
+            return services.UseAzureTableMembership(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container to use AzureTableBasedMembership
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="config"></param>
-        public static IServiceCollection UseAzureTableMembership(this IServiceCollection services, IConfiguration config)
+        public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
+            Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
         {
-            services.Configure<AzureTableMembershipOptions>(config);
+            configureOptions?.Invoke(services.AddOptions<AzureTableMembershipOptions>());
             services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
             return services;
         }
@@ -84,27 +68,20 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure DI container to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
         public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
             Action<AzureTableGatewayListProviderOptions> configureOptions)
         {
-            return services.Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+            return services.UseAzureTableGatewayListProvider(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure DI container to use AzureTableGatewayListProvider
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
         public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
-            IConfiguration configuration)
+            Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
         {
-            return services.Configure<AzureTableGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+            configureOptions?.Invoke(services.AddOptions<AzureTableGatewayListProviderOptions>());
+            return services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
         }
     }
 }
