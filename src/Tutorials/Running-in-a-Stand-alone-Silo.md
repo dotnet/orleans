@@ -45,6 +45,8 @@ You also need to add a OrleansConfiguration.xml file, you can create it using th
 <ProxyingGateway Address="localhost" Port="30000" />
 ```
 
+Don't forget to set the file's "Copy to Output Directory" property to "Copy if newer".
+
 OrleansHost.exe is a ready-made host executable intended for running Orleans silo code. It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 
 ![](../Images/Standalone 1.PNG)
