@@ -90,6 +90,18 @@ namespace Orleans.Configuration
         /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
+            Action<StaticGatewayListProviderOptions> configureOptions)
+        {
+            return collection.UseStaticGatewayListProvider(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
+        /// </summary>
+        /// <param name="collection"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
             Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
             configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());

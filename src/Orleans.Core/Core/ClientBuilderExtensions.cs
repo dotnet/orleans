@@ -159,6 +159,18 @@ namespace Orleans
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
+        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
+        {
+            return builder.ConfigureServices(collection =>
+                collection.UseStaticGatewayListProvider(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure the client to use <see cref="StaticGatewayListProvider"/>
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
         public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
             return builder.ConfigureServices(collection =>

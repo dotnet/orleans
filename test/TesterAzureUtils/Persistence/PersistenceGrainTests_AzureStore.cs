@@ -50,19 +50,20 @@ namespace Tester.AzureUtils.Persistence
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseAzureTableMembership(ob => 
-                        ob.Configure(options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.MaxStorageBusyRetries = 3;
-                        }))
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
         }
 
         public static Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config)
-            .UseAzureTableGatewayListProvider(ob => ob.Configure(gatewayOptions => gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString))
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+            })
             .AddApplicationPartsFromAppDomain()
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
 
