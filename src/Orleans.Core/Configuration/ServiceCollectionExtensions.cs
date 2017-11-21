@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration.Options;
+using Orleans.Hosting;
 using Orleans.Messaging;
 
 namespace Orleans.Configuration
@@ -89,25 +90,10 @@ namespace Orleans.Configuration
         /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
-            Action<StaticGatewayListProviderOptions> configureOptions)
+            Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
-            return collection
-                .Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
-        }
-
-        /// <summary>
-        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configuration"/>
-        /// </summary>
-        /// <param name="collection"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
-            IConfiguration configuration)
-        {
-            return collection
-                .Configure<StaticGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
+            configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
+            return collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
         }
 
         private class GrainCallFilterWrapper : IGrainCallFilter

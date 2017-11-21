@@ -10,11 +10,12 @@ namespace Orleans.Runtime.MembershipService
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
         {
             services.UseAzureTableMembership(
-                options =>
-                {
-                    options.MaxStorageBusyRetries = configuration.MaxStorageBusyRetries;
-                    options.ConnectionString = configuration.DataConnectionString;
-                });
+                ob => ob.Configure(
+                    options =>
+                    {
+                        options.MaxStorageBusyRetries = configuration.MaxStorageBusyRetries;
+                        options.ConnectionString = configuration.DataConnectionString;
+                    }));
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Orleans.Runtime.MembershipService
     {
         public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
         {
-            services.UseDynamoDBMembership(options => options.ConnectionString = configuration.DataConnectionString);
+            services.UseDynamoDBMembership(ob => ob.Configure(options => options.ConnectionString = configuration.DataConnectionString));
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
@@ -15,44 +14,22 @@ namespace Orleans.Hosting
         /// Configure SiloHostBuilder with DynamoDBMembership
         /// </summary>
         public static ISiloHostBuilder UseDynamoDBMembership(this ISiloHostBuilder builder,
-            Action<DynamoDBMembershipOptions> configureOptions)
+            Action<OptionsBuilder<DynamoDBMembershipOptions>> configureOptions)
         {
             builder.ConfigureServices(services => services.UseDynamoDBMembership(configureOptions));
             return builder;
         }
 
         /// <summary>
-        /// Configure SiloHostBuilder with DynamoDBMembership
-        /// </summary>
-        public static ISiloHostBuilder UseDynamoDBMembership(this ISiloHostBuilder builder,
-            IConfiguration config)
-        {
-            builder.ConfigureServices(services => services.UseDynamoDBMembership(config));
-            return builder;
-        }
-
-        /// <summary>
         /// Configure ClientBuilder with DynamoDBGatewayListProvider
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static IClientBuilder UseDynamoDBGatewayListProvider(this IClientBuilder builder,
-            Action<DynamoDBGatewayListProviderOptions> configureOptions)
+            Action<OptionsBuilder<DynamoDBGatewayListProviderOptions>> configureOptions)
         {
-            return  builder.ConfigureServices(services => services.UseDynamoDBGatewayListProvider(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure ClientBuilder with DynamoDBGatewayListProvider
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IClientBuilder UseDynamoDBGatewayListProvider(this IClientBuilder builder,
-            IConfiguration configuration)
-        {
-            return builder.ConfigureServices(services => services.UseDynamoDBGatewayListProvider(configuration));
+            return builder.ConfigureServices(services => services.UseDynamoDBGatewayListProvider(configureOptions));
         }
 
         /// <summary>
@@ -61,23 +38,12 @@ namespace Orleans.Hosting
         /// <param name="services"></param>
         /// <param name="configureOptions"></param>
         public static IServiceCollection UseDynamoDBMembership(this IServiceCollection services,
-            Action<DynamoDBMembershipOptions> configureOptions)
+            Action<OptionsBuilder<DynamoDBMembershipOptions>> configureOptions)
         {
-            services.Configure<DynamoDBMembershipOptions>(configureOptions);
-            services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
-            return services;
+            configureOptions?.Invoke(services.AddOptions<DynamoDBMembershipOptions>());
+            return services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
         }
 
-        /// <summary>
-        /// Configure DI container with DynamoDBMembership
-        /// </summary>
-        public static IServiceCollection UseDynamoDBMembership(this IServiceCollection services,
-            IConfiguration config)
-        {
-            services.Configure<DynamoDBMembershipOptions>(config);
-            services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
-            return services;
-        }
 
         /// <summary>
         /// Condifure client with DynamoDBGatewayListProvider
@@ -86,23 +52,10 @@ namespace Orleans.Hosting
         /// <param name="configureOptions"></param>
         /// <returns></returns>
         public static IServiceCollection UseDynamoDBGatewayListProvider(this IServiceCollection services,
-            Action<DynamoDBGatewayListProviderOptions> configureOptions)
+            Action<OptionsBuilder<DynamoDBGatewayListProviderOptions>> configureOptions)
         {
-            return services.Configure<DynamoDBGatewayListProviderOptions>(configureOptions)
-                .AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
-        }
-
-        /// <summary>
-        /// Condifure client with DynamoDBGatewayListProvider
-        /// </summary>
-        /// <param name="services"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IServiceCollection UseDynamoDBGatewayListProvider(this IServiceCollection services,
-           IConfiguration configuration)
-        {
-            return services.Configure<DynamoDBGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
+            configureOptions?.Invoke(services.AddOptions<DynamoDBGatewayListProviderOptions>());
+            return services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
         }
     }
 }

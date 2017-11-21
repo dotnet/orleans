@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
@@ -17,10 +13,8 @@ namespace OrleansAWSUtils.Membership
         /// <inheritdoc/>
         public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
         {
-            services.UseDynamoDBGatewayListProvider(options =>
-            {
-               ParseDataConnectionString(configuration.DataConnectionString, options);
-            });
+            services.UseDynamoDBGatewayListProvider(ob => 
+                ob.Configure(options => ParseDataConnectionString(configuration.DataConnectionString, options)));
         }
 
         /// <summary>

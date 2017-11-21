@@ -72,10 +72,8 @@ namespace AWSUtils.Tests.Liveness
         }
 
         private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseDynamoDBGatewayListProvider(gatewayOptions =>
-            {
-               LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
-            })
+            .UseConfiguration(config)
+            .UseDynamoDBGatewayListProvider(ob => ob.Configure(options => LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, options)))
             .AddApplicationPartsFromAppDomain()
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
         public class SiloBuilderFactory : ISiloBuilderFactory
@@ -85,10 +83,7 @@ namespace AWSUtils.Tests.Liveness
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .UseDynamoDBMembership(options =>
-                    {
-                        options.ConnectionString = ConnectionString;
-                    })
+                    .UseDynamoDBMembership(ob => ob.Configure(options => options.ConnectionString = ConnectionString))
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
             }
         }

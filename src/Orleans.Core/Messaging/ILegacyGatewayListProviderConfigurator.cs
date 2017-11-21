@@ -78,9 +78,9 @@ namespace Orleans.Messaging
     {
         public void ConfigureServices(ClientConfiguration clientConfiguration, IServiceCollection services)
         {
-            services.UseStaticGatewayListProvider(options =>
+            services.UseStaticGatewayListProvider(ob =>
             {
-                options.Gateways = clientConfiguration.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
+                ob.Configure(options => options.Gateways = clientConfiguration.Gateways.Select(ep => ep.ToGatewayUri()).ToList());
             });
         }
     }
