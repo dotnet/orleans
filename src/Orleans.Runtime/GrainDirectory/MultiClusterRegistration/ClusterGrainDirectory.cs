@@ -21,7 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly LocalGrainDirectory router;
         private readonly string clusterId;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IMultiClusterOracle multiClusterOracle;
 
         public ClusterGrainDirectory(
@@ -67,8 +67,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                if (logger.IsVerbose2)
-                    logger.Verbose("GSIP:Rsp {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("GSIP:Rsp {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
 
                 var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, forwardAddress);
                 return await clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, hopCount + 1);
@@ -134,12 +133,12 @@ namespace Orleans.Runtime.GrainDirectory
                             //update own activation status to race loser.
                             if (existingActivationStatus == GrainDirectoryEntryStatus.RequestedOwnership)
                             {
-                                logger.Verbose2("GSIP:Rsp {0} Origin={1} RaceLoser", grain.ToString(), requestClusterId);
+                                logger.Trace("GSIP:Rsp {0} Origin={1} RaceLoser", grain.ToString(), requestClusterId);
                                 var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, GrainDirectoryEntryStatus.RaceLoser, GrainDirectoryEntryStatus.RequestedOwnership);
                                 if (!success)
                                 {
                                     // there was a race. retry.
-                                    logger.Verbose2("GSIP:Rsp {0} Origin={1} Retry", grain.ToString(), requestClusterId);
+                                    logger.Trace("GSIP:Rsp {0} Origin={1} Retry", grain.ToString(), requestClusterId);
                                     return ProcessRequestLocal(grain, requestClusterId);
                                 }
                             }
@@ -159,8 +158,8 @@ namespace Orleans.Runtime.GrainDirectory
                 };
             }
 
-            if (logger.IsVerbose)
-                logger.Verbose("GSIP:Rsp {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response);
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.Debug("GSIP:Rsp {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response);
 
             return response;
         }

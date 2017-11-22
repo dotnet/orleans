@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
         {
@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
-            logger = new LoggerWrapper<ClientStatisticsManager>(loggerFactory);
+            logger = loggerFactory.CreateLogger<ClientStatisticsManager>();
             this.loggerFactory = loggerFactory;
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);

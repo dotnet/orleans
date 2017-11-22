@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Orleans.MultiCluster;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {
@@ -18,12 +19,12 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private readonly HashSet<GrainReference> confListeners;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
 
         internal MultiClusterData Current { get { return localData; } }
 
-        internal MultiClusterOracleData(Logger log, IInternalGrainFactory grainFactory)
+        internal MultiClusterOracleData(ILogger log, IInternalGrainFactory grainFactory)
         {
             logger = log;
             this.grainFactory = grainFactory;
@@ -50,8 +51,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         internal bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)
         {
-            if (logger.IsVerbose2)
-                logger.Verbose2("SubscribeToMultiClusterConfigurationEvents: {0}", observer);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("SubscribeToMultiClusterConfigurationEvents: {0}", observer);
 
             lock (confListeners)
             {
@@ -66,8 +67,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         internal bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer)
         {
-            if (logger.IsVerbose3)
-                logger.Verbose3("UnSubscribeFromMultiClusterConfigurationEvents: {0}", observer);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("UnSubscribeFromMultiClusterConfigurationEvents: {0}", observer);
 
             lock (confListeners)
             {
@@ -85,8 +86,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             this.localData = prev.Merge(data, out delta);
 
-            if (logger.IsVerbose2)
-                logger.Verbose2("ApplyDataAndNotify: delta {0}", delta);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("ApplyDataAndNotify: delta {0}", delta);
 
             if (delta.IsEmpty)
                 return delta;
@@ -112,8 +113,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 {
                     try
                     {
-                        if (logger.IsVerbose2)
-                            logger.Verbose2("-NotificationWork: notify IProtocolParticipant {0} of configuration {1}", listener, delta.Configuration);
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace("-NotificationWork: notify IProtocolParticipant {0} of configuration {1}", listener, delta.Configuration);
 
                         // enqueue conf change event as grain call
                         var g = this.grainFactory.Cast<ILogConsistencyProtocolParticipant>(listener);

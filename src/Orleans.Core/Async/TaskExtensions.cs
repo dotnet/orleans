@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -130,7 +131,7 @@ namespace Orleans
             return completion.Task;
         }
 
-        public static async Task LogException(this Task task, Logger logger, ErrorCode errorCode, string message)
+        public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try
             {

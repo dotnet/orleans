@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -26,7 +28,7 @@ namespace UnitTests.General
         private int initCount;
 
         public string Name { get; private set; }
-        protected Logger logger { get; private set; }
+        protected ILogger logger { get; private set; }
 
         public int InitCount
         {
@@ -44,7 +46,7 @@ namespace UnitTests.General
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            logger = providerRuntime.GetLogger(GetType().Name);
+            logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<MockBootstrapProvider>>();
             logger.Info("Init Name={0}", Name);
             Interlocked.Increment(ref initCount);
             return Task.CompletedTask;
@@ -109,7 +111,7 @@ namespace UnitTests.General
     public class LocalGrainInitBootstrapper : MarshalByRefObject, IBootstrapProvider
     {
         public string Name { get; private set; }
-        private Logger logger;
+        private ILogger logger;
 
         public LocalGrainInitBootstrapper()
         {
@@ -122,7 +124,8 @@ namespace UnitTests.General
         public virtual async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            logger = providerRuntime.GetLogger(GetType().Name);
+            logger = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(this.GetType().FullName);
             logger.Info("Init Name={0}", Name);
 
             ILocalContentGrain grain = providerRuntime.GrainFactory.GetGrain<ILocalContentGrain>(Guid.NewGuid());

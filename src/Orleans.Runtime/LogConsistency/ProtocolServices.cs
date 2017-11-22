@@ -33,7 +33,7 @@ namespace Orleans.Runtime.LogConsistency
 
         private readonly IMultiClusterOracle multiClusterOracle;
 
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly IInternalGrainFactory grainFactory;
         private readonly Grain grain;   // links to the grain that owns this service object
         private readonly MultiClusterConfiguration pseudoMultiClusterConfiguration;
@@ -52,7 +52,7 @@ namespace Orleans.Runtime.LogConsistency
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
-            this.log = new LoggerWrapper<ProtocolServices>(loggerFactory);
+            this.log = loggerFactory.CreateLogger<ProtocolServices>();
             this.grainFactory = grainFactory;
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
@@ -75,8 +75,7 @@ namespace Orleans.Runtime.LogConsistency
 
         public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
-
-            log?.Verbose3("SendMessage {0}->{1}: {2}", this.siloOptions.ClusterId, clusterId, payload);
+            log?.Trace("SendMessage {0}->{1}: {2}", this.siloOptions.ClusterId, clusterId, payload);
 
             // send the message to ourself if we are the destination cluster
             if (this.siloOptions.ClusterId == clusterId)
@@ -95,10 +94,10 @@ namespace Orleans.Runtime.LogConsistency
             if (!this.MultiClusterEnabled)
                 throw new ProtocolTransportException("no such cluster");
 
-            if (log != null && log.IsVerbose3)
+            if (log != null && log.IsEnabled(LogLevel.Trace))
             {
                 var gws = this.multiClusterOracle.GetGateways();
-                log.Verbose3("Available Gateways:\n{0}", string.Join("\n", gws.Select((gw) => gw.ToString())));
+                log.Trace("Available Gateways:\n{0}", string.Join("\n", gws.Select((gw) => gw.ToString())));
             }
 
             var clusterGateway = this.multiClusterOracle.GetRandomClusterGateway(clusterId);
@@ -226,15 +225,15 @@ namespace Orleans.Runtime.LogConsistency
                    where), e);
         }
 
-        public void Log(Severity severity, string format, params object[] args)
+        public void Log(LogLevel level, string format, params object[] args)
         {
-            if (log != null && log.SeverityLevel >= severity)
+            if (log != null && log.IsEnabled(level))
             {
                 var msg = string.Format("{0}{1} {2}",
                         grain.GrainReference,
                         this.ClusterDisplayName,
                         string.Format(format, args));
-                log.Log(0, severity, msg, EmptyObjectArray, null);
+                log.Log(level, 0, msg, null, (m, exc) => $"{m}");
             }
         }
     }

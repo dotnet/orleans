@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessageSender pingSender;
         private readonly SiloMessageSender systemSender;
         private readonly MessageCenter messageCenter;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private bool stopped;
 
         public int Count
@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Messaging
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
             }
-            logger = new LoggerWrapper<OutboundMessageQueue>(loggerFactory);
+            logger = loggerFactory.CreateLogger<OutboundMessageQueue>();
             stopped = false;
         }
 
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Messaging
             // Shortcut messages to this silo
             if (msg.TargetSilo.Equals(messageCenter.MyAddress))
             {
-                if (logger.IsVerbose3) logger.Verbose3("Message has been looped back to this silo: {0}", msg);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Message has been looped back to this silo: {0}", msg);
                 MessagingStatisticsGroup.LocalMessagesSent.Increment();
                 messageCenter.InboundQueue.PostMessage(msg);
             }

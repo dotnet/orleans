@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Counters
         private RuntimeStatisticsGroup runtimeStats;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private SiloOptions siloOptions;
 
         public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions)
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Counters
             SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
-            this.logger = new LoggerWrapper<SiloStatisticsManager>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager, loggerFactory);
             this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, loggerFactory, initializationParams.NodeConfig);

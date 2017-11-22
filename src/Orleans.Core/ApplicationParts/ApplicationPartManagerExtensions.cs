@@ -83,7 +83,7 @@ namespace Orleans
                 AssemblyLoaderReflectionCriterion.NewCriterion(ReferencesOrleansOrAbstractionsAssemblyPredicate)
             };
 
-            var loadedAssemblies = AssemblyLoader.LoadAssemblies(dirs, excludeCriteria, loadCriteria, new LoggerWrapper(nameof(ApplicationPartManagerExtensions), NullLoggerFactory.Instance));
+            var loadedAssemblies = AssemblyLoader.LoadAssemblies(dirs, excludeCriteria, loadCriteria, NullLogger.Instance);
             foreach (var assembly in loadedAssemblies)
             {
                 manager.AddApplicationPart(new AssemblyPart(assembly));

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -16,7 +18,7 @@ namespace UnitTests.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly TestCluster testCluster;
 
         public SubscriptionMultiplicityTestRunner(string streamProviderName, TestCluster testCluster)
@@ -26,7 +28,7 @@ namespace UnitTests.StreamingTests
                 throw new ArgumentNullException("streamProviderName");
             }
             this.streamProviderName = streamProviderName;
-            this.logger = testCluster.Client.Logger;
+            this.logger = testCluster.Client.ServiceProvider.GetRequiredService<ILogger<SubscriptionMultiplicityTestRunner>>();
             this.testCluster = testCluster;
         }
 

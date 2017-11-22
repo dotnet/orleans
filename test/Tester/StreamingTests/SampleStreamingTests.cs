@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -17,7 +18,7 @@ namespace UnitTests.StreamingTests
     {
         private readonly Fixture fixture;
 
-        private Logger logger;
+        private ILogger logger;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -177,10 +178,10 @@ namespace UnitTests.StreamingTests
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private readonly string streamProvider;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly TestCluster cluster;
 
-        public SampleStreamingTests(string streamProvider, Logger logger, TestCluster cluster)
+        public SampleStreamingTests(string streamProvider, ILogger logger, TestCluster cluster)
         {
             this.streamProvider = streamProvider;
             this.logger = logger;

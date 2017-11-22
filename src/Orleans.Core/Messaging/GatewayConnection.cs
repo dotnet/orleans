@@ -55,7 +55,7 @@ namespace Orleans.Messaging
 
         public override void Start()
         {
-            if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_GatewayConnStarted, "Starting gateway connection for gateway {0}", Address);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_GatewayConnStarted, "Starting gateway connection for gateway {0}", Address);
             lock (Lockable)
             {
                 if (State == ThreadState.Running)
@@ -153,7 +153,7 @@ namespace Orleans.Messaging
         {
             if (!MsgCenter.Running)
             {
-                if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_MsgCtrNotRunning, "Ignoring connection attempt to gateway {0} because the proxy message center is not running", Address);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_MsgCtrNotRunning, "Ignoring connection attempt to gateway {0} because the proxy message center is not running", Address);
                 return;
             }
 
@@ -165,7 +165,7 @@ namespace Orleans.Messaging
             {
                 if (!IsLive)
                 {
-                    if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_DeadGateway, "Ignoring connection attempt to gateway {0} because this gateway connection is already marked as non live", Address);
+                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_DeadGateway, "Ignoring connection attempt to gateway {0} because this gateway connection is already marked as non live", Address);
                     return; // if the connection is already marked as dead, don't try to reconnect. It has been doomed.
                 }
 
@@ -193,7 +193,7 @@ namespace Orleans.Messaging
                             if (millisecondsSinceLastAttempt < ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY)
                             {
                                 var wait = ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY - millisecondsSinceLastAttempt;
-                                if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_PauseBeforeRetry, "Pausing for {0} before trying to connect to gateway {1} on trial {2}", wait, Address, i);
+                                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_PauseBeforeRetry, "Pausing for {0} before trying to connect to gateway {1} on trial {2}", wait, Address, i);
                                 Thread.Sleep(wait);
                             }
                         }
@@ -326,7 +326,7 @@ namespace Orleans.Messaging
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (MsgCenter.Running && msg.Direction == Message.Directions.Request)
             {
-                if (Log.IsVerbose) Log.Verbose(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
                 MsgCenter.QueueIncomingMessage(error);

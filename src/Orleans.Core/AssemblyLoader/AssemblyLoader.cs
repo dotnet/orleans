@@ -8,6 +8,7 @@ using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -16,7 +17,7 @@ namespace Orleans.Runtime
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
@@ -27,7 +28,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                Logger logger)
+                ILogger logger)
         {
             this.dirEnumArgs = dirEnumArgs;
             this.pathNameCriteria = pathNameCriteria;
@@ -58,7 +59,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                Logger logger)
+                ILogger logger)
         {
             var loader =
                 NewAssemblyLoader(
@@ -89,7 +90,7 @@ namespace Orleans.Runtime
             return loadedAssemblies;
         }
         
-        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger, IServiceProvider serviceProvider) where T : class
+        public static T LoadAndCreateInstance<T>(string assemblyName, ILogger logger, IServiceProvider serviceProvider) where T : class
         {
             try
             {
@@ -111,7 +112,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                Logger logger)
+                ILogger logger)
         {
             if (null == dirEnumArgs)
                 throw new ArgumentNullException("dirEnumArgs");
@@ -201,12 +202,12 @@ namespace Orleans.Runtime
                         }
                         else
                         {
-                            if (logger.IsInfo) logger.Info("{0} is not compatible with current process, loading is skipped.", j);
+                            if (logger.IsEnabled(LogLevel.Information)) logger.Info("{0} is not compatible with current process, loading is skipped.", j);
                         }
                     }
                     catch (Exception)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", j);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Failed to pre-load assembly {0} in reflection-only context.", j);
                     }
                 }
 

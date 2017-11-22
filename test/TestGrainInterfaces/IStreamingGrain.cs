@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -67,7 +68,7 @@ namespace UnitTests.GrainInterfaces
     public interface IProducerObserver
     {
         void BecomeProducer(Guid streamId, IStreamProvider streamProvider, string streamNamespace);
-        void RenewProducer(Logger logger, IStreamProvider streamProvider);
+        void RenewProducer(ILogger logger, IStreamProvider streamProvider);
         Task StopBeingProducer();
         Task ProduceSequentialSeries(int count);
         Task ProduceParallelSeries(int count);
@@ -83,7 +84,7 @@ namespace UnitTests.GrainInterfaces
     public interface IConsumerObserver
     {
         Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace);
-        Task RenewConsumer(Logger logger, IStreamProvider streamProvider);
+        Task RenewConsumer(ILogger logger, IStreamProvider streamProvider);
         Task StopBeingConsumer(IStreamProvider streamProvider);
         Task<int> ItemsConsumed { get; }
         Task<int> ConsumerCount { get; }

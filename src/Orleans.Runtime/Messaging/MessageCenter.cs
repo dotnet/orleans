@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Messaging
     {
         private Gateway Gateway { get; set; }
         private IncomingMessageAcceptor ima;
-        private readonly Logger log;
+        private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
 
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory)
         {
             this.loggerFactory = loggerFactory;
-            this.log = new LoggerWrapper<MessageCenter>(loggerFactory);
+            this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
             this.executorService = executorService;
@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
 
         private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions, ISiloPerformanceMetrics metrics = null)
         {
-            if(log.IsVerbose3) log.Verbose3("Starting initialization.");
+            if(log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
             SocketManager = new SocketManager(networkingOptions, this.loggerFactory);
             ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.executorService, this.loggerFactory);
@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Messaging
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
 
-            if (log.IsVerbose3) log.Verbose3("Completed initialization.");
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
         }
 
         public void Start()
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.Messaging
 
         public void StopAcceptingClientMessages()
         {
-            if (log.IsVerbose) log.Verbose("StopClientMessages");
+            if (log.IsEnabled(LogLevel.Debug)) log.Debug("StopClientMessages");
             if (Gateway == null) return;
 
             try
@@ -234,7 +234,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public void BlockApplicationMessages()
         {
-            if(log.IsVerbose) log.Verbose("BlockApplicationMessages");
+            if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
         }
     }

@@ -3,6 +3,7 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.MultiCluster;
@@ -102,7 +103,7 @@ namespace Orleans.LogConsistency
         void CaughtUserCodeException(string callback, string where, Exception e);
 
         /// <summary> Output the specified message at the specified log level. </summary>
-        void Log(Severity severity, string format, params object[] args);
+        void Log(LogLevel level, string format, params object[] args);
 
         #endregion
     }
