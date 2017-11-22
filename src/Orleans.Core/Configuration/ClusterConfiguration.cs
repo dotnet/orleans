@@ -185,15 +185,9 @@ namespace Orleans.Runtime.Configuration
             {
                 var n = new NodeConfiguration(Defaults);
                 n.Load(ParseXml(new StringReader(p.Value)));
-                InitNodeSettingsFromGlobals(n);
+                n.InitNodeSettingsFromGlobals(this);
                 Overrides[n.SiloName] = n;
             }
-        }
-
-        private void InitNodeSettingsFromGlobals(NodeConfiguration n)
-        {
-            if (n.Endpoint.Equals(this.PrimaryNode)) n.IsPrimaryNode = true;
-            if (Globals.SeedNodes.Contains(n.Endpoint)) n.IsSeedNode = true;
         }
 
         /// <summary>Loads the configuration from a file</summary>
@@ -226,7 +220,7 @@ namespace Orleans.Runtime.Configuration
         public NodeConfiguration CreateNodeConfigurationForSilo(string siloName)
         {
             var siloNode = new NodeConfiguration(Defaults) { SiloName = siloName };
-            InitNodeSettingsFromGlobals(siloNode);
+            siloNode.InitNodeSettingsFromGlobals(this);
             Overrides[siloName] = siloNode;
             return siloNode;
         }

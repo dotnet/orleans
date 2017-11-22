@@ -333,6 +333,12 @@ namespace Orleans.Runtime.Configuration
             return sb.ToString();
         }
 
+        internal void InitNodeSettingsFromGlobals(ClusterConfiguration clusterConfiguration)
+        {
+            this.IsPrimaryNode = this.Endpoint.Equals(clusterConfiguration.PrimaryNode);
+            this.IsSeedNode = clusterConfiguration.Globals.SeedNodes.Contains(this.Endpoint);
+        }
+
         internal void Load(XmlElement root)
         {
             SiloName = root.LocalName.Equals("Override") ? root.GetAttribute("Node") : DEFAULT_NODE_NAME;
