@@ -23,20 +23,18 @@ namespace Orleans.SqlUtils
         /// When inserting statistics and generating a batch insert clause, these are the columns in the statistics
         /// table that will be updated with multiple values. The other ones are updated with one value only.
         /// </summary>
-        private readonly static string[] InsertStatisticsMultiupdateColumns =
-        {
-            $"@{DbStoredQueries.Columns.IsValueDelta}",
-            $"@{DbStoredQueries.Columns.StatValue}",
-            $"@{DbStoredQueries.Columns.Statistic}"
+        private static readonly string[] InsertStatisticsMultiupdateColumns = {
+            DbStoredQueries.Columns.IsValueDelta,
+            DbStoredQueries.Columns.StatValue,
+            DbStoredQueries.Columns.Statistic
         };
 
-        /// <summary>
-        /// the orleans functional queries
-        /// </summary>
-        private readonly DbStoredQueries dbStoredQueries;
+    /// <summary>
+    /// the orleans functional queries
+    /// </summary>
+    private readonly DbStoredQueries dbStoredQueries;
 
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private readonly bool supportsProviderBooleanParameters;
 
         /// <summary>
         /// Constructor
@@ -49,7 +47,6 @@ namespace Orleans.SqlUtils
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
             this.grainReferenceConverter = grainReferenceConverter;
-            this.supportsProviderBooleanParameters =  DbConstantsStore.SupportsBooleanParameters(storage.InvariantName);
         }
 
         /// <summary>
@@ -98,11 +95,10 @@ namespace Orleans.SqlUtils
             return ExecuteAsync(dbStoredQueries.UpsertSiloMetricsKey, command =>
             {
                 var columns = new DbStoredQueries.Columns(command);
-                
-                //Don´t use object initalizer here, as ODP.net binds parameters by index and this order has to be kept.
+
                 columns.DeploymentId = deploymentId;
                 columns.HostName = hostName;
-                columns.SetSiloMetrics(siloMetrics, supportsProviderBooleanParameters);
+                columns.SiloMetrics = siloMetrics;
                 columns.SiloAddress = siloAddress;
                 columns.GatewayAddress = gateway.Address;
                 columns.GatewayPort = gateway.Port;
@@ -171,14 +167,25 @@ namespace Orleans.SqlUtils
             int lastSemicolon = queryTemplate.LastIndexOf(";", StringComparison.Ordinal);
             int endTo = lastSemicolon > 0 ? queryTemplate.LastIndexOf(";", lastSemicolon - 1, StringComparison.Ordinal) : -1;
             var template = queryTemplate.Substring(startFrom, endTo - startFrom);
-            var parameterNames = template.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries).Select(i => i.Trim()).ToArray();
+
+            //HACK: The oracle query template ends with FROM DUAL, other providers queries don´t.
+            //It has to stay in the query template, but needs to removed from the template variable, because
+            //the otherwise the Replace which used for the union generation below would generate an invalid query  
+            template = template.Replace(" FROM DUAL", String.Empty);
+
+            var parameterNames = template.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
+                                         .Select(i => i.Trim()).ToArray();
+
             var collectionOfParametersToBeUnionized = new List<string>();
             var parametersToBeUnioned = new string[parameterNames.Length];
             for (int counterIndex = 0; counterIndex < counters.Count; ++counterIndex)
             {
                 for (int parameterNameIndex = 0; parameterNameIndex < parameterNames.Length; ++parameterNameIndex)
                 {
-                    if (InsertStatisticsMultiupdateColumns.Contains(parameterNames[parameterNameIndex]))
+                    //The column names in InsertStatisticsMultiupdateColumns are without parameter placeholders,
+                    //but parameterNames are with placeholders. As the placeholder is provider dependent, we are ignoring 
+                    //the placeholder when looking for columns.
+                    if (InsertStatisticsMultiupdateColumns.Any(x => parameterNames[parameterNameIndex].EndsWith(x)))
                     {
                         //These parameters change for each row. The format is
                         //@StatValue0, @StatValue1, @StatValue2, ... @sStatValue{counters.Count}.
@@ -196,14 +203,17 @@ namespace Orleans.SqlUtils
             var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
             var query = queryTemplate.Replace(template, string.Join(storageConsts.UnionAllSelectTemplate, collectionOfParametersToBeUnionized));
             return ExecuteAsync(query, command =>
-                new DbStoredQueries.Columns(command)
+            {
+                var columns = new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     HostName = hostName,
-                    Counters = counters,
                     Name = siloOrClientName,
                     Id = id
-                });
+                };
+                columns.Counters = counters;
+                return columns;
+            });
         }
 
         /// <summary>

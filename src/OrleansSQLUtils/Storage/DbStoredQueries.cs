@@ -20,7 +20,7 @@ namespace OrleansSQLUtils.Storage
 
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
-            var fields = typeof (DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
+            var fields = typeof(DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
             var missingQueryKeys = fields.Except(queries.Keys).ToArray();
             if (missingQueryKeys.Length > 0)
@@ -168,7 +168,7 @@ namespace OrleansSQLUtils.Storage
                         SiloAddress = GetSiloAddress(record, nameof(Columns.Port)),
                         SiloName = TryGetSiloName(record),
                         HostName = record.GetValue<string>(nameof(Columns.HostName)),
-                        Status = (SiloStatus)Enum.Parse(typeof(SiloStatus),record.GetInt32(nameof(Columns.Status)).ToString()),
+                        Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), record.GetInt32(nameof(Columns.Status)).ToString()),
                         ProxyPort = record.GetInt32(nameof(Columns.ProxyPort)),
                         StartTime = startTime.Value,
                         IAmAliveTime = record.GetValue<DateTime>(nameof(Columns.IAmAliveTime))
@@ -245,7 +245,7 @@ namespace OrleansSQLUtils.Storage
             internal Columns(IDbCommand cmd)
             {
                 command = cmd;
-               
+
             }
 
             private void Add<T>(string paramName, T paramValue, DbType? dbType = null)
@@ -270,14 +270,14 @@ namespace OrleansSQLUtils.Storage
 
             private void AddGrainHash(string name, uint grainHash)
             {
-                Add(name, (int) grainHash);
+                Add(name, (int)grainHash);
             }
 
             internal string ClientId
             {
                 set { Add(nameof(ClientId), value); }
             }
-            
+
             internal int GatewayPort
             {
                 set { Add(nameof(GatewayPort), value); }
@@ -314,26 +314,24 @@ namespace OrleansSQLUtils.Storage
                     for (int i = 0; i < value.Count; ++i)
                     {
                         Add($"{IsValueDelta}{i}", value[i].IsValueDelta);
-                        Add($"{StatValue}{i}",
-                            value[i].IsValueDelta ? value[i].GetDeltaString() : value[i].GetValueString());
+                        Add($"{StatValue}{i}", value[i].IsValueDelta ? value[i].GetDeltaString() : value[i].GetValueString());
                         Add($"{Statistic}{i}", value[i].Name);
                     }
                 }
             }
 
-            internal void SetSiloMetrics(ISiloPerformanceMetrics siloPerformanceMetrics, bool mapIsOverloadedAsBoolean)
+            internal ISiloPerformanceMetrics SiloMetrics
             {
-                AddCoreMetricsParams(siloPerformanceMetrics);
-                Add(nameof(siloPerformanceMetrics.ActivationCount), siloPerformanceMetrics.ActivationCount);
-                Add(nameof(siloPerformanceMetrics.RecentlyUsedActivationCount), siloPerformanceMetrics.RecentlyUsedActivationCount);
-                Add(nameof(siloPerformanceMetrics.RequestQueueLength), siloPerformanceMetrics.RequestQueueLength);
+                set
+                {
+                    AddCoreMetricsParams(value);
+                    Add(nameof(value.ActivationCount), value.ActivationCount);
+                    Add(nameof(value.RecentlyUsedActivationCount), value.RecentlyUsedActivationCount);
+                    Add(nameof(value.RequestQueueLength), value.RequestQueueLength);
+                    Add(nameof(value.IsOverloaded), value.IsOverloaded);
+                    Add(nameof(value.ClientCount), value.ClientCount);
+                }
 
-                //Yet another fix for Oracle Data Provider: ODP.net doesn´t support boolean parameters
-                if(mapIsOverloadedAsBoolean)
-                    Add(nameof(siloPerformanceMetrics.IsOverloaded), siloPerformanceMetrics.IsOverloaded);
-                else
-                    Add(nameof(siloPerformanceMetrics.IsOverloaded), siloPerformanceMetrics.IsOverloaded ? 1 : 0);
-                Add(nameof(siloPerformanceMetrics.ClientCount), siloPerformanceMetrics.ClientCount);
             }
 
 
@@ -433,12 +431,12 @@ namespace OrleansSQLUtils.Storage
 
             internal TimeSpan Period
             {
-                set { Add(nameof(Period), (int) value.TotalMilliseconds); }
+                set { Add(nameof(Period), (int)value.TotalMilliseconds); }
             }
 
             internal SiloStatus Status
             {
-                set { Add(nameof(Status), (int) value); }
+                set { Add(nameof(Status), (int)value); }
             }
 
             internal int ProxyPort

@@ -1,3 +1,33 @@
+/*
+Implementation notes:
+
+1) The general idea is that data is read and written through Orleans specific queries.
+   Orleans operates on column names and types when reading and on parameter names and types when writing.
+
+2) The implementations *must* preserve input and output names and types. Orleans uses these parameters to reads query results by name and type.
+   Vendor and deployment specific tuning is allowed and contributions are encouraged as long as the interface contract
+   is maintained.
+
+3) The implementation across vendor specific scripts *should* preserve the constraint names. This simplifies troubleshooting
+   by virtue of uniform naming across concrete implementations.
+
+5) ETag for Orleans is an opaque column that represents a unique version. The type of its actual implementation
+   is not important as long as it represents a unique version. In this implementation we use integers for versioning
+
+6) For the sake of being explicit and removing ambiguity, Orleans expects some queries to return either TRUE as >0 value
+   or FALSE as =0 value. That is, affected rows or such does not matter. If an error is raised or an exception is thrown
+   the query *must* ensure the entire transaction is rolled back and may either return FALSE or propagate the exception.
+   Orleans handles exception as a failure and will retry.
+
+7) The implementation follows the Extended Orleans membership protocol. For more information, see at:
+		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html
+		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management
+		https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
+*/
+
+-- This table defines Orleans operational queries. Orleans uses these to manage its operations,
+-- these are the only queries Orleans issues to the database.
+-- These can be redefined (e.g. to provide non-destructive updates) provided the stated interface principles hold.
 CREATE TABLE "ORLEANSQUERY" 
 (	
     "QUERYKEY" VARCHAR2(64 BYTE) NOT NULL ENABLE, 
@@ -6,6 +36,8 @@ CREATE TABLE "ORLEANSQUERY"
     CONSTRAINT "ORLEANSQUERY_PK" PRIMARY KEY ("QUERYKEY")
 );
 /
+
+-- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
 CREATE TABLE "ORLEANSMEMBERSHIPVERSIONTABLE" 
 (	
     "DEPLOYMENTID" NVARCHAR2(150) NOT NULL ENABLE, 
@@ -15,20 +47,8 @@ CREATE TABLE "ORLEANSMEMBERSHIPVERSIONTABLE"
     CONSTRAINT "ORLEANSMEMBERSHIPVERSIONTA_PK" PRIMARY KEY ("DEPLOYMENTID")
 );
 /
-CREATE TABLE "ORLEANSREMINDERSTABLE"
-(
-    "SERVICEID" NVARCHAR2(150) NOT NULL ENABLE,
-    "GRAINID" VARCHAR2(150) NOT NULL,
-    "REMINDERNAME" NVARCHAR2(150) NOT NULL,
-    "STARTTIME" TIMESTAMP(6) NOT NULL ENABLE,
-    "PERIOD" INT NULL,
-    "GRAINHASH" INT NOT NULL,
-    "VERSION" INT NOT NULL,
-    
-    CONSTRAINT PK_REMINDERSTABLE PRIMARY KEY(SERVICEID, GRAINID, REMINDERNAME)
-);
-/
 
+-- Every silo instance has a row in the membership table.
 CREATE TABLE "ORLEANSMEMBERSHIPTABLE" 
 (	
     "DEPLOYMENTID" NVARCHAR2(150) NOT NULL ENABLE, 
@@ -48,6 +68,54 @@ CREATE TABLE "ORLEANSMEMBERSHIPTABLE"
 	  REFERENCES "ORLEANSMEMBERSHIPVERSIONTABLE" ("DEPLOYMENTID") ENABLE
 );
 /
+
+-- Orleans Reminders table - http://dotnet.github.io/orleans/Advanced-Concepts/Timers-and-Reminders
+CREATE TABLE "ORLEANSREMINDERSTABLE"
+(
+    "SERVICEID" NVARCHAR2(150) NOT NULL ENABLE,
+    "GRAINID" VARCHAR2(150) NOT NULL,
+    "REMINDERNAME" NVARCHAR2(150) NOT NULL,
+    "STARTTIME" TIMESTAMP(6) NOT NULL ENABLE,
+    "PERIOD" INT NULL,
+    "GRAINHASH" INT NOT NULL,
+    "VERSION" INT NOT NULL,
+    
+    CONSTRAINT PK_REMINDERSTABLE PRIMARY KEY(SERVICEID, GRAINID, REMINDERNAME)
+);
+/
+
+CREATE TABLE "ORLEANSSTATISTICSTABLE" 
+   (	
+    "ORLEANSSTATISTICSTABLEID" NUMBER(*,0), 
+	"DEPLOYMENTID" NVARCHAR2(150) NOT NULL ENABLE, 
+	"TIMESTAMP" TIMESTAMP (6) DEFAULT sys_extract_utc(systimestamp) NOT NULL ENABLE, 
+	"ID" NVARCHAR2(250) NOT NULL ENABLE, 
+	"HOSTNAME" NVARCHAR2(150) NOT NULL ENABLE, 
+	"NAME" NVARCHAR2(150) NOT NULL ENABLE, 
+	"ISVALUEDELTA" NUMBER(*,0) NOT NULL ENABLE, 
+	"STATVALUE" NVARCHAR2(1024), 
+	"STATISTIC" NVARCHAR2(512) NOT NULL ENABLE, 
+	 CONSTRAINT "ORLEANSSTATISTICSTABLE_PK" PRIMARY KEY ("ORLEANSSTATISTICSTABLEID")
+   );
+/
+
+CREATE SEQUENCE "ORLEANSSTATISTICSTABLE_SEQ"  MINVALUE 1 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 20 NOORDER  NOCYCLE;
+
+CREATE OR REPLACE TRIGGER "ORLEANSSTATISTICSTABLE_TRG" 
+BEFORE INSERT ON ORLEANSSTATISTICSTABLE 
+FOR EACH ROW 
+BEGIN
+  <<COLUMN_SEQUENCES>>
+  BEGIN
+    IF INSERTING AND :NEW.ORLEANSSTATISTICSTABLEID IS NULL THEN
+      SELECT ORLEANSSTATISTICSTABLE_SEQ.NEXTVAL INTO :NEW.ORLEANSSTATISTICSTABLEID FROM SYS.DUAL;
+    END IF;
+  END COLUMN_SEQUENCES;
+END;
+/
+ALTER TRIGGER "ORLEANSSTATISTICSTABLE_TRG" ENABLE;
+
+
 CREATE TABLE "ORLEANSCLIENTMETRICSTABLE" 
 (	
     "DEPLOYMENTID" VARCHAR2(150 BYTE) NOT NULL ENABLE, 
@@ -95,144 +163,101 @@ CREATE TABLE "ORLEANSCLIENTMETRICSTABLE"
 );
 /
 
+
+-- The design criteria for this table are:
+--
+-- 1. It can contain arbitrary content serialized as binary, XML or JSON. These formats
+-- are supported to allow one to take advantage of in-storage processing capabilities for
+-- these types if required. This should not incur extra cost on storage.
+--
+-- 2. The table design should scale with the idea of tens or hundreds (or even more) types
+-- of grains that may operate with even hundreds of thousands of grain IDs within each
+-- type of a grain.
+--
+-- 3. The table and its associated operations should remain stable. There should not be
+-- structural reason for unexpected delays in operations. It should be possible to also
+-- insert data reasonably fast without resource contention.
+--
+-- 4. For reasons in 2. and 3., the index should be as narrow as possible so it fits well in
+-- memory and should it require maintenance, isn't resource intensive. For this
+-- reason the index is narrow by design (ideally non-clustered). Currently the entity
+-- is recognized in the storage by the grain type and its ID, which are unique in Orleans silo.
+-- The ID is the grain ID bytes (if string type UTF-8 bytes) and possible extension key as UTF-8
+-- bytes concatenated with the ID and then hashed.
+--
+-- Reason for hashing: Database engines usually limit the length of the column sizes, which
+-- would artificially limit the length of IDs or types. Even when within limitations, the
+-- index would be thick and consume more memory.
+--
+-- In the current setup the ID and the type are hashed into two INT type instances, which
+-- are made a compound index. When there are no collisions, the index can quickly locate
+-- the unique row. Along with the hashed index values, the NVARCHAR(nnn) values are also
+-- stored and they are used to prune hash collisions down to only one result row.
+--
+-- 5. The design leads to duplication in the storage. It is reasonable to assume there will
+-- a low number of services with a given service ID operational at any given time. Or that
+-- compared to the number of grain IDs, there are a fairly low number of different types of
+-- grain. The catch is that were these data separated to another table, it would make INSERT
+-- and UPDATE operations complicated and would require joins, temporary variables and additional
+-- indexes or some combinations of them to make it work. It looks like fitting strategy
+-- could be to use table compression.
+--
+-- 6. For the aforementioned reasons, grain state DELETE will set NULL to the data fields
+-- and updates the Version number normally. This should alleviate the need for index or
+-- statistics maintenance with the loss of some bytes of storage space. The table can be scrubbed
+-- in a separate maintenance operation.
+--
+-- 7. In the storage operations queries the columns need to be in the exact same order
+-- since the storage table operations support optionally streaming.
 CREATE TABLE "STORAGE" 
 (	
-  "GRAINIDHASH" NUMBER(*,0) NOT NULL ENABLE, 
+
+    -- These are for the book keeping. Orleans calculates
+    -- these hashes (see RelationalStorageProvide implementation),
+	-- which are signed 32 bit integers mapped to the *Hash fields.
+	-- The mapping is done in the code. The
+    -- *String columns contain the corresponding clear name fields.
+	--
+	-- If there are duplicates, they are resolved by using GrainIdN0,
+	-- GrainIdN1, GrainIdExtensionString and GrainTypeString fields.
+	-- It is assumed these would be rarely needed.
+    "GRAINIDHASH" NUMBER(*,0) NOT NULL ENABLE, 
 	"GRAINIDN0" NUMBER(19,0) NOT NULL ENABLE, 
 	"GRAINIDN1" NUMBER(19,0) NOT NULL ENABLE, 
 	"GRAINTYPEHASH" NUMBER(*,0) NOT NULL ENABLE, 
 	"GRAINTYPESTRING" NVARCHAR2(512) NOT NULL ENABLE, 
 	"GRAINIDEXTENSIONSTRING" NVARCHAR2(512), 
 	"SERVICEID" NVARCHAR2(150) NOT NULL ENABLE, 
-	"PAYLOADBINARY" BLOB, 
-	"PAYLOADXML" NCLOB, 
-	"PAYLOADJSON" NCLOB, 
-	"MODIFIEDON" TIMESTAMP (6) NOT NULL ENABLE, 
-	"VERSION" NUMBER(*,0)
-);
-CREATE INDEX "IX_STORAGE" ON "STORAGE" ("GRAINIDHASH", "GRAINTYPEHASH");
-/
-
-CREATE TABLE "ORLEANSSTATISTICSTABLE" 
-   (	
-    "ORLEANSSTATISTICSTABLEID" NUMBER(*,0), 
-	"DEPLOYMENTID" NVARCHAR2(150) NOT NULL ENABLE, 
-	"TIMESTAMP" TIMESTAMP (6) DEFAULT sys_extract_utc(systimestamp) NOT NULL ENABLE, 
-	"ID" NVARCHAR2(250) NOT NULL ENABLE, 
-	"HOSTNAME" NVARCHAR2(150) NOT NULL ENABLE, 
-	"NAME" NVARCHAR2(150) NOT NULL ENABLE, 
-	"ISVALUEDELTA" NUMBER(*,0) NOT NULL ENABLE, 
-	"STATVALUE" NVARCHAR2(1024) NOT NULL ENABLE, 
-	"STATISTIC" NVARCHAR2(512) NOT NULL ENABLE, 
-	 CONSTRAINT "ORLEANSSTATISTICSTABLE_PK" PRIMARY KEY ("ORLEANSSTATISTICSTABLEID")
-   );
-/
-
-CREATE SEQUENCE "ORLEANSSTATISTICSTABLE_SEQ"  MINVALUE 1 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 20 NOORDER  NOCYCLE;
-
-CREATE OR REPLACE TRIGGER "ORLEANSSTATISTICSTABLE_TRG" 
-BEFORE INSERT ON ORLEANSSTATISTICSTABLE 
-FOR EACH ROW 
-BEGIN
-  <<COLUMN_SEQUENCES>>
-  BEGIN
-    IF INSERTING AND :NEW.ORLEANSSTATISTICSTABLEID IS NULL THEN
-      SELECT ORLEANSSTATISTICSTABLE_SEQ.NEXTVAL INTO :NEW.ORLEANSSTATISTICSTABLEID FROM SYS.DUAL;
-    END IF;
-  END COLUMN_SEQUENCES;
-END;
-/
-ALTER TRIGGER "ORLEANSSTATISTICSTABLE_TRG" ENABLE;
-
-CREATE OR REPLACE TYPE ORLEANS_MEMBERSHIP_TABLE IS TABLE OF ORLEANS_MEMBERSHIP;
-/
-
-CREATE OR REPLACE TYPE ORLEANS_MEMBERSHIP IS OBJECT(
-      DEPLOYMENTID NVARCHAR2(150), 
-      ADDRESS VARCHAR2(45 BYTE), 
-      PORT NUMBER, 
-      GENERATION NUMBER, 
-      SILONAME NVARCHAR2(150), 
-      HOSTNAME NVARCHAR2(150), 
-      STATUS NUMBER, 
-      PROXYPORT NUMBER, 
-      SUSPECTTIMES VARCHAR2(4000 BYTE), 
-      STARTTIME TIMESTAMP, 
-      IAMALIVETIME TIMESTAMP,
-      VERSION NUMBER
-);
-/
-
-CREATE OR REPLACE FUNCTION MembershipReadRowKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
-                                PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER) 
-  RETURN ORLEANS_MEMBERSHIP_TABLE IS
-    tbl ORLEANS_MEMBERSHIP_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_MEMBERSHIP(
-		CAST(v.DeploymentId AS NVARCHAR2(150)),
-		CAST(m.Address AS VARCHAR2(45 BYTE)),
-		CAST(m.Port AS NUMBER),
-		CAST(m.Generation as NUMBER),
-		CAST(m.SiloName as NVARCHAR2(150)),
-		CAST(m.HostName as NVARCHAR2(150)),
-		CAST(m.Status as NUMBER),
-		CAST(m.ProxyPort as NUMBER),
-		CAST(m.SuspectTimes as VARCHAR2(4000 BYTE)),
-		CAST(m.StartTime as TIMESTAMP),
-		CAST(m.IAmAliveTime as TIMESTAMP),
-		CAST(v.Version as NUMBER))
-    BULK COLLECT INTO tbl
-	FROM
-		OrleansMembershipVersionTable v
-		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
-		AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
-		AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
-		AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
-	WHERE
-		v.DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL;
     
-    RETURN tbl;
-  END;
-/
-
-
-
-CREATE OR REPLACE TYPE ORLEANS_REMINDER IS OBJECT(
-      GRAINID VARCHAR2(150 BYTE),
-      REMINDERNAME NVARCHAR2(150),
-      STARTTIME TIMESTAMP (6), 
-      PERIOD NUMBER,
-      VERSION NUMBER
+    
+    -- The usage of the Payload records is exclusive in that
+    -- only one should be populated at any given time and two others
+    -- are NULL. The types are separated to advantage on special
+	-- processing capabilities present on database engines (not all might
+	-- have both JSON and XML types.
+	--
+	-- One is free to alter the size of these fields.
+	"PAYLOADBINARY" BLOB, 
+	"PAYLOADXML" CLOB, 
+	"PAYLOADJSON" CLOB, 
+    -- Informational field, no other use.
+	"MODIFIEDON" TIMESTAMP (6) NOT NULL ENABLE, 
+    -- The version of the stored payload.
+	"VERSION" NUMBER(*,0)
+    
+    -- The following would in principle be the primary key, but it would be too thick
+	-- to be indexed, so the values are hashed and only collisions will be solved
+	-- by using the fields. That is, after the indexed queries have pinpointed the right
+	-- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 );
+CREATE INDEX "IX_STORAGE" ON "STORAGE" ("GRAINIDHASH", "GRAINTYPEHASH") PARALLEL 
+COMPRESS;
 /
-
-CREATE OR REPLACE TYPE ORLEANS_REMINDER_TABLE IS TABLE OF ORLEANS_REMINDER;
-/
-
-CREATE OR REPLACE FUNCTION ReadRangeRows1Key(PARAM_SERVICEID IN NVARCHAR2, PARAM_BEGINHASH IN NUMBER,
-                                PARAM_ENDHASH IN NUMBER) 
-  RETURN ORLEANS_REMINDER_TABLE IS
-    tbl ORLEANS_REMINDER_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_REMINDER(
-        GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-    )
-    BULK COLLECT INTO tbl
-    FROM OrleansRemindersTable
-    WHERE
-		ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
-		AND GrainHash > PARAM_BEGINHASH AND PARAM_BEGINHASH IS NOT NULL
-		AND GrainHash <= PARAM_ENDHASH AND PARAM_ENDHASH IS NOT NULL;
-    RETURN tbl;
-  END;
-  /
-
+-- Oracle specific implementation note:
+-- Some OrleansQueries are implemented as functions and differ from the scripts of other databases. 
+-- The main reason for this is the fact, that oracle doesn´t support returning variables from queries
+-- directly. So in the case that a variable value is needed as output of a OrleansQuery (e.g. version)
+-- a function is used.
 
 CREATE OR REPLACE FUNCTION InsertMembershipKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
                                     PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_STARTTIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_PROXYPORT IN NUMBER, PARAM_VERSION IN NUMBER)
@@ -538,12 +563,31 @@ RETURN NUMBER IS
 
 CREATE OR REPLACE FUNCTION WriteToStorageKey(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
                                              PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB,
-                                             PARAM_PAYLOADJSON IN NCLOB, PARAM_PAYLOADXML IN NCLOB)
+                                             PARAM_PAYLOADJSON IN VARCHAR2, PARAM_PAYLOADXML IN VARCHAR2)
   RETURN NUMBER IS
   rowcount NUMBER;
   newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
+    -- When Orleans is running in normal, non-split state, there will
+	-- be only one grain with the given ID and type combination only. This
+	-- grain saves states mostly serially if Orleans guarantees are upheld. Even
+	-- if not, the updates should work correctly due to version number.
+	--
+	-- In split brain situations there can be a situation where there are two or more
+	-- grains with the given ID and type combination. When they try to INSERT
+	-- concurrently, the table needs to be locked pessimistically before one of
+	-- the grains gets @GrainStateVersion = 1 in return and the other grains will fail
+	-- to update storage. The following arrangement is made to reduce locking in normal operation.
+	--
+	-- If the version number explicitly returned is still the same, Orleans interprets it so the update did not succeed
+	-- and throws an InconsistentStateException.
+	--
+	-- See further information at http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Grain-Persistence.
+  
+  
+	-- If the @GrainStateVersion is not zero, this branch assumes it exists in this database.
+	-- The NULL value is supplied by Orleans when the state is new.
 	IF newGrainStateVersion IS NOT NULL THEN
 		UPDATE Storage
 		SET
@@ -697,181 +741,19 @@ BEGIN
 END;
 /
 
-SELECT PayloadBinary, PayloadXml, PayloadJson, Version FROM Storage
-    WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
-      AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
-      AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
-      AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
-      AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
-      AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
-      AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL;
-      
-      
-CREATE OR REPLACE TYPE ORLEANS_STORAGE IS OBJECT(
-    PAYLOADBINARY BLOB, 
-    PAYLOADXML NCLOB, 
-    PAYLOADJSON NCLOB, 
-     VERSION NUMBER
-);
-/
-
-CREATE OR REPLACE TYPE ORLEANS_STORAGE_TABLE IS TABLE OF ORLEANS_STORAGE;
-/
-
-CREATE OR REPLACE FUNCTION ReadFromStorageKey(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER,
-                                PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
-                                PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN NVARCHAR2) 
-  RETURN ORLEANS_STORAGE_TABLE IS
-    tbl ORLEANS_STORAGE_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_STORAGE(PayloadBinary, PayloadXml, PayloadJson, Version)
-    BULK COLLECT INTO tbl
-    FROM Storage
-    WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
-      AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
-      AND (GrainIdN1 = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
-      AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
-      AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
-      AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
-      AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL;
-    RETURN tbl;
-END;
-/
-
-CREATE OR REPLACE FUNCTION ReadReminderRowsKey(PARAM_SERVICEID IN NVARCHAR2, PARAM_GRAINID IN VARCHAR2) 
-  RETURN ORLEANS_REMINDER_TABLE IS
-    tbl ORLEANS_REMINDER_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_REMINDER(
-        GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-    )
-    BULK COLLECT INTO tbl
-    FROM OrleansRemindersTable
-    WHERE
-        ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
-		AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL;
-    RETURN tbl;
-  END;
-/
-
-CREATE OR REPLACE FUNCTION ReadReminderRowKey(PARAM_SERVICEID IN NVARCHAR2, PARAM_GRAINID IN VARCHAR2, PARAM_REMINDERNAME IN NVARCHAR2) 
-  RETURN ORLEANS_REMINDER_TABLE IS
-    tbl ORLEANS_REMINDER_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_REMINDER(
-        GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-    )
-    BULK COLLECT INTO tbl
-    FROM OrleansRemindersTable
-    WHERE
-        ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
-		AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL
-        AND ReminderName = PARAM_REMINDERNAME AND PARAM_REMINDERNAME IS NOT NULL;
-    RETURN tbl;
-  END;
-/
-
-CREATE OR REPLACE FUNCTION ReadRangeRows2Key(PARAM_SERVICEID IN NVARCHAR2, PARAM_BEGINHASH IN NUMBER,
-                                             PARAM_ENDHASH IN NUMBER) 
-  RETURN ORLEANS_REMINDER_TABLE IS
-    tbl ORLEANS_REMINDER_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_REMINDER(
-        GrainId,
-		ReminderName,
-		StartTime,
-		Period,
-		Version
-    )
-    BULK COLLECT INTO tbl
-    FROM OrleansRemindersTable
-    WHERE
-		ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
-		AND ((GrainHash > PARAM_BEGINHASH AND PARAM_BEGINHASH IS NOT NULL)
-		OR (GrainHash <= PARAM_ENDHASH AND PARAM_ENDHASH IS NOT NULL));
-    RETURN tbl;
-END;
-/
-
-
-create or replace TYPE ORLEANS_GATEWAY IS OBJECT(
-      ADDRESS VARCHAR2(45 BYTE), 
-      PROXYPORT NUMBER, 
-      GENERATION NUMBER
-);
-/
-
-create or replace TYPE ORLEANS_GATEWAY_TABLE IS TABLE OF ORLEANS_GATEWAY;
-/
-
-CREATE OR REPLACE FUNCTION GatewaysQueryKey(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_STATUS IN NUMBER) 
-  RETURN ORLEANS_GATEWAY_TABLE IS
-    tbl ORLEANS_GATEWAY_TABLE;
-  BEGIN
-    SELECT ORLEANS_GATEWAY(Address, ProxyPort, Generation)
-    BULK COLLECT INTO tbl
-    FROM OrleansMembershipTable
-    WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-      AND Status = PARAM_STATUS AND PARAM_STATUS IS NOT NULL
-      AND ProxyPort > 0;
-    RETURN tbl;
-END;
-/
-
-
-CREATE OR REPLACE FUNCTION MembershipReadAllKey(PARAM_DEPLOYMENTID IN NVARCHAR2) 
-  RETURN ORLEANS_MEMBERSHIP_TABLE IS
-    tbl ORLEANS_MEMBERSHIP_TABLE;
-  BEGIN
-    SELECT 
-    ORLEANS_MEMBERSHIP(
-		v.DeploymentId,
-		m.Address,
-		m.Port,
-		m.Generation,
-		m.SiloName,
-		m.HostName,
-		m.Status,
-		m.ProxyPort,
-		m.SuspectTimes,
-		m.StartTime,
-		m.IAmAliveTime,
-		v.Version)
-    BULK COLLECT INTO tbl
-	FROM
-		OrleansMembershipVersionTable v
-		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
-	WHERE
-		v.DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL;
-    
-    RETURN tbl;
-END;
-/
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpdateIAmAlivetimeKey','
-	SELECT UpdateIAmAlivetimeKey(:PARAM_DEPLOYMENTID, :PARAM_ADDRESS, :PARAM_PORT, :PARAM_GENERATION, :PARAM_IAMALIVE) AS RESULT FROM DUAL
+	SELECT UpdateIAmAlivetimeKey(:DEPLOYMENTID, :ADDRESS, :PORT, :GENERATION, :IAMALIVETIME) AS RESULT FROM DUAL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'InsertMembershipVersionKey','
-	SELECT InsertMembershipVersionKey(:PARAM_DEPLOYMENTID) AS RESULT FROM DUAL
+	SELECT InsertMembershipVersionKey(:DEPLOYMENTID) AS RESULT FROM DUAL
 ');
 /
 
@@ -893,33 +775,37 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpsertReminderRowKey','
-	SELECT UpsertReminderRowKey(:PARAM_SERVICEID, :PARAM_GRAINHASH, :PARAM_GRAINID, :PARAM_REMINDERNAME, :PARAM_STARTTIME, :PARAM_PERIOD) AS Version FROM DUAL
+	SELECT UpsertReminderRowKey(:SERVICEID, :GRAINHASH, :GRAINID, :REMINDERNAME, :STARTTIME, :PERIOD) AS Version FROM DUAL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpsertReportClientMetricsKey','
-	  SELECT UpsertReportClientMetricsKey(:PARAM_DEPLOYMENTID, :PARAM_HOSTNAME, :PARAM_CPUUSAGE, :PARAM_MEMORYUSAGE,
-                                                        :PARAM_SENDQUEUELENGTH, :PARAM_RECEIVEQUEUELENGTH, :PARAM_SENTMESSAGES,
-                                                        :PARAM_RECEIVEDMESSAGES, :PARAM_CONNECTEDGATEWAYCOUNT, :PARAM_CLIENTID, :PARAM_ADDRESS) AS RESULT FROM DUAL
+	  SELECT UpsertReportClientMetricsKey(:DEPLOYMENTID, :HOSTNAME, :CPUUSAGE, :MEMORYUSAGE,
+                                                        :SENDQUEUELENGTH, :RECEIVEQUEUELENGTH, :SENTMESSAGES,
+                                                        :RECEIVEDMESSAGES, :CONNECTEDGATEWAYCOUNT, :CLIENTID, :ADDRESS) AS RESULT FROM DUAL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpsertSiloMetricsKey','
-  SELECT UpsertSiloMetricsKey(:PARAM_DEPLOYMENTID, :PARAM_HOSTNAME, :PARAM_CPUUSAGE, :PARAM_MEMORYUSAGE, :PARAM_SENDQUEUELENGTH,
-                                                :PARAM_RECEIVEQUEUELENGTH, :PARAM_SENTMESSAGES, :PARAM_RECEIVEDMESSAGES, :PARAM_ACTIVATIONCOUNT, :PARAM_RECENTLYUSEDACTIVATIONS,
-                                                :PARAM_REQUESTQUEUELENGHT, :PARAM_ISOVERLOADED, :PARAM_CLIENTCOUNT, :PARAM_ADDRESS,
-                                                :PARAM_PORT, :PARAM_GENERATION, :PARAM_GATEWAYADDRESS, :PARAM_GATEWAYPORT, :PARAM_SILOID) AS RESULT FROM DUAL
+  SELECT UpsertSiloMetricsKey(:DEPLOYMENTID, :HOSTNAME, :CPUUSAGE, :MEMORYUSAGE, :SENDQUEUELENGTH,
+                                                :RECEIVEQUEUELENGTH, :SENTMESSAGES, :RECEIVEDMESSAGES, :ACTIVATIONCOUNT, :RECENTLYUSEDACTIVATIONCOUNT,
+                                                :REQUESTQUEUELENGTH, :ISOVERLOADED, :CLIENTCOUNT, :ADDRESS,
+                                                :PORT, :GENERATION, :GATEWAYADDRESS, :GATEWAYPORT, :SILOID) AS RESULT FROM DUAL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'GatewaysQueryKey','
-	SELECT * FROM TABLE(GatewaysQueryKey(:PARAM_DEPLOYMENTID, :PARAM_STATUS))
+	SELECT Address, ProxyPort, Generation
+    FROM OrleansMembershipTable
+    WHERE DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
+      AND Status = :STATUS AND :STATUS IS NOT NULL
+      AND ProxyPort > 0
 ');
 /
 
@@ -927,7 +813,16 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'MembershipReadRowKey','
-	 SELECT * FROM TABLE(MembershipReadRowKey(:PARAM_DEPLOYMENTID, :PARAM_ADDRESS, :PARAM_PORT, :PARAM_GENERATION))
+	 SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
+       m.Status, m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+	FROM
+		OrleansMembershipVersionTable v
+		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+		AND Address = :ADDRESS AND :ADDRESS IS NOT NULL
+		AND Port = :PORT AND :PORT IS NOT NULL
+		AND Generation = :GENERATION AND :GENERATION IS NOT NULL
+	WHERE
+		v.DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
 ');
 /
 
@@ -935,7 +830,13 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'MembershipReadAllKey','
-	SELECT * FROM TABLE(MembershipReadAllKey(:PARAM_DEPLOYMENTID))
+	SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName, m.Status,
+       m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+	FROM
+		OrleansMembershipVersionTable v
+		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+	WHERE
+		v.DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
 ');
 /
 
@@ -955,28 +856,47 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadReminderRowsKey','
-     SELECT * FROM TABLE(ReadReminderRowsKey(:PARAM_SERVICEID, :PARAM_GRAINID))
+    SELECT GrainId, ReminderName, StartTime, Period, Version
+    FROM OrleansRemindersTable
+    WHERE
+        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
+		AND GrainId = :GRAINID AND :GRAINID IS NOT NULL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadReminderRowKey','
-    SELECT * FROM TABLE(ReadReminderRowKey(:PARAM_SERVICEID, :PARAM_GRAINID, :PARAM_REMINDERNAME))L
+    SELECT GrainId, ReminderName, StartTime, Period, Version
+    FROM OrleansRemindersTable
+    WHERE
+        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
+		AND GrainId = :GRAINID AND :GRAINID IS NOT NULL
+        AND ReminderName = :REMINDERNAME AND :REMINDERNAME IS NOT NULL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadRangeRows1Key','
-	SELECT * FROM TABLE(ReadRangeRows1Key(:PARAM_SERVICEID, :PARAM_BEGINHASH, :PARAM_ENDHASH))
+	SELECT GrainId, ReminderName, StartTime, Period, Version
+    FROM OrleansRemindersTable
+    WHERE
+		ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
+		AND GrainHash > :BEGINHASH AND :BEGINHASH IS NOT NULL
+		AND GrainHash <= :ENDHASH AND :ENDHASH IS NOT NULL
 ');
 /
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadRangeRows2Key','
-	SELECT * FROM TABLE(ReadRangeRows2Key(:PARAM_SERVICEID, :PARAM_BEGINHASH, :PARAM_ENDHASH))
+	SELECT GrainId, ReminderName, StartTime, Period,Version
+    FROM OrleansRemindersTable
+    WHERE
+		ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
+		AND ((GrainHash > :BEGINHASH AND :BEGINHASH IS NOT NULL)
+		OR (GrainHash <= :ENDHASH AND :ENDHASH IS NOT NULL))
 ');
 /
 
@@ -984,7 +904,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'InsertOrleansStatisticsKey','
-	INSERT INTO OrleansStatisticsTable
+BEGIN
+    INSERT INTO OrleansStatisticsTable
 	(
 		DeploymentId,
 		Id,
@@ -994,15 +915,8 @@ VALUES
 		StatValue,
 		Statistic
 	)
-	SELECT
-		:DeploymentId,
-		:Id,
-		:HostName,
-		:Name,
-		:IsValueDelta,
-		:StatValue,
-		:Statistic
-  FROM DUAL
+	SELECT :DeploymentId, :Id, :HostName, :Name, :IsValueDelta, :StatValue, :Statistic FROM DUAL;
+END;
 ');
 /
 
@@ -1010,7 +924,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'DeleteReminderRowKey','
-	SELECT DeleteReminderRowKey(:PARAM_SERVICEID, :PARAM_GRAINID, :PARAM_REMINDERNAME, :PARAM_VERSION) AS RESULT FROM DUAL
+	SELECT DeleteReminderRowKey(:SERVICEID, :GRAINID, :REMINDERNAME, :VERSION) AS RESULT FROM DUAL
 ');
 /
 
@@ -1027,9 +941,9 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'WriteToStorageKey','
-  SELECT WriteToStorageKey(:PARAM_GRAINIDHASH, :PARAM_GRAINIDN0, :PARAM_GRAINIDN1, :PARAM_GRAINTYPEHASH, :PARAM_GRAINTYPESTRING,
-                                             :PARAM_GRAINIDEXTENSIONSTRING, :PARAM_SERVICEID, :PARAM_GRAINSTATEVERSION, :PARAM_PAYLOADBINARY,
-                                             :PARAM_PAYLOADJSON, :PARAM_PAYLOADXML) AS NewGrainStateVersion FROM DUAL
+  SELECT WriteToStorageKey(:GRAINIDHASH, :GRAINIDN0, :GRAINIDN1, :GRAINTYPEHASH, :GRAINTYPESTRING,
+                                             :GRAINIDEXTENSIONSTRING, :SERVICEID, :GRAINSTATEVERSION, :PAYLOADBINARY,
+                                             :PAYLOADJSON, :PAYLOADXML) AS NewGrainStateVersion FROM DUAL
 ');
 /
 
@@ -1037,8 +951,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ClearStorageKey',
-	'SELECT ClearStorageKey(:PARAM_GRAINIDHASH, :PARAM_GRAINIDN0, :PARAM_GRAINIDN1, :PARAM_GRAINTYPEHASH, :PARAM_GRAINTYPESTRING,
-                                             :PARAM_GRAINIDEXTENSIONSTRING, :PARAM_SERVICEID, :PARAM_GRAINSTATEVERSION) AS VERSION FROM DUAL'
+	'SELECT ClearStorageKey(:GRAINIDHASH, :GRAINIDN0, :GRAINIDN1, :GRAINTYPEHASH, :GRAINTYPESTRING,
+                                             :GRAINIDEXTENSIONSTRING, :SERVICEID, :GRAINSTATEVERSION) AS VERSION FROM DUAL'
 );
 /
 
@@ -1046,9 +960,16 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'ReadFromStorageKey',
-	'SELECT * FROM TABLE(ReadFromStorageKey(:PARAM_GRAINIDHASH, :PARAM_GRAINIDN0,
-                                :PARAM_GRAINIDN1, :PARAM_GRAINTYPEHASH, :PARAM_GRAINTYPESTRING,
-                                :PARAM_GRAINIDEXTENSIONSTRING, :PARAM_SERVICEID))'
+	'
+     SELECT PayloadBinary, PayloadXml, PayloadJson, Version
+     FROM Storage
+     WHERE GrainIdHash = :GRAINIDHASH AND :GRAINIDHASH IS NOT NULL
+       AND (GrainIdN0 = :GRAINIDN0 OR :GRAINIDN0 IS NULL)
+       AND (GrainIdN1 = :GRAINIDN1 OR :GRAINIDN1 IS NULL)
+       AND GrainTypeHash = :GRAINTYPEHASH AND :GRAINTYPEHASH IS NOT NULL
+       AND (GrainTypeString = :GRAINTYPESTRING OR :GRAINTYPESTRING IS NULL)
+       AND ((:GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GRAINIDEXTENSIONSTRING) OR:GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
+       AND ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL'
 );
 /
   

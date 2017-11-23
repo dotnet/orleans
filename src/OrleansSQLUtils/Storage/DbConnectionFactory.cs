@@ -52,7 +52,7 @@ namespace Orleans.SqlUtils
             if (providerFactoryType == null)
                 throw new InvalidOperationException($"Unable to load type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
 
-            var prop = providerFactoryType.GetFields().Where(p => string.Equals(p.Name, "Instance", StringComparison.OrdinalIgnoreCase) && p.IsStatic).SingleOrDefault();
+            var prop = providerFactoryType.GetFields().SingleOrDefault(p => string.Equals(p.Name, "Instance", StringComparison.OrdinalIgnoreCase) && p.IsStatic);
             if (prop == null)
                 throw new InvalidOperationException($"Invalid provider type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
 

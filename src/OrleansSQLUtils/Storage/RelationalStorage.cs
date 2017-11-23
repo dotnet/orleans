@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OrleansSQLUtils.Storage;
 
 namespace Orleans.SqlUtils
 {
@@ -36,6 +37,8 @@ namespace Orleans.SqlUtils
         /// (the ADO.NET Db*.XXXAsync classes are overriden) or not.
         /// </summary>
         private readonly bool isSynchronousAdoNetImplementation;
+
+        private IDatabaseCommandInterceptor databaseCommandInterceptor;
 
 
         /// <summary>
@@ -201,6 +204,7 @@ namespace Orleans.SqlUtils
             this.invariantName = invariantName;
             supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
+            this.databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
         }
 
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
@@ -256,12 +260,11 @@ namespace Orleans.SqlUtils
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 using(var command = connection.CreateCommand())
-                {                    
-                    if(parameterProvider != null)
-                    {
-                        parameterProvider(command);
-                    }
+                {
+                    parameterProvider?.Invoke(command);
                     command.CommandText = query;
+
+                    databaseCommandInterceptor.Intercept(command);
 
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
                     if(isSynchronousAdoNetImplementation)
