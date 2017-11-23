@@ -136,7 +136,10 @@ namespace Orleans.Runtime.GrainDirectory
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, loggerFactory);
 
             var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndPoint;
-            this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
+            if (primarySiloEndPoint != null)
+            {
+                this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
+            }
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
             DirectoryPartition = grainDirectoryPartitionFactory();
