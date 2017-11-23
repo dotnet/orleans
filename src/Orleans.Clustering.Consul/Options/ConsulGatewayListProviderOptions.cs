@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace OrleansConsulUtils.Options
+namespace Orleans.ConsulUtils.Options
 {
     public class ConsulGatewayListProviderOptions
     {

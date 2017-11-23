@@ -6,7 +6,7 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansConsulUtils
+namespace Orleans.ConsulUtils
 {
     /// <inheritdoc/>
     public class LegacyConsulGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
