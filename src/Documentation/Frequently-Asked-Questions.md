@@ -69,7 +69,7 @@ You can [add silos with new grain classes](Deployment-and-Operations/Heterogeneo
 
 ## Can I persist a grain’s state to the Azure cache service?
 
-This can be done though a storage provider for Azure Cache. We don’t have one but you can easily build your own.
+This can be done through a storage provider for Azure Cache. We don’t have one but you can easily build your own.
 
 ## Can I Connect to Orleans silos from the public internet?
 
