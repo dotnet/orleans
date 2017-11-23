@@ -28,7 +28,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "src\Or
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Bond", "src\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.Consul", "src\Orleans.Membership.Consul\Orleans.Membership.Consul.csproj", "{2C8AAE89-C0E3-4FD3-89DA-BA0593EDBE06}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.Consul", "src\Orleans.Clustering.Consul\Orleans.Clustering.Consul.csproj", "{2C8AAE89-C0E3-4FD3-89DA-BA0593EDBE06}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.EventSourcing", "src\Orleans.EventSourcing\Orleans.EventSourcing.csproj", "{187AB6FA-B34B-482B-AF4F-E0A82C196BEE}"
 EndProject
@@ -50,7 +50,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost", "src\Orleans.TestingHost\Orleans.TestingHost.csproj", "{9BCF7A12-6A5B-43FF-828A-A804F9B9DBB4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.ZooKeeper", "src\Orleans.Membership.ZooKeeper\Orleans.Membership.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeeper", "src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
 EndProject

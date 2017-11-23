@@ -44,7 +44,7 @@ namespace Orleans.Messaging
 
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
                     configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
+                            Constants.ORLEANS_CLUSTERING_ZOOKEEPER);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:
