@@ -967,8 +967,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            IKeyedSerializer keyedSerializer;
-            if (sm.TryLookupKeyedSerializer(t, out keyedSerializer))
+            if (sm.TryLookupKeyedSerializer(t, out var keyedSerializer))
             {
                 writer.Write((byte)SerializationTokenType.KeyedSerializer);
                 writer.Write((byte)keyedSerializer.SerializerId);
