@@ -56,14 +56,14 @@ namespace Orleans.Runtime.MembershipService
         {
             public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
             {
-                services.UseGrainBasedMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
+                services.UseDevelopmentMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
             }
 
-            private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, GrainBasedMembershipOptions options)
+            private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, DevelopmentMembershipOptions options)
             {
                 if (configuration.SeedNodes?.Count > 0)
                 {
-                    options.SeedNode = configuration.SeedNodes?.FirstOrDefault()?.ToGatewayUri();
+                    options.PrimarySiloEndPoint = configuration.SeedNodes?.FirstOrDefault();
                 }
             }
         }

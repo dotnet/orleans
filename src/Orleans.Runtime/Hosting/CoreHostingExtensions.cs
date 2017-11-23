@@ -93,33 +93,33 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use GrainBasedMembership
         /// </summary>
-        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder, Action<GrainBasedMembershipOptions> configureOptions)
+        public static ISiloHostBuilder UseDevelopmentMembership(this ISiloHostBuilder builder, Action<DevelopmentMembershipOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseGrainBasedMembership(configureOptions));
+            return builder.ConfigureServices(services => services.UseDevelopmentMembership(configureOptions));
         }
 
         /// <summary>
-        /// Configure silo to use GrainBasedMembership
+        /// Configure silo to use Development membership
         /// </summary>
-        public static ISiloHostBuilder UseGrainBasedMembership(this ISiloHostBuilder builder, Action<OptionsBuilder<GrainBasedMembershipOptions>> configureOptions)
+        public static ISiloHostBuilder UseDevelopmentMembership(this ISiloHostBuilder builder, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseGrainBasedMembership(configureOptions));
+            return builder.ConfigureServices(services => services.UseDevelopmentMembership(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use Development membership
+        /// </summary>
+        public static IServiceCollection UseDevelopmentMembership(this IServiceCollection services, Action<DevelopmentMembershipOptions> configureOptions)
+        {
+            return services.UseDevelopmentMembership(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure silo to use Grain-based membership
         /// </summary>
-        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services, Action<GrainBasedMembershipOptions> configureOptions)
+        public static IServiceCollection UseDevelopmentMembership(this IServiceCollection services, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
         {
-            return services.UseGrainBasedMembership(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use Grain-based membership
-        /// </summary>
-        public static IServiceCollection UseGrainBasedMembership(this IServiceCollection services, Action<OptionsBuilder<GrainBasedMembershipOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<GrainBasedMembershipOptions>());
+            configureOptions?.Invoke(services.AddOptions<DevelopmentMembershipOptions>());
             services
                 .AddSingleton<GrainBasedMembershipTable>()
                 .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();

@@ -101,7 +101,7 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
             ExecutorService executorService,
-            IOptions<GrainBasedMembershipOptions> grainMembershipOptions,
+            IOptions<DevelopmentMembershipOptions> developmentOptions,
             ILoggerFactory loggerFactory)
         {
             this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
@@ -135,8 +135,8 @@ namespace Orleans.Runtime.GrainDirectory
                     loggerFactory);
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, loggerFactory);
 
-            var seedNode = grainMembershipOptions.Value.SeedNode?.ToSiloAddress();
-            this.seed = this.MyAddress.Endpoint.Equals(seedNode?.Endpoint) ? this.MyAddress : seedNode;
+            var primarySiloEndPoint = developmentOptions.Value.PrimarySiloEndPoint;
+            this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
             DirectoryPartition = grainDirectoryPartitionFactory();
