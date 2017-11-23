@@ -91,7 +91,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use GrainBasedMembership
+        /// Configure silo to use Development membership
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentMembership(this ISiloHostBuilder builder, Action<DevelopmentMembershipOptions> configureOptions)
         {
@@ -115,7 +115,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Grain-based membership
+        /// Configure silo to use Development membership
         /// </summary>
         public static IServiceCollection UseDevelopmentMembership(this IServiceCollection services, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
         {
