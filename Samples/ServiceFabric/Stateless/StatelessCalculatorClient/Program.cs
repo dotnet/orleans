@@ -7,13 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using GrainInterfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace StatelessCalculatorClient
 {
-    using Microsoft.Orleans.ServiceFabric;
-
     class Program
     {
         static void Main(string[] args)
@@ -24,19 +24,30 @@ namespace StatelessCalculatorClient
         private static async Task Run(string[] args)
         {
             var serviceName = new Uri("fabric:/StatelessCalculatorApp/StatelessCalculatorService");
-            
-            var client = new ClientBuilder()
-                .UseConfiguration(new ClientConfiguration())
-                .AddServiceFabric(serviceName)
-                .ConfigureServices(
-                    services =>
-                    {
-                        // Some deployments require a custom FabricClient, eg so that cluster endpoints and certificates can be configured.
-                        // A pre-configured FabricClient can be injected.
-                        var fabricClient = new FabricClient();
-                        services.AddSingleton(fabricClient);
-                    })
-                .Build();
+
+            var builder = new ClientBuilder();
+            builder.UseConfiguration(new ClientConfiguration());
+
+            // Use Service Fabric for managing cluster membership.
+            builder.AddServiceFabricMembership(serviceName);
+
+            // Add the application assemblies.
+            builder.AddApplicationPart(typeof(ICalculatorGrain).Assembly);
+
+            // Optional: configure logging.
+            builder.ConfigureLogging(logging => logging.AddDebug());
+
+            builder.ConfigureServices(
+                services =>
+                {
+                    // Some deployments require a custom FabricClient, eg so that cluster endpoints and certificates can be configured.
+                    // A pre-configured FabricClient can be injected.
+                    var fabricClient = new FabricClient();
+                    services.AddSingleton(fabricClient);
+                });
+
+            // Creat the client and connect to the cluster.
+            var client = builder.Build();
             await client.Connect();
 
             double result;
@@ -55,7 +66,7 @@ namespace StatelessCalculatorClient
             var observerReference = await client.CreateObjectReference<ICalculatorObserver>(observer);
             var cancellationTokenSource = new CancellationTokenSource();
             var subscriptionTask = StaySubscribed(calculator, observerReference, cancellationTokenSource.Token);
-            
+
             switch (args[0].ToLower())
             {
                 case "stress":

@@ -17,7 +17,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans
 {
@@ -139,7 +139,8 @@ namespace Orleans
 
             this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
 
-            StatisticsCollector.Initialize(config);
+            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<StatisticsOptions>>();
+            StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
             BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions);
 
@@ -153,7 +154,7 @@ namespace Orleans
                     .WaitForResultWithThrow(initTimeout);
                 if (statsProviderName != null)
                 {
-                    config.StatisticsProviderName = statsProviderName;
+                    statisticsOptions.Value.ProviderName = statsProviderName;
                 }
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;

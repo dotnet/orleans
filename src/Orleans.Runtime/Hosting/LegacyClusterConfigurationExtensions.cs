@@ -36,6 +36,9 @@ namespace Orleans.Hosting
                 });
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
 
+            services.AddOptions<StatisticsOptions>()
+                .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options));
+
             // Translate legacy configuration to new Options
             services.Configure<SiloMessagingOptions>(options =>
             {
@@ -53,7 +56,7 @@ namespace Orleans.Hosting
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
 
-            services.Configure<IOptions<SiloIdentityOptions>, GrainClassOptions>((identityOptions, options) =>
+            services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloIdentityOptions>>((options, identityOptions) =>
             {
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(identityOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
@@ -61,25 +64,6 @@ namespace Orleans.Hosting
 
             LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
             return services;
-        }
-
-        internal static void Configure<TService, TOptions>(this IServiceCollection services, Action<TService, TOptions> configure) where TOptions : class
-        {
-            services.AddTransient<IConfigureOptions<TOptions>>(sp => new ServiceBasedConfigurator<TService, TOptions>(sp.GetRequiredService<TService>(), configure));
-        }
-
-        private class ServiceBasedConfigurator<TService, TOptions> : IConfigureOptions<TOptions> where TOptions : class
-        {
-            private readonly Action<TService, TOptions> configure;
-            private readonly TService service;
-
-            public ServiceBasedConfigurator(TService service, Action<TService, TOptions> configure)
-            {
-                this.service = service;
-                this.configure = configure;
-            }
-
-            public void Configure(TOptions options) => this.configure(this.service, options);
         }
     }
 }

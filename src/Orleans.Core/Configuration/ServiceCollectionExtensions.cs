@@ -2,8 +2,8 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using Microsoft.Extensions.Configuration;
 using Orleans.Configuration.Options;
+using Orleans.Hosting;
 using Orleans.Messaging;
 
 namespace Orleans.Configuration
@@ -50,64 +50,55 @@ namespace Orleans.Configuration
         /// <summary>
         /// Adds an <see cref="IGrainCallFilter"/> to the filter pipeline.
         /// </summary>
-        /// <param name="collection">The service collection.</param>
+        /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddGrainCallFilter(this IServiceCollection collection, IGrainCallFilter filter)
+        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, IGrainCallFilter filter)
         {
-            return collection.AddSingleton(filter);
+            return services.AddSingleton(filter);
         }
 
         /// <summary>
         /// Adds an <see cref="IGrainCallFilter"/> to the filter pipeline.
         /// </summary>
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
-        /// <param name="collection">The service collection.</param>
+        /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddGrainCallFilter<TImplementation>(this IServiceCollection collection)
+        public static IServiceCollection AddGrainCallFilter<TImplementation>(this IServiceCollection services)
             where TImplementation : class, IGrainCallFilter
         {
-            return collection.AddSingleton<IGrainCallFilter, TImplementation>();
+            return services.AddSingleton<IGrainCallFilter, TImplementation>();
         }
 
         /// <summary>
         /// Adds an <see cref="IGrainCallFilter"/> to the filter pipeline via a delegate.
         /// </summary>
-        /// <param name="collection">The service collection.</param>
+        /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddGrainCallFilter(this IServiceCollection collection, GrainCallFilterDelegate filter)
+        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
         {
-            return collection.AddSingleton<IGrainCallFilter>(
+            return services.AddSingleton<IGrainCallFilter>(
                 new GrainCallFilterWrapper(filter));
         }
 
         /// <summary>
         /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
         /// </summary>
-        /// <param name="collection"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
-        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection services,
             Action<StaticGatewayListProviderOptions> configureOptions)
         {
-            return collection
-                .Configure(configureOptions)
-                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
+            return services.UseStaticGatewayListProvider(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
-        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configuration"/>
+        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
         /// </summary>
-        /// <param name="collection"></param>
-        /// <param name="configuration"></param>
-        /// <returns></returns>
-        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection collection,
-            IConfiguration configuration)
+        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection services,
+            Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
-            return collection
-                .Configure<StaticGatewayListProviderOptions>(configuration)
-                .AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
+            configureOptions?.Invoke(services.AddOptions<StaticGatewayListProviderOptions>());
+            return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
         }
 
         private class GrainCallFilterWrapper : IGrainCallFilter

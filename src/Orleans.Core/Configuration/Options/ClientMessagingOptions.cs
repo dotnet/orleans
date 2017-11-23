@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+﻿namespace Orleans.Hosting
 {
     /// <summary>
     /// Specifies global messaging options that are client related.

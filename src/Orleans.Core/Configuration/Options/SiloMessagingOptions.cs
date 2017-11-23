@@ -1,7 +1,7 @@
 ﻿using Orleans.Runtime;
 using System;
 
-namespace Orleans.Configuration
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Specifies global messaging options that are silo related.

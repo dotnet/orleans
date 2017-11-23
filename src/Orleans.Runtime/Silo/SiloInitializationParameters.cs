@@ -61,6 +61,7 @@ namespace Orleans.Runtime
                 this.NodeConfig.Generation = SiloAddress.AllocateNewGeneration();
             }
 
+            this.NodeConfig.InitNodeSettingsFromGlobals(config);
             this.SiloAddress = SiloAddress.New(this.NodeConfig.Endpoint, this.NodeConfig.Generation);
             this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
         }
