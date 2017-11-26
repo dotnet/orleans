@@ -26,6 +26,7 @@ The most common approach is to configure the silo to periodically scan for activ
 
 * receiving a call
 * receiving a reminder
+* receiving an event via streaming
 
 **What does NOT count as “being active” for the purpose of grain activation collection**
 
