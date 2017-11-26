@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         /// <param name="address">The address to bind to.</param>
         /// <returns>The new socket, appropriately bound.</returns>
         internal static Socket GetAcceptingSocketForEndpoint(IPEndPoint address)
-        {
+        { 
             var s = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
             {
