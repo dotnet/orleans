@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -39,6 +41,7 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close
                 s.LingerState = new LingerOption(true, 0);
                 s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                s.EnableFastpath();
                 // And bind it to the address
                 s.Bind(address);
             }
@@ -67,6 +70,7 @@ namespace Orleans.Runtime
             var s = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
             {
+                s.EnableFastpath();
                 Connect(s, target, connectionTimeout);
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
@@ -240,5 +244,10 @@ namespace Orleans.Runtime
                 // Ignore
             }
         }
+
+       
+
+
+
     }
 }
