@@ -1,18 +1,16 @@
 using System;
-using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Microsoft.Extensions.Options;
-using Orleans.Hosting;
 
 namespace Orleans.Messaging
 {
@@ -108,10 +106,10 @@ namespace Orleans.Messaging
             IClusterConnectionStatusListener connectionStatusListener,
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
-            IOptions<ClientMessagingOptions> messagingOptions)
+            IOptions<NetworkingOptions> networkingOptions)
         {
             this.loggerFactory = loggerFactory;
-            this.openConnectionTimeout = messagingOptions.Value.OpenConnectionTimeout;
+            this.openConnectionTimeout = networkingOptions.Value.OpenConnectionTimeout;
             this.SerializationManager = serializationManager;
             this.executorService = executorService;
             lockable = new object();
