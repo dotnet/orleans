@@ -15,41 +15,37 @@ namespace Orleans.SqlUtils
                     new DbConstants(startEscapeIndicator: '[',
                                     endEscapeIndicator: ']',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    supportsBooleanParameters: true,
-                                    isSynchronousAdoNetImplementation:false,
-                                    supportsStreamNatively:true,
-                                    supportsCommandCancellation:true,
-                                    commandInterceptor:NoOpDatabaseCommandInterceptor.Instance)
+                                    isSynchronousAdoNetImplementation: false,
+                                    supportsStreamNatively: true,
+                                    supportsCommandCancellation: true,
+                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance)
                 },
                 {AdoNetInvariants.InvariantNameMySql, new DbConstants(
                                     startEscapeIndicator: '`',
                                     endEscapeIndicator: '`',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    supportsBooleanParameters: true,
-                                    isSynchronousAdoNetImplementation:true,
-                                    supportsStreamNatively:false,
-                                    supportsCommandCancellation:false,
-                                    commandInterceptor:NoOpDatabaseCommandInterceptor.Instance)
+                                    isSynchronousAdoNetImplementation: true,
+                                    supportsStreamNatively: false,
+                                    supportsCommandCancellation: false,
+                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance)
                 },
                 {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
                                     startEscapeIndicator: '"',
                                     endEscapeIndicator: '"',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    supportsBooleanParameters: true,
-                                    isSynchronousAdoNetImplementation:true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
-                                    supportsStreamNatively:true,
-                                    supportsCommandCancellation:true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
-                                    commandInterceptor:NoOpDatabaseCommandInterceptor.Instance) 
+                                    isSynchronousAdoNetImplementation: true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
+                                    supportsStreamNatively: true,
+                                    supportsCommandCancellation: true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
+                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance) 
                                     
                 },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
                                     endEscapeIndicator: '\"',
                                     unionAllSelectTemplate: " FROM DUAL UNION ALL SELECT ",
-                                    supportsBooleanParameters: false,
-                                    isSynchronousAdoNetImplementation:true,
-                                    supportsStreamNatively:false,
-                                    supportsCommandCancellation:false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
+                                    isSynchronousAdoNetImplementation: true,
+                                    supportsStreamNatively: false,
+                                    supportsCommandCancellation: false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
                                     commandInterceptor: OracleDatabaseCommandInterceptor.Instance) 
                     
                 }, 
@@ -126,17 +122,6 @@ namespace Orleans.SqlUtils
             return GetDbConstants(adoNetProvider).IsSynchronousAdoNetImplementation;
         }
 
-
-        /// <summary>
-        /// Whether the ADO.net provider supports boolean parameters. 
-        /// </summary>
-        /// <param name="invariantName">The ADO.NET provider invariant string.</param>
-        /// <returns>True if the ADO.net data provider supports boolean parameters else false.</returns>
-        public static bool SupportsBooleanParameters(string invariantName)
-        {
-            return GetDbConstants(invariantName).SupportsBooleanParameters;
-        }
-
         public static IDatabaseCommandInterceptor GetDatabaseCommandInterceptor(string invariantName)
         {
             return GetDbConstants(invariantName).DatabaseCommandInterceptor;
@@ -149,11 +134,6 @@ namespace Orleans.SqlUtils
         /// A query template for union all select
         /// </summary>
         public readonly string UnionAllSelectTemplate;
-
-        /// <summary>
-        /// Indicates whether the ADO.net provider supports boolean parameters.
-        /// </summary>
-        public readonly bool SupportsBooleanParameters;
 
         /// <summary>
         /// Indicates whether the ADO.net provider does only support synchronous operations.
@@ -183,13 +163,12 @@ namespace Orleans.SqlUtils
         public readonly IDatabaseCommandInterceptor DatabaseCommandInterceptor;
 
 
-        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate, bool supportsBooleanParameters,
+        public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate,
                            bool isSynchronousAdoNetImplementation, bool supportsStreamNatively, bool supportsCommandCancellation, IDatabaseCommandInterceptor commandInterceptor)
         {
             StartEscapeIndicator = startEscapeIndicator;
             EndEscapeIndicator = endEscapeIndicator;
             UnionAllSelectTemplate = unionAllSelectTemplate;
-            SupportsBooleanParameters = supportsBooleanParameters;
             IsSynchronousAdoNetImplementation = isSynchronousAdoNetImplementation;
             SupportsStreamNatively = supportsStreamNatively;
             SupportsCommandCancellation = supportsCommandCancellation;
