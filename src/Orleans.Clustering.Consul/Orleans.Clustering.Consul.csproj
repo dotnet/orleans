@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Membership.Consul</AssemblyName>
+    <AssemblyName>Orleans.Clustering.Consul</AssemblyName>
     <RootNamespace>OrleansConsulUtils</RootNamespace>
   </PropertyGroup>
 

@@ -43,7 +43,7 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_CLUSTERING_ZOOKEEPER,
                 logger, this.Services);
         }
 
