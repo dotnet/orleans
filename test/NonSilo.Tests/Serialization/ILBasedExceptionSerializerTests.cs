@@ -223,6 +223,7 @@ namespace UnitTests.Serialization
             public SomeFunObject BaseField { get; set; }
         }
 
+        [Serializable]
         private class ILExceptionSerializerTestException : BaseException
         {
             public string SubClassField { get; set; }
