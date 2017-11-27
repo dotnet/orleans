@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Transactions;
+using Orleans.Utilities;
 
 namespace Orleans.CodeGeneration
 {
@@ -161,7 +162,7 @@ namespace Orleans.CodeGeneration
                 {
                     if (!first) strMethodId.Append(',');
                     else first = false;
-                    strMethodId.Append(arg.Name);
+                    strMethodId.Append(RuntimeTypeNameFormatter.Format(arg));
                 }
 
                 strMethodId.Append('>');
@@ -174,15 +175,16 @@ namespace Orleans.CodeGeneration
             {
                 if (!bFirstTime)
                     strMethodId.Append(',');
-
-                strMethodId.Append(info.ParameterType.Name);
-                var typeInfo = info.ParameterType.GetTypeInfo();
-                if (typeInfo.IsGenericType)
+                var pt = info.ParameterType;
+                if (pt.IsGenericParameter)
                 {
-                    Type[] args = typeInfo.GetGenericArguments();
-                    foreach (Type arg in args)
-                        strMethodId.Append(arg.Name);
+                    strMethodId.Append(pt.Name);
                 }
+                else
+                {
+                    strMethodId.Append(RuntimeTypeNameFormatter.Format(info.ParameterType));
+                }
+
                 bFirstTime = false;
             }
             strMethodId.Append(')');
@@ -349,49 +351,15 @@ namespace Orleans.CodeGeneration
 
         private class MethodInfoComparer : IEqualityComparer<MethodInfo>
         {
-            #region IEqualityComparer<InterfaceInfo> Members
-
             public bool Equals(MethodInfo x, MethodInfo y)
             {
-                return string.Equals(GetSignature(x), GetSignature(y), StringComparison.Ordinal);
-            }
-
-            private static string GetSignature(MethodInfo method)
-            {
-                var result = new StringBuilder(method.Name);
-
-                if (method.IsGenericMethodDefinition)
-                {
-                    foreach (var arg in method.GetGenericArguments())
-                    {
-                        result.Append(arg.Name);
-                    }
-                }
-
-                var parms = method.GetParameters();
-                foreach (var info in parms)
-                {
-                    var typeInfo = info.ParameterType.GetTypeInfo();
-                    result.Append(typeInfo.Name);
-                    if (typeInfo.IsGenericType)
-                    {
-                        var args = info.ParameterType.GetGenericArguments();
-                        foreach (var arg in args)
-                        {
-                            result.Append(arg.Name);
-                        }
-                    }
-                }
-
-                return result.ToString();
+                return ComputeMethodId(x) == ComputeMethodId(y);
             }
 
             public int GetHashCode(MethodInfo obj)
             {
                 throw new NotImplementedException();
             }
-
-            #endregion
         }
 
         /// <summary>
@@ -403,7 +371,6 @@ namespace Orleans.CodeGeneration
         private static void GetMethodsImpl(Type grainType, Type serviceType, List<MethodInfo> methodInfos)
         {
             Type[] iTypes = GetRemoteInterfaces(serviceType, false).Values.ToArray();
-            IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
 
             var typeInfo = grainType.GetTypeInfo();
 
@@ -421,14 +388,14 @@ namespace Orleans.CodeGeneration
                         if (typeInfo.IsClass)
                         {
                             var mi = methodInfo;
-                            var match = mapping.TargetMethods.Any(info => methodComparer.Equals(mi, info) &&
+                            var match = mapping.TargetMethods.Any(info => MethodComparer.Equals(mi, info) &&
                                 info.DeclaringType == grainType);
 
                             if (match)
-                                if (!methodInfos.Contains(mi, methodComparer))
+                                if (!methodInfos.Contains(mi, MethodComparer))
                                     methodInfos.Add(mi);
                         }
-                        else if (!methodInfos.Contains(methodInfo, methodComparer))
+                        else if (!methodInfos.Contains(methodInfo, MethodComparer))
                         {
                             methodInfos.Add(methodInfo);
                         }
