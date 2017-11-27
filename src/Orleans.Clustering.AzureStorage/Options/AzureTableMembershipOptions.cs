@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Orleans.AzureUtils.Configuration
+﻿namespace Orleans.AzureUtils.Configuration
 {
     /// <summary>
     /// Specify options used for AzureTableBasedMembership
@@ -18,5 +14,4 @@ namespace Orleans.AzureUtils.Configuration
         /// </summary>
         public string ConnectionString { get; set; }
     }
-
 }

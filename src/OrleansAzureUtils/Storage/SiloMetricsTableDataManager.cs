@@ -70,7 +70,7 @@ namespace Orleans.AzureUtils
         private IPEndPoint gateway;
         private string myHostName;
         private readonly SiloMetricsData metricsDataObject = new SiloMetricsData();
-        private AzureTableDataManager<SiloMetricsData> storage;
+        private Orleans.AzureUtils.AzureTableDataManager<SiloMetricsData> storage;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;

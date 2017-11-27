@@ -19,6 +19,7 @@ namespace Orleans.Runtime
         public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
 
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
+        public const string ORLEANS_CLUSTERING_AZURESTORAGE = "Orleans.Clustering.AzureStorage";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
         public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";

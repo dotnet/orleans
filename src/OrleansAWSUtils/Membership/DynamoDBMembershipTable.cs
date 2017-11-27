@@ -241,7 +241,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.AzureTable_60,
+                logger.Error(ErrorCode.MembershipBase,
                     $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.", exc);
                 throw;
             }
