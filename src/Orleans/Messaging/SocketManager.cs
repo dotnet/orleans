@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="address">The address to bind to.</param>
         /// <returns>The new socket, appropriately bound.</returns>
-        internal static Socket GetAcceptingSocketForEndpoint(IPEndPoint address)
+        internal Socket GetAcceptingSocketForEndpoint(IPEndPoint address)
         {
             var s = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
@@ -35,6 +35,10 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close
                 s.LingerState = new LingerOption(true, 0);
                 s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                // The following timeout is only effective when calling the synchronous
+                // Socket.Receive method. We should only use this method when we are reading
+                // the connection preamble
+                s.ReceiveTimeout = (int) this.connectionTimeout.TotalMilliseconds;
                 // And bind it to the address
                 s.Bind(address);
             }
