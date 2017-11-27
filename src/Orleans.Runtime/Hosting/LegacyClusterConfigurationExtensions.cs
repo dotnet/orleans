@@ -50,6 +50,8 @@ namespace Orleans.Hosting
                 options.ClientDropTimeout = configuration.Globals.ClientDropTimeout;
             });
 
+            services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
+            
             services.Configure<SerializationProviderOptions>(options =>
             {
                 options.SerializationProviders = configuration.Globals.SerializationProviders;

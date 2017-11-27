@@ -4,7 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
@@ -99,6 +101,7 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
             ExecutorService executorService,
+            IOptions<DevelopmentMembershipOptions> developmentMembershipOptions,
             ILoggerFactory loggerFactory)
         {
             this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
@@ -132,9 +135,10 @@ namespace Orleans.Runtime.GrainDirectory
                     loggerFactory);
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, loggerFactory);
 
-            if (globalConfig.SeedNodes.Count > 0)
+            var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndPoint;
+            if (primarySiloEndPoint != null)
             {
-                seed = globalConfig.SeedNodes.Contains(MyAddress.Endpoint) ? MyAddress : SiloAddress.New(globalConfig.SeedNodes[0], 0);
+                this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
@@ -484,9 +488,10 @@ namespace Orleans.Runtime.GrainDirectory
                     string grainName;
                     if (!Constants.TryGetSystemGrainName(grainId, out grainName))
                         grainName = "MembershipTableGrain";
-                    
-                    var errorMsg = grainName + " cannot run without Seed node - please check your silo configuration file and make sure it specifies a SeedNode element. " +
-                        " Alternatively, you may want to use AzureTable for LivenessType.";
+
+                    var errorMsg = $"{grainName} cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
+                                   $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
+                                   " Alternatively, you may want to use reliable membership, such as Azure Table.";
                     throw new ArgumentException(errorMsg, "grainId = " + grainId);
                 }
                 // Directory info for the membership table grain has to be located on the primary (seed) node, for bootstrapping
