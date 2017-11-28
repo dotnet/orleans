@@ -325,6 +325,14 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="MaxSocketAge" type="tns:TimeSpan" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          The MaxSocketAge attribute specifies how long to keep an open socket before it is closed.
+          Default is TimeSpan.MaxValue (never close sockets automatically, unless they were broken).
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
 
   <xs:complexType name="SystemStoreConfiguration">
