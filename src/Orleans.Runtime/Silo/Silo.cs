@@ -816,12 +816,8 @@ namespace Orleans.Runtime
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
 
-            if (!GlobalConfig.LivenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
-            {
-                // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
-                SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
-                    .WaitWithThrow(stopTimeout));
-            }
+            SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
+                .WaitWithThrow(stopTimeout));
 
             // incoming messages
             SafeExecute(incomingSystemAgent.Stop);
