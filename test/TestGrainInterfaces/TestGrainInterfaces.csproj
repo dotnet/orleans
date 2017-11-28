@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestGrainInterfaces</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

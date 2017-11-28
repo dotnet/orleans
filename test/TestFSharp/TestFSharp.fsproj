@@ -2,6 +2,7 @@
   <PropertyGroup>
     <AssemblyName>TestFSharp</AssemblyName>
     <RootNamespace>TestFSharp</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

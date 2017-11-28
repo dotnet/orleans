@@ -15,6 +15,7 @@ SET TestResultDir=%CMDHOME%\Binaries\%BuildConfiguration%\TestResults
 if not exist %TestResultDir% md %TestResultDir%
 
 SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
+SET _CoreDirectory=bin\%BuildConfiguration%\netcoreapp2.0\win10-x64
 
 rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
 if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1

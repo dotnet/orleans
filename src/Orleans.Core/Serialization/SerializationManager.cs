@@ -34,11 +34,16 @@ namespace Orleans.Serialization
 
         private readonly HashSet<Type> registeredTypes;
         private readonly List<IExternalSerializer> externalSerializers;
+        private readonly Dictionary<KeyedSerializerId, IKeyedSerializer> keyedSerializers = new Dictionary<KeyedSerializerId, IKeyedSerializer>();
+        private readonly List<IKeyedSerializer> orderedKeyedSerializers = new List<IKeyedSerializer>();
         private readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
         private readonly CachedReadConcurrentDictionary<string, Type> types;
         private readonly Dictionary<string, string> typeKeysToQualifiedNames = new Dictionary<string, string>();
         private readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
+
+        private readonly CachedReadConcurrentDictionary<Type, IKeyedSerializer> typeToKeyedSerializer =
+            new CachedReadConcurrentDictionary<Type, IKeyedSerializer>();
         private readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
         private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
@@ -791,6 +796,12 @@ namespace Orleans.Serialization
 
             }
 
+            IKeyedSerializer keyedSerializer;
+            if (this.TryLookupKeyedSerializer(t, out keyedSerializer))
+            {
+                return keyedSerializer.DeepCopy(original, context);
+            }
+
             if (fallbackSerializer.IsSupportedType(t))
                 return FallbackSerializationDeepCopy(original, context);
 
@@ -953,6 +964,14 @@ namespace Orleans.Serialization
             {
                 writer.WriteTypeHeader(t, expected);
                 ser(obj, context, expected);
+                return;
+            }
+
+            if (sm.TryLookupKeyedSerializer(t, out var keyedSerializer))
+            {
+                writer.Write((byte)SerializationTokenType.KeyedSerializer);
+                writer.Write((byte)keyedSerializer.SerializerId);
+                keyedSerializer.Serialize(obj, context, expected);
                 return;
             }
 
@@ -1296,6 +1315,16 @@ namespace Orleans.Serialization
                 {
                     resultType = reader.ReadSpecifiedTypeHeader(sm);
                 }
+                else if (token == SerializationTokenType.KeyedSerializer)
+                {
+                    var serializerId = (KeyedSerializerId)reader.ReadByte();
+                    if (!sm.keyedSerializers.TryGetValue(serializerId, out var keyedSerializer))
+                    {
+                        throw new SerializationException($"Specified serializer {serializerId} not configured.");
+                    }
+
+                    return keyedSerializer.Deserialize(expected, context);
+                }
                 else
                 {
                     throw new SerializationException("Unexpected token '" + token + "' introducing type specifier");
@@ -1600,6 +1629,29 @@ namespace Orleans.Serialization
             return serializer != null;
         }
 
+        private bool TryLookupKeyedSerializer(Type type, out IKeyedSerializer serializer)
+        {
+            if (this.orderedKeyedSerializers.Count == 0)
+            {
+                serializer = null;
+                return false;
+            }
+
+            if (this.typeToKeyedSerializer.TryGetValue(type, out serializer)) return true;
+
+            foreach (var keyedSerializer in this.orderedKeyedSerializers)
+            {
+                if (keyedSerializer.IsSupportedType(type))
+                {
+                    this.typeToKeyedSerializer[type] = keyedSerializer;
+                    serializer = keyedSerializer;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
 #endregion
 
 #region Fallback serializer and deserializer
@@ -1824,6 +1876,15 @@ namespace Orleans.Serialization
                         logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + typeInfo.FullName, exception);
                     }
                 });
+
+            if (this.ServiceProvider != null)
+            {
+                foreach (var serializer in this.ServiceProvider.GetServices<IKeyedSerializer>())
+                {
+                    this.orderedKeyedSerializers.Add(serializer);
+                    this.keyedSerializers[serializer.SerializerId] = serializer;
+                }
+            }
         }
 
         public void Dispose()
