@@ -5,7 +5,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : AsynchAgent
+    internal class IncomingMessageAgent : SingleTaskAsynchAgent
     {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
@@ -42,48 +42,30 @@ namespace Orleans.Runtime.Messaging
 
         protected override void Run()
         {
-            try
+            CancellationToken ct = Cts.Token;
+            while (true)
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                // Get an application message
+                var msg = messageCenter.WaitMessage(category, ct);
+                if (msg == null)
                 {
-                    threadTracking.OnStartExecution();
+                    if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
+                    // Null return means cancelled
+                    break;
                 }
-#endif
-                CancellationToken ct = Cts.Token;
-                while (true)
-                {
-                    // Get an application message
-                    var msg = messageCenter.WaitMessage(category, ct);
-                    if (msg == null)
-                    {
-                        if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
-                        // Null return means cancelled
-                        break;
-                    }
 
 #if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStartProcessing();
-                    }
-#endif
-                    ReceiveMessage(msg);
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStopProcessing();
-                        threadTracking.IncrementNumberOfProcessed();
-                    }
-#endif
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStartProcessing();
                 }
-            }
-            finally
-            {
+#endif
+                ReceiveMessage(msg);
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
-                    threadTracking.OnStopExecution();
+                    threadTracking.OnStopProcessing();
+                    threadTracking.IncrementNumberOfProcessed();
                 }
 #endif
             }
