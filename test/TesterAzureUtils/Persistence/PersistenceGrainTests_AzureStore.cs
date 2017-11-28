@@ -21,6 +21,7 @@ using Xunit.Abstractions;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
+using Orleans.Persistence.AzureStorage;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable

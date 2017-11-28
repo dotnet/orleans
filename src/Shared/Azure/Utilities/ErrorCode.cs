@@ -1,9 +1,25 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-#if CLUSTERING_AZURESTORAGE
+//
+// Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
+//
+
+#if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage.Utilities
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.AzureStorage.Utilities
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.AzureStorage.Utilities
+#elif ORLEANS_STATISTICS
+namespace Orleans.Statistics.AzureStorage.Utilities
+#elif ORLEANS_STREAMING
+namespace Orleans.Streaming.AzureStorage.Utilities
+#elif ORLEANS_EVENTHUBS
+namespace Orleans.Streaming.EventHubs.Utilities
+#elif TESTER_AZUREUTILS
+namespace Orleans.Tests.AzureUtils.Utilities
 #else
-namespace Orleans.AzureUtils.Utilities
+// No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
     [SuppressMessage("ReSharper", "InconsistentNaming")]
@@ -28,32 +44,8 @@ namespace Orleans.AzureUtils.Utilities
         AzureTable_15 = AzureTableBase + 15,
         AzureTable_17 = AzureTableBase + 17,
         AzureTable_18 = AzureTableBase + 18,
-        AzureTable_20 = AzureTableBase + 20,
-        AzureTable_21 = AzureTableBase + 21,
-        AzureTable_22 = AzureTableBase + 22,
-        AzureTable_23 = AzureTableBase + 23,
-        AzureTable_24 = AzureTableBase + 24,
-        AzureTable_25 = AzureTableBase + 25,
-        AzureTable_26 = AzureTableBase + 26,
-        AzureTable_32 = AzureTableBase + 32,
-        AzureTable_33 = AzureTableBase + 33,
-        AzureTable_34 = AzureTableBase + 34,
         AzureTable_37 = AzureTableBase + 37,
-        // reminders related
-        AzureTable_38 = AzureTableBase + 38,
-        AzureTable_39 = AzureTableBase + 39,
-        AzureTable_40 = AzureTableBase + 40,
-        AzureTable_42 = AzureTableBase + 42,
-        AzureTable_43 = AzureTableBase + 43,
-        AzureTable_44 = AzureTableBase + 44,
-        AzureTable_45 = AzureTableBase + 45,
-        AzureTable_46 = AzureTableBase + 46,
-        AzureTable_47 = AzureTableBase + 47,
-        AzureTable_49 = AzureTableBase + 49,
         // Azure storage provider related
         AzureTable_DataNotFound = AzureTableBase + 50,
-        AzureTable_60 = AzureTableBase + 60,
-        AzureTable_61 = AzureTableBase + 61,
-        AzureTable_ReadWrongReminder = AzureTableBase + 64
     }
 }

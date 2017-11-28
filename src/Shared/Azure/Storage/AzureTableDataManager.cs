@@ -9,10 +9,26 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
-#if CLUSTERING_AZURESTORAGE
+//
+// Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
+//
+
+#if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.AzureStorage
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.AzureStorage
+#elif ORLEANS_STATISTICS
+namespace Orleans.Statistics.AzureStorage
+#elif ORLEANS_STREAMING
+namespace Orleans.Streaming.AzureStorage
+#elif ORLEANS_EVENTHUBS
+namespace Orleans.Streaming.EventHubs
+#elif TESTER_AZUREUTILS
+namespace Orleans.Tests.AzureUtils
 #else
-namespace Orleans.AzureUtils
+// No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
     /// <summary>

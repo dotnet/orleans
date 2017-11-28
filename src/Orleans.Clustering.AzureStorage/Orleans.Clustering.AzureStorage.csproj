@@ -3,14 +3,14 @@
     <PackageId>Microsoft.Orleans.Clustering.AzureStorage</PackageId>
     <Title>Microsoft Orleans Membership Azure Table Storage</Title>
     <Description>Membership provider for Azure Table Storage of Microsoft Orleans.</Description>
-    <PackageTags>$(PackageTags) Azure</PackageTags>
+    <PackageTags>$(PackageTags) Azure Table Blob Storage</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans.Clustering.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Clustering.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>$(DefineConstants);CLUSTERING_AZURESTORAGE</DefineConstants>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

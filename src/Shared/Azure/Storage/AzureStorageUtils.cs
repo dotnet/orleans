@@ -9,10 +9,26 @@ using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
-#if CLUSTERING_AZURESTORAGE
+//
+// Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
+//
+
+#if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.AzureStorage
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.AzureStorage
+#elif ORLEANS_STATISTICS
+namespace Orleans.Statistics.AzureStorage
+#elif ORLEANS_STREAMING
+namespace Orleans.Streaming.AzureStorage
+#elif ORLEANS_EVENTHUBS
+namespace Orleans.Streaming.EventHubs
+#elif TESTER_AZUREUTILS
+namespace Orleans.Tests.AzureUtils
 #else
-namespace Orleans.AzureUtils
+// No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
     /// <summary>
@@ -176,67 +192,6 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal static CloudQueueClient GetCloudQueueClient(
-            string storageConnectionString,
-            IRetryPolicy retryPolicy,
-            TimeSpan timeout,
-            ILogger logger)
-        {
-            try
-            {
-                var storageAccount = GetCloudStorageAccount(storageConnectionString);
-                CloudQueueClient operationsClient = storageAccount.CreateCloudQueueClient();
-                operationsClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
-                operationsClient.DefaultRequestOptions.ServerTimeout = timeout;
-                return operationsClient;
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.AzureQueue_14, String.Format("Error creating GetCloudQueueOperationsClient."), exc);
-                throw;
-            }
-        }
-
-        internal static void ValidateQueueName(string queueName)
-        {
-            // Naming Queues and Metadata: http://msdn.microsoft.com/en-us/library/windowsazure/dd179349.aspx
-            if (!(queueName.Length >= 3 && queueName.Length <= 63))
-            {
-                // A queue name must be from 3 through 63 characters long.
-                throw new ArgumentException(String.Format("A queue name must be from 3 through 63 characters long, while your queueName length is {0}, queueName is {1}.", queueName.Length, queueName), queueName);
-            }
-
-            if (!Char.IsLetterOrDigit(queueName.First()))
-            {
-                // A queue name must start with a letter or number
-                throw new ArgumentException(String.Format("A queue name must start with a letter or number, while your queueName is {0}.", queueName), queueName);
-            }
-
-            if (!Char.IsLetterOrDigit(queueName.Last()))
-            {
-                // The first and last letters in the queue name must be alphanumeric. The dash (-) character cannot be the first or last character.
-                throw new ArgumentException(String.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), queueName);
-            }
-
-            if (!queueName.All(c => Char.IsLetterOrDigit(c) || c.Equals('-')))
-            {
-                // A queue name can only contain letters, numbers, and the dash (-) character.
-                throw new ArgumentException(String.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
-            }
-
-            if (queueName.Contains("--"))
-            {
-                // Consecutive dash characters are not permitted in the queue name.
-                throw new ArgumentException(String.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), queueName);
-            }
-
-            if (queueName.Where(Char.IsLetter).Any(c => !Char.IsLower(c)))
-            {
-                // All letters in a queue name must be lowercase.
-                throw new ArgumentException(String.Format("All letters in a queue name must be lowercase, while your queueName is {0}.", queueName), queueName);
-            }
-        }
-
         internal static void ValidateTableName(string tableName)
         {
             // Table Name Rules: http://msdn.microsoft.com/en-us/library/dd179338.aspx
@@ -279,17 +234,6 @@ namespace Orleans.AzureUtils
                 throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
 
             return key;
-        }
-
-
-        internal static string PrintCloudQueueMessage(CloudQueueMessage message)
-        {
-            return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
-                    message.Id,
-                    message.NextVisibleTime.HasValue ? LogFormatter.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
-                    message.DequeueCount,
-                    message.PopReceipt,
-                    message.AsString);
         }
 
         internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, ILogger logger)

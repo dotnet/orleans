@@ -5,10 +5,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Protocol;
-using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
+using Orleans.Tests.AzureUtils;
 
 namespace Tester.AzureUtils
 {

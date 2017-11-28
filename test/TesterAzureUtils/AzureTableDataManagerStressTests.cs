@@ -6,11 +6,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Tests.AzureUtils;
 
 namespace Tester.AzureUtils
 {

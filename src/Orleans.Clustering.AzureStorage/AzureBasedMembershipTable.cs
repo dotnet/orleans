@@ -12,7 +12,7 @@ using Orleans.AzureUtils.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Orleans.Runtime.Configuration;
 using Orleans.Clustering.AzureStorage;
-using TableStorageErrorCode = Orleans.Clustering.AzureStorage.Utilities.ErrorCode;
+using Orleans.Clustering.AzureStorage.Utilities;
 
 namespace Orleans.Runtime.MembershipService
 {

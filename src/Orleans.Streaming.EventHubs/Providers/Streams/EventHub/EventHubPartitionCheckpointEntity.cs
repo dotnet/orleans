@@ -1,5 +1,5 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.AzureUtils;
+using Orleans.Streaming.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {

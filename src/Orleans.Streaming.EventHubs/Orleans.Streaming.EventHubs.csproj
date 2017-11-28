@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans EventHubs Provider</Title>
     <Description>Library of utility types for Microsoft Azure EventHubs of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>
+    <DefineConstants>$(DefineConstants);ORLEANS_EVENTHUBS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -13,14 +14,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.EventHubs" Version="$(MicrosoftAzureEventHubsVersion)" />
+    <Compile Include="..\Shared\Azure\Storage\AzureStorageUtils.cs" Link="Storage\AzureStorageUtils.cs" />
+    <Compile Include="..\Shared\Azure\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />
+    <Compile Include="..\Shared\Azure\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
+    <Compile Include="..\Shared\Azure\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <PackageReference Include="Microsoft.Azure.EventHubs" Version="$(MicrosoftAzureEventHubsVersion)" />
+    <PackageReference Include="System.Net.Requests" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="WindowsAzure.Storage" Version="$(WindowsAzureStorageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Utilities\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 </Project>

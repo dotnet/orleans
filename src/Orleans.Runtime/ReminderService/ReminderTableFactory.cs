@@ -40,7 +40,7 @@ namespace Orleans.Runtime.ReminderService
                         this.serviceProvider);
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        Constants.ORLEANS_AZURE_UTILS_DLL,
+                        Constants.ORLEANS_REMINDERS_AZURESTORAGE,
                         logger,
                         this.serviceProvider);
                 case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:

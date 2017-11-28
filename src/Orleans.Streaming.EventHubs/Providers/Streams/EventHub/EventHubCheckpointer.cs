@@ -1,9 +1,8 @@
-﻿
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.AzureUtils;
 using Orleans.Streams;
+using Orleans.Streaming.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {

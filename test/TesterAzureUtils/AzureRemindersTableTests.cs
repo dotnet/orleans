@@ -7,9 +7,9 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Tester;
-using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
+using Orleans.Reminders.AzureStorage;
 
 namespace UnitTests.RemindersTest
 {
@@ -17,7 +17,7 @@ namespace UnitTests.RemindersTest
     /// Tests for operation of Orleans Reminders Table using Azure
     /// </summary>
     [TestCategory("Reminders"), TestCategory("Azure")]
-    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<AzureStorageBasicTests>
+    public class AzureRemindersTableTests : ReminderTableTestsBase, IClassFixture<Tester.AzureUtils.AzureStorageBasicTests>
     {
         public AzureRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {

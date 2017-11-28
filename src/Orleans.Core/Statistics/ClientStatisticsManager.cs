@@ -64,7 +64,7 @@ namespace Orleans.Runtime
             else if (config.UseAzureSystemStore)
             {
                 // Hook up to publish client metrics to Azure storage table
-                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
+                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
                 await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
                 tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats, this.loggerFactory)
                 {
@@ -82,7 +82,7 @@ namespace Orleans.Runtime
                 }
                 else if (config.UseAzureSystemStore)
                 {
-                    var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
+                    var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
                     await statsDataPublisher.Init(false, config.DataConnectionString, config.ClusterId,
                         transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;

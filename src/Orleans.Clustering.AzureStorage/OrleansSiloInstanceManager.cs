@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Clustering.AzureStorage;
-using TableStorageErrorCode = Orleans.Clustering.AzureStorage.Utilities.ErrorCode;
+using Orleans.Clustering.AzureStorage.Utilities;
 
 namespace Orleans.AzureUtils
 {

@@ -1,5 +1,4 @@
 ﻿using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using OrleansAWSUtils.Storage;
 using System;
@@ -110,8 +109,7 @@ namespace OrleansAWSUtils.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.AzureQueue_15,
-                        $"Exception upon DeleteMessage on queue {Id}. Ignoring.", exc);
+                    logger.LogWarning($"Exception upon DeleteMessage on queue {Id}. Ignoring.", exc);
                 }
             }
             finally
