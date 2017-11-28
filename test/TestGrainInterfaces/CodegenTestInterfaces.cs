@@ -4,10 +4,35 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
-
 namespace UnitTests.GrainInterfaces
 {
     using Orleans.Concurrency;
+
+    namespace One
+    {
+        public class Command
+        {
+        }
+    }
+
+    namespace Two
+    {
+        public class Command
+        {
+        }
+    }
+
+    /// <summary>
+    /// Repro for https://github.com/dotnet/orleans/issues/3713.
+    /// Having multiple methods with the same name and same parameter type
+    /// name would cause a code generation failure because only one of the
+    /// methods would be implemented in the generated GrainReference.
+    /// </summary>
+    internal interface ISameNameParameterTypeGrain : IGrainWithIntegerKey
+    {
+        Task ExecuteCommand(One.Command command);
+        Task ExecuteCommand(Two.Command command);
+    }
 
     internal interface IInternalPingGrain : IGrainWithIntegerKey
     {
