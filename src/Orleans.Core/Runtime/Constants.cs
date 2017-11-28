@@ -19,11 +19,12 @@ namespace Orleans.Runtime
         public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
 
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
+        public const string ORLEANS_CLUSTERING_AZURESTORAGE = "Orleans.Clustering.AzureStorage";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
         public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
 
-        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "Orleans.Membership.ZooKeeper";
+        public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);

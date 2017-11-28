@@ -30,7 +30,7 @@ namespace Orleans.Messaging
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
                     configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_AZURE_UTILS_DLL);
+                            Constants.ORLEANS_CLUSTERING_AZURESTORAGE);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
@@ -44,7 +44,7 @@ namespace Orleans.Messaging
 
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
                     configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
+                            Constants.ORLEANS_CLUSTERING_ZOOKEEPER);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:

@@ -1,119 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
-
+using Orleans.Clustering.AzureStorage;
+using TableStorageErrorCode = Orleans.Clustering.AzureStorage.Utilities.ErrorCode;
 
 namespace Orleans.AzureUtils
 {
-    internal class SiloInstanceTableEntry : TableEntity
-    {
-        public string DeploymentId { get; set; }    // PartitionKey
-        public string Address { get; set; }         // RowKey
-        public string Port { get; set; }            // RowKey
-        public string Generation { get; set; }      // RowKey
-
-        public string HostName { get; set; }        // Mandatory
-        public string Status { get; set; }          // Mandatory
-        public string ProxyPort { get; set; }       // Optional
-
-        public string RoleName { get; set; }        // Optional - only for Azure role
-        public string SiloName { get; set; }
-        public string InstanceName { get; set; }    // For backward compatability we leave the old column, untill all clients update the code to new version.
-        public string UpdateZone { get; set; }         // Optional - only for Azure role
-        public string FaultZone { get; set; }          // Optional - only for Azure role
-
-        public string SuspectingSilos { get; set; }          // For liveness
-        public string SuspectingTimes { get; set; }          // For liveness
-
-        public string StartTime       { get; set; }          // Time this silo was started. For diagnostics.
-        public string IAmAliveTime    { get; set; }           // Time this silo updated it was alive. For diagnostics.
-        public string MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
-
-        internal const string TABLE_VERSION_ROW = "VersionRow"; // Row key for version row.
-        internal const char Seperator = '-';
-
-        public static string ConstructRowKey(SiloAddress silo)
-        {
-            return String.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
-        }
-        internal static SiloAddress UnpackRowKey(string rowKey)
-        {
-            var debugInfo = "UnpackRowKey";
-            try
-            {
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0}", rowKey);
-                Trace.TraceInformation(debugInfo);
-#endif
-                int idx1 = rowKey.IndexOf(Seperator);
-                int idx2 = rowKey.LastIndexOf(Seperator);
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
-#endif
-                var addressStr = rowKey.Substring(0, idx1);
-                var portStr = rowKey.Substring(idx1 + 1, idx2 - idx1 - 1);
-                var genStr = rowKey.Substring(idx2 + 1);
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}", rowKey, addressStr, portStr, genStr);
-                Trace.TraceInformation(debugInfo);
-#endif
-                IPAddress address = IPAddress.Parse(addressStr);
-                int port = Int32.Parse(portStr);
-                int generation = Int32.Parse(genStr);
-                return SiloAddress.New(new IPEndPoint(address, port), generation);
-            }
-            catch (Exception exc)
-            {
-                throw new AggregateException("Error from " + debugInfo, exc);
-            }
-        }
-
-        public override string ToString()
-        {
-            var sb = new StringBuilder();
-            if (RowKey.Equals(TABLE_VERSION_ROW))
-            {
-                sb.Append("VersionRow [").Append(DeploymentId);
-                sb.Append(" Deployment=").Append(DeploymentId);
-                sb.Append(" MembershipVersion=").Append(MembershipVersion);
-                sb.Append("]");
-            }
-            else
-            {
-                sb.Append("OrleansSilo [");
-                sb.Append(" Deployment=").Append(DeploymentId);
-                sb.Append(" LocalEndpoint=").Append(Address);
-                sb.Append(" LocalPort=").Append(Port);
-                sb.Append(" Generation=").Append(Generation);
-
-                sb.Append(" Host=").Append(HostName);
-                sb.Append(" Status=").Append(Status);
-                sb.Append(" ProxyPort=").Append(ProxyPort);
-
-                if (!string.IsNullOrEmpty(RoleName)) sb.Append(" RoleName=").Append(RoleName);
-                sb.Append(" SiloName=").Append(SiloName);
-                sb.Append(" UpgradeZone=").Append(UpdateZone);
-                sb.Append(" FaultZone=").Append(FaultZone);
-
-                if (!string.IsNullOrEmpty(SuspectingSilos)) sb.Append(" SuspectingSilos=").Append(SuspectingSilos);
-                if (!string.IsNullOrEmpty(SuspectingTimes)) sb.Append(" SuspectingTimes=").Append(SuspectingTimes);
-                sb.Append(" StartTime=").Append(StartTime);
-                sb.Append(" IAmAliveTime=").Append(IAmAliveTime);
-                sb.Append("]");
-            }
-            return sb.ToString();
-        }
-    }
-
     internal class OrleansSiloInstanceManager
     {
         public string TableName { get { return INSTANCE_TABLE_NAME; } }
@@ -150,13 +49,13 @@ namespace Orleans.AzureUtils
             catch (TimeoutException te)
             {
                 string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
-                instance.logger.Error(ErrorCode.AzureTable_32, errorMsg, te);
+                instance.logger.Error((int)TableStorageErrorCode.AzureTable_32, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
                 string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
-                instance.logger.Error(ErrorCode.AzureTable_33, errorMsg, ex);
+                instance.logger.Error((int)TableStorageErrorCode.AzureTable_33, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
             return instance;
@@ -237,7 +136,7 @@ namespace Orleans.AzureUtils
                 string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
                 var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
                                     .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
-               
+
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
                 logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
@@ -257,8 +156,8 @@ namespace Orleans.AzureUtils
 
             var sb = new StringBuilder();
             sb.Append(String.Format("Deployment {0}. Silos: ", DeploymentId));
-            
-            // Loop through the results, displaying information about the entity 
+
+            // Loop through the results, displaying information about the entity
             Array.Sort(entries,
                 (e1, e2) =>
                 {
@@ -325,14 +224,14 @@ namespace Orleans.AzureUtils
             var asList = queryResults.ToList();
             if (asList.Count < 1 || asList.Count > 2)
                 throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress.ToLongString(), Utils.EnumerableToString(asList)));
-            
+
             int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
-            if (numTableVersionRows < 1) 
+            if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(asList)));
-            
+
             if (numTableVersionRows > 1)
                 throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(asList)));
-            
+
             return asList;
         }
 
@@ -343,13 +242,13 @@ namespace Orleans.AzureUtils
             var asList = queryResults.ToList();
             if (asList.Count < 1)
                 throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(asList)));
-            
+
             int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(asList)));
             if (numTableVersionRows > 1)
                 throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(asList)));
-            
+
             return asList;
         }
 
@@ -403,7 +302,7 @@ namespace Orleans.AzureUtils
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
-                
+
                 throw;
             }
         }
@@ -431,7 +330,7 @@ namespace Orleans.AzureUtils
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("UpdateSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
-                
+
                 throw;
             }
         }

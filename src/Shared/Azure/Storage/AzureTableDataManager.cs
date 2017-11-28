@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,7 +9,11 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
+#if CLUSTERING_AZURESTORAGE
+namespace Orleans.Clustering.AzureStorage
+#else
 namespace Orleans.AzureUtils
+#endif
 {
     /// <summary>
     /// Utility class to encapsulate row-based access to Azure table storage.
@@ -65,14 +68,14 @@ namespace Orleans.AzureUtils
                 bool didCreate = await tableRef.CreateIfNotExistsAsync();
 
 
-                Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
+                Logger.Info((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
                 CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
                 tableReference = tableOperationsClient.GetTableReference(TableName);
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_02, $"Could not initialize connection to storage table {TableName}", exc);
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_02, $"Could not initialize connection to storage table {TableName}", exc);
                 throw;
             }
             finally
@@ -99,12 +102,12 @@ namespace Orleans.AzureUtils
 
                 if (didDelete)
                 {
-                    Logger.Info(ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
+                    Logger.Info((int)Utilities.ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
                 }
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_04, "Could not delete storage table {0}", exc);
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_04, "Could not delete storage table {0}", exc);
                 throw;
             }
             finally
@@ -185,11 +188,11 @@ namespace Orleans.AzureUtils
                     // svc.UpdateObject(data);
                     // SaveChangesOptions.ReplaceOnUpdate,
                     var opResult = await tableReference.ExecuteAsync(TableOperation.InsertOrReplace(data));
-                    return opResult.Etag;                                                           
+                    return opResult.Etag;
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_06,
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_06,
                         $"Intermediate error upserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
                     throw;
                 }
@@ -215,7 +218,7 @@ namespace Orleans.AzureUtils
 
             try
             {
-               
+
                 try
                 {
                     // WAS:
@@ -229,7 +232,7 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_07,
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_07,
                         $"Intermediate error merging entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
                     throw;
                 }
@@ -260,7 +263,7 @@ namespace Orleans.AzureUtils
                     data.ETag = dataEtag;
                     var opResult = await tableReference.ExecuteAsync(TableOperation.Replace(data));
 
-                    //The ETag of data is needed in further operations.                                        
+                    //The ETag of data is needed in further operations.
                     return opResult.Etag;
                 }
                 catch (Exception exc)
@@ -283,15 +286,15 @@ namespace Orleans.AzureUtils
         /// <param name="eTag">ETag to use.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task DeleteTableEntryAsync(T data, string eTag)
-        {            
+        {
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} table {1}  entry {2}", operation, TableName, data);
 
             try
-            {   
+            {
                 data.ETag = eTag;
-                
+
                 try
                 {
                     await tableReference.ExecuteAsync(TableOperation.Delete(data));
@@ -299,7 +302,7 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_08,
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_08,
                         $"Intermediate error deleting entry {data} from the table {TableName}.", exc);
                     throw;
                 }
@@ -329,7 +332,7 @@ namespace Orleans.AzureUtils
                 {
                     string queryString = TableQueryFilterBuilder.MatchPartitionKeyAndRowKeyFilter(partitionKey, rowKey);
                     var query = new TableQuery<T>().Where(queryString);
-                    TableQuerySegment<T> segment = await tableReference.ExecuteQuerySegmentedAsync(query, null); 
+                    TableQuerySegment<T> segment = await tableReference.ExecuteQuerySegmentedAsync(query, null);
                     retrievedResult = segment.Results.SingleOrDefault();
                 }
                 catch (StorageException exception)
@@ -337,7 +340,7 @@ namespace Orleans.AzureUtils
                     if (!AzureStorageUtils.TableStorageDataNotFound(exception))
                         throw;
                 }
-                //The ETag of data is needed in further operations.                                        
+                //The ETag of data is needed in further operations.
                 if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag);
                 if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
                 return null;  // No data
@@ -416,7 +419,7 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_08,
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_08,
                         $"Intermediate error deleting entries {Utils.EnumerableToString(collection)} from the table {TableName}.", exc);
                     throw;
                 }
@@ -468,7 +471,7 @@ namespace Orleans.AzureUtils
                         AzureTableDefaultPolicies.TableOperationTimeout,
                         backoff);
 
-                    // Data was read successfully if we got to here                    
+                    // Data was read successfully if we got to here
                     return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
 
             }
@@ -478,7 +481,7 @@ namespace Orleans.AzureUtils
                     var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
                     if (!AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
-                        Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
+                        Logger.Warn((int)Utilities.ErrorCode.AzureTable_09, errorMsg, exc);
                     }
                     throw new OrleansException(errorMsg, exc);
                 }
@@ -536,7 +539,7 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_37,
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_37,
                         $"Intermediate error bulk inserting {collection.Count} entries in the table {TableName}", exc);
                 }
             }
@@ -557,16 +560,16 @@ namespace Orleans.AzureUtils
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} into table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
 
             try
-            {                                
+            {
                 try
                 {
                     // WAS:
                     // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
                     // svc.AddObject(TableName, data);
-                    // --- 
+                    // ---
                     // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
                     // svc.UpdateObject(tableVersion);
-                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
                     // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
                     // return dataResult.ETag;
 
@@ -579,14 +582,14 @@ namespace Orleans.AzureUtils
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
-                    //The ETag of data is needed in further operations.                    
-                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                                                                                                                                                              
+                    //The ETag of data is needed in further operations.
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);
                 }
                 catch (Exception exc)
                 {
                     CheckAlertWriteError(operation, data1, data2Str, exc);
                     throw;
-                }                              
+                }
             }
             finally
             {
@@ -612,7 +615,7 @@ namespace Orleans.AzureUtils
                     // ----
                     // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
                     // svc.UpdateObject(tableVersion);
-                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
                     // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
                     // return dataResult.ETag;
 
@@ -630,19 +633,19 @@ namespace Orleans.AzureUtils
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
-                    //The ETag of data is needed in further operations.                                        
-                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                   
+                    //The ETag of data is needed in further operations.
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);
                 }
                 catch (Exception exc)
                 {
                     CheckAlertWriteError(operation, data1, data2Str, exc);
-                    throw;                
+                    throw;
                 }
             }
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
-            }            
+            }
         }
 
         // Utility methods
@@ -661,7 +664,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
                 throw;
             }
         }
@@ -680,7 +683,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
                 throw;
             }
         }
@@ -692,13 +695,13 @@ namespace Orleans.AzureUtils
             if(AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus) && AzureStorageUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if(Logger.IsEnabled(LogLevel.Debug)) Logger.Debug(ErrorCode.AzureTable_13,
+                if(Logger.IsEnabled(LogLevel.Debug)) Logger.Debug((int)Utilities.ErrorCode.AzureTable_13,
                     $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
 
             }
             else
             {
-                Logger.Error(ErrorCode.AzureTable_14,
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_14,
                     $"Azure table access write error {operation} to table {TableName} entry {data1}", exc);
             }
         }
@@ -708,11 +711,49 @@ namespace Orleans.AzureUtils
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > AzureTableDefaultPolicies.TableOperationTimeout)
             {
-                Logger.Warn(ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
+                Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
         }
 
-#endregion
+        #endregion
+
+        /// <summary>
+        /// Helper functions for building table queries.
+        /// </summary>
+        private class TableQueryFilterBuilder
+        {
+            /// <summary>
+            /// Builds query string to match partitionkey
+            /// </summary>
+            /// <param name="partitionKey"></param>
+            /// <returns></returns>
+            public static string MatchPartitionKeyFilter(string partitionKey)
+            {
+                return TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey);
+            }
+
+            /// <summary>
+            /// Builds query string to match rowkey
+            /// </summary>
+            /// <param name="rowKey"></param>
+            /// <returns></returns>
+            public static string MatchRowKeyFilter(string rowKey)
+            {
+                return TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey);
+            }
+
+            /// <summary>
+            /// Builds a query string that matches a specific partitionkey and rowkey.
+            /// </summary>
+            /// <param name="partitionKey"></param>
+            /// <param name="rowKey"></param>
+            /// <returns></returns>
+            public static string MatchPartitionKeyAndRowKeyFilter(string partitionKey, string rowKey)
+            {
+                return TableQuery.CombineFilters(MatchPartitionKeyFilter(partitionKey), TableOperators.And,
+                                          MatchRowKeyFilter(rowKey));
+            }
+        }
     }
 
     internal static class TableDataManagerInternalExtensions

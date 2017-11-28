@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.ConsulUtils.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
-using OrleansConsulUtils.Options;
+using Orleans.ConsulUtils.Options;
 
 namespace Orleans.Hosting
 {

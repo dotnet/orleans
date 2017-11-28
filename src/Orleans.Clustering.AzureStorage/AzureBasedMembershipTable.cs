@@ -9,9 +9,10 @@ using Orleans.AzureUtils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Configuration;
-using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Orleans.Runtime.Configuration;
+using Orleans.Clustering.AzureStorage;
+using TableStorageErrorCode = Orleans.Clustering.AzureStorage.Utilities.ErrorCode;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -65,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_20,
+                logger.Warn((int)TableStorageErrorCode.AzureTable_20,
                     $"Intermediate error reading silo entry for key {key.ToLongString()} from the table {tableManager.TableName}.", exc);
                 throw;
             }
@@ -83,7 +84,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_21,
+                logger.Warn((int)TableStorageErrorCode.AzureTable_21,
                     $"Intermediate error reading all silo entries {tableManager.TableName}.", exc);
                 throw;
             }
@@ -101,13 +102,13 @@ namespace Orleans.Runtime.MembershipService
                     tableEntry, versionEntry, tableVersion.VersionEtag);
 
                 if (result == false)
-                    logger.Warn(ErrorCode.AzureTable_22,
+                    logger.Warn((int)TableStorageErrorCode.AzureTable_22,
                         $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, table version = {tableVersion}");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_23,
+                logger.Warn((int)TableStorageErrorCode.AzureTable_23,
                     $"Intermediate error inserting entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
                 throw;
             }
@@ -123,13 +124,13 @@ namespace Orleans.Runtime.MembershipService
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
-                    logger.Warn(ErrorCode.AzureTable_24,
+                    logger.Warn((int)TableStorageErrorCode.AzureTable_24,
                         $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}, table version = {tableVersion} ");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_25,
+                logger.Warn((int)TableStorageErrorCode.AzureTable_25,
                     $"Intermediate error updating entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
                 throw;
             }
@@ -145,7 +146,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_26,
+                logger.Warn((int)TableStorageErrorCode.AzureTable_26,
                     $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {tableManager.TableName}.", exc);
                 throw;
             }
@@ -174,7 +175,7 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            logger.Error(ErrorCode.AzureTable_61,
+                            logger.Error((int)TableStorageErrorCode.AzureTable_61,
                                 $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.", exc);
                         }
                     }
@@ -184,7 +185,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.AzureTable_60,
+                logger.Error((int)TableStorageErrorCode.AzureTable_60,
                     $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, tuple => tuple.Item1.ToString())}.", exc);
                 throw;
             }

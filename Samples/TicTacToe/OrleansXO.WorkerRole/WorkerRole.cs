@@ -11,9 +11,6 @@ namespace OrleansXO.WorkerRole
 
         public override bool OnStart()
         {
-            // Set the maximum number of concurrent connections 
-            ServicePointManager.DefaultConnectionLimit = 12;
-
             // Do other silo initialization – for example: Azure diagnostics, etc
             
             // For information on handling configuration changes

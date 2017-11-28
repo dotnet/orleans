@@ -6,7 +6,7 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansAzureUtils.Storage
+namespace Orleans.AzureUtils.Storage
 {
     /// <inheritdoc/>
     public class LegacyAzureTableGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator

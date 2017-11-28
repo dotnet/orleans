@@ -74,7 +74,7 @@ namespace Orleans.Runtime.ReminderService
         }
     }
     
-    internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
+    internal class RemindersTableManager : Orleans.AzureUtils.AzureTableDataManager<ReminderTableEntry>
     {
         private const string REMINDERS_TABLE_NAME = "OrleansReminders";
 
@@ -95,13 +95,13 @@ namespace Orleans.Runtime.ReminderService
             catch (TimeoutException te)
             {
                 string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
-                singleton.Logger.Error(ErrorCode.AzureTable_38, errorMsg, te);
+                singleton.Logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_38, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
                 string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error(ErrorCode.AzureTable_39, errorMsg, ex);
+                singleton.Logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_39, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
             return singleton;
