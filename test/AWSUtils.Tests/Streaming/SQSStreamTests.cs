@@ -5,12 +5,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using OrleansAWSUtils.Streams;
 using UnitTests.StreamingTests;
 using Xunit;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Streaming;
+using OrleansAWSUtils.Streams;
 
 namespace AWSUtils.Tests.Streaming
 {

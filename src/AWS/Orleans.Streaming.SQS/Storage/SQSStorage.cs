@@ -7,15 +7,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
-using Orleans;
+using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
+using Orleans;
 
 namespace OrleansAWSUtils.Storage
 {
     /// <summary>
     /// Wrapper/Helper class around AWS SQS queue service
     /// </summary>
-    public class SQSStorage
+    internal class SQSStorage
     {
         /// <summary>
         /// Maximum number of messages allowed by SQS to peak per request

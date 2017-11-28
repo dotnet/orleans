@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Logging;
+using Orleans.Reminders.DynamoDB;
 using Microsoft.Extensions.Options;
 
 namespace OrleansAWSUtils.Reminders

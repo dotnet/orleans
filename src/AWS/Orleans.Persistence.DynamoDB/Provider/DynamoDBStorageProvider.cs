@@ -5,16 +5,13 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Newtonsoft.Json;
-using System.Threading;
 using Orleans.Serialization;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
-using OrleansAWSUtils;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
-using OrleansAWSUtils.Storage;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Orleans.Persistence.DynamoDB;
 
 namespace Orleans.Storage
 {

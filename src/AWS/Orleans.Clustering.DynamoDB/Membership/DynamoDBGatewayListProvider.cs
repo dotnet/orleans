@@ -4,13 +4,13 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using OrleansAWSUtils.Options;
+using Orleans.Clustering.DynamoDB;
 
 namespace Orleans.Runtime.Membership
 {

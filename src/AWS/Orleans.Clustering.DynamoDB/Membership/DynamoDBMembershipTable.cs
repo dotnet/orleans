@@ -2,7 +2,6 @@
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using OrleansAWSUtils.Configuration;
+using Orleans.Clustering.DynamoDB;
 
 namespace Orleans.Runtime.MembershipService
 {
