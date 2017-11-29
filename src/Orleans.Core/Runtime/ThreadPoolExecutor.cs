@@ -1,28 +1,43 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class QueuedExecutor : IExecutor
+    internal class ThreadPoolExecutor : IExecutor
     {
         private QueueTrackingStatistic queueTracking;
 
+       // private readonly HashSet<WorkerPoolThread> pool;
+      //  private int runningThreadCount;
+
+        internal readonly int activeThreads = 3; // todo: accept as parameter 
+        internal readonly TimeSpan MaxWorkQueueWait;
+        internal readonly bool EnableWorkerThreadInjection;
+   //     private readonly ICorePerformanceMetrics performanceMetrics;
+   //     private readonly ILoggerFactory loggerFactory;
+     //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
+      //  private readonly ILogger timerLogger;
+
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
-        private readonly CancellationTokenSource cancellationTokenSource;
+        private readonly CancellationToken cancellationToken;
         private readonly bool drainAfterCancel;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        public QueuedExecutor(string name, CancellationTokenSource cts, bool drainAfterCancel)
+        public ThreadPoolExecutor(string name, CancellationToken ct, bool drainAfterCancel)
         {
             if (StatisticsCollector.CollectQueueStats)
             {
                 queueTracking = new QueueTrackingStatistic(name);
             }
 
+            // move to initialize  stats method
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
@@ -30,14 +45,18 @@ namespace Orleans.Runtime
             }
 #endif
             this.drainAfterCancel = drainAfterCancel;
-            cancellationTokenSource = cts;
-            cancellationTokenSource.Token.Register(() =>
+
+            cancellationToken.Register(() =>
             {
                 // allow threads to get a chance to exit gracefully.
                 workQueue.Add(QueueWorkItemCallback.NoOpQueueWorkItemCallback);
                 workQueue.CompleteAdding();
             });
-            new ThreadPerTaskExecutor(name).QueueWorkItem(_ => ProcessQueue());
+
+            for (var createThreadCount = 0; createThreadCount < activeThreads; createThreadCount++)
+            {
+                new ThreadPerTaskExecutor(name + createThreadCount).QueueWorkItem(_ => ProcessQueue());
+            }
         }
 
         public int WorkQueueCount => workQueue.Count;
@@ -84,7 +103,7 @@ namespace Orleans.Runtime
         {
             while (true)
             {
-                if (!drainAfterCancel && cancellationTokenSource.IsCancellationRequested ||
+                if (!drainAfterCancel && cancellationToken.IsCancellationRequested ||
                     workQueue.IsCompleted)
                 {
                     return;

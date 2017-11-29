@@ -95,7 +95,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
+                executor = executorService.GetExecutor(new GetThreadPoolExecutorRequest(GetType(), Name, Cts.Token));
 
                 if (State == ThreadState.Stopped)
                 {

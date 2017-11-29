@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -129,6 +130,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext, ILoggerFactory loggerFactory)
         {
+            // todo: should accept cancellation token
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
             state = WorkGroupStatus.Waiting;
@@ -211,7 +213,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
 #endif
-                masterScheduler.RunQueue.Add(this);
+                masterScheduler.ScheduleExecution(this);
             }
         }
 
@@ -282,7 +284,7 @@ namespace Orleans.Runtime.Scheduler
                 state = WorkGroupStatus.Running;
             }
 
-            var thread = WorkerPoolThread.CurrentWorkerThread;
+            var thread = Thread.CurrentThread;//WorkerPoolThread.CurrentWorkerThread;
 
             try
             {
@@ -307,12 +309,12 @@ namespace Orleans.Runtime.Scheduler
                         }
 
                         // Check the cancellation token (means that the silo is stopping)
-                        if (thread.CancelToken.IsCancellationRequested)
-                        {
-                            log.Warn(ErrorCode.SchedulerSkipWorkCancelled, "Thread {0} is exiting work loop due to cancellation token. WorkItemGroup: {1}, Have {2} work items in the queue.",
-                                thread.ToString(), this.ToString(), WorkItemCount);
-                            break;
-                        }
+                        //if (thread.CancelToken.IsCancellationRequested) // todo
+                        //{
+                        //    log.Warn(ErrorCode.SchedulerSkipWorkCancelled, "Thread {0} is exiting work loop due to cancellation token. WorkItemGroup: {1}, Have {2} work items in the queue.",
+                        //        thread.ToString(), this.ToString(), WorkItemCount);
+                        //    break;
+                        //}
                     }
 
                     // Get the first Work Item on the list
@@ -337,7 +339,6 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-                        thread.CurrentTask = task;
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectTurnsStats)
                             SchedulerStatisticsGroup.OnTurnExecutionStartsByWorkGroup(workItemGroupStatisticsNumber, thread.WorkerThreadStatisticsNumber, SchedulingContext);
@@ -366,7 +367,6 @@ namespace Orleans.Runtime.Scheduler
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",
                                 OrleansTaskExtentions.ToString(task), SchedulingContext.ToString(), taskLength, OrleansTaskScheduler.TurnWarningLengthThreshold, thread.ToString());
                         }
-                        thread.CurrentTask = null;
                     }
                     count++;
                 } 
@@ -390,7 +390,7 @@ namespace Orleans.Runtime.Scheduler
                         if (WorkItemCount > 0)
                         {
                             state = WorkGroupStatus.Runnable;
-                            masterScheduler.RunQueue.Add(this);
+                            masterScheduler.ScheduleExecution(this);
                         }
                         else
                         {

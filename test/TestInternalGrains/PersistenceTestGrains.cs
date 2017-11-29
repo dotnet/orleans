@@ -22,23 +22,24 @@ namespace UnitTests.Grains
     {
         public static string CaptureRuntimeEnvironment()
         {
-            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return String.Format(
-                "   TaskScheduler={0}" + Environment.NewLine
-                + "   RuntimeContext={1}" + Environment.NewLine
-                + "   WorkerPoolThread={2}" + Environment.NewLine
-                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
-                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
-                + "   StackTrace=" + Environment.NewLine
-                + "   {5}",
-                TaskScheduler.Current,
-                RuntimeContext.Current,
-                WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
-                WorkerPoolThread.CurrentWorkerThread == null
-                    ? "null"
-                    : WorkerPoolThread.CurrentWorkerThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture),
-                System.Threading.Thread.CurrentThread.ManagedThreadId,
-                callStack);
+            return "";
+            //var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
+            //return String.Format(
+            //    "   TaskScheduler={0}" + Environment.NewLine
+            //    + "   RuntimeContext={1}" + Environment.NewLine
+            //    + "   WorkerPoolThread={2}" + Environment.NewLine
+            //    + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+            //    + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+            //    + "   StackTrace=" + Environment.NewLine
+            //    + "   {5}",
+            //    TaskScheduler.Current,
+            //    RuntimeContext.Current,
+            //    WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
+            //    WorkerPoolThread.CurrentWorkerThread == null
+            //        ? "null"
+            //        : WorkerPoolThread.CurrentWorkerThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture),
+            //    System.Threading.Thread.CurrentThread.ManagedThreadId,
+            //    callStack);
         }
     }
 
