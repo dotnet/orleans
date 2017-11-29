@@ -14,10 +14,13 @@ namespace Tester.ClientConnectionTests
 {
     public class StallConnectionTests : TestClusterPerTest
     {
+        private static TimeSpan Timeout = TimeSpan.FromSeconds(10);
+
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(1);
-            options.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(10);
+            options.ClusterConfiguration.Globals.OpenConnectionTimeout = Timeout;
+            options.ClientConfiguration.ResponseTimeout = Timeout;
             return new TestCluster(options);
         }
 
@@ -36,7 +39,12 @@ namespace Tester.ClientConnectionTests
                 await stalledSocket.ConnectAsync(gwEndpoint);
 
                 // Try to reconnect to GW
+                var stopwatch = Stopwatch.StartNew();
                 this.HostedCluster.InitializeClient();
+                stopwatch.Stop();
+
+                // Check that we were able to connect before the first connection timeout
+                Assert.True(stopwatch.Elapsed < Timeout);
 
                 stalledSocket.Disconnect(true);
             }
