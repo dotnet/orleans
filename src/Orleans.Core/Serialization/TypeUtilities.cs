@@ -21,7 +21,7 @@ namespace Orleans.Serialization
                    t == typeof(string) ||
                    t == typeof(DateTime) ||
                    t == typeof(Decimal) ||
-                   (t.IsArray && t.GetElementType().GetTypeInfo().IsOrleansPrimitive());
+                   (t.IsArray && t.GetElementType().IsOrleansPrimitive());
         }
 
         static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
