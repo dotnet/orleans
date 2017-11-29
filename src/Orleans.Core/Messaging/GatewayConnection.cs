@@ -183,6 +183,7 @@ namespace Orleans.Messaging
                         }
                         lastConnect = DateTime.UtcNow;
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                        Socket.EnableFastpath();
                         SocketManager.Connect(Socket, Silo.Endpoint, this.openConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
                         MsgCenter.OnGatewayConnectionOpen();
