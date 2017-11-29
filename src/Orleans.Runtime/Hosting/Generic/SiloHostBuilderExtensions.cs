@@ -136,7 +136,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The builder.</returns>
-        public static ISiloHostBuilder ConfigureApplicationPartManager(this ISiloHostBuilder builder, Action<IApplicationPartManager> configure)
+        public static ISiloHostBuilder ConfigureApplicationParts(this ISiloHostBuilder builder, Action<IApplicationPartManager> configure)
         {
             if (builder == null)
             {

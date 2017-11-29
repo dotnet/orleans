@@ -76,7 +76,7 @@ namespace AWSUtils.Tests.Liveness
             {
                LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
             })
-            .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain())
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
         public class SiloBuilderFactory : ISiloBuilderFactory
         {

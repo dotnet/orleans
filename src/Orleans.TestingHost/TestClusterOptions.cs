@@ -151,7 +151,7 @@ namespace Orleans.TestingHost
         public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config =>
             ClientBuilder.CreateDefault()
                 .UseConfiguration(config)
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder,
                     TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 

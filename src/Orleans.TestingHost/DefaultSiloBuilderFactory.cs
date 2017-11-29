@@ -11,7 +11,7 @@ namespace Orleans.TestingHost
             var builder = new SiloHostBuilder();
 
             return builder.ConfigureSiloName(siloName)
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder,
                     TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));

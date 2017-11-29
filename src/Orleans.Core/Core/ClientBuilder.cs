@@ -28,7 +28,7 @@ namespace Orleans
         public static IClientBuilder CreateDefault()
             => new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationPartManager(
+                .ConfigureApplicationParts(
                     parts => parts
                         .AddFromApplicationBaseDirectory()
                         .AddFromAppDomain());

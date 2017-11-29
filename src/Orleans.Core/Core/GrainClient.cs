@@ -86,7 +86,7 @@ namespace Orleans
                 throw new ArgumentException("Error loading standard client configuration file");
             }
             var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .UseConfiguration(config)
                 .ConfigureLogging(ConfigureLoggingDelegate)
                 .Build();
@@ -129,7 +129,7 @@ namespace Orleans
                 throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
             var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .UseConfiguration(config)
                 .ConfigureLogging(ConfigureLoggingDelegate)
                 .Build();
@@ -150,7 +150,7 @@ namespace Orleans
                 throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
             var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .UseConfiguration(config)
                 .ConfigureLogging(ConfigureLoggingDelegate)
                 .Build();
@@ -186,7 +186,7 @@ namespace Orleans
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
             var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .UseConfiguration(config)
                 .ConfigureLogging(ConfigureLoggingDelegate)
                 .Build();

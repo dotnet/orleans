@@ -18,7 +18,7 @@ namespace TestVersionGrains
                 .ConfigureSiloName(siloName)
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureServices(this.ConfigureServices)
-                .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
         }
 

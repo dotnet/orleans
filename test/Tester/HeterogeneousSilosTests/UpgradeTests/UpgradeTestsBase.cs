@@ -231,7 +231,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             {
                 // If it was the first silo, setup the client
                 Client = new ClientBuilder()
-                    .ConfigureApplicationPartManager(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                     .UseConfiguration(options.ClientConfiguration)
                     .Build();
                 await Client.Connect();

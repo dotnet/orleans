@@ -28,7 +28,7 @@ namespace UnitTests
                 options.ClientBuilderFactory = cfg => ClientBuilder
                     .CreateDefault()
                     .UseConfiguration(cfg)
-                    .ConfigureApplicationPartManager(
+                    .ConfigureApplicationParts(
                         parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration());
 
                 return new TestCluster(options);
@@ -43,7 +43,7 @@ namespace UnitTests
                     .CreateDefault()
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureSiloName(siloName)
-                    .ConfigureApplicationPartManager(parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration());
+                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration());
             }
         }
 

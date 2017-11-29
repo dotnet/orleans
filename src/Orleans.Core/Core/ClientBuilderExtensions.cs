@@ -203,7 +203,7 @@ namespace Orleans
         /// <param name="builder">The builder.</param>
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The builder.</returns>
-        public static IClientBuilder ConfigureApplicationPartManager(this IClientBuilder builder, Action<IApplicationPartManager> configure)
+        public static IClientBuilder ConfigureApplicationParts(this IClientBuilder builder, Action<IApplicationPartManager> configure)
         {
             if (builder == null)
             {
