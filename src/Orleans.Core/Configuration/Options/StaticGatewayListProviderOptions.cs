@@ -12,6 +12,6 @@ namespace Orleans.Configuration.Options
         /// <summary>
         /// Static gateways to use
         /// </summary>
-        public IList<Uri> Gateways { get; set; }
+        public IList<Uri> Gateways { get; set; } = new List<Uri>();
     }
 }

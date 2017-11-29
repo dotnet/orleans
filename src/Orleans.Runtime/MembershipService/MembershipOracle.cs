@@ -245,6 +245,12 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 DisposeTimers();
+                if (this.membershipTableProvider is GrainBasedMembershipTable)
+                {
+                    // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
+                    return;
+                }
+
                 await UpdateMyStatusGlobal(SiloStatus.Dead);
             }
             catch (Exception exc)
