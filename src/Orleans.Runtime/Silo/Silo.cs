@@ -59,6 +59,7 @@ namespace Orleans.Runtime
         }
 
         private readonly SiloInitializationParameters initializationParams;
+        private readonly SiloIdentityOptions siloIdentityOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -269,8 +270,9 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
+            this.siloIdentityOptions = Services.GetRequiredService<IOptions<SiloIdentityOptions>>().Value;
 
-            if (!this.GlobalConfig.HasMultiClusterNetwork)
+            if (!this.siloIdentityOptions.HasMultiClusterNetwork)
             {
                 logger.Info("Skip multicluster oracle creation (no multicluster network configured)");
             }
@@ -520,10 +522,10 @@ namespace Orleans.Runtime
                 .WithTimeout(this.initTimeout);
 
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
-            if (GlobalConfig.HasMultiClusterNetwork) 
+            if (this.siloIdentityOptions.HasMultiClusterNetwork) 
             {
                 logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                    GlobalConfig.ServiceId, GlobalConfig.ClusterId);
+                    GlobalConfig.ServiceId, this.siloIdentityOptions.ClusterId);
 
                 this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
                                                           this.providerManagerSystemTarget.SchedulingContext;

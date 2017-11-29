@@ -34,6 +34,22 @@ namespace Orleans.Hosting
                     var initializationParams = sp.GetRequiredService<SiloInitializationParameters>();
                     return () => initializationParams.NodeConfig;
                 });
+
+            services.Configure<SiloIdentityOptions>(options =>
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.DeploymentId))
+                {
+                    options.ClusterId = configuration.Globals.DeploymentId;
+                }
+
+                if (configuration.Globals.HasMultiClusterNetwork)
+                {
+                    options.HasMultiClusterNetwork = true;
+                }
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
+
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
 
             services.AddOptions<StatisticsOptions>()

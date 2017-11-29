@@ -3,16 +3,17 @@ using System.Linq;
 using System.Reflection;
 using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
-using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory
 {
 
     internal class MultiClusterRegistrationStrategyManager
     {
-        public MultiClusterRegistrationStrategyManager(GlobalConfiguration config)
+        public MultiClusterRegistrationStrategyManager(GlobalConfiguration config, IOptions<SiloIdentityOptions> siloIdentityOptions)
         {
-            if (config.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
+            if (siloIdentityOptions.Value.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
             {
                 this.DefaultStrategy = GlobalSingleInstanceRegistration.Singleton;
             }
@@ -41,14 +42,6 @@ namespace Orleans.GrainDirectory
                             typeof(MultiClusterRegistrationStrategy).Name,
                             grainClass.Name));
             }
-        }
-    }
-
-    public static class MultiClusterRegistrationStrategyExtensions
-    {
-        public static IEnumerable<string> GetRemoteInstances(this IMultiClusterRegistrationStrategy strategy, MultiClusterConfiguration configuration, string myClusterId)
-        {
-            return strategy.GetRemoteInstances(configuration.Clusters, myClusterId);
         }
     }
 }

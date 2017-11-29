@@ -12,6 +12,16 @@ namespace Orleans.Runtime
         /// Gets or sets the silo name.
         /// </summary>
         public string SiloName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
+        /// </summary>
+        public string ClusterId { get; set; }
+
+        /// <summary>
+        /// Whether this cluster is configured to be part of a multicluster network
+        /// </summary>
+        public bool HasMultiClusterNetwork { get; set; }
     }
 
     /// <summary>

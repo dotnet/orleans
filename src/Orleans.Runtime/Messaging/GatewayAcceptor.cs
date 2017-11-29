@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Messaging;
 using Orleans.Serialization;
 using Orleans.Runtime.Configuration;
@@ -13,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
         private readonly GlobalConfiguration globalConfig;
+        private readonly SiloIdentityOptions siloIdentityOptions;
 
         internal GatewayAcceptor(
             MessageCenter msgCtr,
@@ -22,6 +24,7 @@ namespace Orleans.Runtime.Messaging
             SerializationManager serializationManager,
             GlobalConfiguration globalConfig,
             ExecutorService executorService,
+            IOptions<SiloIdentityOptions> siloIdentityOptions,
             ILoggerFactory loggerFactory)
             : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
         {
@@ -29,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.globalConfig = globalConfig;
+            this.siloIdentityOptions = siloIdentityOptions.Value;
         }
 
         protected override bool RecordOpenedSocket(Socket sock)
@@ -40,21 +44,21 @@ namespace Orleans.Runtime.Messaging
             // refuse clients that are connecting to the wrong cluster
             if (client.Category == UniqueKey.Category.GeoClient)
             {
-                if(client.Key.ClusterId != this.globalConfig.ClusterId)
+                if(client.Key.ClusterId != this.siloIdentityOptions.ClusterId)
                 {
                     Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId,
                         string.Format(
                             "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            client, client.Key.ClusterId, this.globalConfig.ClusterId));
+                            client, client.Key.ClusterId, this.siloIdentityOptions.ClusterId));
                     return false;
                 }
             }
             else
             {
                 //convert handshake cliendId to a GeoClient ID 
-                if (this.globalConfig.HasMultiClusterNetwork)
+                if (this.siloIdentityOptions.HasMultiClusterNetwork)
                 {
-                    client = GrainId.NewClientId(client.PrimaryKey, this.globalConfig.ClusterId);
+                    client = GrainId.NewClientId(client.PrimaryKey, this.siloIdentityOptions.ClusterId);
                 }
             }
 
@@ -88,9 +92,9 @@ namespace Orleans.Runtime.Messaging
             gatewayTrafficCounter.Increment();
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.globalConfig.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
+            if (this.siloIdentityOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.globalConfig.ClusterId);
+                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloIdentityOptions.ClusterId);
             }
 
             // Are we overloaded?

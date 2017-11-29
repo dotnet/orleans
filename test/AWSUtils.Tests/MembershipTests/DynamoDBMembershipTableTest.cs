@@ -47,7 +47,7 @@ namespace AWSUtils.Tests.MembershipTests
             {
                 ConnectionString = this.connectionString,
             };
-            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create<DynamoDBMembershipOptions>(options), this.globalConfiguration);
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.siloIdentityOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

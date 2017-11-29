@@ -41,7 +41,7 @@ namespace UnitTests.RemindersTest
         protected override IReminderTable CreateRemindersTable()
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory);
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.siloIdentityOptions);
         }
 
         protected override Task<string> GetConnectionString()

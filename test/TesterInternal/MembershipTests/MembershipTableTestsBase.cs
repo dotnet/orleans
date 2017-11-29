@@ -14,6 +14,7 @@ using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.MembershipTests
 {
@@ -39,7 +40,7 @@ namespace UnitTests.MembershipTests
         protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
-        protected GlobalConfiguration globalConfiguration;
+        protected IOptions<SiloIdentityOptions> siloIdentityOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly ClientConfiguration clientConfiguration;
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
@@ -54,21 +55,17 @@ namespace UnitTests.MembershipTests
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
-            globalConfiguration = new GlobalConfiguration
-            {
-                ClusterId = this.clusterId,
-                AdoInvariant = GetAdoInvariant(),
-                DataConnectionString = fixture.ConnectionString
-            };
+            this.siloIdentityOptions = Options.Create(new SiloIdentityOptions() { ClusterId = this.clusterId });
+            var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
             clientConfiguration = new ClientConfiguration
             {
-                ClusterId = globalConfiguration.ClusterId,
-                AdoInvariant = globalConfiguration.AdoInvariant,
-                DataConnectionString = globalConfiguration.DataConnectionString
+                ClusterId = this.clusterId,
+                AdoInvariant = adoVariant,
+                DataConnectionString = fixture.ConnectionString
             };
 
             gatewayListProvider = CreateGatewayListProvider(logger);
