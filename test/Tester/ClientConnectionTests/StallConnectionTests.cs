@@ -2,6 +2,7 @@
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -15,7 +16,9 @@ namespace Tester.ClientConnectionTests
     {
         public override TestCluster CreateTestCluster()
         {
-            return new TestCluster(new TestClusterOptions(1));
+            var options = new TestClusterOptions(1);
+            options.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(10);
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Functional")]
@@ -54,15 +57,29 @@ namespace Tester.ClientConnectionTests
                 this.HostedCluster.StartAdditionalSilo();
 
                 // Wait for the silo to join the cluster
-                await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-
-                var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
-                var hosts = await mgmtGrain.GetHosts();
-
-                Assert.Equal(2, hosts.Count);
+                Assert.True(await WaitForClusterSize(2));
 
                 stalledSocket.Disconnect(true);
             }
+        }
+
+        private async Task<bool> WaitForClusterSize(int expectedSize)
+        {
+            var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
+            var timeout = TestCluster.GetLivenessStabilizationTime(this.HostedCluster.ClusterConfiguration.Globals);
+            var stopWatch = Stopwatch.StartNew();
+            do
+            {
+                var hosts = await mgmtGrain.GetHosts();
+                if (hosts.Count == expectedSize)
+                {
+                    stopWatch.Stop();
+                    return true;
+                }
+                await Task.Delay(500);
+            }
+            while (stopWatch.Elapsed < timeout);
+            return false;
         }
     }
 }
