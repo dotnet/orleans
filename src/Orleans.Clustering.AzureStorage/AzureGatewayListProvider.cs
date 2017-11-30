@@ -12,7 +12,7 @@ namespace Orleans.AzureUtils
     internal class AzureGatewayListProvider : IGatewayListProvider
     {
         private OrleansSiloInstanceManager siloInstanceManager;
-        private readonly string deploymentId;
+        private readonly string clusterId;
         private readonly AzureTableGatewayListProviderOptions options;
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
@@ -20,7 +20,7 @@ namespace Orleans.AzureUtils
         public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, ClientConfiguration clientConfiguration)
         {
             this.loggerFactory = loggerFactory;
-            this.deploymentId = clientConfiguration.ClusterId;
+            this.clusterId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
             this.options = options.Value;
         }
@@ -29,7 +29,7 @@ namespace Orleans.AzureUtils
 
         public async Task InitializeGatewayListProvider()
         {
-            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(this.deploymentId, this.options.ConnectionString, this.loggerFactory);
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(this.clusterId, this.options.ConnectionString, this.loggerFactory);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()

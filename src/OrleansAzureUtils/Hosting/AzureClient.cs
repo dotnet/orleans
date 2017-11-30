@@ -167,9 +167,9 @@ namespace Orleans.Runtime.Host
 
             //// Find endpoint info for the gateway to this Orleans silo cluster
             //Trace.WriteLine("Searching for Orleans gateway silo via Orleans instance table...");
-            var deploymentId = config.ClusterId;
+            var clusterId = config.ClusterId;
             var connectionString = config.DataConnectionString;
-            if (String.IsNullOrEmpty(deploymentId))
+            if (String.IsNullOrEmpty(clusterId))
                 throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.ClusterId");
             
             if (String.IsNullOrEmpty(connectionString))
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.Host
                     Trace.TraceError("Client.Initialize failed with exc -- {0}. Will try again", exc.Message);
                 }
                 // Pause to let Primary silo start up and register
-                Trace.TraceInformation("Pausing {0} awaiting silo and gateways registration for Deployment={1}", StartupRetryPause, deploymentId);
+                Trace.TraceInformation("Pausing {0} awaiting silo and gateways registration for Deployment={1}", StartupRetryPause, clusterId);
                 Thread.Sleep(StartupRetryPause);
             }
             
@@ -202,7 +202,7 @@ namespace Orleans.Runtime.Host
 
             OrleansException err;
             err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}. Last exception={1}",
-                deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}.", deploymentId));
+                clusterId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}.", clusterId));
             Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }

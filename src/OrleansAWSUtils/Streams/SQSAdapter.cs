@@ -11,7 +11,7 @@ namespace OrleansAWSUtils.Streams
 {
     internal class SQSAdapter : IQueueAdapter
     {
-        protected readonly string DeploymentId;
+        protected readonly string ClusterId;
         private readonly SerializationManager serializationManager;
         protected readonly string DataConnectionString;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
@@ -22,21 +22,21 @@ namespace OrleansAWSUtils.Streams
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string deploymentId, string providerName)
+        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string clusterId, string providerName)
         {
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
-            if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
+            if (string.IsNullOrEmpty(clusterId)) throw new ArgumentNullException(nameof(clusterId));
             this.loggerFactory = loggerFactory;
             this.serializationManager = serializationManager;
             DataConnectionString = dataConnectionString;
-            DeploymentId = deploymentId;
+            this.ClusterId = clusterId;
             Name = providerName;
             this.streamQueueMapper = streamQueueMapper;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.serializationManager, this.loggerFactory, queueId, DataConnectionString, DeploymentId);
+            return SQSAdapterReceiver.Create(this.serializationManager, this.loggerFactory, queueId, DataConnectionString, this.ClusterId);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -49,7 +49,7 @@ namespace OrleansAWSUtils.Streams
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, DeploymentId);
+                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, this.ClusterId);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }

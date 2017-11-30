@@ -11,7 +11,7 @@ namespace Orleans.Runtime.MembershipService
     public class SqlMembershipTable: IMembershipTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private string deploymentId;        
+        private string clusterId;        
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly SqlMembershipOptions membershipTableOptions;
@@ -20,7 +20,7 @@ namespace Orleans.Runtime.MembershipService
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;
             this.membershipTableOptions = membershipTableoptions.Value;
-            deploymentId = globalConfig.ClusterId;
+            this.clusterId = globalConfig.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("SqlMembershipTable.ReadRow called with key: {0}.", key));
             try
             {
-                return await orleansQueries.MembershipReadRowAsync(deploymentId, key);                
+                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);                
             }
             catch(Exception ex)
             {
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.ReadAll called.");
             try
             {
-                return await orleansQueries.MembershipReadAllAsync(deploymentId);                
+                return await orleansQueries.MembershipReadAllAsync(this.clusterId);                
             }
             catch(Exception ex)
             {
@@ -97,7 +97,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.InsertMembershipRowAsync(deploymentId, entry, tableVersion.VersionEtag);
+                return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
             }
             catch(Exception ex)
             {
@@ -129,7 +129,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.UpdateMembershipRowAsync(deploymentId, entry, tableVersion.VersionEtag);                                
+                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);                                
             }
             catch(Exception ex)
             {
@@ -149,7 +149,7 @@ namespace Orleans.Runtime.MembershipService
             }
             try
             {
-                await orleansQueries.UpdateIAmAliveTimeAsync(deploymentId, entry.SiloAddress, entry.IAmAliveTime);
+                await orleansQueries.UpdateIAmAliveTimeAsync(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
             }
             catch(Exception ex)
             {
@@ -159,12 +159,12 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        public async Task DeleteMembershipTableEntries(string deploymentId)
+        public async Task DeleteMembershipTableEntries(string clusterId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.DeleteMembershipTableEntries called with deploymentId {0}.", deploymentId));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("IMembershipTable.DeleteMembershipTableEntries called with clusterId {0}.", clusterId));
             try
             {
-                await orleansQueries.DeleteMembershipTableEntriesAsync(deploymentId);
+                await orleansQueries.DeleteMembershipTableEntriesAsync(clusterId);
             }
             catch(Exception ex)
             {
@@ -178,7 +178,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                return await orleansQueries.InsertMembershipVersionRowAsync(deploymentId);
+                return await orleansQueries.InsertMembershipVersionRowAsync(this.clusterId);
             }
             catch(Exception ex)
             {

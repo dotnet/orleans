@@ -26,13 +26,13 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
         private readonly DynamoDBMembershipOptions options;
-        private readonly string deploymentId;
+        private readonly string clusterId;
         public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipOptions> options, GlobalConfiguration globalConfiguration)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = options.Value;
-            this.deploymentId = globalConfiguration.ClusterId;
+            this.clusterId = globalConfiguration.ClusterId;
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -52,11 +52,11 @@ namespace Orleans.Runtime.MembershipService
                 });
         }
 
-        public async Task DeleteMembershipTableEntries(string deploymentId)
+        public async Task DeleteMembershipTableEntries(string clusterId)
         {
             try
             {
-                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) } };
+                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(clusterId) } };
                 var records = await storage.QueryAsync(TABLE_NAME_DEFAULT_VALUE, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
                 var toDelete = new List<Dictionary<string, AttributeValue>>();
@@ -74,8 +74,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for deploymentId {1}: Exception={2}",
-                    TABLE_NAME_DEFAULT_VALUE, deploymentId, exc));
+                logger.Error(ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
+                    TABLE_NAME_DEFAULT_VALUE, clusterId, exc));
                 throw;
             }
         }
@@ -86,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var keys = new Dictionary<string, AttributeValue>
                 {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.deploymentId) },
+                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                     { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.ConstructSiloIdentity(siloAddress)) }
                 };
                 var entry = await storage.ReadSingleEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, fields => new SiloInstanceRecord(fields));
@@ -106,7 +106,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) } };
+                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
                 var records = await storage.QueryAsync(TABLE_NAME_DEFAULT_VALUE, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
                 MembershipTableData data = Convert(records);
@@ -302,7 +302,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var tableEntry = new SiloInstanceRecord
             {
-                DeploymentId = deploymentId,
+                DeploymentId = this.clusterId,
                 Address = memEntry.SiloAddress.Endpoint.Address.ToString(),
                 Port = memEntry.SiloAddress.Endpoint.Port,
                 Generation = memEntry.SiloAddress.Generation,
@@ -348,7 +348,7 @@ namespace Orleans.Runtime.MembershipService
         {
             return new SiloInstanceRecord
             {
-                DeploymentId = deploymentId,
+                DeploymentId = this.clusterId,
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress)
             };

@@ -347,7 +347,7 @@
     <xs:attribute name="DeploymentId" type="xs:string" use="optional">
       <xs:annotation>
         <xs:documentation>
-          Specifies a unique identifier of this deployment.
+          Specifies a unique identifier of this cluster.
           If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime,
           accessible to the role via RoleEnvironment.ClusterId static variable and is passed to the silo automatically by the role via config.
           So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).

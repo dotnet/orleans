@@ -222,7 +222,7 @@ namespace Orleans.Runtime.Configuration
         public string ClusterId { get; set; }
 
         /// <summary>
-        /// Deployment Id.
+        /// Deployment Id. This is the same as ClusterId and has been deprecated in favor of it.
         /// </summary>
         [Obsolete("DeploymentId is the same as ClusterId.")]
         public string DeploymentId

@@ -14,14 +14,14 @@ namespace Orleans.Runtime.Membership
     public class ConsulGatewayListProvider : IGatewayListProvider
     {
         private ConsulClient consulClient;
-        private string deploymentId;
+        private string clusterId;
         private ILogger logger;
         private readonly ConsulGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
         public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulGatewayListProviderOptions> options)
         {
             this.logger = logger;
-            this.deploymentId = clientConfig.ClusterId;
+            this.clusterId = clientConfig.ClusterId;
             this.maxStaleness = clientConfig.GatewayListRefreshPeriod;
             this.options = options.Value;
         }
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Membership
 
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.deploymentId, this.logger);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.logger);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

@@ -17,7 +17,6 @@ namespace OrleansAWSUtils.Reminders
     public class DynamoDBReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private const string DEPLOYMENT_ID_PROPERTY_NAME = "DeploymentId";
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
         private const string REMINDER_NAME_PROPERTY_NAME = "ReminderName";
         private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
@@ -34,7 +33,6 @@ namespace OrleansAWSUtils.Reminders
         private ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
-        private string deploymentId;
         private Guid serviceId;
 
         /// <summary>
@@ -56,7 +54,6 @@ namespace OrleansAWSUtils.Reminders
         /// <returns></returns>
         public Task Init(GlobalConfiguration config)
         {
-            deploymentId = config.ClusterId;
             serviceId = config.ServiceId;
 
             storage = new DynamoDBStorage(config.DataConnectionStringForReminders, loggerFactory);

@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// the node name for this deployment. for eg. /ClusterId
         /// </summary>
-        private string deploymentPath;
+        private string clusterPath;
         /// <summary>
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
@@ -79,22 +79,22 @@ namespace Orleans.Runtime.Membership
             {
                 try
                 {
-                    await zk.createAsync(deploymentPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    await zk.sync(deploymentPath);
+                    await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    await zk.sync(this.clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.Info("Created new deployment path: " + deploymentPath);
+                    this.logger.Info("Created new deployment path: " + this.clusterPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.Debug("Deployment path already exists: " + deploymentPath);
+                    this.logger.Debug("Deployment path already exists: " + this.clusterPath);
                 }
             });
         }
 
-        private void InitConfig(string dataConnectionString, string deploymentId)
+        private void InitConfig(string dataConnectionString, string clusterId)
         {
-            deploymentPath = "/" + deploymentId;
-            deploymentConnectionString = dataConnectionString + deploymentPath;
+            this.clusterPath = "/" + clusterId;
+            deploymentConnectionString = dataConnectionString + this.clusterPath;
             rootConnectionString = dataConnectionString;
         }
 
@@ -242,11 +242,11 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Deletes all table entries of the given deploymentId
+        /// Deletes all table entries of the given clusterId
         /// </summary>
-        public Task DeleteMembershipTableEntries(string deploymentId)
+        public Task DeleteMembershipTableEntries(string clusterId)
         {
-            string pathToDelete = "/" + deploymentId;
+            string pathToDelete = "/" + clusterId;
             return UsingZookeeper(rootConnectionString, async zk =>
             {
                 await ZKUtil.deleteRecursiveAsync(zk, pathToDelete);

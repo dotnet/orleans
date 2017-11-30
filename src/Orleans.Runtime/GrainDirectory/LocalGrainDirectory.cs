@@ -848,8 +848,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<AddressesAndTag> LookupInCluster(GrainId grainId, string clusterId)
         {
-            if (clusterId == null)
-                throw new ArgumentNullException("clusterId");
+            if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
             if (clusterId == ClusterId)
             {
