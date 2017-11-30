@@ -219,9 +219,18 @@ namespace Orleans
 
             public IReadOnlyList<IApplicationPart> ApplicationParts => this.manager.ApplicationParts;
 
-            public IApplicationPartManager AddApplicationPart(IApplicationPart part) => this.manager.AddApplicationPart(part);
+            public IApplicationPartManager AddApplicationPart(IApplicationPart part)
+            {
+                this.manager.AddApplicationPart(part);
+                return this;
+            }
 
-            public IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider) => this.manager.AddFeatureProvider(featureProvider);
+            public IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider)
+            {
+                this.manager.AddFeatureProvider(featureProvider);
+                return this;
+            }
+
             public void PopulateFeature<TFeature>(TFeature feature) => this.manager.PopulateFeature(feature);
         }
     }

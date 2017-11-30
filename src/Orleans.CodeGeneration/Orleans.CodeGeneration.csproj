@@ -2,7 +2,6 @@
   <PropertyGroup>
     <AssemblyName>Orleans.CodeGeneration</AssemblyName>
     <RootNamespace>OrleansCodeGenerator</RootNamespace>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
