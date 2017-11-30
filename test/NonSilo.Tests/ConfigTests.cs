@@ -741,7 +741,7 @@ namespace UnitTests
             Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
             Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.Equal(deploymentId, siloConfig.Globals.DeploymentId); // DeploymentId
+            Assert.Equal(deploymentId, siloConfig.Globals.ClusterId); // ClusterId
             Assert.Equal(connectionString, siloConfig.Globals.DataConnectionString); // DataConnectionString
 
             Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
@@ -772,7 +772,7 @@ namespace UnitTests
 
             var config = new ClientConfiguration();
 
-            config.DeploymentId = deploymentId;
+            config.ClusterId = deploymentId;
             config.DataConnectionString = "UseDevelopmentStorage=true";
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 

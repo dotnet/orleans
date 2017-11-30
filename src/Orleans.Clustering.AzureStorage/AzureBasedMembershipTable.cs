@@ -22,13 +22,13 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILoggerFactory loggerFactory;
         private OrleansSiloInstanceManager tableManager;
         private readonly AzureTableMembershipOptions options;
-        private readonly string deploymentId;
+        private readonly string clusterId;
         public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureTableMembershipOptions> membershipOptions, GlobalConfiguration globalConfiguration)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
             this.options = membershipOptions.Value;
-            this.deploymentId = globalConfiguration.DeploymentId;
+            this.clusterId = globalConfiguration.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.MembershipService
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.deploymentId, options.ConnectionString, this.loggerFactory);
+                this.clusterId, options.ConnectionString, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
@@ -50,9 +50,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string deploymentId)
+        public Task DeleteMembershipTableEntries(string clusterId)
         {
-            return tableManager.DeleteTableEntries(deploymentId);
+            return tableManager.DeleteTableEntries(clusterId);
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)

@@ -54,9 +54,9 @@ namespace Orleans.TestingHost
         private readonly StringBuilder log = new StringBuilder();
 
         /// <summary>
-        /// DeploymentId of the cluster
+        /// ClusterId of the cluster
         /// </summary>
-        public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
+        public string ClusterId => this.ClusterConfiguration.Globals.ClusterId;
 
         /// <summary>
         /// The internal client interface.

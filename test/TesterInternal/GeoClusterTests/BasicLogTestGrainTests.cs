@@ -53,7 +53,7 @@ namespace Tests.GeoClusterTests
                     return new SiloHostBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(services => ConfigureLogging(services, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
+                        .ConfigureServices(services => ConfigureLogging(services, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
                 }
 
                 private void ConfigureLogging(IServiceCollection services, string filePath)

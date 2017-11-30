@@ -36,8 +36,8 @@ namespace GoogleUtils.Tests.Streaming
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             
-            options.ClusterConfiguration.Globals.DeploymentId = GoogleTestUtils.ProjectId;
-            options.ClientConfiguration.DeploymentId = GoogleTestUtils.ProjectId;
+            options.ClusterConfiguration.Globals.ClusterId = GoogleTestUtils.ProjectId;
+            options.ClientConfiguration.ClusterId = GoogleTestUtils.ProjectId;
             options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
             options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
             return new TestCluster(options);

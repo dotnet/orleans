@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Membership
     public class SqlGatewayListProvider : IGatewayListProvider
     {
         private readonly ILogger logger;
-        private string deploymentId;
+        private string clusterId;
         private readonly SqlGatewayListProviderOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Membership
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
             this.options = options.Value;
-            deploymentId = clientConfiguration.DeploymentId;
+            this.clusterId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Membership
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlMembershipTable.GetGateways called.");
             try
             {
-                return await orleansQueries.ActiveGatewaysAsync(deploymentId);
+                return await orleansQueries.ActiveGatewaysAsync(this.clusterId);
             }
             catch (Exception ex)
             {

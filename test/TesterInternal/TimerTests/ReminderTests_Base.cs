@@ -51,7 +51,7 @@ namespace UnitTests.TimerTests
             filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.DeploymentId), filters));
+            log = new LoggerWrapper<ReminderTests_Base>(TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.ClusterId), filters));
         }
 
         public IGrainFactory GrainFactory { get; }

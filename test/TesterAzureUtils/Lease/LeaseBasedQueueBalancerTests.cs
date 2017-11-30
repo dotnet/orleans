@@ -55,7 +55,7 @@ namespace Tester.AzureUtils.Lease
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
             }
         }
 

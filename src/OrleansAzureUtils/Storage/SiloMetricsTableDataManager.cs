@@ -81,9 +81,9 @@ namespace Orleans.AzureUtils
             logger = loggerFactory.CreateLogger<SiloMetricsTableDataManager>();
         }
 
-        public async Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
+        public async Task Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
         {
-            this.deploymentId = deploymentId;
+            this.deploymentId = clusterId;
             this.siloAddress = siloAddress;
             this.siloName = siloName;
             this.gateway = gateway;

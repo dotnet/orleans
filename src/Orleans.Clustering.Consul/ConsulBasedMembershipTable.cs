@@ -21,12 +21,12 @@ namespace Orleans.Runtime.Membership
         private ILogger _logger;
         private readonly ConsulClient _consulClient;
         private readonly ConsulMembershipOptions membershipTableOptions;
-        private readonly string deploymentId;
+        private readonly string clusterId;
 
         public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger,
             IOptions<ConsulMembershipOptions> membershipTableOptions, GlobalConfiguration globalConfiguration)
         {
-            this.deploymentId = globalConfiguration.DeploymentId;
+            this.clusterId = globalConfiguration.ClusterId;
             this._logger = logger;
             this.membershipTableOptions = membershipTableOptions.Value;
             _consulClient =
@@ -57,15 +57,15 @@ namespace Orleans.Runtime.Membership
 
         public Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this._consulClient, this.deploymentId, this._logger);
+            return ReadAll(this._consulClient, this.clusterId, this._logger);
         }
 
-        public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string deploymentId, ILogger logger)
+        public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string clusterId, ILogger logger)
         {
-            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(deploymentId));
+            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(clusterId));
             if (deploymentKVAddresses.Response == null)
             {
-                logger.Debug("Could not find any silo registrations for deployment {0}.", deploymentId);
+                logger.Debug("Could not find any silo registrations for deployment {0}.", clusterId);
                 return new MembershipTableData(_tableVersion);
             }
 
@@ -75,7 +75,7 @@ namespace Orleans.Runtime.Membership
                 .Select(siloKV =>
                 {
                     var iAmAliveKV = deploymentKVAddresses.Response.Where(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase)).SingleOrDefault();
-                    return ConsulSiloRegistrationAssembler.FromKVPairs(deploymentId, siloKV, iAmAliveKV);
+                    return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
                 }).ToArray();
 
             return AssembleMembershipTableData(allSiloRegistrations);
@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Membership
             try
             {
                 //Use "0" as the eTag then Consul KV CAS will treat the operation as an insert and return false if the KV already exiats.
-                var consulSiloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.deploymentId, entry, "0");
+                var consulSiloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, "0");
                 var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(consulSiloRegistration);
 
                 var tryUpdate = await _consulClient.KV.CAS(insertKV);
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.Membership
             //Update Silo Liveness
             try
             {
-                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.deploymentId, entry, etag);
+                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
                 var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration);
 
                 //If the KV.CAS() call returns false then the update failed
@@ -133,25 +133,25 @@ namespace Orleans.Runtime.Membership
 
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.deploymentId, entry.SiloAddress, entry.IAmAliveTime);
+            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
-        public async Task DeleteMembershipTableEntries(String deploymentId)
+        public async Task DeleteMembershipTableEntries(String clusterId)
         {
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.deploymentId));
+            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.clusterId));
         }
 
         private async Task<ConsulSiloRegistration> GetConsulSiloRegistration(SiloAddress siloAddress)
         {
-            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.deploymentId, siloAddress);
+            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.clusterId, siloAddress);
             var siloKVEntry = await _consulClient.KV.List(siloKey);
             if (siloKVEntry.Response == null) return null;
 
             var siloKV = siloKVEntry.Response.Single(KV => KV.Key.Equals(siloKey, StringComparison.OrdinalIgnoreCase));
             var iAmAliveKV = siloKVEntry.Response.SingleOrDefault(KV => KV.Key.Equals(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(siloKey), StringComparison.OrdinalIgnoreCase));
 
-            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.deploymentId, siloKV, iAmAliveKV);
+            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
 
             return siloRegistration;
         }

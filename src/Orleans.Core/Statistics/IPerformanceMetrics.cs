@@ -107,13 +107,13 @@ namespace Orleans.Runtime
 
     public interface ISiloMetricsDataPublisher
     {
-        Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName);
+        Task Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName);
         Task ReportMetrics(ISiloPerformanceMetrics metricsData);
     }
 
     public interface IConfigurableSiloMetricsDataPublisher : ISiloMetricsDataPublisher
     {
-        void AddConfiguration(string deploymentId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
+        void AddConfiguration(string clusterId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
     }
 
     public interface IClientMetricsDataPublisher
@@ -124,18 +124,18 @@ namespace Orleans.Runtime
 
     public interface IConfigurableClientMetricsDataPublisher : IClientMetricsDataPublisher
     {
-        void AddConfiguration(string deploymentId, string hostName, string clientId, System.Net.IPAddress address);
+        void AddConfiguration(string clusterId, string hostName, string clientId, System.Net.IPAddress address);
     }
 
     public interface IStatisticsPublisher
     {
         Task ReportStats(List<ICounter> statsCounters);
-        Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName);
+        Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName);
     }
 
     public interface IConfigurableStatisticsPublisher : IStatisticsPublisher
     {
-        void AddConfiguration(string deploymentId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
+        void AddConfiguration(string clusterId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
     }
 
     /// <summary>

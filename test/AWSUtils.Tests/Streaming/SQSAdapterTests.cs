@@ -28,7 +28,7 @@ namespace AWSUtils.Tests.Streaming
         private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private readonly string deploymentId;
+        private readonly string clusterId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
@@ -42,12 +42,12 @@ namespace AWSUtils.Tests.Streaming
 
             this.output = output;
             this.fixture = fixture;
-            this.deploymentId = MakeDeploymentId();
+            this.clusterId = MakeClusterId();
         }
 
         public void Dispose()
         {
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, this.clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         [SkippableFact]
@@ -56,7 +56,7 @@ namespace AWSUtils.Tests.Streaming
             var properties = new Dictionary<string, string>
                 {
                     {SQSAdapterFactory.DataConnectionStringPropertyName, AWSTestConstants.DefaultSQSConnectionString},
-                    {SQSAdapterFactory.DeploymentIdPropertyName, deploymentId}
+                    {SQSAdapterFactory.DeploymentIdPropertyName, this.clusterId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
@@ -191,9 +191,9 @@ namespace AWSUtils.Tests.Streaming
             }).ToList();
         }
 
-        internal static string MakeDeploymentId()
+        internal static string MakeClusterId()
         {
-            const string DeploymentIdFormat = "deployment-{0}";
+            const string DeploymentIdFormat = "cluster-{0}";
             string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
             return String.Format(DeploymentIdFormat, now);
         }
