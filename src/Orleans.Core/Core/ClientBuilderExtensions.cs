@@ -184,19 +184,7 @@ namespace Orleans
         /// <param name="builder">The builder.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> for this builder.</returns>
         public static ApplicationPartManager GetApplicationPartManager(this IClientBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
-
-        /// <summary>
-        /// Adds an <see cref="IApplicationPart"/> to the <see cref="ApplicationPartManager"/>.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="assembly">The assembly.</param>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder AddApplicationPart(this IClientBuilder builder, Assembly assembly)
-        {
-            builder.GetApplicationPartManager().AddApplicationPart(new AssemblyPart(assembly));
-            return builder;
-        }
-
+        
         /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> for this builder.
         /// </summary>

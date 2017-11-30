@@ -117,19 +117,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
         public static ApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
-
-        /// <summary>
-        /// Adds an <see cref="IApplicationPart"/> to the <see cref="ApplicationPartManager"/>.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="assembly">The assembly.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloHostBuilder AddApplicationPart(this ISiloHostBuilder builder, Assembly assembly)
-        {
-            builder.GetApplicationPartManager().AddApplicationPart(new AssemblyPart(assembly));
-            return builder;
-        }
-
+        
         /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.
         /// </summary>

@@ -562,7 +562,7 @@ namespace UnitTests
             const string filename = "ClientConfig_NewAzure.xml";
 
             var client = new ClientBuilder()
-                .AddApplicationPart(typeof(ISimpleGrain).Assembly)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ISimpleGrain).Assembly))
                 .LoadConfiguration(filename)
                 .Build();
             try

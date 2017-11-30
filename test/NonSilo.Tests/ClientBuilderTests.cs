@@ -27,7 +27,7 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
             // Adding an application assembly allows the builder to build successfully.
-            builder = new ClientBuilder().AddApplicationPart(typeof(IAccountGrain).Assembly);
+            builder = new ClientBuilder().ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly));
             using (var client = builder.Build())
             {
                 Assert.NotNull(client);
