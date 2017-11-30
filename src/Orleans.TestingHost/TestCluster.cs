@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// ClusterId of the cluster
         /// </summary>
-        public string DeploymentId => this.ClusterConfiguration.Globals.ClusterId;
+        public string ClusterId => this.ClusterConfiguration.Globals.ClusterId;
 
         /// <summary>
         /// The internal client interface.

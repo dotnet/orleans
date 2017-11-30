@@ -108,7 +108,7 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            var deploymentId = HostedCluster.DeploymentId;
+            var deploymentId = HostedCluster.ClusterId;
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {

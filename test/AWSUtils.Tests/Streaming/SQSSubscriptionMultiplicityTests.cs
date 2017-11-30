@@ -54,7 +54,7 @@ namespace AWSUtils.Tests.Streaming
 
         public override void Dispose()
         {
-            var deploymentId = HostedCluster.DeploymentId;
+            var deploymentId = HostedCluster.ClusterId;
             base.Dispose();
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StreamConnectionString, NullLoggerFactory.Instance).Wait();
         }

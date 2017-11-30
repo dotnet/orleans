@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var deploymentId = HostedCluster?.DeploymentId;
+            var deploymentId = HostedCluster?.ClusterId;
             if (deploymentId != null)
             {
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
