@@ -329,7 +329,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected void InvokeOneWayMethod(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected void InvokeOneWayMethod(int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
             this.Runtime.InvokeOneWayMethod(this, methodId, arguments, options | invokeMethodOptions, silo);
         }
@@ -337,7 +337,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected Task<T> InvokeMethodAsync<T>(int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
             return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options | invokeMethodOptions, silo);
         }

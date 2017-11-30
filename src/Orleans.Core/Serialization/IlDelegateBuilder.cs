@@ -76,6 +76,18 @@ namespace Orleans.Serialization
             }
         }
 
+        public void LoadArgumentAddress(ushort index)
+        {
+            if (index < 0xFF)
+            {
+                this.il.Emit(OpCodes.Ldarga_S, (byte)index);
+            }
+            else
+            {
+                this.il.Emit(OpCodes.Ldarg, index);
+            }
+        }
+
         /// <summary>
         /// Loads the element from the array on the stack at the given index onto the stack.
         /// </summary>

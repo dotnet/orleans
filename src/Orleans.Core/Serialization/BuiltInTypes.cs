@@ -2153,9 +2153,9 @@ namespace Orleans.Serialization
             context.StreamWriter.Write(request.InterfaceId);
             context.StreamWriter.Write(request.InterfaceVersion);
             context.StreamWriter.Write(request.MethodId);
-            context.StreamWriter.Write(request.Arguments != null ? request.Arguments.Length : 0);
+            context.StreamWriter.Write(request.Arguments.IsEmpty ? 0 : request.Arguments.Length);
 
-            if (request.Arguments != null)
+            if (!request.Arguments.IsEmpty)
             {
                 foreach (var arg in request.Arguments)
                 {
@@ -2171,35 +2171,55 @@ namespace Orleans.Serialization
             int mid = context.StreamReader.ReadInt();
 
             int argCount = context.StreamReader.ReadInt();
-            object[] args = null;
 
-            if (argCount > 0)
+            if (argCount == 0)
             {
-                args = new object[argCount];
+                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.Empty);
+            }
+            else if (argCount == 1)
+            {
+                var arg = SerializationManager.DeserializeInner(null, context);
+                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.FromArgument(arg));
+            }
+            else
+            {
+                var args = new object[argCount];
                 for (var i = 0; i < argCount; i++)
                 {
                     args[i] = SerializationManager.DeserializeInner(null, context);
                 }
-            }
 
-            return new InvokeMethodRequest(iid, iVersion, mid, args);
+                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.FromArguments(args));
+            }
         }
 
         internal static object CopyInvokeMethodRequest(object original, ICopyContext context)
         {
             var request = (InvokeMethodRequest)original;
+            InvokeMethodRequest result;
 
-            object[] args = null;
-            if (request.Arguments != null)
+            int argCount = request.Arguments.Length;
+
+            if (argCount == 0)
             {
-                args = new object[request.Arguments.Length];
-                for (var i = 0; i < request.Arguments.Length; i++)
+                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.Empty);
+            }
+            else if (argCount == 1)
+            {
+                var arg = SerializationManager.DeepCopyInner(request.Arguments[0], context);
+                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.FromArgument(arg));
+            }
+            else
+            {
+                var args = new object[argCount];
+                for (var i = 0; i < argCount; i++)
                 {
                     args[i] = SerializationManager.DeepCopyInner(request.Arguments[i], context);
                 }
+
+                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.FromArguments(args));
             }
 
-            var result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, args);
             context.RecordCopy(original, result);
             return result;
         }

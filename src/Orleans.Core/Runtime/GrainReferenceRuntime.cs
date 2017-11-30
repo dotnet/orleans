@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -38,7 +39,7 @@ namespace Orleans.Runtime
         public IRuntimeClient RuntimeClient { get; private set; }
 
         /// <inheritdoc />
-        public void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo)
+        public void InvokeOneWayMethod(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo)
         {
             Task<object> resultTask = InvokeMethodAsync<object>(reference, methodId, arguments, options | InvokeMethodOptions.OneWay, silo);
             if (!resultTask.IsCompleted && resultTask.Result != null)
@@ -48,14 +49,28 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo)
+        public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo)
         {
-            object[] argsDeepCopy = null;
-            if (arguments != null)
+            InvokeMethodArguments argsDeepCopy;
+            if (arguments.IsEmpty)
+            {
+                argsDeepCopy = InvokeMethodArguments.Empty;
+            }
+            else
             {
                 CheckForGrainArguments(arguments);
                 SetGrainCancellationTokensTarget(arguments, reference);
-                argsDeepCopy = (object[])this.serializationManager.DeepCopy(arguments);
+                
+                if (arguments.Length == 1)
+                {
+                    var arg = this.serializationManager.DeepCopy(arguments.AsArgument);
+                    argsDeepCopy = InvokeMethodArguments.FromArgument(arg);
+                }
+                else
+                {
+                    var args = (object[])this.serializationManager.DeepCopy(arguments.AsArguments);
+                    argsDeepCopy = InvokeMethodArguments.FromArguments(args);
+                }
             }
 
             var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, argsDeepCopy);
@@ -93,7 +108,7 @@ namespace Orleans.Runtime
                 {
 #pragma warning disable 162
                     // This is normally unreachable code, but kept for debugging purposes
-                    debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
+                    debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), ref request.Arguments);
 #pragma warning restore 162
                 }
                 else
@@ -101,7 +116,7 @@ namespace Orleans.Runtime
                     var hash = reference.InterfaceId ^ request.MethodId;
                     if (!debugContexts.TryGetValue(hash, out debugContext))
                     {
-                        debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
+                        debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), ref request.Arguments);
                         debugContexts[hash] = debugContext;
                     }
                 }
@@ -194,7 +209,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
+        private static String GetDebugContext(string interfaceName, string methodName, ref InvokeMethodArguments arguments)
         {
             // String concatenation is approx 35% faster than string.Format here
             //debugContext = String.Format("{0}:{1}()", interfaceName, methodName);
@@ -202,7 +217,7 @@ namespace Orleans.Runtime
             debugContext.Append(interfaceName);
             debugContext.Append(":");
             debugContext.Append(methodName);
-            if (USE_DEBUG_CONTEXT_PARAMS && arguments != null && arguments.Length > 0)
+            if (USE_DEBUG_CONTEXT_PARAMS && !arguments.IsEmpty && arguments.Length > 0)
             {
                 debugContext.Append("(");
                 debugContext.Append(Utils.EnumerableToString(arguments));
@@ -215,7 +230,7 @@ namespace Orleans.Runtime
             return debugContext.ToString();
         }
 
-        private static void CheckForGrainArguments(object[] arguments)
+        private static void CheckForGrainArguments(InvokeMethodArguments arguments)
         {
             foreach (var argument in arguments)
                 if (argument is Grain)
@@ -227,7 +242,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="arguments"> Grain method arguments list</param>
         /// <param name="target"> Target grain reference</param>
-        private void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
+        private void SetGrainCancellationTokensTarget(InvokeMethodArguments arguments, GrainReference target)
         {
             if (arguments == null) return;
             foreach (var argument in arguments)

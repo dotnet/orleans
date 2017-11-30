@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -29,7 +30,7 @@ namespace Orleans
         /// <summary>
         /// Gets the arguments for this method invocation.
         /// </summary>
-        object[] Arguments { get; }
+        IList<object> Arguments { get; }
 
         /// <summary>
         /// Invokes the request.

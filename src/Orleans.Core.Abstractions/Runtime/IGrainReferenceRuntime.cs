@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         /// <param name="arguments">The method payload.</param>
         /// <param name="options">Invocation options.</param>
         /// <param name="silo">The target silo.</param>
-        void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo);
+        void InvokeOneWayMethod(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo);
 
         /// <summary>Invokes a method on a remote object.</summary>
         /// <typeparam name="T">The result type</typeparam>
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <param name="options">Invocation options.</param>
         /// <param name="silo">The target silo.</param>
         /// <returns>Returns the response from the remote object.</returns>
-        Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo);
+        Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo);
 
         /// <summary>Converts the provided <paramref name="grain"/> to the specified interface.</summary>
         /// <typeparam name="TGrainInterface">The target grain interface type.</typeparam>

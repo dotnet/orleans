@@ -15,9 +15,9 @@ namespace Orleans.CodeGeneration
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
         /// <summary> Arguments for this Invoke request. </summary>
-        public object[] Arguments { get; private set; }
+        public InvokeMethodArguments Arguments;
 
-        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, object[] arguments)
+        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, InvokeMethodArguments arguments)
         {
             InterfaceId = interfaceId;
             InterfaceVersion = interfaceVersion;

@@ -72,7 +72,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public object[] Arguments => request.Arguments;
+        public IList<object> Arguments => request.Arguments;
         
         /// <inheritdoc />
         public object Result { get; set; }

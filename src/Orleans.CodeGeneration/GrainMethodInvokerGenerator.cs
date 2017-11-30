@@ -204,7 +204,7 @@ namespace Orleans.CodeGenerator
 
             var argumentsDeclaration =
                 SF.LocalDeclarationStatement(
-                    SF.VariableDeclaration(typeof(object[]).GetTypeSyntax())
+                    SF.VariableDeclaration(typeof(InvokeMethodArguments).GetTypeSyntax())
                         .AddVariables(
                             SF.VariableDeclarator("arguments")
                                 .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.Arguments)))));
@@ -293,7 +293,7 @@ namespace Orleans.CodeGenerator
                 var invokerFieldName = GetGenericMethodInvokerFieldName(method);
                 var invokerCall = SF.InvocationExpression(
                                         SF.IdentifierName(invokerFieldName)
-                                          .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, null)))
+                                          .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, default(InvokeMethodArguments))))
                                     .AddArgumentListArguments(SF.Argument(grain), SF.Argument(arguments));
                 return new StatementSyntax[] { SF.ReturnStatement(SF.AwaitExpression(invokerCall)) };
             }

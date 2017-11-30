@@ -136,6 +136,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GenerateInvokeMethods(Type grainType, Action<Type> onEncounteredType)
         {
             var baseReference = SF.BaseExpression();
+            var invokeMethodArgumentsType = typeof(InvokeMethodArguments).GetTypeSyntax();
             var methods = GrainInterfaceUtils.GetMethods(grainType);
             var members = new List<MemberDeclarationSyntax>();
             foreach (var method in methods)
@@ -174,22 +175,19 @@ namespace Orleans.CodeGenerator
                     allParameters.AddRange(parameters.Select(GetParameterForInvocation));
 
                     args =
-                        SF.ArrayCreationExpression(typeof(object).GetArrayTypeSyntax())
-                        .WithInitializer(
-                            SF.InitializerExpression(SyntaxKind.ArrayInitializerExpression)
-                              .AddExpressions(allParameters.ToArray()));
+                        SF.InvocationExpression(invokeMethodArgumentsType.Member(allParameters.Count > 1 ? "FromArguments" : "FromArgument"))
+                            .AddArgumentListArguments(allParameters.Select(p => SF.Argument(p)).ToArray());
                 }
                 else if (parameters.Length == 0)
                 {
-                    args = SF.LiteralExpression(SyntaxKind.NullLiteralExpression);
+                    args = invokeMethodArgumentsType.Member("Empty");
                 }
                 else
                 {
                     args =
-                        SF.ArrayCreationExpression(typeof(object).GetArrayTypeSyntax())
-                            .WithInitializer(
-                                SF.InitializerExpression(SyntaxKind.ArrayInitializerExpression)
-                                    .AddExpressions(parameters.Select(GetParameterForInvocation).ToArray()));
+                        SF.InvocationExpression(invokeMethodArgumentsType.Member(parameters.Length > 1 ? "FromArguments" : "FromArgument"))
+                            .AddArgumentListArguments(
+                                parameters.Select((p, i) => SF.Argument(GetParameterForInvocation(p, i))).ToArray());
                 }
 
                 var options = GetInvokeOptions(method);
