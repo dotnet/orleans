@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = options.Value;
-            this.deploymentId = globalConfiguration.DeploymentId;
+            this.deploymentId = globalConfiguration.ClusterId;
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

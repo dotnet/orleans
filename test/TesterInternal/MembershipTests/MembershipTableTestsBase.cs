@@ -50,13 +50,13 @@ namespace UnitTests.MembershipTests
 
             deploymentId = "test-" + Guid.NewGuid();
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("ClusterId={0}", deploymentId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
             globalConfiguration = new GlobalConfiguration
             {
-                DeploymentId = deploymentId,
+                ClusterId = deploymentId,
                 AdoInvariant = GetAdoInvariant(),
                 DataConnectionString = fixture.ConnectionString
             };
@@ -66,7 +66,7 @@ namespace UnitTests.MembershipTests
 
             clientConfiguration = new ClientConfiguration
             {
-                DeploymentId = globalConfiguration.DeploymentId,
+                DeploymentId = globalConfiguration.ClusterId,
                 AdoInvariant = globalConfiguration.AdoInvariant,
                 DataConnectionString = globalConfiguration.DataConnectionString
             };

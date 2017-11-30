@@ -20,7 +20,7 @@ namespace Orleans.TestingHost
                 .AddApplicationPartsFromAppDomain()
                 .UseConfiguration(clusterConfiguration)
                 .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder,
-                    TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
+                    TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
         }
     }
 }

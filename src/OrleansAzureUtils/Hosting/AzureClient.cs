@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Host
             var deploymentId = config.DeploymentId;
             var connectionString = config.DataConnectionString;
             if (String.IsNullOrEmpty(deploymentId))
-                throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.DeploymentId");
+                throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.ClusterId");
             
             if (String.IsNullOrEmpty(connectionString))
                 throw new ArgumentException("Cannot connect to Azure silos with null connectionString", "config.DataConnectionString");
@@ -201,8 +201,8 @@ namespace Orleans.Runtime.Host
             if (initSucceeded) return;
 
             OrleansException err;
-            err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}. Last exception={1}",
-                deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}.", deploymentId));
+            err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}. Last exception={1}",
+                deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}.", deploymentId));
             Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }

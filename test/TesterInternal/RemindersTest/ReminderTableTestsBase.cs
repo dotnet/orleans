@@ -33,14 +33,14 @@ namespace UnitTests.RemindersTest
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("ClusterId={0}", deploymentId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration
             {
                 ServiceId = serviceId,
-                DeploymentId = deploymentId,
+                ClusterId = deploymentId,
                 AdoInvariantForReminders = GetAdoInvariant(),
                 DataConnectionStringForReminders = fixture.ConnectionString
             };

@@ -50,7 +50,7 @@ namespace Tester.AzureUtils.TimerTests
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
-                DeploymentId = "TMSLocalTesting",
+                ClusterId = "TMSLocalTesting",
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
             await table.Init(config);
@@ -67,7 +67,7 @@ namespace Tester.AzureUtils.TimerTests
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
-                DeploymentId = deploymentId,
+                ClusterId = deploymentId,
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
             await table.Init(config);

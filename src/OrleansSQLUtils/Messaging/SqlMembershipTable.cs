@@ -20,7 +20,7 @@ namespace Orleans.Runtime.MembershipService
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;
             this.membershipTableOptions = membershipTableoptions.Value;
-            deploymentId = globalConfig.DeploymentId;
+            deploymentId = globalConfig.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)

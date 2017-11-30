@@ -22,7 +22,7 @@ namespace TestVersionGrains
                 .ConfigureServices(this.ConfigureServices)
                 .AddApplicationPartsFromAppDomain()
                 .AddApplicationPartsFromBasePath()
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
+                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
         }
 
         private void ConfigureServices(IServiceCollection services)

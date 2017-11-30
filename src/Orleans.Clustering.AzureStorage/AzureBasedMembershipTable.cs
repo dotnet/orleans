@@ -28,7 +28,7 @@ namespace Orleans.Runtime.MembershipService
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
             this.options = membershipOptions.Value;
-            this.deploymentId = globalConfiguration.DeploymentId;
+            this.deploymentId = globalConfiguration.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)

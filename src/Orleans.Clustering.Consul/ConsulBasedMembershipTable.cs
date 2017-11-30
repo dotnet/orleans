@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Membership
         public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger,
             IOptions<ConsulMembershipOptions> membershipTableOptions, GlobalConfiguration globalConfiguration)
         {
-            this.deploymentId = globalConfiguration.DeploymentId;
+            this.deploymentId = globalConfiguration.ClusterId;
             this._logger = logger;
             this.membershipTableOptions = membershipTableOptions.Value;
             _consulClient =

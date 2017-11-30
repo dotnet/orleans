@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Versions
         public GrainVersionStore(IInternalGrainFactory grainFactory, GlobalConfiguration configuration)
         {
             this.grainFactory = grainFactory;
-            this.deploymentId = configuration.DeploymentId;
+            this.deploymentId = configuration.ClusterId;
             this.IsEnabled = false;
         }
 

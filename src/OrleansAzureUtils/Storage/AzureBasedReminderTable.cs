@@ -23,7 +23,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init(GlobalConfiguration config)
         {
-            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders, this.loggerFactory);
+            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.ClusterId, config.DataConnectionStringForReminders, this.loggerFactory);
         }
 
         #region Utility methods

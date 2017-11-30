@@ -325,18 +325,18 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Set the DeploymentId for this silo, 
+        /// Set the ClusterId for this silo, 
         /// as well as the connection string to use the silo system data, 
         /// such as the cluster membership table..
         /// </summary>
-        /// <param name="deploymentId">DeploymentId this silo is part of.</param>
+        /// <param name="deploymentId">ClusterId this silo is part of.</param>
         /// <param name="connectionString">Azure connection string to use the silo system data.</param>
         public void SetDeploymentId(string deploymentId, string connectionString)
         {
             logger.Info(ErrorCode.SiloSetDeploymentId, "Setting Deployment Id to {0} and data connection string to {1}",
                 deploymentId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
 
-            Config.Globals.DeploymentId = deploymentId;
+            Config.Globals.ClusterId = deploymentId;
             Config.Globals.DataConnectionString = connectionString;
         }
 
@@ -509,7 +509,7 @@ namespace Orleans.Runtime.Host
             Config = config;
 
             if (!String.IsNullOrEmpty(DeploymentId))
-                Config.Globals.DeploymentId = DeploymentId;
+                Config.Globals.ClusterId = DeploymentId;
 
             if (string.IsNullOrWhiteSpace(Name))
                 throw new ArgumentException("SiloName not defined - cannot initialize config");

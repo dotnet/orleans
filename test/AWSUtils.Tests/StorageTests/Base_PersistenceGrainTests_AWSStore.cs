@@ -265,7 +265,7 @@ namespace AWSUtils.Tests.StorageTests
             var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
             var initialDeploymentId = this.HostedCluster.DeploymentId;
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
@@ -285,9 +285,9 @@ namespace AWSUtils.Tests.StorageTests
 
             output.WriteLine("Silos restarted");
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
             Assert.Equal(initialServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
-            Assert.Equal(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId same after restart."
+            Assert.Equal(initialDeploymentId, this.HostedCluster.DeploymentId);  // "ClusterId same after restart."
 
             val = await grain.GetValue();
             Assert.Equal(1, val);  // "Value after Write-1"

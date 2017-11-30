@@ -44,11 +44,11 @@ namespace Orleans.Runtime.Membership
         private ZooKeeperWatcher watcher;
 
         /// <summary>
-        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/DeploymentId"
+        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
         private string deploymentConnectionString;
         /// <summary>
-        /// the node name for this deployment. for eg. /DeploymentId
+        /// the node name for this deployment. for eg. /ClusterId
         /// </summary>
         private string deploymentPath;
         /// <summary>
@@ -61,20 +61,20 @@ namespace Orleans.Runtime.Membership
             this.logger = logger;
             var options = membershipTableOptions.Value;
             watcher = new ZooKeeperWatcher(logger);
-            InitConfig(options.ConnectionString, globalConfiguration.DeploymentId);
+            InitConfig(options.ConnectionString, globalConfiguration.ClusterId);
         }
 
         /// <summary>
         /// Initializes the ZooKeeper based membership table.
         /// </summary>
-        /// <param name="tryInitPath">if set to true, we'll try to create a node named "/DeploymentId"</param>
+        /// <param name="tryInitPath">if set to true, we'll try to create a node named "/ClusterId"</param>
         /// <returns></returns>
         public async Task InitializeMembershipTable(bool tryInitPath)
         {
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.
-            // note that when a zookeeper connection adds /DeploymentId to the connection string, the nodes are relative
+            // note that when a zookeeper connection adds /ClusterId to the connection string, the nodes are relative
             await UsingZookeeper(rootConnectionString, async zk =>
             {
                 try

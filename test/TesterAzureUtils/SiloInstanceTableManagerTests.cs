@@ -48,7 +48,7 @@ namespace Tester.AzureUtils
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
 
-            output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
+            output.WriteLine("ClusterId={0} Generation={1}", deploymentId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
             manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, fixture.LoggerFactory)

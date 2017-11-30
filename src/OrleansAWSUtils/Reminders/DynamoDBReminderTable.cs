@@ -56,7 +56,7 @@ namespace OrleansAWSUtils.Reminders
         /// <returns></returns>
         public Task Init(GlobalConfiguration config)
         {
-            deploymentId = config.DeploymentId;
+            deploymentId = config.ClusterId;
             serviceId = config.ServiceId;
 
             storage = new DynamoDBStorage(config.DataConnectionStringForReminders, loggerFactory);

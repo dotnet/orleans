@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="providerName">The provider name</param>
         /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
         /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
-        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="deploymentId">The ClusterId used for partitioning. If none is specified, the provider will use the same ClusterId as the Cluster.</param>
         /// <param name="cacheSize">The cache size.</param>
         /// <param name="startupState">The startup state of the persistent stream provider.</param>
         /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Configuration
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
-            deploymentId = deploymentId ?? config.Globals.DeploymentId;
+            deploymentId = deploymentId ?? config.Globals.ClusterId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
 #pragma warning disable 618
             config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
@@ -123,7 +123,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="providerName">The provider name</param>
         /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
         /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
-        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="deploymentId">The ClusterId used for partitioning. If none is specified, the provider will use the same ClusterId as the Cluster.</param>
         /// <param name="cacheSize">The cache size.</param>
         /// <param name="startupState">The startup state of the persistent stream provider.</param>
         /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>
@@ -140,7 +140,7 @@ namespace Orleans.Runtime.Configuration
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
-            deploymentId = deploymentId ?? config.Globals.DeploymentId;
+            deploymentId = deploymentId ?? config.Globals.ClusterId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
             config.Globals.RegisterStreamProvider<AzureQueueStreamProviderV2>(providerName, properties);
         }
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="providerName">The provider name</param>
         /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
         /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
-        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="deploymentId">The ClusterId used for partitioning. If none is specified, the provider will use the same ClusterId as the Cluster.</param>
         /// <param name="cacheSize">The cache size.</param>
         /// <param name="startupState">The startup state of the persistent stream provider.</param>
         /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>
@@ -183,7 +183,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="providerName">The provider name</param>
         /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
         /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
-        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="deploymentId">The ClusterId used for partitioning. If none is specified, the provider will use the same ClusterId as the Cluster.</param>
         /// <param name="cacheSize">The cache size.</param>
         /// <param name="startupState">The startup state of the persistent stream provider.</param>
         /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>

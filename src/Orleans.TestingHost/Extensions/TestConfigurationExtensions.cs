@@ -20,7 +20,7 @@ namespace Orleans.TestingHost.Extensions
             {
                 throw new ArgumentNullException(nameof(clusterConfig));
             }
-            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.DeploymentId);
+            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.ClusterId);
             if (string.IsNullOrEmpty(clusterConfig.Globals.DataConnectionString))
             {
                 if (dataConnectionStringFallback != null)
