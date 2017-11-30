@@ -267,8 +267,8 @@ namespace Orleans.Runtime
 
         #endregion
 
-        public Guid CurrentCallChainId { get; set; }
-            
+        public CorrelationId CallChainId { get; set; }
+
         public ISchedulingContext SchedulingContext { get; }
 
         public string GrainTypeName
@@ -484,7 +484,7 @@ namespace Orleans.Runtime
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             Running = message;
-            CurrentCallChainId = Guid.Empty.Equals(message.CallChainId) ? Guid.NewGuid() : message.CallChainId;
+            CallChainId = message.Id;
             currentRequestStartTime = DateTime.UtcNow;
         }
 

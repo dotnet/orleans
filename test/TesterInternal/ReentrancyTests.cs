@@ -307,7 +307,8 @@ namespace UnitTests
             var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
             var target = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
             await grain.CallOtherLongRunningTask(target, 2, TimeSpan.FromSeconds(1));
-            await Assert.ThrowsAsync<TaskCanceledException>(() => target.FanOutOtherLongRunningTask(grain, 2, TimeSpan.FromSeconds(10), 5));
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => target.FanOutOtherLongRunningTask(grain, 2, TimeSpan.FromSeconds(10), 5));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]

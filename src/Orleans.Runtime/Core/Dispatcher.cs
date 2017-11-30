@@ -345,9 +345,9 @@ namespace Orleans.Runtime
         /// <returns>Whether reentancy is allowed</returns>
         private bool IsCallChainReentrancyAllowed(ActivationData targetActivation, Message incoming)
         {
-            var targetChainId = targetActivation.CurrentCallChainId;
+            var targetChainId = targetActivation.CallChainId;
             var incomingChainId = incoming.CallChainId;
-            if (targetChainId.Equals(Guid.Empty) || incomingChainId.Equals(Guid.Empty))
+            if (targetChainId == null || incomingChainId == null)
             {
                 return false;
             }
@@ -362,12 +362,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (sendingActivation.CurrentCallChainId.Equals(Guid.Empty))
-            {
-                sendingActivation.CurrentCallChainId = Guid.NewGuid();
-            }
-
-            outgoing.CallChainId = sendingActivation.CurrentCallChainId;
+            outgoing.CallChainId = sendingActivation.CallChainId;
         }
 
         /// <summary>
