@@ -47,7 +47,7 @@ namespace AWSUtils.Tests.Streaming
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
             options.ClusterConfiguration.Globals.ClusterId = deploymentId;
-            options.ClientConfiguration.DeploymentId = deploymentId;
+            options.ClientConfiguration.ClusterId = deploymentId;
             options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             options.ClientConfiguration.DataConnectionString = StorageConnectionString;
             options.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;

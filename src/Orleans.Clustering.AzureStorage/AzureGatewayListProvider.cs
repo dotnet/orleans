@@ -20,7 +20,7 @@ namespace Orleans.AzureUtils
         public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, ClientConfiguration clientConfiguration)
         {
             this.loggerFactory = loggerFactory;
-            this.deploymentId = clientConfiguration.DeploymentId;
+            this.deploymentId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
             this.options = options.Value;
         }

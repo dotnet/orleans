@@ -54,7 +54,7 @@ namespace Orleans.Runtime
                 if (configurableMetricsDataPublisher != null)
                 {
                     configurableMetricsDataPublisher.AddConfiguration(
-                        config.DeploymentId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
+                        config.ClusterId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
                 }
                 tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats, this.loggerFactory)
                 {
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
                 else if (config.UseAzureSystemStore)
                 {
                     var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
-                    await statsDataPublisher.Init(false, config.DataConnectionString, config.DeploymentId,
+                    await statsDataPublisher.Init(false, config.DataConnectionString, config.ClusterId,
                         transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;
                 }

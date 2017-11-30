@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Membership
         {
             watcher = new ZooKeeperWatcher(logger);
 
-            deploymentPath = "/" + clientConfiguration.DeploymentId;
+            deploymentPath = "/" + clientConfiguration.ClusterId;
             deploymentConnectionString = options.Value.ConnectionString + deploymentPath;
             maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }

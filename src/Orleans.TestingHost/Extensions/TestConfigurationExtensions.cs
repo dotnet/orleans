@@ -41,7 +41,7 @@ namespace Orleans.TestingHost.Extensions
                 throw new ArgumentNullException(nameof(clientConfiguration));
             }
 
-            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.DeploymentId);
+            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.ClusterId);
             if (string.IsNullOrEmpty(clientConfiguration.DataConnectionString))
             {
                 if (dataConnectionStringFallback != null)

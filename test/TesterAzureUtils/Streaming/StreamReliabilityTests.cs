@@ -71,7 +71,7 @@ namespace UnitTests.Streaming.Reliability
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })
             .AddApplicationPartsFromAppDomain()
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {

@@ -74,7 +74,7 @@ namespace Orleans.AzureUtils
 
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
         {
-            deploymentId = config.DeploymentId;
+            deploymentId = config.ClusterId;
             this.clientId = clientId;
             this.address = address;
             myHostName = config.DNSHostName;

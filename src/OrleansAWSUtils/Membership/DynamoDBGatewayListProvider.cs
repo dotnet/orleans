@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Membership
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
-            this.deploymentId = clientConfiguration.DeploymentId;
+            this.deploymentId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 

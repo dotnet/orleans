@@ -169,7 +169,7 @@ namespace Orleans.Runtime.Configuration
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
-            deploymentId = deploymentId ?? config.DeploymentId;
+            deploymentId = deploymentId ?? config.ClusterId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
 #pragma warning disable 618
             config.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
@@ -200,7 +200,7 @@ namespace Orleans.Runtime.Configuration
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
             connectionString = GetConnectionString(connectionString, config);
-            deploymentId = deploymentId ?? config.DeploymentId;
+            deploymentId = deploymentId ?? config.ClusterId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
             config.RegisterStreamProvider<AzureQueueStreamProviderV2>(providerName, properties);
         }

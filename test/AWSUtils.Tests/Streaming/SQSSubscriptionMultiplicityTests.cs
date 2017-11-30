@@ -39,7 +39,7 @@ namespace AWSUtils.Tests.Streaming
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             
             options.ClusterConfiguration.Globals.ClusterId = deploymentId;
-            options.ClientConfiguration.DeploymentId = deploymentId;
+            options.ClientConfiguration.ClusterId = deploymentId;
             options.ClientConfiguration.DataConnectionString = StreamConnectionString;
             options.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
             options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);

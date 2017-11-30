@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Membership
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
             this.options = options.Value;
-            deploymentId = clientConfiguration.DeploymentId;
+            deploymentId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 

@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Membership
         public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulGatewayListProviderOptions> options)
         {
             this.logger = logger;
-            this.deploymentId = clientConfig.DeploymentId;
+            this.deploymentId = clientConfig.ClusterId;
             this.maxStaleness = clientConfig.GatewayListRefreshPeriod;
             this.options = options.Value;
         }

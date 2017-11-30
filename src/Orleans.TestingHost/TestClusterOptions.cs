@@ -154,7 +154,7 @@ namespace Orleans.TestingHost
                 .AddApplicationPartsFromAppDomain()
                 .AddApplicationPartsFromBasePath()
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder,
-                    TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
+                    TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         /// <summary>
         /// Factory delegate to create a client builder which will be used to build the <see cref="TestCluster"/> client. 
@@ -260,7 +260,7 @@ namespace Orleans.TestingHost
 
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
             config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
-            config.DeploymentId = clusterConfig.Globals.ClusterId;
+            config.ClusterId = clusterConfig.Globals.ClusterId;
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             // If a debugger is attached, override the timeout setting
             config.ResponseTimeout = Debugger.IsAttached

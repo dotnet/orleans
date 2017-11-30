@@ -66,7 +66,7 @@ namespace UnitTests.MembershipTests
 
             clientConfiguration = new ClientConfiguration
             {
-                DeploymentId = globalConfiguration.ClusterId,
+                ClusterId = globalConfiguration.ClusterId,
                 AdoInvariant = globalConfiguration.AdoInvariant,
                 DataConnectionString = globalConfiguration.DataConnectionString
             };

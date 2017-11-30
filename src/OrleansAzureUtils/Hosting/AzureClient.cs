@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Host
             var config = new ClientConfiguration
             {
                 GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
-                DeploymentId = GetDeploymentId(),
+                ClusterId = GetDeploymentId(),
                 DataConnectionString = GetDataConnectionString(),
             };
             
@@ -131,7 +131,7 @@ namespace Orleans.Runtime.Host
             Trace.TraceInformation("Overriding Orleans client config from Azure runtime environment.");
             try
             {
-                config.DeploymentId = GetDeploymentId();
+                config.ClusterId = GetDeploymentId();
                 config.DataConnectionString = GetDataConnectionString();
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
             }
@@ -167,7 +167,7 @@ namespace Orleans.Runtime.Host
 
             //// Find endpoint info for the gateway to this Orleans silo cluster
             //Trace.WriteLine("Searching for Orleans gateway silo via Orleans instance table...");
-            var deploymentId = config.DeploymentId;
+            var deploymentId = config.ClusterId;
             var connectionString = config.DataConnectionString;
             if (String.IsNullOrEmpty(deploymentId))
                 throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.ClusterId");

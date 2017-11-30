@@ -772,7 +772,7 @@ namespace UnitTests
 
             var config = new ClientConfiguration();
 
-            config.DeploymentId = deploymentId;
+            config.ClusterId = deploymentId;
             config.DataConnectionString = "UseDevelopmentStorage=true";
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
