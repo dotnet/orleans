@@ -164,7 +164,7 @@ namespace Orleans.Runtime.Messaging
                     if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
                 }
             },
-            () => "Dispatcher.ReceiveMessage"), context);
+            "Dispatcher.ReceiveMessage"), context);
         }
     }
 }
