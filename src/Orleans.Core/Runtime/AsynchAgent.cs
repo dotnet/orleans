@@ -55,7 +55,6 @@ namespace Orleans.Runtime
 
             this.executorService = executorService;
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-            EnsureExecutorInitialized();
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
