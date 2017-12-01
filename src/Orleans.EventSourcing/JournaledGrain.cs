@@ -56,11 +56,51 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Raise an event.
+        /// Raises an event, and either confirms it, or throws <see cref="LostRaceException"/> 
+        /// and discards it (if another instance raised an event in the meantime).
         /// </summary>
         /// <param name="event">Event to raise</param>
-        /// <returns></returns>
-        protected virtual void RaiseEvent<TEvent>(TEvent @event) 
+        /// <returns>a task that completes when the event has been confirmed</returns>
+        protected async Task RaiseEvent<TEvent>(TEvent @event) 
+            where TEvent : TEventBase
+        {
+            if (@event == null) throw new ArgumentNullException("event");
+
+            var success = await LogViewAdaptor.TryAppend(@event);
+
+            if (!success)
+            {
+                throw new LostRaceException("Event was dropped because one or more other events were confirmed first.");
+            }
+        }
+
+        /// <summary>
+        /// Raises multiple events, as an atomic sequence, and either confirms them all, 
+        /// or throws <see cref="LostRaceException"/> and discards them all
+        /// (if another instance raised an event in the meantime).
+        /// </summary>
+        /// <param name="events">Events to raise</param>
+        /// <returns>a task that completes when the event has been confirmed</returns>
+        protected async Task RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
+            where TEvent : TEventBase
+        {
+            if (events == null) throw new ArgumentNullException("events");
+
+            var success = await LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
+
+            if (!success)
+            {
+                throw new LostRaceException("Events were dropped because one or more other events were confirmed first.");
+            }
+        }
+
+
+        /// <summary>
+        /// Inserts an event into the queue of unconfirmed events and returns immediately.
+        /// The runtime confirms queued events automatically, asynchronously, eventually, retrying if necessary.
+        /// </summary>
+        /// <param name="event">Event to raise</param>
+        protected void EnqueueEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
             if (@event == null) throw new ArgumentNullException("event");
@@ -68,12 +108,13 @@ namespace Orleans.EventSourcing
             LogViewAdaptor.Submit(@event);
         }
 
+
         /// <summary>
-        /// Raise multiple events, as an atomic sequence.
+        /// Inserts multiple events into the queue of unconfirmed events, as an atomic sequence, and returns immediately.
+        /// The runtime confirms queued events automatically, asynchronously, eventually, retrying if necessary.
         /// </summary>
         /// <param name="events">Events to raise</param>
-        /// <returns></returns>
-        protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
+        protected void EnqueueEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
             if (events == null) throw new ArgumentNullException("events");
@@ -81,34 +122,6 @@ namespace Orleans.EventSourcing
             LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
         }
 
-
-        /// <summary>
-        /// Raise an event conditionally. 
-        /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
-        /// </summary>
-        /// <param name="event">Event to raise</param>
-        /// <returns>true if successful, false if there was a conflict.</returns>
-        protected virtual Task<bool> RaiseConditionalEvent<TEvent>(TEvent @event)
-            where TEvent : TEventBase
-        {
-            if (@event == null) throw new ArgumentNullException("event");
-
-            return LogViewAdaptor.TryAppend(@event);
-        }
-
-
-        /// <summary>
-        /// Raise multiple events, as an atomic sequence, conditionally. 
-        /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
-        /// </summary>
-        /// <param name="events">Events to raise</param>
-        /// <returns>true if successful, false if there was a conflict.</returns>
-        protected virtual Task<bool> RaiseConditionalEvents<TEvent>(IEnumerable<TEvent> events)
-            where TEvent : TEventBase
-        {
-            if (events == null) throw new ArgumentNullException("events");
-            return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
-        }
 
         /// <summary>
         /// The current confirmed state. 
@@ -138,7 +151,7 @@ namespace Orleans.EventSourcing
 
         /// <summary>
         /// The current tentative state.
-        /// Includes both confirmed and unconfirmed events.
+        /// Includes both confirmed events, and unconfirmed events in the queue.
         /// </summary>
         protected TGrainState TentativeState
         {
@@ -167,7 +180,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Retrieves the latest state now, and confirms all previously raised events. 
+        /// Retrieves the latest state now, and confirms all previously enqueued unconfirmed events. 
         /// Effectively, this enforces synchronization with the global state.
         /// <para>Await this before reading the state to ensure strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>

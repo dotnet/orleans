@@ -71,43 +71,52 @@ namespace TestGrains
 
         public async Task SetAGlobal(int x)
         {
-            RaiseEvent(new UpdateA() { Val = x });
+            EnqueueEvent(new UpdateA() { Val = x });
             await ConfirmEvents();
         }
 
         public async Task<Tuple<int, bool>> SetAConditional(int x)
         {
             int version = this.Version;
-            bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
+            bool success;
+            try
+            {
+                await RaiseEvent(new UpdateA() { Val = x });
+                success = true;
+            }
+            catch (LostRaceException)
+            {
+                success = false;
+            }
             return new Tuple<int, bool>(version, success);
         }
 
         public Task SetALocal(int x)
         {
-            RaiseEvent(new UpdateA() { Val = x });
+            EnqueueEvent(new UpdateA() { Val = x });
             return Task.CompletedTask;
         }
         public async Task SetBGlobal(int x)
         {
-            RaiseEvent(new UpdateB() { Val = x });
+            EnqueueEvent(new UpdateB() { Val = x });
             await ConfirmEvents();
         }
 
         public Task SetBLocal(int x)
         {
-            RaiseEvent(new UpdateB() { Val = x });
+            EnqueueEvent(new UpdateB() { Val = x });
             return Task.CompletedTask;
         }
 
         public async Task IncrementAGlobal()
         {
-            RaiseEvent(new IncrementA());
+            EnqueueEvent(new IncrementA());
             await ConfirmEvents();
         }
 
         public Task IncrementALocal()
         {
-            RaiseEvent(new IncrementA());
+            EnqueueEvent(new IncrementA());
             return Task.CompletedTask;
 
         }
@@ -136,13 +145,13 @@ namespace TestGrains
 
         public Task AddReservationLocal(int val)
         {
-            RaiseEvent(new AddReservation() { Val = val });
+            EnqueueEvent(new AddReservation() { Val = val });
             return Task.CompletedTask;
 
         }
         public Task RemoveReservationLocal(int val)
         {
-            RaiseEvent(new RemoveReservation() { Val = val });
+            EnqueueEvent(new RemoveReservation() { Val = val });
             return Task.CompletedTask;
 
         }
@@ -178,7 +187,16 @@ namespace TestGrains
                 await RefreshNow();
             if (expectedversion != Version)
                 return false;
-            return await RaiseConditionalEvents(updates);
+
+            try
+            {
+                await RaiseEvents(updates);
+                return true;
+            }
+            catch (LostRaceException)
+            {
+                return false;
+            }
         }
 
         public Task Deactivate()
@@ -187,7 +205,8 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<object>> GetEventLog() {
+        public Task<IReadOnlyList<object>> GetEventLog()
+        {
             return this.RetrieveConfirmedEvents(0, Version);
         }
 

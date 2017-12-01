@@ -74,7 +74,11 @@ namespace TestGrains
 
         public async Task Add(string key, int amount, bool wait_for_confirmation)
         {
-            RaiseEvent(new UpdatedEvent() { Key = key, Amount = amount });
+            EnqueueEvent(new UpdatedEvent()
+            {
+                Key = key,
+                Amount = amount
+            });
 
             // optionally, wait until the event has been persisted to storage
             if (wait_for_confirmation)
@@ -83,7 +87,7 @@ namespace TestGrains
 
         public async Task Reset(bool wait_for_confirmation)
         {
-            RaiseEvent(new ResetAllEvent());
+            EnqueueEvent(new ResetAllEvent());
 
             // optionally, wait until the event has been persisted to storage
             if (wait_for_confirmation)

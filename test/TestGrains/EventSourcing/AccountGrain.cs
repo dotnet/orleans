@@ -2,6 +2,7 @@
 using Orleans.EventSourcing;
 using Orleans.MultiCluster;
 using Orleans.Providers;
+using Orleans.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,7 +42,11 @@ namespace TestGrains
             public void Apply(WithdrawalTransaction d)
             {
                 if (d.WithdrawalAmount > Balance)
-                    throw new InvalidOperationException("we make sure this never happens");
+                {
+                    // the balance is checked before we withdraw,
+                    // so this exception is never actually thrown
+                    throw new InvalidOperationException("internal error");
+                }
 
                 Balance = Balance - d.WithdrawalAmount;
             }
@@ -52,37 +57,46 @@ namespace TestGrains
             return Task.FromResult(State.Balance);
         }
 
-        public Task Deposit(uint amount, Guid guid, string description)
+        public async Task Deposit(uint amount, Guid guid, string description)
         {
-            RaiseEvent(new DepositTransaction() {
+            // we are queueing the event so it gets retried on races
+            EnqueueEvent(new DepositTransaction()
+            {
                 Guid = guid,
                 IssueTime = DateTime.UtcNow,
                 DepositAmount = amount,
                 Description = description
             });
 
-            // we wait for storage ack
-            return ConfirmEvents();
+            // wait for confirmation
+            await ConfirmEvents();
         }
 
-        public Task<bool> Withdraw(uint amount, Guid guid, string description)
+        public async Task<bool> Withdraw(uint amount, Guid guid, string description)
         {
             // if the balance is too low, can't withdraw
-            // reject it immediately
             if (State.Balance < amount)
-                return Task.FromResult(false);
-
-            // use a conditional event for withdrawal
-            // (conditional events commit only if the version hasn't already changed in the meantime)
-            // this is important so we can guarantee that we never overdraw
-            // even if racing with other clusters, of in transient duplicate grain situations
-            return RaiseConditionalEvent(new WithdrawalTransaction()
             {
-                Guid = guid,
-                IssueTime = DateTime.UtcNow,
-                WithdrawalAmount = amount,
-                Description = description
-            });
+                return false;
+            }
+
+            try
+            {
+                await RaiseEvent(new WithdrawalTransaction()
+                {
+                    Guid = guid,
+                    IssueTime = DateTime.UtcNow,
+                    WithdrawalAmount = amount,
+                    Description = description
+                });
+
+                return true;
+            }
+            catch (LostRaceException)
+            {
+                // no money was withdrawn.
+                return false;
+            }
         }
 
         public Task<IReadOnlyList<Transaction>> GetTransactionLog()

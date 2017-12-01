@@ -34,12 +34,16 @@ namespace TestGrains
         public async Task<bool> Reserve(int seatnumber, string userid)
         {
             // first, enqueue the request
-            RaiseEvent(new SeatReservation() { Seat = seatnumber, UserId = userid });
+            EnqueueEvent(new SeatReservation()
+            {
+                Seat = seatnumber,
+                UserId = userid
+            });
 
-            // then, wait for the request to propagate
+            // then, wait for the request to propagate (automatically retry on races)
             await ConfirmEvents();
 
-            // we can determine if the reservation went through
+            // now we can determine if the reservation went through
             // by re-reading it - if it is not there, it means a different user won
             var success = (State.Reservations.ContainsKey(seatnumber)
                                  && State.Reservations[seatnumber].UserId == userid);

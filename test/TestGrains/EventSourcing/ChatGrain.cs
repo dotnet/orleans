@@ -1,6 +1,7 @@
 ﻿using Orleans;
 using Orleans.EventSourcing;
 using Orleans.Providers;
+using Orleans.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,13 +41,19 @@ namespace TestGrains
             // if the chat has not been initialized, do that now
             if (Version == 0)
             {
-                // we are using a conditional event (in case creation is racing with other clusters)
-                // (conditional events commit only if the version hasn't already changed in the meantime)
-                await RaiseConditionalEvent(new CreatedEvent()
+                try 
                 {
-                    Timestamp = DateTime.UtcNow,
-                    Origin = typeof(ChatGrain).FullName
-                });
+                    await RaiseEvent(new CreatedEvent()
+                    {
+                        Timestamp = DateTime.UtcNow,
+                        Origin = typeof(ChatGrain).FullName
+                    });
+                }
+                catch (InconsistentStateException)
+                {
+                    // we lost a race with another instance's CreatedEvent.
+                    // That's fine. Does not really matter who does the initialization.
+                }
             }
         }
 
@@ -68,19 +75,29 @@ namespace TestGrains
  
         public Task Post(Guid guid, string user, string text)
         {
-            RaiseEvent(new PostedEvent() { Guid = guid, User = user, Text = text, Timestamp = DateTime.UtcNow });
+            EnqueueEvent(new PostedEvent() {
+                Guid = guid,
+                User = user,
+                Text = text,
+                Timestamp = DateTime.UtcNow
+            });
             return Task.CompletedTask;
         }
 
         public Task Delete(Guid guid)
         {
-            RaiseEvent(new DeletedEvent() { Guid = guid });
+            EnqueueEvent(new DeletedEvent() {
+                Guid = guid
+            });
             return Task.CompletedTask;
         }
 
         public Task Edit(Guid guid, string text)
         {
-            RaiseEvent(new EditedEvent() { Guid = guid, Text = text});
+            EnqueueEvent(new EditedEvent() {
+                Guid = guid,
+                Text = text
+            });
             return Task.CompletedTask;
         }
     }

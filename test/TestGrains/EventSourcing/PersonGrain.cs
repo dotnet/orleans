@@ -13,16 +13,12 @@ namespace TestGrains
     public class PersonGrain : JournaledGrain<PersonState,IPersonEvent>, IPersonGrain
     {
 
-        public Task RegisterBirth(PersonAttributes props)
+        public async Task RegisterBirth(PersonAttributes props)
         {
             if (this.State.FirstName == null)
             {
-                RaiseEvent(new PersonRegistered(props.FirstName, props.LastName, props.Gender));
-
-                return ConfirmEvents();
+                await RaiseEvent(new PersonRegistered(props.FirstName, props.LastName, props.Gender));
             }
-
-            return Task.CompletedTask;
         }
 
         public async Task Marry(IPersonGrain spouse)
@@ -42,13 +38,12 @@ namespace TestGrains
             }
 
             // issue all events atomically
-            RaiseEvents(events);
-            await ConfirmEvents();
+            await RaiseEvents(events);
         }
 
         public Task ChangeLastName(string lastName)
         {
-            RaiseEvent(new PersonLastNameChanged(lastName));
+            EnqueueEvent(new PersonLastNameChanged(lastName));
 
             // we are not confirming this event here!
             // therefore, the tentative state and the confirmed state can differ for some time
