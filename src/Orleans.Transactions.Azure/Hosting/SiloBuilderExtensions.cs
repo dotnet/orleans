@@ -1,7 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.Transactions.Abstractions;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Azure
 {
@@ -10,16 +9,27 @@ namespace Orleans.Transactions.Azure
         /// <summary>
         /// Configure cluster to use azure transaction log.
         /// </summary>
-        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, AzureTransactionLogConfiguration config)
+        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, Action<AzureTransactionLogOptions> configureOptions)
         {
-            return builder.ConfigureServices(UseAzureTransactionLog)
-                          .Configure<AzureTransactionLogConfiguration>((cfg) => cfg.Copy(config));
-
+            return builder.ConfigureServices(services => services.UseAzureTransactionLog(configureOptions));
         }
 
-        private static void UseAzureTransactionLog(IServiceCollection services)
+        /// <summary>
+        /// Configure cluster to use azure transaction log.
+        /// </summary>
+        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services, Action<AzureTransactionLogOptions> configureOptions)
         {
-            services.AddTransient(AzureTransactionLogStorage.Create);
+            return services.UseAzureTransactionLog(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure cluster to use azure transaction log.
+        /// </summary>
+        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services,
+            Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
+        {
+            configureOptions?.Invoke(services.AddOptions<AzureTransactionLogOptions>());
+            return services.AddTransient(AzureTransactionLogStorage.Create);
         }
     }
 }

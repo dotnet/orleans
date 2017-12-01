@@ -11,12 +11,16 @@ namespace Orleans.Transactions.Development
         /// </summary>
         public static ISiloHostBuilder UseInMemoryTransactionLog(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(UseInMemoryTransactionLog);
+            return builder.ConfigureServices(services => services.UseInMemoryTransactionLog());
         }
 
-        private static void UseInMemoryTransactionLog(IServiceCollection services)
+        /// <summary>
+        /// Configure cluster to use an in-memory transaction log.
+        /// For development and test purposes only
+        /// </summary>
+        public static IServiceCollection UseInMemoryTransactionLog(this IServiceCollection services)
         {
-            services.AddTransient(InMemoryTransactionLogStorage.Create);
+            return services.AddTransient(InMemoryTransactionLogStorage.Create);
         }
     }
 }

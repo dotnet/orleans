@@ -8,7 +8,6 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using BenchmarkGrainInterfaces.Transaction;
 using System.Linq;
-using System.Diagnostics;
 
 namespace Benchmarks.Transactions
 {
@@ -78,7 +77,7 @@ namespace Benchmarks.Transactions
                 return new SiloHostBuilder().ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
-                    .UseInClusterTransactionManager(new TransactionsConfiguration())
+                    .UseInClusterTransactionManager(options => { })
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();
             }
