@@ -63,7 +63,8 @@ namespace Orleans.CodeGenerator
 
         private static readonly RuntimeTypeHandle IntPtrTypeHandle = typeof(IntPtr).TypeHandle;
         private static readonly RuntimeTypeHandle UIntPtrTypeHandle = typeof(UIntPtr).TypeHandle;
-        private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+        private static readonly RuntimeTypeHandle MarshalByRefObjectType = typeof(MarshalByRefObject).TypeHandle;
+        private static readonly Type DelegateType = typeof(Delegate);
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.
@@ -574,7 +575,8 @@ namespace Orleans.CodeGenerator
             if (handle.Equals(IntPtrTypeHandle)) return false;
             if (handle.Equals(UIntPtrTypeHandle)) return false;
 
-            if (DelegateTypeInfo.IsAssignableFrom(fieldType)) return false;
+            if (DelegateType.IsAssignableFrom(fieldType)) return false;
+            if (field.DeclaringType?.TypeHandle == MarshalByRefObjectType) return false;
 
             return true;
         }

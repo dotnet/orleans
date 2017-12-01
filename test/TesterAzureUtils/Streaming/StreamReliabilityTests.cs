@@ -70,7 +70,7 @@ namespace UnitTests.Streaming.Reliability
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })
-            .AddApplicationPartsFromAppDomain()
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         public class SiloBuilderFactory : ISiloBuilderFactory

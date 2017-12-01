@@ -183,9 +183,9 @@ namespace Orleans.Runtime
                 var hostContext = new HostBuilderContext(new Dictionary<object, object>());
                 DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
 
-                var applicationPartManager = hostContext.GetApplicationPartManager();
-                applicationPartManager.AddApplicationPartsFromAppDomain();
-                applicationPartManager.AddApplicationPartsFromBasePath();
+                hostContext.GetApplicationPartManager()
+                    .AddFromAppDomain()
+                    .AddFromApplicationBaseDirectory();
 
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
