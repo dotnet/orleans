@@ -55,6 +55,7 @@ namespace Orleans.Runtime
 
             this.executorService = executorService;
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+            EnsureExecutorInitialized();
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -95,13 +96,12 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
-
                 if (State == ThreadState.Stopped)
                 {
                     Cts = new CancellationTokenSource();
                 }
 
+                EnsureExecutorInitialized();
                 OnStart();
                 State = ThreadState.Running;
             }
@@ -122,6 +122,7 @@ namespace Orleans.Runtime
                     {
                         State = ThreadState.StopRequested;
                         Cts.Cancel();
+                        executor = null;
                         State = ThreadState.Stopped;
                     }
                 }
@@ -163,5 +164,13 @@ namespace Orleans.Runtime
         }
 
         internal static bool IsStarting { get; set; }
+
+        private void EnsureExecutorInitialized()
+        {
+            if (executor == null)
+            {
+                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
+            }
+        }
     }
 }
