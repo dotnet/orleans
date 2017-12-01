@@ -282,7 +282,7 @@ namespace Orleans.Runtime
             get { return Headers.Result; }
             set {  Headers.Result = value; }
         }
-        
+
         public TimeSpan? TimeToLive
         {
             get { return Headers.TimeToLive; }
@@ -742,8 +742,6 @@ namespace Orleans.Runtime
                 // transactions
                 TRANSACTION_INFO = 1 << 27,
                 IS_TRANSACTION_REQUIRED = 1 << 28,
-                
-                CALL_CHAIN_ID = 1 << 29
 
                 // Do not add over int.MaxValue of these.
             }
@@ -1046,7 +1044,7 @@ namespace Orleans.Runtime
                     _rejectionInfo = value;
                 }
             }
-            
+
             public Dictionary<string, object> RequestContextData
             {
                 get { return _requestContextData; }
@@ -1217,7 +1215,7 @@ namespace Orleans.Runtime
                 {
                     WriteObj(context, typeof(GuidId), input.TargetObserverId);
                 }
-                
+
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                 {
                     writer.Write(input.TargetSilo);
@@ -1327,7 +1325,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                     result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
-                
+
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                     result.TargetSilo = reader.ReadSiloAddress();
 
