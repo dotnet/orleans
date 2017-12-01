@@ -468,14 +468,12 @@ namespace Orleans.Runtime
                         this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                     }
                 }
-                catch (Exception) { }
                 finally
                 {
                     TransactionContext.Clear();
+                    if (message.Direction != Message.Directions.OneWay)
+                        SafeSendExceptionResponse(message, exc2);
                 }
-
-                if (message.Direction != Message.Directions.OneWay)
-                    SafeSendExceptionResponse(message, exc2);
             }
             finally
             {
