@@ -342,14 +342,9 @@ namespace Orleans.Runtime
         /// during duration of request processing. If target of outgoing request is found in that collection - 
         /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
-        private void EnsureCallChainIdIsSet(ActivationData sendingActivation, Message outgoing)
+        private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (sendingActivation == null)
-            {
-                return;
-            }
-
-            if (sendingActivation.RunningRequestsSenders.Contains(outgoing.TargetGrain))
+            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetGrain) == true)
             {
                 outgoing.IsAlwaysInterleave = true;
             }
@@ -641,7 +636,7 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
         {
-            EnsureCallChainIdIsSet(sendingActivation, message);
+            MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             Action<Exception> onAddressingFailure = ex =>
             {
                 if (ShouldLogError(ex))
