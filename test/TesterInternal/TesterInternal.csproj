@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>UnitTests</RootNamespace>
     <AssemblyName>TesterInternal</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

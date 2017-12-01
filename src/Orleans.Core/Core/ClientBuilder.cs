@@ -25,7 +25,13 @@ namespace Orleans
         /// Returns a new default client builder.
         /// </summary>
         /// <returns>A new default client builder.</returns>
-        public static IClientBuilder CreateDefault() => new ClientBuilder().ConfigureDefaults();
+        public static IClientBuilder CreateDefault()
+            => new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain());
 
         /// <inheritdoc />
         public IClusterClient Build()

@@ -71,26 +71,15 @@ namespace Orleans.CodeGeneration
         {
             using (var loggerFactory = new LoggerFactory())
             {
-                var config = new ClusterConfiguration();
                 loggerFactory.AddConsole(logLevel);
-                var serializationProviderOptions = Options.Create(
-                    new SerializationProviderOptions
-                    {
-                        SerializationProviders = config.Globals.SerializationProviders,
-                        FallbackSerializationProvider = config.Globals.FallbackSerializationProvider
-                    });
-                var applicationPartManager = new ApplicationPartManager();
-                applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
-                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
-                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
-                applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
-                applicationPartManager.AddApplicationPart(grainAssembly);
-                applicationPartManager.AddApplicationPart(typeof(RuntimeVersion).Assembly);
-                applicationPartManager.AddApplicationPartsFromReferences(grainAssembly);
-                applicationPartManager.AddApplicationPartsFromReferences(typeof(RuntimeVersion).Assembly);
-                var serializationManager = new SerializationManager(null, serializationProviderOptions, loggerFactory, new CachedTypeResolver());
-                serializationManager.RegisterSerializers(applicationPartManager);
-                var codeGenerator = new RoslynCodeGenerator(serializationManager, applicationPartManager, loggerFactory);
+                var parts = new ApplicationPartManager()
+                    .AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator())
+                    .AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>())
+                    .AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>())
+                    .AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
+                parts.AddApplicationPart(grainAssembly).WithReferences();
+                parts.AddApplicationPart(typeof(RuntimeVersion).Assembly).WithReferences();
+                var codeGenerator = new RoslynCodeGenerator(parts, loggerFactory);
                 return codeGenerator.GenerateSourceForAssembly(grainAssembly);
             }
         }
