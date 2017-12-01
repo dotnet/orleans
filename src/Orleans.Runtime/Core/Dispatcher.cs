@@ -328,33 +328,20 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || catalog.CanInterleave(targetActivation.ActivationId, incoming)
-                || IsCallChainReentrancyAllowed(targetActivation, incoming);
+                || targetActivation.ActivationId.Equals(incoming.SendingActivation)
+                || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
         }
 
         /// <summary>
-        /// Checks whether reentrancy is allowed for calls to grains that are already part of the call chain.
-        /// Designed for such cases as: grain A calls grain B, and while executing the invoked method B calls back to A. 
-        /// Also covers A -> A communications
         /// https://github.com/dotnet/orleans/issues/3184
+        /// Checks whether reentrancy is allowed for calls to grains that are already part of the call chain.
+        /// Covers following case: grain A calls grain B, and while executing the invoked method B calls back to A. 
+        /// Design: Senders collection `RunningRequestsSenders` contains sending grains references
+        /// during duration of request processing. If target of outgoing request is found in that collection - 
+        /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
-        /// <param name="targetActivation"></param>
-        /// <param name="incoming">Message to analyze</param>
-        /// <returns>Whether reentancy is allowed</returns>
-        private bool IsCallChainReentrancyAllowed(ActivationData targetActivation, Message incoming)
-        {
-            var targetChainId = targetActivation.CallChainId;
-            var incomingChainId = incoming.CallChainId;
-            if (targetChainId == null || incomingChainId == null)
-            {
-                return false;
-            }
-
-            return targetChainId.Equals(incomingChainId);
-        }
-
         private void EnsureCallChainIdIsSet(ActivationData sendingActivation, Message outgoing)
         {
             if (sendingActivation == null)
@@ -362,7 +349,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            outgoing.CallChainId = sendingActivation.CallChainId;
+            if (sendingActivation.RunningRequestsSenders.Contains(outgoing.TargetGrain))
+            {
+                outgoing.IsAlwaysInterleave = true;
+            }
         }
 
         /// <summary>

@@ -267,7 +267,7 @@ namespace Orleans.Runtime
 
         #endregion
 
-        public CorrelationId CallChainId { get; set; }
+        public HashSet<GrainId> RunningRequestsSenders { get; } = new HashSet<GrainId>();
 
         public ISchedulingContext SchedulingContext { get; }
 
@@ -479,12 +479,12 @@ namespace Orleans.Runtime
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
 
             numRunning++;
+            RunningRequestsSenders.Add(message.SendingGrain);
             if (Running != null) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             Running = message;
-            CallChainId = message.Id;
             currentRequestStartTime = DateTime.UtcNow;
         }
 
@@ -492,6 +492,7 @@ namespace Orleans.Runtime
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
             numRunning--;
+            RunningRequestsSenders.Remove(message.SendingGrain);
             if (numRunning == 0)
             {
                 becameIdle = DateTime.UtcNow;
