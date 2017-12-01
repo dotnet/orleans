@@ -39,7 +39,7 @@ namespace Orleans.Transactions.Tests
             await Assert.ThrowsAsync<OrleansTransactionTimeoutException>(() => WaitForTransactionCommit(id, this.logMaintenanceInterval + this.storageDelay));
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Intermitent failure, jbragg investigating")]
         public async Task DependentTransaction()
         {
             long id1 = this.transactionManager.StartTransaction(TimeSpan.FromTicks(this.storageDelay.Ticks * 2));
