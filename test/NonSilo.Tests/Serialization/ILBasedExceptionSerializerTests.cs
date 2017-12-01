@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
+using Orleans.Utilities;
 using TestExtensions;
 
 namespace UnitTests.Serialization
@@ -115,7 +117,7 @@ namespace UnitTests.Serialization
 
             // Check for referential equality in the fields which happened to be reference-equals.
             Assert.Equal(actual.Object.BaseField, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
-            Assert.Equal(actual.Object, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
+            Assert.Equal(actual, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
             Assert.Equal(actual.SomeFunObject, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
         }
 
@@ -152,7 +154,7 @@ namespace UnitTests.Serialization
         {
             var expected = GetNewException();
 
-            var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer());
+            var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer(new CachedTypeResolver()));
             
             var writer = new SerializationContext(this.environment.SerializationManager)
             {
@@ -171,13 +173,13 @@ namespace UnitTests.Serialization
             };
 
             // Ensure that the deserialized object has the fallback type.
-            var doesNotKnowException = new ILBasedExceptionSerializer(this.serializerGenerator, new TestTypeSerializer());
+            var doesNotKnowException = new ILBasedExceptionSerializer(this.serializerGenerator, new TestTypeSerializer(new CachedTypeResolver()));
             var untypedActual = doesNotKnowException.Deserialize(null, reader);
             Assert.IsType<RemoteNonDeserializableException>(untypedActual);
 
             // Ensure that the original type name is preserved correctly.
             var actualDeserialized = (RemoteNonDeserializableException) untypedActual;
-            Assert.Equal(typeof(ILExceptionSerializerTestException).AssemblyQualifiedName, actualDeserialized.OriginalTypeName);
+            Assert.Equal(RuntimeTypeNameFormatter.Format(typeof(ILExceptionSerializerTestException)), actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
             writer = new SerializationContext(this.environment.SerializationManager)
@@ -221,6 +223,7 @@ namespace UnitTests.Serialization
             public SomeFunObject BaseField { get; set; }
         }
 
+        [Serializable]
         private class ILExceptionSerializerTestException : BaseException
         {
             public string SubClassField { get; set; }
@@ -234,6 +237,10 @@ namespace UnitTests.Serialization
             {
                 if (throwOnError) throw new TypeLoadException($"Type {assemblyQualifiedTypeName} could not be loaded");
                 return null;
+            }
+
+            public TestTypeSerializer(ITypeResolver typeResolver) : base(typeResolver)
+            {
             }
         }
     }

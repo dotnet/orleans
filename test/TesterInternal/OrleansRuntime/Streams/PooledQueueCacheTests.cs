@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -83,7 +85,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class EvictionStrategy : ChronologicalEvictionStrategy<TestCachedMessage>
         {
-            public EvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            public EvictionStrategy(ILogger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
                 : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {
             }
@@ -199,8 +201,8 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
+            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 
@@ -216,8 +218,8 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NoOpTestLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
+            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
             dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
 
@@ -236,15 +238,16 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // now add messages into cache newer than cursor
             // Adding enough to fill the pool
-            for (int i = 0; i < MessagesPerBuffer * PooledBufferCount; i++)
-            {
-                cache.Add(new TestQueueMessage
+            List<TestQueueMessage> messages = Enumerable.Range(0, MessagesPerBuffer * PooledBufferCount)
+                .Select(i => new TestQueueMessage
                 {
                     StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
                     StreamNamespace = TestStreamNamespace,
-                    SequenceNumber = sequenceNumber++,
-                }, DateTime.UtcNow);
-            }
+                    SequenceNumber = sequenceNumber + i
+                })
+                .ToList();
+            cache.Add(messages, DateTime.UtcNow);
+            sequenceNumber += MessagesPerBuffer * PooledBufferCount;
 
             // get cursor for stream1, walk all the events in the stream using the cursor
             object stream1Cursor = cache.GetCursor(stream1, new EventSequenceTokenV2(startOfCache));
@@ -277,15 +280,16 @@ namespace UnitTests.OrleansRuntime.Streams
             // Add a blocks worth of events to the cache, then walk each cursor.  Do this enough times to fill the cache twice.
             for (int j = 0; j < PooledBufferCount*2; j++)
             {
-                for (int i = 0; i < MessagesPerBuffer; i++)
+                List<TestQueueMessage> moreMessages = Enumerable.Range(0, MessagesPerBuffer)
+                .Select(i => new TestQueueMessage
                 {
-                    cache.Add(new TestQueueMessage
-                    {
-                        StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
-                        StreamNamespace = TestStreamNamespace,
-                        SequenceNumber = sequenceNumber++,
-                    }, DateTime.UtcNow);
-                }
+                    StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
+                    StreamNamespace = TestStreamNamespace,
+                    SequenceNumber = sequenceNumber + i
+                })
+                .ToList();
+                cache.Add(moreMessages, DateTime.UtcNow);
+                sequenceNumber += MessagesPerBuffer;
 
                 // walk all the events in the stream using the cursor
                 while (cache.TryGetNextMessage(stream1Cursor, out batch))

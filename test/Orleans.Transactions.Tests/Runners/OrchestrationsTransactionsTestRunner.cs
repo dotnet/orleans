@@ -9,8 +9,13 @@ namespace Orleans.Transactions.Tests
 {
     public abstract class OrchestrationsTransactionsTestRunner : TransactionTestRunnerBase
     {
-        protected OrchestrationsTransactionsTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
-        : base(grainFactory, output) { }
+        private readonly TimeSpan DefaultWaitTime = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan waitTime;
+        protected OrchestrationsTransactionsTestRunner(IGrainFactory grainFactory, ITestOutputHelper output, TimeSpan? waitTime = null)
+        : base(grainFactory, output)
+        {
+            this.waitTime = waitTime ?? DefaultWaitTime;
+        }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.TransactionOrchestrationGrain)]
@@ -19,7 +24,7 @@ namespace Orleans.Transactions.Tests
             Guid grainId = Guid.NewGuid();
             ITransactionTestGrain grain = TestGrain(transactionTestGrainClassName, grainId);
             await grain.Get();
-            await CheckReport(grainId, 1, 0, 1);
+            await CheckReport(grainId, 1, 0);
         }
 
         [SkippableTheory]
@@ -32,7 +37,7 @@ namespace Orleans.Transactions.Tests
             await grain.Get();
             await grain.Add(delta);
             await grain.Get();
-            await CheckReport(grainId, 3, 0, 3);
+            await CheckReport(grainId, 3, 0);
         }
 
         [SkippableTheory]
@@ -59,7 +64,7 @@ namespace Orleans.Transactions.Tests
             }
             foreach (var grainId in grainIds)
             {
-                await CheckReport(grainId, 2, 0, 2);
+                await CheckReport(grainId, 2, 0);
             }
         }
 
@@ -88,7 +93,7 @@ namespace Orleans.Transactions.Tests
             }
             foreach (var grainId in grainIds)
             {
-                await CheckReport(grainId, 3, 0, 3);
+                await CheckReport(grainId, 3, 0);
             }
         }
 
@@ -108,18 +113,40 @@ namespace Orleans.Transactions.Tests
             await coordinator.MultiGrainAdd(grains, delta);
 
             await grains[0].Get();
-            await CheckReport(grainId, 2, 0, 2);
+            await CheckReport(grainId, 2, 0);
         }
 
-        private async Task CheckReport(Guid grainId, int perpareCount, int abortCount, int commitCount)
+        private async Task CheckReport(Guid grainId, int perpareCount, int abortCount)
+        {
+            var endTime = DateTime.UtcNow + this.waitTime;
+            while (DateTime.UtcNow < endTime)
+            {
+                bool passed = await CheckReport(grainId, perpareCount, abortCount, false);
+                if (passed) return;
+                await Task.Delay(this.waitTime.Milliseconds / 10);
+            }
+            await CheckReport(grainId, perpareCount, abortCount, true);
+        }
+
+        private async Task<bool> CheckReport(Guid grainId, int perpareCount, int abortCount, bool assert)
         {
             var resultGrain = this.grainFactory.GetGrain<ITransactionOrchestrationResultGrain>(grainId);
 
             TransactionOrchestrationResult results = await resultGrain.GetResults();
 
-            Assert.Equal(perpareCount, results.Prepared.Count);
-            Assert.Equal(abortCount, results.Aborted.Count);
-            Assert.Equal(commitCount, results.Committed.Count);
+            if(assert)
+            {
+                Assert.Equal(perpareCount, results.Prepared.Count);
+                Assert.Equal(abortCount, results.Aborted.Count);
+                Assert.Equal(results.Prepared.Max(), results.Committed.Aggregate((long)0, (t1, t2) => Math.Max(t1, t2)));
+            }
+            else if(perpareCount != results.Prepared.Count ||
+                      abortCount != results.Aborted.Count ||
+                      results.Prepared.Max() != results.Committed.Aggregate((long)0, (t1, t2) => Math.Max(t1, t2)))
+            {
+                return false;
+            }
+            return true;
         }
     }
 }

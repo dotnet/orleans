@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildTargetsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildTargetsFile)'))</_ParentDirectoryBuildTargetsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
+
+  <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
+    <PackageReference Include="SourceLink.Create.CommandLine" Version="$(SourceLinkVersion)" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

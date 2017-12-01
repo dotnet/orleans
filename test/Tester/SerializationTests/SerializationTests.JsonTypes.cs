@@ -128,13 +128,13 @@ namespace UnitTests.Serialization
             public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
-                context.SerializationManager.Serialize(str, context.StreamWriter);
+                context.GetSerializationManager().Serialize(str, context.StreamWriter);
             }
 
             [DeserializerMethod]
             public static object Deserialize(Type expected, IDeserializationContext context)
             {
-                var str = (string)context.SerializationManager.Deserialize(typeof(string), context.StreamReader);
+                var str = (string)context.GetSerializationManager().Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
             }
         }

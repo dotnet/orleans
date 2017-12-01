@@ -1,15 +1,23 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.25920.0
+VisualStudioVersion = 15.0.26730.12
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SiloHost", "src\SiloHost\SiloHost.csproj", "{8833CADE-80B5-4AA1-835E-594E907C58DF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SiloHost", "src\SiloHost\SiloHost.csproj", "{8833CADE-80B5-4AA1-835E-594E907C58DF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansClient", "src\OrleansClient\OrleansClient.csproj", "{18DFEAE0-0000-4EFF-825F-2150B0C509F8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansClient", "src\OrleansClient\OrleansClient.csproj", "{18DFEAE0-0000-4EFF-825F-2150B0C509F8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld.Interfaces", "src\HelloWorld.Interfaces\HelloWorld.Interfaces.csproj", "{1977C291-BE23-415A-8305-9E6F7B23203D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HelloWorld.Interfaces", "src\HelloWorld.Interfaces\HelloWorld.Interfaces.csproj", "{1977C291-BE23-415A-8305-9E6F7B23203D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld.Grains", "src\HelloWorld.Grains\HelloWorld.Grains.csproj", "{C8097F83-2D0E-4FFD-AEAE-AA075141289C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HelloWorld.Grains", "src\HelloWorld.Grains\HelloWorld.Grains.csproj", "{C8097F83-2D0E-4FFD-AEAE-AA075141289C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3C202E56-5082-4C00-9438-E0DFAAEC9326}"
+	ProjectSection(SolutionItems) = preProject
+		BuildAndRun.ps1 = BuildAndRun.ps1
+		BuildAndRun.sh = BuildAndRun.sh
+		NuGet.Config = NuGet.Config
+		Readme.md = Readme.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,5 +44,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {770CE15D-FCF4-4F37-BBC3-B62DEEFFB973}
 	EndGlobalSection
 EndGlobal

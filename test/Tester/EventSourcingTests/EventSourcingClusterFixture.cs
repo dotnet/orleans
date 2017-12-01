@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
 using TestExtensions;
 using Orleans.Runtime.Configuration;
@@ -47,14 +48,14 @@ namespace Tester.EventSourcingTests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
             }
 
             private void ConfigureLogging(ILoggingBuilder builder, string filePath)
             {
                 TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
                 builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
-                builder.AddFilter("LogViews", LogLevel.Debug);
+                builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
             }
         }
 

@@ -1,10 +1,10 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using HelloWorld.Interfaces;
+﻿using HelloWorld.Interfaces;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansClient
 {
@@ -15,33 +15,44 @@ namespace OrleansClient
     {
         static int Main(string[] args)
         {
-            var config = ClientConfiguration.LocalhostSilo();
-            try
-            {
-                InitializeWithRetries(config, initializeAttemptsBeforeFailing: 5);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Orleans client initialization failed failed due to {ex}");
-
-                Console.ReadLine();
-                return 1;
-            }
-
-            DoClientWork().Wait();
-            Console.WriteLine("Press Enter to terminate...");
-            Console.ReadLine();
-            return 0;
+            return RunMainAsync().Result;
         }
 
-        private static void InitializeWithRetries(ClientConfiguration config, int initializeAttemptsBeforeFailing)
+        private static async Task<int> RunMainAsync()
+        {
+            try
+            {
+                using (var client = await StartClientWithRetries())
+                {
+                    await DoClientWork(client);
+                    Console.ReadKey();
+                }
+
+                return 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return 1;
+            }
+        }
+
+        private static async Task<IClusterClient> StartClientWithRetries(int initializeAttemptsBeforeFailing = 5)
         {
             int attempt = 0;
+            IClusterClient client;
             while (true)
             {
                 try
                 {
-                    GrainClient.Initialize(config);
+                    var config = ClientConfiguration.LocalhostSilo();
+                    client = new ClientBuilder()
+                        .UseConfiguration(config)
+                        .AddApplicationPartsFromReferences(typeof(IHello).Assembly)
+                        .ConfigureLogging(logging => logging.AddConsole())
+                        .Build();
+
+                    await client.Connect();
                     Console.WriteLine("Client successfully connect to silo host");
                     break;
                 }
@@ -53,18 +64,19 @@ namespace OrleansClient
                     {
                         throw;
                     }
-                    Thread.Sleep(TimeSpan.FromSeconds(2));
+                    await Task.Delay(TimeSpan.FromSeconds(4));
                 }
             }
+
+            return client;
         }
 
-        private static async Task DoClientWork()
+        private static async Task DoClientWork(IClusterClient client)
         {
             // example of calling grains from the initialized client
-            var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
+            var friend = client.GetGrain<IHello>(0);
             var response = await friend.SayHello("Good morning, my friend!");
             Console.WriteLine("\n\n{0}\n\n", response);
         }
-
     }
 }

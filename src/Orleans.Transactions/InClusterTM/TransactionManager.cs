@@ -5,10 +5,12 @@ using System.Collections.Concurrent;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Transactions
-{
+{ 
     public class TransactionManager : ITransactionManager
     {
         private const int MaxCheckpointBatchSize = 200;
@@ -43,8 +45,9 @@ namespace Orleans.Transactions
         protected readonly ILogger logger;
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
-
-        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory, TimeSpan? logMaintenanceInterval = null)
+        private TransactionManagerMetrics metrics;
+        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer,
+            Factory<NodeConfiguration> getNodeConfig, TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
@@ -64,7 +67,8 @@ namespace Orleans.Transactions
             this.checkpointLock = new InterlockedExchangeLock();
             this.resources = new Dictionary<ITransactionalResource, long>();
             this.transactions = new List<Transaction>();
-
+            this.metrics =
+                new TransactionManagerMetrics(telemetryProducer, getNodeConfig().StatisticsMetricsTableWriteInterval);
             this.checkpointedLSN = 0;
             this.IsRunning = false;
         }
@@ -129,8 +133,8 @@ namespace Orleans.Transactions
 
         public long StartTransaction(TimeSpan timeout)
         {
+            this.metrics.StartTransactionRequestCounter++;
             var transactionId = activeTransactionsTracker.GetNewTransactionId();
-
             Transaction tx = new Transaction(transactionId)
             {
                 State = TransactionState.Started,
@@ -144,6 +148,9 @@ namespace Orleans.Transactions
 
         public void AbortTransaction(long transactionId, OrleansTransactionAbortedException reason)
         {
+            this.metrics.AbortTransactionRequestCounter++;
+            this.metrics.AbortedTransactionCounter++;
+            if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Abort transaction {transactionId} due to reason {reason}");
             if (transactionsTable.TryGetValue(transactionId, out Transaction tx))
             {
                 bool justAborted = false;
@@ -174,6 +181,7 @@ namespace Orleans.Transactions
 
         public void CommitTransaction(TransactionInfo transactionInfo)
         {
+            this.metrics.CommitTransactionRequestCounter++;
             if (transactionsTable.TryGetValue(transactionInfo.TransactionId, out Transaction tx))
             {
                 bool abort = false;
@@ -200,7 +208,9 @@ namespace Orleans.Transactions
                             if (!transactionsTable.TryGetValue(dependentId, out Transaction dependentTx))
                             {
                                 abort = true;
+                                if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Will abort transaction {transactionInfo.TransactionId} because it doesn't exist in the transaction table");
                                 cascadingDependentId = dependentId;
+                                this.metrics.AbortedTransactionDueToMissingInfoInTransactionTableCounter++;
                                 break;
                             }
 
@@ -212,7 +222,9 @@ namespace Orleans.Transactions
                                 if (dependentTx.State == TransactionState.Aborted)
                                 {
                                     abort = true;
+                                    if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug($"Will abort transaction {transactionInfo.TransactionId} because one of its dependent transaction {dependentTx.TransactionId} has aborted");
                                     cascadingDependentId = dependentId;
+                                    this.metrics.AbortedTransactionDueToDependencyCounter++;
                                     break;
                                 }
 
@@ -601,7 +613,7 @@ namespace Orleans.Transactions
                 {
                     this.logger.Error(OrleansTransactionsErrorCode.TransactionManager_TransactionLogMaintenanceError, $"Error while maintaining transaction log.", ex);
                 }
-
+                this.metrics.TryReportMetrics();
                 await Task.Delay(this.logMaintenanceInterval);
             }
         }

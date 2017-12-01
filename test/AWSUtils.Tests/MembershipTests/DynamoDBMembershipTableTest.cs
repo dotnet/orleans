@@ -1,15 +1,22 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
+using OrleansAWSUtils.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
+using OrleansAWSUtils;
+using OrleansAWSUtils.Membership;
+using OrleansAWSUtils.Options;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -36,13 +43,18 @@ namespace AWSUtils.Tests.MembershipTests
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
-
-            return new DynamoDBMembershipTable(this.loggerFactory);
+            var options = new DynamoDBMembershipOptions()
+            {
+                ConnectionString = this.connectionString,
+            };
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create<DynamoDBMembershipOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return new DynamoDBGatewayListProvider(this.loggerFactory);
+            var options = new DynamoDBGatewayListProviderOptions();
+            LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
+            return new DynamoDBGatewayListProvider(this.loggerFactory, this.clientConfiguration, Options.Create<DynamoDBGatewayListProviderOptions>(options));
         }
 
         protected override Task<string> GetConnectionString()

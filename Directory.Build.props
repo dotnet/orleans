@@ -23,9 +23,10 @@
   <!-- Common compile parameters -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <GenerateDocumentationFile Condition="'$(Configuration)'=='Release'">true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <!-- We use full (Windows PDBs) until cross platform support for source link will get better -->
+    <DebugType>full</DebugType>
   </PropertyGroup>
 
   <!-- FSharp SDK overrides -->
@@ -90,16 +91,21 @@
     <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>
 
     <!-- Test related packages -->
+    <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.10.9</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
-    <xUnitVersion>2.3.0-beta5-build3769</xUnitVersion>
+    <xUnitVersion>2.3.1</xUnitVersion>
+    <NodaTimeVersion>2.2.2</NodaTimeVersion>
+
+    <!-- Tooling related packages -->
+    <SourceLinkVersion>2.5.0</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
   <PropertyGroup>
     <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.0</VersionPrefix>
-    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">preview3</VersionSuffix>
+    <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -112,4 +118,36 @@
   <PropertyGroup>
     <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(Configuration)</PackageOutputPath>
   </PropertyGroup>
+
+  <Choose>
+    <When Condition="'$(OfficialBuild)' != 'true'">
+      <!-- On non-official builds we don't burn in a git sha.  In large part because it
+           hurts our determinism efforts as binaries which should be the same between
+           builds will not (due to developers building against different HEAD
+           values -->
+      <PropertyGroup>
+        <GitHeadSha>&lt;developer build&gt;</GitHeadSha>
+      </PropertyGroup>
+    </When>
+    <When Condition="'$(BUILD_SOURCEVERSION)' != ''">
+      <PropertyGroup>
+        <GitHeadSha>$(BUILD_SOURCEVERSION)</GitHeadSha>
+      </PropertyGroup>
+    </When>
+    <When Condition="'$(BUILD_SOURCEVERSION)' == '' AND '$(GIT_COMMIT)' != ''">
+      <PropertyGroup>
+        <GitHeadSha>$(GIT_COMMIT)</GitHeadSha>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <GitHeadSha>Not found</GitHeadSha>
+        <DotGitDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).git'))</DotGitDir>
+        <HeadFileContent Condition="Exists('$(DotGitDir)/HEAD')">$([System.IO.File]::ReadAllText('$(DotGitDir)/HEAD').Trim())</HeadFileContent>
+        <RefPath Condition="$(HeadFileContent.StartsWith('ref: '))">$(DotGitDir)/$(HeadFileContent.Substring(5))</RefPath>
+        <GitHeadSha Condition="'$(RefPath)' != '' AND Exists('$(RefPath)')">$([System.IO.File]::ReadAllText('$(RefPath)').Trim())</GitHeadSha>
+        <GitHeadSha Condition="'$(HeadFileContent)' != '' AND '$(RefPath)' == ''">$(HeadFileContent)</GitHeadSha>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
 </Project>

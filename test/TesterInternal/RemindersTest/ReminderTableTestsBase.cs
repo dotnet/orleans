@@ -27,20 +27,20 @@ namespace UnitTests.RemindersTest
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
-            loggerFactory = TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName, filters);
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid();
-            var deploymentId = "test-" + serviceId;
+            var clusterId = "test-" + serviceId;
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("ClusterId={0}", clusterId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration
             {
                 ServiceId = serviceId,
-                DeploymentId = deploymentId,
+                ClusterId = clusterId,
                 AdoInvariantForReminders = GetAdoInvariant(),
                 DataConnectionStringForReminders = fixture.ConnectionString
             };

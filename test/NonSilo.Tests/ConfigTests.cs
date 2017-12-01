@@ -12,6 +12,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -112,22 +113,6 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void LogFileName()
-        {
-            var oc = new ClusterConfiguration();
-            oc.StandardLoad();
-            NodeConfiguration n = oc.CreateNodeConfigurationForSilo("Node1");
-            string fname = n.TraceFileName;
-            Assert.NotNull(fname);
-            Assert.False(fname.Contains(":"), "Log file name should not contain colons.");
-
-            // Check that .NET is happy with the file name
-            var f = new FileInfo(fname);
-            Assert.NotNull(f.Name);
-            Assert.Equal(fname, f.Name);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_Default_ToString()
         {
             var cfg = new ClientConfiguration();
@@ -138,54 +123,6 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void ClientConfig_TraceFileName_Blank()
-        {
-            var cfg = new ClientConfiguration();
-            cfg.TraceFileName = string.Empty;
-            output.WriteLine(cfg.ToString());
-
-            cfg.TraceFileName = null;
-            output.WriteLine(cfg.ToString());
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void ClientConfig_TraceFilePattern_Blank()
-        {
-            var cfg = new ClientConfiguration();
-            cfg.TraceFilePattern = string.Empty;
-            output.WriteLine(cfg.ToString());
-            Assert.Null(cfg.TraceFileName);
-
-            cfg.TraceFilePattern = null;
-            output.WriteLine(cfg.ToString());
-            Assert.Null(cfg.TraceFileName);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void ServerConfig_TraceFileName_Blank()
-        {
-            var cfg = new NodeConfiguration();
-            cfg.TraceFileName = string.Empty;
-            output.WriteLine(cfg.ToString());
-
-            cfg.TraceFileName = null;
-            output.WriteLine(cfg.ToString());
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void ServerConfig_TraceFilePattern_Blank()
-        {
-            var cfg = new NodeConfiguration();
-            cfg.TraceFilePattern = string.Empty;
-            output.WriteLine(cfg.ToString());
-            Assert.Null(cfg.TraceFileName); // TraceFileName should be null
-
-            cfg.TraceFilePattern = null;
-            output.WriteLine(cfg.ToString());
-            Assert.Null(cfg.TraceFileName); // TraceFileName should be null
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ClientConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -203,7 +140,30 @@ namespace UnitTests
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ClientConfig_PropagateActivityId()
+        {
+            string filename = "Config_LogConsumers-ClientConfiguration.xml";
+            bool expectedPropagateActivityId = true;
+            var cfg = ClientConfiguration.LoadFromFile(filename);
+            Assert.Equal(filename, cfg.SourceFile);
+
+            Assert.Equal(cfg.PropagateActivityId, expectedPropagateActivityId);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void ServerConfig_PropagateActivityId()
+        {
+            string filename = "Config_LogConsumers-OrleansConfiguration.xml";
+            bool expectedPropagateActivityId = true;
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.Equal(filename, config.SourceFile);
+
+            Assert.Equal(config.Defaults.PropagateActivityId, expectedPropagateActivityId);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ServerConfig_TelemetryConsumers()
         {
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -601,7 +561,10 @@ namespace UnitTests
         {
             const string filename = "ClientConfig_NewAzure.xml";
 
-            var client = new ClientBuilder().LoadConfiguration(filename).Build();
+            var client = new ClientBuilder()
+                .AddApplicationPart(typeof(ISimpleGrain).Assembly)
+                .LoadConfiguration(filename)
+                .Build();
             try
             {
                 ClientConfiguration config = client.Configuration;
@@ -714,8 +677,7 @@ namespace UnitTests
         {
             const string filename = "DevTestServerConfiguration.xml";
             Guid myGuid = Guid.Empty;
-
-            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
+            
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
@@ -779,7 +741,7 @@ namespace UnitTests
             Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
             Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.Equal(deploymentId, siloConfig.Globals.DeploymentId); // DeploymentId
+            Assert.Equal(deploymentId, siloConfig.Globals.ClusterId); // ClusterId
             Assert.Equal(connectionString, siloConfig.Globals.DataConnectionString); // DataConnectionString
 
             Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
@@ -810,7 +772,7 @@ namespace UnitTests
 
             var config = new ClientConfiguration();
 
-            config.DeploymentId = deploymentId;
+            config.ClusterId = deploymentId;
             config.DataConnectionString = "UseDevelopmentStorage=true";
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
@@ -872,7 +834,6 @@ namespace UnitTests
             siloConfig.LoadFromFile(filename);
 
             output.WriteLine(siloConfig.Globals);
-            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
             Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
@@ -888,7 +849,6 @@ namespace UnitTests
         {
             const string filename = "Config_OldAzure.xml";
             
-            TestingUtils.CreateDefaultLoggerFactory(new NodeConfiguration().TraceFileName);
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 

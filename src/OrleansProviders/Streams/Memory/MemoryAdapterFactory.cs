@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers
 {
@@ -31,7 +32,8 @@ namespace Orleans.Providers
         private IServiceProvider serviceProvider;
         private MemoryAdapterConfig adapterConfig;
         private ITelemetryProducer telemetryProducer;
-        private Logger logger;
+        private ILogger logger;
+        private ILoggerFactory loggerFactory;
         private String providerName;
         private IGrainFactory grainFactory;
         private TimePurgePredicate purgePredicate;
@@ -80,11 +82,11 @@ namespace Orleans.Providers
         /// </summary>
         /// <param name="providerConfig"></param>
         /// <param name="name"></param>
-        /// <param name="log"></param>
         /// <param name="svcProvider"></param>
-        public void Init(IProviderConfiguration providerConfig, string name, Logger log, IServiceProvider svcProvider)
+        public void Init(IProviderConfiguration providerConfig, string name, IServiceProvider svcProvider)
         {
-            logger = log;
+            logger = svcProvider.GetService<ILogger<MemoryAdapterFactory<TSerializer>>>();
+            this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
             serviceProvider = svcProvider;
             providerName = name;
             queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
@@ -152,7 +154,7 @@ namespace Orleans.Providers
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
-            var receiverLogger = logger.GetSubLogger(typeof(MemoryAdapterReceiver<TSerializer>).Name);
+            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.providerName}.{queueId}");
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
@@ -193,7 +195,7 @@ namespace Orleans.Providers
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
-            var logger = this.logger.GetSubLogger(typeof(MemoryPooledCache<TSerializer>).Name);
+            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.providerName}.{queueId}");
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }

@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
-using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.Stats
 {
@@ -57,7 +55,8 @@ namespace UnitTests.Stats
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
-            Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
+            var statisticsOptions = this.HostedCluster.ServiceProvider.GetService<IOptions<StatisticsOptions>>().Value;
+            Assert.Equal("MockStats", statisticsOptions.ProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
@@ -98,9 +97,7 @@ namespace UnitTests.Stats
         [Fact, TestCategory("Manual"), TestCategory("Stats")]
         public void ApplicationRequestsStatisticsGroup_Perf()
         {
-            var config = new NodeConfiguration();
-            config.StatisticsCollectionLevel = StatisticsLevel.Info;
-            StatisticsCollector.Initialize(config);
+            StatisticsCollector.Initialize(StatisticsLevel.Info);
             ApplicationRequestsStatisticsGroup.Init(TimeSpan.FromSeconds(30));
             const long nIterations = 10000000;
             const int nValues = 1000;

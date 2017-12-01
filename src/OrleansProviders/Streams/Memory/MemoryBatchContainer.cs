@@ -48,7 +48,7 @@ namespace Orleans.Providers
             var context = Payload().RequestContext;
             if (context != null)
             {
-                RequestContext.Import(context);
+                RequestContextExtensions.Import(context);
                 return true;
             }
             return false;

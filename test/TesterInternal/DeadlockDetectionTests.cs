@@ -56,18 +56,9 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(grainId, true));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
 
-                try
-                {
-                    await firstGrain.CallNext_1(callChain, 1);
-                }
-                catch (Exception exc)
-                {
-                    Exception baseExc = exc.GetBaseException();
-                    this.fixture.Logger.Info(baseExc.Message);
-                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
-                    DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
-                }
+                var deadlockExc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
+                this.fixture.Logger.Info(deadlockExc.Message);
+                Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
             }
         }
 
@@ -86,18 +77,9 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(bBase + grainId, true));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
 
-                try
-                {
-                    await firstGrain.CallNext_1(callChain, 1);
-                }
-                catch (Exception exc)
-                {
-                    Exception baseExc = exc.GetBaseException();
-                    this.fixture.Logger.Info(baseExc.Message);
-                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
-                    DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
-                }
+                var deadlockExc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
+                this.fixture.Logger.Info(deadlockExc.Message);
+                Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
             }
         }
 
@@ -117,18 +99,9 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));
                 callChain.Add(new Tuple<long, bool>(grainId, true));
 
-                try
-                {
-                    await firstGrain.CallNext_1(callChain, 1);
-                }
-                catch (Exception exc)
-                {
-                    Exception baseExc = exc.GetBaseException();
-                    this.fixture.Logger.Info(baseExc.Message);
-                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
-                    DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
-                }
+                var exc = await Assert.ThrowsAsync<DeadlockException>(() => firstGrain.CallNext_1(callChain, 1));
+                this.fixture.Logger.Info(exc.Message);
+                Assert.Equal(callChain.Count, exc.CallChain.Count());
             }
         }
 

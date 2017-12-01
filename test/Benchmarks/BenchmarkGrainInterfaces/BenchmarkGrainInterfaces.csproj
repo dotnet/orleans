@@ -2,10 +2,11 @@
   <PropertyGroup>
     <RootNamespace>BenchmarkGrainInterfaces</RootNamespace>
     <AssemblyName>BenchmarkGrainInterfaces</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
 </Project>

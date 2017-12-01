@@ -5,6 +5,7 @@ using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -84,12 +85,6 @@ namespace UnitTests.Serialization
             Assert.Equal(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
         }
 
-        [Serializable]
-        private class TestTypeA
-        {
-            public ICollection<TestTypeA> Collection { get; set; }
-        }
-
         [Serializer(typeof(TestTypeA))]
         internal class TestTypeASerialization
         {
@@ -153,7 +148,7 @@ namespace UnitTests.Serialization
             Assert.True(input.SequenceEqual(output));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple()
         {
             var input = new List<ValueTuple<int>> { ValueTuple.Create(1), ValueTuple.Create(100) };
@@ -165,7 +160,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple2()
         {
             var input = new List<ValueTuple<int, int>> { ValueTuple.Create(1, 2), ValueTuple.Create(100, 200) };
@@ -177,7 +172,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple3()
         {
             var input = new List<ValueTuple<int, int, int>>
@@ -193,7 +188,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple4()
         {
             var input = new List<ValueTuple<int, int, int, int>>
@@ -209,7 +204,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple5()
         {
             var input = new List<ValueTuple<int, int, int, int, int>>
@@ -225,7 +220,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple6()
         {
             var input = new List<ValueTuple<int, int, int, int, int, int>>
@@ -241,7 +236,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple7()
         {
             var input = new List<ValueTuple<int, int, int, int, int, int, int>>
@@ -257,7 +252,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_ValueTuple8()
         {
             var valueTuple = ValueTuple.Create(1, 2, 3, 4, 5, 6, 7, 8);

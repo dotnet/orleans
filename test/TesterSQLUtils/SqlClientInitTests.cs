@@ -10,6 +10,8 @@ using Orleans.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace Tester.SQLUtils
 {
@@ -35,10 +37,8 @@ namespace Tester.SQLUtils
                 options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
                 options.ClientConfiguration.DataConnectionString = connectionString;
                 options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
-
                 return new TestCluster(options);
             }
-
         }
 
         static string statisticProviderName = "SQL";
@@ -63,7 +63,8 @@ namespace Tester.SQLUtils
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
-            Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
+            var statisticsOptions = this.HostedCluster.ServiceProvider.GetService<IOptions<StatisticsOptions>>();
+            Assert.Equal(statisticProviderName, statisticsOptions.Value.ProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");

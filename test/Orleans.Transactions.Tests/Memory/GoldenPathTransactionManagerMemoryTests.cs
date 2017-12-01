@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Development;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.Transactions.Tests
 {
@@ -13,7 +15,7 @@ namespace Orleans.Transactions.Tests
     public class GoldenPathTransactionManagerMemoryTests : GoldenPathTransactionManagerTestRunner
     {
         private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromMilliseconds(10);
-        private static readonly TimeSpan StorageDelay = TimeSpan.FromMilliseconds(1);
+        private static readonly TimeSpan StorageDelay = TimeSpan.FromMilliseconds(30);
 
         public GoldenPathTransactionManagerMemoryTests(ITestOutputHelper output)
             : base(MakeTransactionManager(), LogMaintenanceInterval, StorageDelay, output)
@@ -23,7 +25,7 @@ namespace Orleans.Transactions.Tests
         private static ITransactionManager MakeTransactionManager()
         {
             Factory<Task<ITransactionLogStorage>> storageFactory = () => Task.FromResult<ITransactionLogStorage>(new InMemoryTransactionLogStorage());
-            ITransactionManager tm = new TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, LogMaintenanceInterval);
+            ITransactionManager tm = new TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, ()=>new NodeConfiguration(), LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }

@@ -636,6 +636,54 @@ namespace UnitTests.SchedulerTests
             Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }
 
+        [Fact]
+        public async Task RequestContextProtectedInQueuedTasksTest()
+        {
+            string key = Guid.NewGuid().ToString();
+            string value = Guid.NewGuid().ToString();
+
+            // Caller RequestContext is protected from clear within QueueTask
+            RequestContext.Set(key, value);
+            await this.scheduler.QueueTask(() => AsyncCheckClearRequestContext(key), this.rootContext);
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is protected from clear within QueueTask even if work is not actually asynchronous.
+            await this.scheduler.QueueTask(() => NonAsyncCheckClearRequestContext(key), this.rootContext);
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is protected from clear when work is asynchronous.
+            Func<Task> asyncCheckClearRequestContext = async () =>
+            {
+                RequestContext.Clear();
+                Assert.Null(RequestContext.Get(key));
+                await Task.Delay(TimeSpan.Zero);
+            };
+            await asyncCheckClearRequestContext();
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is NOT protected from clear when work is not asynchronous.
+            Func<Task> nonAsyncCheckClearRequestContext = () =>
+            {
+                RequestContext.Clear();
+                Assert.Null(RequestContext.Get(key));
+                return Task.CompletedTask;
+            };
+            await nonAsyncCheckClearRequestContext();
+            Assert.Null(RequestContext.Get(key));
+        }
+
+        private async Task AsyncCheckClearRequestContext(string key)
+        {
+            Assert.Null(RequestContext.Get(key));
+            await Task.Delay(TimeSpan.Zero);
+        }
+
+        private Task NonAsyncCheckClearRequestContext(string key)
+        {
+            Assert.Null(RequestContext.Get(key));
+            return Task.CompletedTask;
+        }
+
         private void LogContext(string what)
         {
             lock (lockable)
@@ -666,8 +714,8 @@ namespace UnitTests.SchedulerTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();
             NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(config.TraceFileName, filters);
-            StatisticsCollector.Initialize(config);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.SiloName, orleansConfig.Globals.ClusterId), filters);
+            StatisticsCollector.Initialize(StatisticsLevel.Info);
             SchedulerStatisticsGroup.Init(loggerFactory);
             return loggerFactory;
         }

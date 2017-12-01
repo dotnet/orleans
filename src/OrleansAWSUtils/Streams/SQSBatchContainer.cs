@@ -106,7 +106,7 @@ namespace OrleansAWSUtils.Streams
         {
             if (requestContext != null)
             {
-                RequestContext.Import(requestContext);
+                RequestContextExtensions.Import(requestContext);
                 return true;
             }
             return false;

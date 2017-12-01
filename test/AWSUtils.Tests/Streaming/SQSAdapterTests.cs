@@ -28,7 +28,7 @@ namespace AWSUtils.Tests.Streaming
         private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private readonly string deploymentId;
+        private readonly string clusterId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
@@ -42,12 +42,12 @@ namespace AWSUtils.Tests.Streaming
 
             this.output = output;
             this.fixture = fixture;
-            this.deploymentId = MakeDeploymentId();
+            this.clusterId = MakeClusterId();
         }
 
         public void Dispose()
         {
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, this.clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         [SkippableFact]
@@ -56,12 +56,12 @@ namespace AWSUtils.Tests.Streaming
             var properties = new Dictionary<string, string>
                 {
                     {SQSAdapterFactory.DataConnectionStringPropertyName, AWSTestConstants.DefaultSQSConnectionString},
-                    {SQSAdapterFactory.DeploymentIdPropertyName, deploymentId}
+                    {SQSAdapterFactory.DeploymentIdPropertyName, this.clusterId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, new LoggerWrapper<SQSAdapter>(NullLoggerFactory.Instance), this.fixture.Services);
+            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, this.fixture.Services);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
@@ -128,7 +128,7 @@ namespace AWSUtils.Tests.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export(this.fixture.SerializationManager)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
@@ -191,9 +191,9 @@ namespace AWSUtils.Tests.Streaming
             }).ToList();
         }
 
-        internal static string MakeDeploymentId()
+        internal static string MakeClusterId()
         {
-            const string DeploymentIdFormat = "deployment-{0}";
+            const string DeploymentIdFormat = "cluster-{0}";
             string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
             return String.Format(DeploymentIdFormat, now);
         }

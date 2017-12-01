@@ -240,9 +240,6 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableStorageProvider(useJson, testName);
             var initialState = state.State;
 
-            var logger = new LoggerWrapper<PersistenceProviderTests_Local>(TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log"));
-            storage.InitLogger(logger);
-
             var entity = new DynamicTableEntity();
 
             storage.ConvertToStorageFormat(initialState, entity);
@@ -318,7 +315,7 @@ namespace Tester.AzureUtils.Persistence
         public void LoadClassByName()
         {
             string className = typeof(MockStorageProvider).FullName;
-            Type classType = TypeUtils.ResolveType(className);
+            Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }

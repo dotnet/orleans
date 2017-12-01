@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime.Configuration;
 
 
+#pragma warning disable CS0618 // Type or member is obsolete
 namespace Orleans.Runtime.Host
 {
     /// <summary>
@@ -88,7 +89,7 @@ namespace Orleans.Runtime.Host
             var config = new ClientConfiguration
             {
                 GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
-                DeploymentId = GetDeploymentId(),
+                ClusterId = GetDeploymentId(),
                 DataConnectionString = GetDataConnectionString(),
             };
             
@@ -130,7 +131,7 @@ namespace Orleans.Runtime.Host
             Trace.TraceInformation("Overriding Orleans client config from Azure runtime environment.");
             try
             {
-                config.DeploymentId = GetDeploymentId();
+                config.ClusterId = GetDeploymentId();
                 config.DataConnectionString = GetDataConnectionString();
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
             }
@@ -166,10 +167,10 @@ namespace Orleans.Runtime.Host
 
             //// Find endpoint info for the gateway to this Orleans silo cluster
             //Trace.WriteLine("Searching for Orleans gateway silo via Orleans instance table...");
-            var deploymentId = config.DeploymentId;
+            var clusterId = config.ClusterId;
             var connectionString = config.DataConnectionString;
-            if (String.IsNullOrEmpty(deploymentId))
-                throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.DeploymentId");
+            if (String.IsNullOrEmpty(clusterId))
+                throw new ArgumentException("Cannot connect to Azure silos with null deploymentId", "config.ClusterId");
             
             if (String.IsNullOrEmpty(connectionString))
                 throw new ArgumentException("Cannot connect to Azure silos with null connectionString", "config.DataConnectionString");
@@ -193,15 +194,15 @@ namespace Orleans.Runtime.Host
                     Trace.TraceError("Client.Initialize failed with exc -- {0}. Will try again", exc.Message);
                 }
                 // Pause to let Primary silo start up and register
-                Trace.TraceInformation("Pausing {0} awaiting silo and gateways registration for Deployment={1}", StartupRetryPause, deploymentId);
+                Trace.TraceInformation("Pausing {0} awaiting silo and gateways registration for Deployment={1}", StartupRetryPause, clusterId);
                 Thread.Sleep(StartupRetryPause);
             }
             
             if (initSucceeded) return;
 
             OrleansException err;
-            err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}. Last exception={1}",
-                deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}.", deploymentId));
+            err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}. Last exception={1}",
+                clusterId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for ClusterId={0}.", clusterId));
             Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
@@ -209,3 +210,4 @@ namespace Orleans.Runtime.Host
         #endregion
     }
 }
+#pragma warning restore CS0618 // Type or member is obsolete

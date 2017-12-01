@@ -13,6 +13,7 @@ using Xunit;
 using TestExtensions;
 using Tester;
 using Microsoft.Extensions.Logging;
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.TestingHost.Utils;
 
 namespace Tests.GeoClusterTests
@@ -52,7 +53,7 @@ namespace Tests.GeoClusterTests
                     return new SiloHostBuilder()
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(services => ConfigureLogging(services, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                        .ConfigureServices(services => ConfigureLogging(services, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
                 }
 
                 private void ConfigureLogging(IServiceCollection services, string filePath)
@@ -60,7 +61,7 @@ namespace Tests.GeoClusterTests
                     services.AddLogging(builder =>
                     {
                         TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                        builder.AddFilter("LogViews", LogLevel.Trace);
+                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Trace);
                     });
                 }
             }

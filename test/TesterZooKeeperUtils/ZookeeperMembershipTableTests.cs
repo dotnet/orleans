@@ -1,8 +1,13 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Host;
+using Orleans.Runtime.Membership;
+using OrleansZooKeeperUtils.Configuration;
 using TestExtensions;
 using Xunit;
 using Tester.ZooKeeperUtils;
@@ -29,13 +34,16 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger,
-                this.Services);
+            var options = new ZooKeeperMembershipOptions();
+            options.ConnectionString = this.connectionString;
+           
+            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(),
+               Options.Create<ZooKeeperMembershipOptions>(options), this.globalConfiguration);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_CLUSTERING_ZOOKEEPER,
                 logger, this.Services);
         }
 

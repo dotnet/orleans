@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
@@ -217,20 +218,22 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 siloName = $"Secondary_{siloIdx}";
                 siloType = Silo.SiloType.Secondary;
             }
-
+            
             var silo = AppDomainSiloHandle.Create(
                 siloName,
                 siloType,
                 typeof(TestVersionGrains.VersionGrainsSiloBuilderFactory),
-                options.ClusterConfiguration,
-                options.ClusterConfiguration.Overrides[siloName],
-                new Dictionary<string, GeneratedAssembly>(),
-                rootDir.FullName);
+                this.options.ClusterConfiguration,
+                this.options.ClusterConfiguration.Overrides[siloName],
+                applicationBase: rootDir.FullName);
 
             if (this.siloIdx == 0)
             {
                 // If it was the first silo, setup the client
-                Client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
+                Client = new ClientBuilder()
+                    .AddApplicationPartsFromAppDomain()
+                    .UseConfiguration(options.ClientConfiguration)
+                    .Build();
                 await Client.Connect();
                 ManagementGrain = Client.GetGrain<IManagementGrain>(0);
             }

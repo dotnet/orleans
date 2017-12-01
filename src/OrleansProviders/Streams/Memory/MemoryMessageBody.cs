@@ -58,7 +58,7 @@ namespace Orleans.Providers
 
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
-            this.serializationManager = context.SerializationManager;
+            this.serializationManager = context.GetSerializationManager();
         }
     }
 

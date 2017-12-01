@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+  </ItemGroup>
+  
+</Project>

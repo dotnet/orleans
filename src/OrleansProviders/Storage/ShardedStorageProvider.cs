@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 
@@ -43,17 +45,7 @@ namespace Orleans.Storage
     public class ShardedStorageProvider : IStorageProvider
     {
         private IStorageProvider[] storageProviders;
-        private static int counter;
-        private readonly int id;
-
-        /// <summary>
-        /// Default constructor.
-        /// </summary>
-        public ShardedStorageProvider()
-        {
-            id = Interlocked.Increment(ref counter);
-        }
-
+        private ILogger logger;
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
@@ -84,13 +76,16 @@ namespace Orleans.Storage
             if(config.Children.Count == 1)
                 throw new ArgumentException("At least two providers have to be listed.");
 
-            Log = providerRuntime.GetLogger("Storage.ShardedStorageProvider." + id);
+            var loggerName = $"{this.GetType().FullName}.{Name}";
+            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            this.logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             var providers = new List<IStorageProvider>();
             int index = 0;
             foreach( var provider in config.Children)
             {
-                Log.Info((int)ProviderErrorCode.ShardedStorageProvider_ProviderName, "Provider {0} = {1}", index++, provider.Name);
+                logger.Info((int)ProviderErrorCode.ShardedStorageProvider_ProviderName, "Provider {0} = {1}", index++, provider.Name);
                 providers.Add((IStorageProvider)provider);
                 
             }
@@ -142,7 +137,7 @@ namespace Orleans.Storage
             if (num < 0 || num >= storageProviders.Length)
             {
                 var msg = String.Format("Hash function returned out of bounds value {0}. This is an error.", num);
-                Log.Error((int)ProviderErrorCode.ShardedStorageProvider_HashValueOutOfBounds, msg);
+                logger.Error((int)ProviderErrorCode.ShardedStorageProvider_HashValueOutOfBounds, msg);
                 throw new OrleansException(msg);
             }
             return num;

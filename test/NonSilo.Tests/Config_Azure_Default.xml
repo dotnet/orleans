@@ -7,7 +7,5 @@
   <Globals>
   </Globals>
 	<Defaults>
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" >
-    </Tracing>
 	</Defaults>
 </OrleansConfiguration>

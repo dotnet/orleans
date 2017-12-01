@@ -44,7 +44,7 @@ namespace Tester.CustomPlacementTests
                         .ConfigureSiloName(siloName)
                         .UseConfiguration(clusterConfiguration)
                         .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName));
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
                 }
             }
 

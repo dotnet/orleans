@@ -1,5 +1,6 @@
-using System.Threading.Tasks;
 using HelloWorld.Interfaces;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace HelloWorld.Grains
 {
@@ -8,9 +9,17 @@ namespace HelloWorld.Grains
     /// </summary>
     public class HelloGrain : Orleans.Grain, IHello
     {
+        private readonly ILogger logger;
+
+        public HelloGrain(ILogger<HelloGrain> logger)
+        {
+            this.logger = logger;
+        }  
+
         Task<string> IHello.SayHello(string greeting)
         {
-            return Task.FromResult("You said: '" + greeting + "', I say: Hello!");
+            logger.LogInformation($"SayHello message received: greeting = '{greeting}'");
+            return Task.FromResult($"You said: '{greeting}', I say: Hello!");
         }
     }
 }

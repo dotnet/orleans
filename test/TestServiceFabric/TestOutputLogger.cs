@@ -1,23 +1,28 @@
 using System;
-using Orleans.Runtime;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions.Internal;
 namespace TestServiceFabric
 {
+    public class TestOutputLogger<TCategoryName> : TestOutputLogger, ILogger<TCategoryName>
+    {
+        public TestOutputLogger(ITestOutputHelper output, LogLevel level = LogLevel.Information) : base(output, typeof(TCategoryName).FullName, level)
+        {
+        }
+    }
+
     public class TestOutputLogger : ILogger
     {
+        private readonly LogLevel minLevel;
 
-        public string LoggerName { get; set; }
-
-        public string Name => this.LoggerName;
-        private LogLevel logLevel;
         public TestOutputLogger(ITestOutputHelper output, string name = null, LogLevel level = LogLevel.Information)
         {
             this.Output = output;
-            this.LoggerName = name ?? nameof(TestOutputLogger);
-            this.logLevel = level;
+            this.Name = name ?? nameof(TestOutputLogger);
+            this.minLevel = level;
         }
+
+        public string Name { get; }
 
         public IDisposable BeginScope<TState>(TState state)
         {
@@ -28,7 +33,7 @@ namespace TestServiceFabric
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return logLevel > this.logLevel;
+            return logLevel > this.minLevel;
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,

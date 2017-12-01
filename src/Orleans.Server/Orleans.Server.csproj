@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Server</PackageId>
+    <Title>Microsoft Orleans Server Libraries</Title>
+    <Description>Collection of Microsoft Orleans libraries and files needed on the server.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\Orleans.Core\Configuration\OrleansConfiguration.xsd">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+</Project>

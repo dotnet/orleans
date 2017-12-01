@@ -79,7 +79,7 @@ namespace UnitTests.Serialization
 
             Assert.Null(input.Context);
             Assert.NotNull(deserialized.Context);
-            Assert.Equal(this.fixture.SerializationManager, deserialized.Context.SerializationManager);
+            Assert.Equal(this.fixture.SerializationManager, deserialized.Context.GetSerializationManager());
         }
 
         /// <summary>

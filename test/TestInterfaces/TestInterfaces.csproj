@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.Interfaces</RootNamespace>
     <AssemblyName>TestInterfaces</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

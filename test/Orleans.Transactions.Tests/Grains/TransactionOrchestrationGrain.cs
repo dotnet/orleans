@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Providers;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions;
 
 namespace Orleans.Transactions.Tests
 {

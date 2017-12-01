@@ -5,6 +5,9 @@ using System.Linq;
 using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
+using Benchmarks.TransactionManager;
+using Benchmarks.Ping;
+using Benchmarks.Transactions;
 
 namespace Benchmarks
 {
@@ -28,7 +31,55 @@ namespace Benchmarks
             ["Serialization"] = () =>
             {
                 BenchmarkRunner.Run<SerializationBenchmarks>();
-            }
+            },
+            ["TransactionManager.Azure"] = () =>
+            {
+                RunBenchmark(
+                "Running Azure TransactionManager benchmark",
+                () =>
+                {
+                    return new TransactionManagerBenchmarks();
+                },
+                benchmark => benchmark.RunAgainstAzure(),
+                benchmark => { });
+            },
+            ["TransactionManager.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running Azure TransactionManager benchmark",
+                () =>
+                {
+                    return new TransactionManagerBenchmarks();
+                },
+                benchmark => benchmark.RunAgainstMemory(),
+                benchmark => { });
+            },
+            ["Transactions"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Ping"] = () =>
+            {
+                RunBenchmark(
+                "Running Ping benchmark",
+                () =>
+                {
+                    var benchmark = new PingBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
@@ -63,6 +114,7 @@ namespace Benchmarks
             benchmarkAction(bench);
             Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
             tearDown(bench);
+            Console.WriteLine("Press any key to continue ...");
             Console.ReadLine();
         }
     }

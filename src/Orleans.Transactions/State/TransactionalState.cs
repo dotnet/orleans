@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
+using Newtonsoft.Json;
+using Orleans.Transactions;
 
 namespace Orleans.Transactions
 {
@@ -31,19 +31,28 @@ namespace Orleans.Transactions
         private readonly Dictionary<long, TState> transactionCopy;
         private readonly AsyncSerialExecutor<bool> storageExecutor;
 
-        private IStorage<TransactionalStateRecord<TState>> storage;
         private ITransactionalResource transactionalResource;
 
-        // In-memory version of the persistent state.
-        private readonly SortedDictionary<long, LogRecord<TState>> log;
-        private TState value;
-        private TransactionalResourceVersion version;
-        private long stableVersion;
-        private bool validState;
+        // storage
+        private ITransactionalStateStorage<TState> storage;
 
-        private long writeLowerBound;
+        // only to be modified at save/load time
+        private Metadata metadata;
+        private string eTag;
+        private bool validState;
+        private TState commitedState;
+
+        // In-memory version of the persistent state.
+        private TState value;
+        private readonly SortedDictionary<long, LogRecord<TState>> log;
+        private TransactionalResourceVersion version;
+        private long highestReadTransactionId;
+        private long highCommitTransactionId;
 
         public TState State => GetState();
+
+        private string stateName;
+        private string StateName => stateName ?? (stateName = StoredName());
 
         public TransactionalState(ITransactionalStateConfiguration transactionalStateConfiguration, IGrainActivationContext context, ITransactionDataCopier<TState> copier, ITransactionAgent transactionAgent, IProviderRuntime runtime, ILoggerFactory loggerFactory)
         {
@@ -52,7 +61,7 @@ namespace Orleans.Transactions
             this.copier = copier;
             this.transactionAgent = transactionAgent;
             this.runtime = runtime;
-            this.logger = loggerFactory.CreateLogger($"{this.context.GrainIdentity}+{this.config.StateName}");
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.context.GrainIdentity}.{this.config.StateName}");
             this.transactionCopy = new Dictionary<long, TState>();
             this.storageExecutor = new AsyncSerialExecutor<bool>();
             this.log = new SortedDictionary<long, LogRecord<TState>>();
@@ -65,7 +74,7 @@ namespace Orleans.Transactions
         {
             var info = TransactionContext.GetTransactionInfo();
 
-            this.logger.Debug("Write {0}", info);
+            if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Write {0}", info);
 
             if (info.IsReadOnly)
             {
@@ -73,7 +82,7 @@ namespace Orleans.Transactions
                 throw new OrleansReadOnlyViolatedException(info.TransactionId);
             }
 
-            Restore();
+            Rollback();
 
             var copiedValue = this.transactionCopy[info.TransactionId];
 
@@ -81,7 +90,7 @@ namespace Orleans.Transactions
             // Validation
             //
 
-            if (this.version.TransactionId > info.TransactionId || this.writeLowerBound >= info.TransactionId)
+            if (this.version.TransactionId > info.TransactionId || this.highestReadTransactionId >= info.TransactionId)
             {
                 // Prevent cycles. Wait-die
                 throw new OrleansTransactionWaitDieException(info.TransactionId);
@@ -93,7 +102,7 @@ namespace Orleans.Transactions
             //
             // Update Transaction Context
             //
-            info.RecordWrite(transactionalResource, this.version, this.stableVersion);
+            info.RecordWrite(transactionalResource, this.version, this.metadata.StableVersion.TransactionId);
 
             //
             // Modify the State
@@ -124,13 +133,15 @@ namespace Orleans.Transactions
         async Task<bool> ITransactionalResource.Prepare(long transactionId, TransactionalResourceVersion? writeVersion,
             TransactionalResourceVersion? readVersion)
         {
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Prepare {0}", transactionId);
+
             this.transactionCopy.Remove(transactionId);
 
             long wlb = 0;
             if (readVersion.HasValue)
             {
-                this.writeLowerBound = Math.Max(this.writeLowerBound, readVersion.Value.TransactionId - 1);
-                wlb = this.writeLowerBound;
+                this.highestReadTransactionId = Math.Max(this.highestReadTransactionId, readVersion.Value.TransactionId - 1);
+                wlb = this.highestReadTransactionId;
             }
 
             if (!ValidateWrite(writeVersion))
@@ -164,6 +175,8 @@ namespace Orleans.Transactions
         /// </summary>
         Task ITransactionalResource.Abort(long transactionId)
         {
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Abort {0}", transactionId);
+
             // Rollback t if it has changed the grain
             if (this.log.ContainsKey(transactionId))
             {
@@ -177,14 +190,18 @@ namespace Orleans.Transactions
         /// </summary>
         async Task ITransactionalResource.Commit(long transactionId)
         {
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Commit {0}", transactionId);
+
             // Learning that t is committed implies that all pending transactions before t also committed
-            if (transactionId > this.stableVersion)
+            if (transactionId > this.metadata.StableVersion.TransactionId)
             {
+                this.highCommitTransactionId = Math.Max(this.highCommitTransactionId, transactionId);
                 try
                 {
                     bool success = await this.storageExecutor.AddNext(() => GuardState(() => PersistCommit(transactionId)));
-                } catch(Exception)
+                } catch(Exception ex)
                 {
+                    this.logger.Info(OrleansTransactionsErrorCode.Transactions_CommitFailed, "Commit {0} failed.  Recovering.  Exception: {1}", transactionId, ex);
                     // On error, queue up a recovery action.  Will do nothing if state recovers before this is processed
                     this.storageExecutor.AddNext(() => GuardState(() => Task.FromResult(true))).Ignore();
                     throw;
@@ -196,8 +213,8 @@ namespace Orleans.Transactions
         {
             if (!this.validState)
             {
-                await this.storage.ReadStateAsync();
-                DoRecovery();
+                this.logger.Debug("Invalid state found. Recovering.");
+                await DoLoad();
             }
             this.validState = false;
             bool results = await action();
@@ -207,6 +224,8 @@ namespace Orleans.Transactions
 
         private async Task<bool> PersistPrepare(long wlb, long transactionId, TransactionalResourceVersion? writeVersion, TransactionalResourceVersion? readVersion)
         {
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("PersistPrepare. WLB: {0}, transactionId: {1}", wlb, transactionId);
+
             if (!ValidateWrite(writeVersion))
             {
                 return false;
@@ -218,24 +237,40 @@ namespace Orleans.Transactions
             }
 
             // check if we need to do a log write
-            if (this.storage.State.Version.TransactionId >= transactionId && this.storage.State.WriteLowerBound >= wlb)
+            if (this.metadata.StableVersion.TransactionId >= transactionId && this.metadata.HighestReadTransactionId >= wlb)
             {
                 // Logs already persisted, nothing to do here
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("PersistPrepare TransactionId {1} ignored. Already persisted", transactionId);
                 return true;
             }
 
-            await Persist(this.storage.State.StableVersion, wlb);
+            List<PendingTransactionState<TState>> pending = this.log.Select(kvp => new PendingTransactionState<TState>(kvp.Value.Version.ToString(), kvp.Key, kvp.Value.NewVal)).ToList();
+            Metadata metadata = new Metadata()
+            {
+                StableVersion = this.metadata.StableVersion,
+                HighestVersion = this.version,
+                HighestReadTransactionId = wlb
+            };
+            this.eTag = await this.storage.Persist(StateName, this.eTag, metadata.ToString(), pending);
+            this.metadata = metadata;
 
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("PersistPrepare TransactionId {1} succeded", transactionId);
             return true;
         }
 
         private async Task<bool> PersistCommit(long transactionId)
         {
-            if (transactionId <= this.storage.State.StableVersion)
+            transactionId = Math.Max(this.highCommitTransactionId, transactionId);
+            if (transactionId <= this.metadata.StableVersion.TransactionId)
             {
                 // Transaction commit already persisted.
                 return true;
             }
+
+            // find version related to this transaction
+            LogRecord<TState> stableRecord = this.log.First(kvp => kvp.Key <= transactionId).Value;
+            TransactionalResourceVersion stableversion = stableRecord.Version;
+            TState stableState = stableRecord.NewVal;
 
             // Trim the logs to remove old versions. 
             // Note that we try to keep the highest version that is below or equal to the ReadOnlyTransactionId
@@ -254,10 +289,22 @@ namespace Orleans.Transactions
             if (this.log.Count != 0)
             {
                 List<KeyValuePair<long, LogRecord<TState>>> records = this.log.TakeWhile(kvp => kvp.Key < highestKey).ToList();
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    records.ForEach(kvp => this.logger.Debug("Removing committed transaction from log: transactionId: {1}", kvp.Key));
                 records.ForEach(kvp => this.log.Remove(kvp.Key));
             }
 
-            await Persist(transactionId, this.writeLowerBound);
+            Metadata newMetadata = new Metadata()
+            {
+                StableVersion = stableversion,
+                HighestVersion = this.version,
+                HighestReadTransactionId = this.highestReadTransactionId,
+            };
+            this.eTag = await this.storage.Confirm(StateName, this.eTag, newMetadata.ToString(), stableversion.ToString());
+            this.metadata = newMetadata;
+            this.commitedState = stableState;
+            UpdateActiveState();
+
             return true;
         }
         #endregion ITransactionalResource
@@ -300,14 +347,14 @@ namespace Orleans.Transactions
 
             var info = TransactionContext.GetTransactionInfo();
 
-            this.logger.Debug("Read {0}", info);
-
-            Restore();
+            Rollback();
 
             if (this.transactionCopy.TryGetValue(info.TransactionId, out TState state))
             {
                 return state;
             }
+
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("GetState {0}", info);
 
             if (!TryGetVersion(info.TransactionId, out TState readState, out TransactionalResourceVersion readVersion))
             {
@@ -315,14 +362,14 @@ namespace Orleans.Transactions
                 throw new OrleansTransactionVersionDeletedException(info.TransactionId);
             }
 
-            if (info.IsReadOnly && readVersion.TransactionId > this.stableVersion)
+            if (info.IsReadOnly && readVersion.TransactionId > this.metadata.StableVersion.TransactionId)
             {
                 throw new OrleansTransactionUnstableVersionException(info.TransactionId);
             }
 
-            info.RecordRead(transactionalResource, readVersion, this.storage.State.StableVersion);
+            info.RecordRead(transactionalResource, readVersion, this.metadata.StableVersion.TransactionId);
 
-            writeLowerBound = Math.Max(writeLowerBound, info.TransactionId - 1);
+            this.highestReadTransactionId = Math.Max(this.highestReadTransactionId, info.TransactionId - 1);
 
             TState copy = this.copier.DeepCopy(readState);
 
@@ -342,6 +389,7 @@ namespace Orleans.Transactions
             List<KeyValuePair<long, LogRecord<TState>>> records = this.log.SkipWhile(kvp => kvp.Key < transactionId).ToList();
             foreach (KeyValuePair<long, LogRecord<TState>> kvp in records)
             {
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Removing transaction {0} in rollback", kvp.Key);
                 this.log.Remove(kvp.Key);
                 this.transactionCopy.Remove(kvp.Key);
             }
@@ -349,73 +397,33 @@ namespace Orleans.Transactions
             if (this.log.Count > 0)
             {
                 LogRecord<TState> lastLogRecord = this.log.Values.Last();
+                if (this.logger.IsEnabled(LogLevel.Debug) && this.version != lastLogRecord.Version)
+                    this.logger.Debug("Rolling back from {0} to {1}", this.version, lastLogRecord.Version);
                 this.version = lastLogRecord.Version;
                 this.value = lastLogRecord.NewVal;
             }
             else
             {
-                this.version = TransactionalResourceVersion.Create(0, 0);
-                this.value = new TState();
+                if (this.logger.IsEnabled(LogLevel.Debug) && this.version != this.metadata.StableVersion)
+                    this.logger.Debug("Rolling back to stable version, from {0} to {1}", this.version, this.metadata.StableVersion);
+                this.version = this.metadata.StableVersion;
+                this.value = this.commitedState;
             }
         }
 
         /// <summary>
         /// Check with the transaction agent and rollback any aborted transaction.
         /// </summary>
-        private void Restore()
+        private void Rollback()
         {
             foreach (var transactionId in this.log.Keys)
             {
-                if (transactionId > this.storage.State.StableVersion && transactionAgent.IsAborted(transactionId))
+                if (transactionId > this.metadata.StableVersion.TransactionId && transactionAgent.IsAborted(transactionId))
                 {
                     Rollback(transactionId);
                     return;
                 }
             }
-        }
-
-        /// <summary>
-        /// Write log in the format needed for the persistence framework and copy to the persistent state interface.
-        /// </summary>
-        private void RecordInPersistedLog()
-        {
-            this.storage.State.Logs.Clear();
-            foreach (KeyValuePair<long, LogRecord<TState>> kvp in this.log)
-            {
-                this.storage.State.Logs[kvp.Key] = kvp.Value.NewVal;
-            }
-        }
-
-        /// <summary>
-        /// Read Log from persistent state interface.
-        /// </summary>
-        private void RevertToPersistedLog()
-        {
-            this.log.Clear();
-            foreach (KeyValuePair<long, TState> kvp in this.storage.State.Logs)
-            {
-                this.log[kvp.Key] = new LogRecord<TState>
-                {
-                    NewVal = kvp.Value,
-                    Version = TransactionalResourceVersion.Create(kvp.Key, 1)
-                };
-            }
-        }
-
-        private async Task Persist(long newStableVersion, long newWriteLowerBound)
-        {
-            RecordInPersistedLog();
-
-            // update storage state
-            TransactionalStateRecord<TState> storageState = this.storage.State;
-            storageState.Value = this.value;
-            storageState.Version = this.version;
-            storageState.StableVersion = newStableVersion;
-            storageState.WriteLowerBound = newWriteLowerBound;
-
-            await this.storage.WriteStateAsync();
-
-            this.stableVersion = newStableVersion;
         }
 
         private bool ValidateWrite(TransactionalResourceVersion? writeVersion)
@@ -424,7 +432,10 @@ namespace Orleans.Transactions
                 return true;
 
             // Validate that we still have all of the transaction's writes.
-            return this.log.TryGetValue(writeVersion.Value.TransactionId, out LogRecord<TState> logRecord) && logRecord.Version == writeVersion.Value;
+            var validate  = this.log.TryGetValue(writeVersion.Value.TransactionId, out LogRecord<TState> logRecord) && logRecord.Version == writeVersion.Value;
+            if(!validate && this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.Debug($"ValidateWrite failed, because version is not the same as recorded in state log record of the same transaction, write version in the log record is {logRecord.Version}, version to be validated is {writeVersion.Value}");
+            return validate;
         }
 
         private bool ValidateRead(long transactionId, TransactionalResourceVersion? readVersion)
@@ -441,28 +452,75 @@ namespace Orleans.Transactions
 
                 if (key > readVersion.Value.TransactionId && key < transactionId)
                 {
+                    if(this.logger.IsEnabled(LogLevel.Debug))
+                        this.logger.Debug($"ValidateRead failed, due to one of the log record has larger transaction Id than the one in read version {readVersion.Value.TransactionId}, and smaller than transaction {transactionId}");
                     return false;
                 }
             }
 
-            if (readVersion.Value.TransactionId == 0) return readVersion.Value.WriteNumber == 0;
+            if (readVersion.Value.TransactionId == this.metadata.StableVersion.TransactionId)
+            {
+                if (readVersion.Value.WriteNumber != this.metadata.StableVersion.WriteNumber && this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.Debug("ValidateRead failed, due to invalid write count. TransactionId: {0}, ReadVersion: {1}, StableVersion {3}", transactionId, readVersion.Value, this.metadata.StableVersion);
+                return readVersion.Value.WriteNumber == this.metadata.StableVersion.WriteNumber;
+            }
+            if (readVersion.Value.TransactionId < this.metadata.StableVersion.TransactionId) return true;
             // If version read by the transaction is lost, return false.
-            if (!this.log.TryGetValue(readVersion.Value.TransactionId, out LogRecord<TState> logRecord)) return false;
+            if (!this.log.TryGetValue(readVersion.Value.TransactionId, out LogRecord<TState> logRecord))
+            {
+                if(this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.Debug("ValidateRead failed, due to version read by the transaction lost. TransactionId: {0}, ReadVersion: {1}", transactionId, readVersion.Value);
+                return false;
+            }
+        
+            
             // If version is not same it was overridden by the same transaction that originally wrote it.
-            return logRecord.Version == readVersion.Value;
+            if (logRecord.Version != readVersion.Value)
+            {
+                if(this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.Debug("ValidateRead failed, because version is not same as recorded by state log record of the same transaction. TransactionId: {0}, ReadVersion: {1}, logVersion {2}", transactionId, readVersion.Value, logRecord.Version);
+                return false;
+            }
+
+            return true;
         }
 
-        private void DoRecovery()
+        private async Task DoLoad()
         {
-            TransactionalStateRecord<TState> storageState = this.storage.State;
-            this.stableVersion = storageState.StableVersion;
-            this.writeLowerBound = storageState.WriteLowerBound;
-            this.version = storageState.Version;
-            this.value = storageState.Value;
-            RevertToPersistedLog();
+            this.logger.Debug("DoLoad");
+            // load inital state
+            TransactionalStorageLoadResponse<TState> loadResponse = await this.storage.Load(StateName);
+            this.eTag = loadResponse.ETag;
+            this.metadata = Metadata.FromString(loadResponse.Metadata);
+            this.version = this.metadata.HighestVersion;
+            this.highestReadTransactionId = this.metadata.HighestReadTransactionId;
+            this.commitedState = loadResponse.CommittedState;
+            foreach (PendingTransactionState<TState> pendingState in loadResponse.PendingStates)
+            {
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.Debug("Rebuilding log from storage for {0}", pendingState.SequenceId);
+                this.log[pendingState.SequenceId] = new LogRecord<TState>
+                {
+                    NewVal = pendingState.State,
+                    Version = (TransactionalResourceVersion.TryParse(pendingState.TransactionId, out TransactionalResourceVersion version)) ? version : default(TransactionalResourceVersion)
+                };
+            }
+
+            UpdateActiveState();
+        }
+
+        private void UpdateActiveState()
+        {
+            this.logger.Debug("UpdateActiveState");
+            if(this.metadata.HighestVersion > this.version)
+                this.version =  this.metadata.HighestVersion;
+            this.value = this.log.TryGetValue(this.version.TransactionId, out LogRecord<TState> record)
+                ? record.NewVal
+                : this.commitedState;
+            this.log.Clear();
 
             // Rollback any known aborted transactions
-            Restore();
+            Rollback();
         }
 
         private async Task OnSetupState(CancellationToken ct)
@@ -473,17 +531,12 @@ namespace Orleans.Transactions
             boundExtension.Item1.Register(this.config.StateName, this);
             this.transactionalResource = boundExtension.Item2.AsTransactionalResource(this.config.StateName);
 
-            // wire up storage provider
-            IStorageProvider storageProvider = string.IsNullOrWhiteSpace(this.config.StorageName)
-                ? this.context.ActivationServices.GetRequiredService<IStorageProvider>()
-                : this.context.ActivationServices.GetServiceByKey<string, IStorageProvider>(this.config.StorageName);
-            this.storage = new StateStorageBridge<TransactionalStateRecord<TState>>(StoredName(), this.context.GrainInstance.GrainReference, storageProvider);
-
-            // load inital state
-            await this.storage.ReadStateAsync();
+            INamedTransactionalStateStorageFactory storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
+            this.storage = storageFactory.Create<TState>(this.config.StorageName);
 
             // recover state
-            DoRecovery();
+            await DoLoad();
+
             this.validState = true;
         }
 
@@ -501,30 +554,58 @@ namespace Orleans.Transactions
         {
             return $"{this.context.GrainInstance}.{this.config.StateName}";
         }
-    }
 
-    [Serializable]
-    public class LogRecord<T>
-    {
-        public T NewVal { get; set; }
-        public TransactionalResourceVersion Version { get; set; }
-    }
+        private class Metadata
+        {
+            private static readonly JsonSerializerSettings settings = new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.All,
+                PreserveReferencesHandling = PreserveReferencesHandling.Objects,
+                DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                NullValueHandling = NullValueHandling.Ignore,
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
+                Formatting = Formatting.None
+            };
 
-    [Serializable]
-    public class TransactionalStateRecord<TState>
-        where TState : class, new()
-    {
-        // The transactionId of the transaction that wrote the current value
-        public TransactionalResourceVersion Version { get; set; }
+            [JsonIgnore]
+            public TransactionalResourceVersion HighestVersion { get; set; }
+            public string HighestVersionString
+            {
+                get { return this.HighestVersion.ToString(); }
+                set { this.HighestVersion = (TransactionalResourceVersion.TryParse(value, out TransactionalResourceVersion version)) ? version : default(TransactionalResourceVersion); }
+            }
 
-        // The last known committed version
-        public long StableVersion { get; set; }
+            [JsonIgnore]
+            public TransactionalResourceVersion StableVersion { get; set; }
+            public string StableVersionString
+            {
+                get { return this.StableVersion.ToString(); }
+                set { this.StableVersion = (TransactionalResourceVersion.TryParse(value, out TransactionalResourceVersion version)) ? version : default(TransactionalResourceVersion); }
+            }
 
-        // Writes of transactions with Id equal or below this will be rejected
-        public long WriteLowerBound { get; set; }
+            public long HighestReadTransactionId { get; set; }
 
-        public SortedDictionary<long, TState> Logs { get; set; } = new SortedDictionary<long, TState>();
+            // TODO consider passing metadata type to storage, and letting storage handle serialization
+            #region Serialization
+            public override string ToString()
+            {
+                return JsonConvert.SerializeObject(this, settings);
+            }
 
-        public TState Value { get; set; } = new TState();
+            public static Metadata FromString(string metadataString)
+            {
+                return (!string.IsNullOrEmpty(metadataString)) ? JsonConvert.DeserializeObject<Metadata>(metadataString, settings) : new Metadata();
+            }
+            #endregion
+        }
+
+        private class LogRecord<T>
+        {
+            public T NewVal { get; set; }
+            public TransactionalResourceVersion Version { get; set; }
+        }
     }
 }

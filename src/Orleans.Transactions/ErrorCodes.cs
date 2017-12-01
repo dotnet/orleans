@@ -14,16 +14,16 @@ namespace Orleans.Transactions
         /// Start of orlean servicebus errocodes
         /// </summary>
         OrleansTransactions = 1 << 17,
-
-        Transactions_IdAllocationFailed = OrleansTransactions + 1,
-        Transactions_PrepareFailed      = Transactions_IdAllocationFailed+1,
+            Transactions_IdAllocationFailed = OrleansTransactions,
+            Transactions_PrepareFailed      = OrleansTransactions + 1,
+            Transactions_CommitFailed       = OrleansTransactions + 2,
 
         // transaction manager errors
         TransactionManagerErrorCodes = OrleansTransactions + 1000,
-        TransactionManager_GroupCommitError = TransactionManagerErrorCodes,
-        TransactionManager_CheckpointError = TransactionManager_GroupCommitError + 1,
-        TransactionManager_TransactionLogMaintenanceError = TransactionManager_CheckpointError + 1,
-        TransactionManager_TransactionLogTruncationError = TransactionManager_TransactionLogMaintenanceError + 1,
+            TransactionManager_GroupCommitError                 = TransactionManagerErrorCodes,
+            TransactionManager_CheckpointError                  = TransactionManagerErrorCodes + 1,
+            TransactionManager_TransactionLogMaintenanceError   = TransactionManagerErrorCodes + 2,
+            TransactionManager_TransactionLogTruncationError    = TransactionManagerErrorCodes + 3,
     }
 
     internal static class LoggerExtensions
