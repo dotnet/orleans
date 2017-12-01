@@ -479,7 +479,11 @@ namespace Orleans.Runtime
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
 
             numRunning++;
-            RunningRequestsSenders.Add(message.SendingGrain);
+            if (message.Direction != Message.Directions.OneWay && message.SendingGrain != null)
+            {
+                RunningRequestsSenders.Add(message.SendingGrain);
+            }
+
             if (Running != null) return;
 
             // This logic only works for non-reentrant activations
