@@ -15,6 +15,9 @@ namespace Orleans.Messaging
     internal class GatewayConnection : OutgoingMessageSender, IQueueDrainable
     {
         private readonly MessageFactory messageFactory;
+
+        private readonly ManualResetEvent initializationEvent = new ManualResetEvent(false);
+
         internal bool IsLive { get; private set; }
         internal ProxiedMessageCenter MsgCenter { get; private set; }
 
@@ -59,8 +62,15 @@ namespace Orleans.Messaging
                 {
                     return;
                 }
+
                 Connect();
-                if (!IsLive) return;
+                initializationEvent.Set();
+                if (!IsLive)
+                {
+                    // Only partially initialized, callers responsibility 
+                    // is not to use this object.
+                    return;
+                }
 
                 // If the Connect succeeded
                 receiver.Start();
@@ -71,6 +81,7 @@ namespace Orleans.Messaging
         public override void Stop()
         {
             IsLive = false;
+            initializationEvent.Reset();
             receiver.Stop();
             base.Stop();
             MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
@@ -83,6 +94,11 @@ namespace Orleans.Messaging
             if (s == null) return;
 
             CloseSocket(s);
+        }
+
+        public void WaitInitialization()
+        {
+            initializationEvent.WaitOne();
         }
 
         protected override void Process(Message msg)
