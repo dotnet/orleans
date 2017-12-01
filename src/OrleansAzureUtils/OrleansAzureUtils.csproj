@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
-    <ProjectReference Include="..\Orleans.Hosting.CloudServices\Orleans.Hosting.CloudServices.csproj" />
+    <ProjectReference Include="..\Orleans.Hosting.CloudServices\Orleans.Hosting.AzureCloudServices.csproj" />
     <ProjectReference Include="..\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
     <ProjectReference Include="..\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
     <ProjectReference Include="..\Orleans.Statistics.AzureStorage\Orleans.Statistics.AzureStorage.csproj" />
