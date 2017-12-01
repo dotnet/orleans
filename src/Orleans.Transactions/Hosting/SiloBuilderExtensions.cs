@@ -10,6 +10,14 @@ namespace Orleans.Transactions
     public static class SiloBuilderExtensions
     {
         /// <summary>
+        /// Configure cluster to use an in-cluster transaction manager using defaults.
+        /// </summary>
+        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder)
+        {
+            return builder.UseInClusterTransactionManager(options => { });
+        }
+
+        /// <summary>
         /// Configure cluster to use an in-cluster transaction manager.
         /// </summary>
         public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder, Action<TransactionsOptions> configureOptions)
