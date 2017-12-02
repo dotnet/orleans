@@ -1,6 +1,10 @@
 ﻿using System;
+using System.Linq;
 using Orleans;
+using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Xunit;

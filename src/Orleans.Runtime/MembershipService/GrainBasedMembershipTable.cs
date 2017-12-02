@@ -87,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string deploymentId) => this.grain.DeleteMembershipTableEntries(deploymentId);
+        public Task DeleteMembershipTableEntries(string clusterId) => this.grain.DeleteMembershipTableEntries(clusterId);
 
         public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key);
 
@@ -127,9 +127,9 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task DeleteMembershipTableEntries(string deploymentId)
+        public Task DeleteMembershipTableEntries(string clusterId)
         {
-            logger.Info("DeleteMembershipTableEntries {0}", deploymentId);
+            logger.Info("DeleteMembershipTableEntries {0}", clusterId);
             table = null;
             return Task.CompletedTask;
         }

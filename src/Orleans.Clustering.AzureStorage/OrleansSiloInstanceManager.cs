@@ -30,17 +30,17 @@ namespace Orleans.AzureUtils
 
         public string DeploymentId { get; private set; }
 
-        private OrleansSiloInstanceManager(string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private OrleansSiloInstanceManager(string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            DeploymentId = deploymentId;
+            DeploymentId = clusterId;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
                 INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory);
         }
 
-        public static async Task<OrleansSiloInstanceManager> GetManager(string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            var instance = new OrleansSiloInstanceManager(deploymentId, storageConnectionString, loggerFactory);
+            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, loggerFactory);
             try
             {
                 await instance.storage.InitTableAsync()
@@ -187,11 +187,11 @@ namespace Orleans.AzureUtils
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        internal async Task<int> DeleteTableEntries(string deploymentId)
+        internal async Task<int> DeleteTableEntries(string clusterId)
         {
-            if (deploymentId == null) throw new ArgumentNullException("deploymentId");
+            if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
-            var entries = await storage.ReadAllTableEntriesForPartitionAsync(deploymentId);
+            var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
             var entriesList = new List<Tuple<SiloInstanceTableEntry, string>>(entries);
             if (entriesList.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {

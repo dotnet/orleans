@@ -73,9 +73,9 @@ namespace Orleans.AzureUtils
             this.logger = this.loggerFactory.CreateLogger<StatsTableDataManager>();
         }
 
-        async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName)
         {
-            this.deploymentId = deploymentId;
+            this.deploymentId = clusterId;
             this.address = address;
             name = siloName;
             myHostName = hostName;

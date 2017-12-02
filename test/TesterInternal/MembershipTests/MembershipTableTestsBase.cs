@@ -36,7 +36,7 @@ namespace UnitTests.MembershipTests
         private readonly Logger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
-        protected readonly string deploymentId;
+        protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
         protected GlobalConfiguration globalConfiguration;
@@ -48,15 +48,15 @@ namespace UnitTests.MembershipTests
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             logger = new LoggerWrapper<MembershipTableTestsBase>(loggerFactory);
 
-            deploymentId = "test-" + Guid.NewGuid();
+            this.clusterId = "test-" + Guid.NewGuid();
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("ClusterId={0}", this.clusterId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
             globalConfiguration = new GlobalConfiguration
             {
-                DeploymentId = deploymentId,
+                ClusterId = this.clusterId,
                 AdoInvariant = GetAdoInvariant(),
                 DataConnectionString = fixture.ConnectionString
             };
@@ -66,7 +66,7 @@ namespace UnitTests.MembershipTests
 
             clientConfiguration = new ClientConfiguration
             {
-                DeploymentId = globalConfiguration.DeploymentId,
+                ClusterId = globalConfiguration.ClusterId,
                 AdoInvariant = globalConfiguration.AdoInvariant,
                 DataConnectionString = globalConfiguration.DataConnectionString
             };
@@ -85,7 +85,7 @@ namespace UnitTests.MembershipTests
         {
             if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                membershipTable.DeleteMembershipTableEntries(deploymentId).Wait();
+                membershipTable.DeleteMembershipTableEntries(this.clusterId).Wait();
             }
             this.loggerFactory.Dispose();
         }

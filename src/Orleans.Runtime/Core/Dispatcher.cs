@@ -173,7 +173,7 @@ namespace Orleans.Runtime
                                             nonExistentActivation), exc);
                                 }
                             },
-                            () => "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
+                            "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
                             catalog.SchedulingContext);
 
                         ProcessRequestToInvalidActivation(message, nonExistentActivation, null, "Non-existent activation");

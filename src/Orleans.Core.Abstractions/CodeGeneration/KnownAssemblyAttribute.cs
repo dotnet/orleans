@@ -34,6 +34,7 @@ namespace Orleans.CodeGeneration
         /// serializable.
         /// </summary>
         /// <remarks>This is equivalent to specifying <see cref="KnownTypeAttribute"/> for all types.</remarks>
+        [Obsolete("This property is no longer supported. Serializers will be generated for all accessible types.")]
         public bool TreatTypesAsSerializable { get; set; }
     }
 }

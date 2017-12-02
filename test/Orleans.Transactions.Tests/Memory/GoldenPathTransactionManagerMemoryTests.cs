@@ -15,7 +15,7 @@ namespace Orleans.Transactions.Tests
     public class GoldenPathTransactionManagerMemoryTests : GoldenPathTransactionManagerTestRunner
     {
         private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromMilliseconds(10);
-        private static readonly TimeSpan StorageDelay = TimeSpan.FromMilliseconds(1);
+        private static readonly TimeSpan StorageDelay = TimeSpan.FromMilliseconds(30);
 
         public GoldenPathTransactionManagerMemoryTests(ITestOutputHelper output)
             : base(MakeTransactionManager(), LogMaintenanceInterval, StorageDelay, output)

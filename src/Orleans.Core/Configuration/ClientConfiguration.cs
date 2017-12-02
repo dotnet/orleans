@@ -64,13 +64,24 @@ namespace Orleans.Runtime.Configuration
         public GatewayProviderType GatewayProvider { get; set; }
 
         /// <summary>
-        /// Specifies a unique identifier of this deployment.
+        /// Specifies a unique identifier for this cluster.
         /// If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime, 
         /// accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config. 
         /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
         /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConfiguration.xml file.
         /// </summary>
-        public string DeploymentId { get; set; }
+        public string ClusterId { get; set; }
+
+        /// <summary>
+        /// Deployment Id. This is the same as ClusterId and has been deprecated in favor of it.
+        /// </summary>
+        [Obsolete("DeploymentId is the same as ClusterId.")]
+        public string DeploymentId
+        {
+            get => this.ClusterId;
+            set => this.ClusterId = value;
+        }
+
         /// <summary>
         /// Specifies the connection string for the gateway provider.
         /// If the silos are deployed on Azure (run as workers roles), DataConnectionString may be specified via RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
@@ -136,7 +147,7 @@ namespace Orleans.Runtime.Configuration
         { 
             get { 
                 return GatewayProvider == GatewayProviderType.AzureTable 
-                       && !String.IsNullOrWhiteSpace(DeploymentId) 
+                       && !String.IsNullOrWhiteSpace(this.ClusterId) 
                        && !String.IsNullOrWhiteSpace(DataConnectionString); 
             } 
         }
@@ -148,7 +159,7 @@ namespace Orleans.Runtime.Configuration
             get
             {
                 return GatewayProvider == GatewayProviderType.SqlServer
-                && !String.IsNullOrWhiteSpace(DeploymentId)
+                && !String.IsNullOrWhiteSpace(this.ClusterId)
                 && !String.IsNullOrWhiteSpace(DataConnectionString);
             }
         }
@@ -170,7 +181,7 @@ namespace Orleans.Runtime.Configuration
             NetInterface = null;
             Port = 0;
             DNSHostName = Dns.GetHostName();
-            DeploymentId = "";
+            this.ClusterId = "";
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
@@ -234,7 +245,7 @@ namespace Orleans.Runtime.Configuration
                             }
                             if (child.HasAttribute("DeploymentId"))
                             {
-                                DeploymentId = child.GetAttribute("DeploymentId");
+                                this.ClusterId = child.GetAttribute("DeploymentId");
                             }
                             if (child.HasAttribute(Constants.DATA_CONNECTION_STRING_NAME))
                             {
@@ -454,10 +465,10 @@ namespace Orleans.Runtime.Configuration
                 sb.Append("   Preferred Gateway Address: ").AppendLine(Gateways[PreferedGatewayIndex].ToString());
             }
             sb.Append("   GatewayListRefreshPeriod: ").Append(GatewayListRefreshPeriod).AppendLine();
-            if (!String.IsNullOrEmpty(DeploymentId) || !String.IsNullOrEmpty(DataConnectionString))
+            if (!String.IsNullOrEmpty(this.ClusterId) || !String.IsNullOrEmpty(DataConnectionString))
             {
                 sb.Append("   Azure:").AppendLine();
-                sb.Append("      DeploymentId: ").Append(DeploymentId).AppendLine();
+                sb.Append("      ClusterId: ").Append(this.ClusterId).AppendLine();
                 string dataConnectionInfo = ConfigUtilities.RedactConnectionStringInfo(DataConnectionString); // Don't print Azure account keys in log files
                 sb.Append("      DataConnectionString: ").Append(dataConnectionInfo).AppendLine();
             }
@@ -522,7 +533,7 @@ namespace Orleans.Runtime.Configuration
                     break;
                 case GatewayProviderType.SqlServer:
                     if (!UseSqlSystemStore)
-                        throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but DeploymentId or DataConnectionString are not specified or not complete.", "GatewayProvider");
+                        throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but ClusterId or DataConnectionString are not specified or not complete.", "GatewayProvider");
                     break;
                 case GatewayProviderType.ZooKeeper:
                     break;
