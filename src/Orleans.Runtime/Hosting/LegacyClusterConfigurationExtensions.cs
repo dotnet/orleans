@@ -35,7 +35,7 @@ namespace Orleans.Hosting
                     return () => initializationParams.NodeConfig;
                 });
 
-            services.Configure<SiloIdentityOptions>(options =>
+            services.Configure<SiloOptions>(options =>
             {
 #pragma warning disable CS0618 // Type or member is obsolete
                 if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.DeploymentId))
@@ -74,9 +74,9 @@ namespace Orleans.Hosting
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
 
-            services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloIdentityOptions>>((options, identityOptions) =>
+            services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloOptions>>((options, siloOptions) =>
             {
-                var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(identityOptions.Value.SiloName);
+                var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
 

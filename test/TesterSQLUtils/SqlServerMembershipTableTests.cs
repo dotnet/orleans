@@ -40,7 +40,7 @@ namespace UnitTests.MembershipTests
                 AdoInvariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new SqlMembershipTable(this.GrainReferenceConverter, this.siloIdentityOptions, Options.Create(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

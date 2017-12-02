@@ -24,7 +24,7 @@ namespace UnitTests.RemindersTest
 
         private readonly IReminderTable remindersTable;
         protected ILoggerFactory loggerFactory;
-        protected IOptions<SiloIdentityOptions> siloIdentityOptions;
+        protected IOptions<SiloOptions> siloOptions;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
@@ -36,7 +36,7 @@ namespace UnitTests.RemindersTest
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);
-            siloIdentityOptions = Options.Create(new SiloIdentityOptions { ClusterId = clusterId });
+            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration

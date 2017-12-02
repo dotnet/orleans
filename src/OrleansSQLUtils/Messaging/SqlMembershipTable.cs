@@ -15,12 +15,12 @@ namespace Orleans.Runtime.MembershipService
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly SqlMembershipOptions membershipTableOptions;
-        public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloIdentityOptions> siloIdentityOptions, IOptions<SqlMembershipOptions> membershipTableoptions, ILogger<SqlMembershipTable> logger)
+        public SqlMembershipTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<SqlMembershipOptions> membershipTableoptions, ILogger<SqlMembershipTable> logger)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;
             this.membershipTableOptions = membershipTableoptions.Value;
-            this.clusterId = siloIdentityOptions.Value.ClusterId;
+            this.clusterId = siloOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)

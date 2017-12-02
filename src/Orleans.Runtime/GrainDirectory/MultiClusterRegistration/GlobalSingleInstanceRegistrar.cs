@@ -40,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
-            IOptions<SiloIdentityOptions> siloIdentityOptions)
+            IOptions<SiloOptions> siloOptions)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
             this.logger = logger;
@@ -48,8 +48,8 @@ namespace Orleans.Runtime.GrainDirectory
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.hasMultiClusterNetwork = siloIdentityOptions.Value.HasMultiClusterNetwork;
-            this.clusterId = siloIdentityOptions.Value.ClusterId;
+            this.hasMultiClusterNetwork = siloOptions.Value.HasMultiClusterNetwork;
+            this.clusterId = siloOptions.Value.ClusterId;
         }
 
         public bool IsSynchronous { get { return false; } }

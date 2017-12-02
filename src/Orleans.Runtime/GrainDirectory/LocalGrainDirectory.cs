@@ -102,13 +102,13 @@ namespace Orleans.Runtime.GrainDirectory
             RegistrarManager registrarManager,
             ExecutorService executorService,
             IOptions<DevelopmentMembershipOptions> developmentMembershipOptions,
-            IOptions<SiloIdentityOptions> siloIdentityOptions,
+            IOptions<SiloOptions> siloOptions,
             ILoggerFactory loggerFactory)
         {
             this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
             var globalConfig = clusterConfig.Globals;
 
-            var clusterId = siloIdentityOptions.Value.HasMultiClusterNetwork ? siloIdentityOptions.Value.ClusterId : null;
+            var clusterId = siloOptions.Value.HasMultiClusterNetwork ? siloOptions.Value.ClusterId : null;
             MyAddress = siloDetails.SiloAddress;
 
             Scheduler = scheduler;
@@ -134,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
                     grainFactory, 
                     executorService,
                     loggerFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, siloIdentityOptions, loggerFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, siloOptions, loggerFactory);
 
             var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndPoint;
             if (primarySiloEndPoint != null)

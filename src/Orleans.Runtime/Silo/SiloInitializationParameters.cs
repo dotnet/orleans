@@ -6,7 +6,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Silo identity configuration options.
     /// </summary>
-    public class SiloIdentityOptions
+    public class SiloOptions
     {
         /// <summary>
         /// Gets or sets the silo name.
@@ -32,12 +32,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="SiloInitializationParameters"/> class. 
         /// </summary>
-        /// <param name="identityOptions">The identity of this silo.</param>
+        /// <param name="siloOptions">The identity of this silo.</param>
         /// <param name="config">The cluster configuration.</param>
         public SiloInitializationParameters(
-            IOptions<SiloIdentityOptions> identityOptions,
+            IOptions<SiloOptions> siloOptions,
             ClusterConfiguration config) : this(
-            identityOptions.Value.SiloName,
+            siloOptions.Value.SiloName,
             config)
         {
         }

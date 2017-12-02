@@ -37,7 +37,7 @@ namespace UnitTests.MembershipTests
             var options = new ZooKeeperMembershipOptions();
             options.ConnectionString = this.connectionString;
            
-            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.siloIdentityOptions);
+            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.siloOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)

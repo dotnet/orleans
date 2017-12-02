@@ -21,10 +21,10 @@ namespace Orleans.Runtime.Versions
 
         public bool IsEnabled { get; private set; }
 
-        public GrainVersionStore(IInternalGrainFactory grainFactory, IOptions<SiloIdentityOptions> siloIdentityOptions)
+        public GrainVersionStore(IInternalGrainFactory grainFactory, IOptions<SiloOptions> siloOptions)
         {
             this.grainFactory = grainFactory;
-            this.clusterId = siloIdentityOptions.Value.ClusterId;
+            this.clusterId = siloOptions.Value.ClusterId;
             this.IsEnabled = false;
         }
 

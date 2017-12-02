@@ -40,7 +40,7 @@ namespace UnitTests.MembershipTests
         protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
-        protected IOptions<SiloIdentityOptions> siloIdentityOptions;
+        protected IOptions<SiloOptions> siloOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly ClientConfiguration clientConfiguration;
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
@@ -55,7 +55,7 @@ namespace UnitTests.MembershipTests
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
-            this.siloIdentityOptions = Options.Create(new SiloIdentityOptions() { ClusterId = this.clusterId });
+            this.siloOptions = Options.Create(new SiloOptions() { ClusterId = this.clusterId });
             var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);

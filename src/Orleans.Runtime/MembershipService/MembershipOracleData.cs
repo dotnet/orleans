@@ -31,7 +31,7 @@ namespace Orleans.Runtime.MembershipService
 
         private UpdateFaultCombo myFaultAndUpdateZones;
 
-        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, GlobalConfiguration globalConfig, Logger log, SiloIdentityOptions siloIdentityOptions)
+        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, GlobalConfiguration globalConfig, Logger log, SiloOptions siloOptions)
         {
             logger = log;
             localTable = new Dictionary<SiloAddress, MembershipEntry>();  
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.MembershipService
             MyAddress = siloDetails.SiloAddress;
             MyHostname = nodeConfiguration.DNSHostName;
             SiloName = siloDetails.Name;
-            this.multiClusterActive = siloIdentityOptions.HasMultiClusterNetwork;
+            this.multiClusterActive = siloOptions.HasMultiClusterNetwork;
             this.maxMultiClusterGateways = globalConfig.MaxMultiClusterGateways;
             CurrentStatus = SiloStatus.Created;
             clusterSizeStatistic = IntValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER_SIZE, () => localTableCopyOnlyActive.Count);

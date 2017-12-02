@@ -59,7 +59,7 @@ namespace Orleans.Runtime
         }
 
         private readonly SiloInitializationParameters initializationParams;
-        private readonly SiloIdentityOptions siloIdentityOptions;
+        private readonly SiloOptions siloOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -180,7 +180,7 @@ namespace Orleans.Runtime
                 serviceCollection.AddSingleton<Silo>(this);
                 serviceCollection.AddSingleton(initializationParams);
                 serviceCollection.AddLegacyClusterConfigurationSupport(config);
-                serviceCollection.Configure<SiloIdentityOptions>(options => options.SiloName = name);
+                serviceCollection.Configure<SiloOptions>(options => options.SiloName = name);
                 var hostContext = new HostBuilderContext(new Dictionary<object, object>());
                 DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
 
@@ -270,9 +270,9 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
-            this.siloIdentityOptions = Services.GetRequiredService<IOptions<SiloIdentityOptions>>().Value;
+            this.siloOptions = Services.GetRequiredService<IOptions<SiloOptions>>().Value;
 
-            if (!this.siloIdentityOptions.HasMultiClusterNetwork)
+            if (!this.siloOptions.HasMultiClusterNetwork)
             {
                 logger.Info("Skip multicluster oracle creation (no multicluster network configured)");
             }
@@ -522,10 +522,10 @@ namespace Orleans.Runtime
                 .WithTimeout(this.initTimeout);
 
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
-            if (this.siloIdentityOptions.HasMultiClusterNetwork) 
+            if (this.siloOptions.HasMultiClusterNetwork) 
             {
                 logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                    GlobalConfig.ServiceId, this.siloIdentityOptions.ClusterId);
+                    GlobalConfig.ServiceId, this.siloOptions.ClusterId);
 
                 this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
                                                           this.providerManagerSystemTarget.SchedulingContext;

@@ -37,7 +37,7 @@ namespace Orleans.Runtime.LogConsistency
         private readonly Grain grain;   // links to the grain that owns this service object
         private readonly MultiClusterConfiguration pseudoMultiClusterConfiguration;
 
-        private readonly SiloIdentityOptions siloIdentityOptions;
+        private readonly SiloOptions siloOptions;
 
         public ProtocolServices(
             Grain gr,
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.LogConsistency
             IMultiClusterRegistrationStrategy strategy,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
-            IOptions<SiloIdentityOptions> siloIdentityOptions,
+            IOptions<SiloOptions> siloOptions,
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
@@ -54,13 +54,13 @@ namespace Orleans.Runtime.LogConsistency
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
             this.multiClusterOracle = multiClusterOracle;
-            this.siloIdentityOptions = siloIdentityOptions.Value;
+            this.siloOptions = siloOptions.Value;
 
-            if (!this.siloIdentityOptions.HasMultiClusterNetwork)
+            if (!this.siloOptions.HasMultiClusterNetwork)
             {
                 // we are creating a default multi-cluster configuration containing exactly one cluster, this one.
                 this.pseudoMultiClusterConfiguration = PseudoMultiClusterConfigurations.FindOrCreate(
-                    this.siloIdentityOptions.ClusterId,
+                    this.siloOptions.ClusterId,
                     CreatePseudoConfig);
             }
         }
@@ -72,10 +72,10 @@ namespace Orleans.Runtime.LogConsistency
         public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
 
-            log?.Verbose3("SendMessage {0}->{1}: {2}", this.siloIdentityOptions.ClusterId, clusterId, payload);
+            log?.Verbose3("SendMessage {0}->{1}: {2}", this.siloOptions.ClusterId, clusterId, payload);
 
             // send the message to ourself if we are the destination cluster
-            if (this.siloIdentityOptions.ClusterId == clusterId)
+            if (this.siloOptions.ClusterId == clusterId)
             {
                 var g = (ILogConsistencyProtocolParticipant)grain;
                 // we are on the same scheduler, so we can call the method directly
@@ -123,13 +123,13 @@ namespace Orleans.Runtime.LogConsistency
         /// <inheritdoc />
         public SerializationManager SerializationManager { get; }
 
-        public bool MultiClusterEnabled => this.siloIdentityOptions.HasMultiClusterNetwork;
+        public bool MultiClusterEnabled => this.siloOptions.HasMultiClusterNetwork;
     
         public string MyClusterId
         {
             get
             {
-                return this.siloIdentityOptions.ClusterId;
+                return this.siloOptions.ClusterId;
             }
         }
 
@@ -150,7 +150,7 @@ namespace Orleans.Runtime.LogConsistency
             {
                 foreach (var cluster in this.multiClusterOracle.GetMultiClusterConfiguration().Clusters)
                 {
-                    if (cluster != this.siloIdentityOptions.ClusterId)
+                    if (cluster != this.siloOptions.ClusterId)
                         yield return cluster;
                 }
             }
@@ -200,7 +200,7 @@ namespace Orleans.Runtime.LogConsistency
             if (!this.MultiClusterEnabled)
                 throw new OrleansException(string.Format("{0} (grain={1})", msg, grain.GrainReference));
             else
-                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.siloIdentityOptions.ClusterId));
+                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.siloOptions.ClusterId));
         }
 
         public void CaughtException(string where, Exception e)

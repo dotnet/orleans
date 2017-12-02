@@ -21,7 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly TimeSpan period;
         private readonly IMultiClusterOracle multiClusterOracle;
-        private readonly SiloIdentityOptions siloIdentityOptions;
+        private readonly SiloOptions siloOptions;
 
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
@@ -35,7 +35,7 @@ namespace Orleans.Runtime.GrainDirectory
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
             ExecutorService executorService,
-            IOptions<SiloIdentityOptions> siloIdentityOptions,
+            IOptions<SiloOptions> siloOptions,
             ILoggerFactory loggerFactory)
             :base(executorService, loggerFactory)
         {
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.logger = logger;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.siloIdentityOptions = siloIdentityOptions.Value;
+            this.siloOptions = siloOptions.Value;
             this.period = config.GlobalSingleInstanceRetryInterval;
             logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
@@ -83,10 +83,10 @@ namespace Orleans.Runtime.GrainDirectory
         // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
         protected override async void Run()
         {
-            if (!this.siloIdentityOptions.HasMultiClusterNetwork)
+            if (!this.siloOptions.HasMultiClusterNetwork)
                 return;
 
-            var myClusterId = this.siloIdentityOptions.ClusterId;
+            var myClusterId = this.siloOptions.ClusterId;
 
             while (router.Running)
             {
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster);
                     var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
-                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloIdentityOptions.ClusterId);
+                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloOptions.ClusterId);
                     batchResponses.Add(r);
                 }
                 catch (Exception e)

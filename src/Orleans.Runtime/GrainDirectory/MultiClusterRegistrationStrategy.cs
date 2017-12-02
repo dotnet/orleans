@@ -11,9 +11,9 @@ namespace Orleans.GrainDirectory
 
     internal class MultiClusterRegistrationStrategyManager
     {
-        public MultiClusterRegistrationStrategyManager(GlobalConfiguration config, IOptions<SiloIdentityOptions> siloIdentityOptions)
+        public MultiClusterRegistrationStrategyManager(GlobalConfiguration config, IOptions<SiloOptions> siloOptions)
         {
-            if (siloIdentityOptions.Value.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
+            if (siloOptions.Value.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
             {
                 this.DefaultStrategy = GlobalSingleInstanceRegistration.Singleton;
             }

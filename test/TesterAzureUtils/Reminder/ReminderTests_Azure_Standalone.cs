@@ -47,8 +47,8 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            var siloIdentityOptions = Options.Create(new SiloIdentityOptions { ClusterId = "TMSLocalTesting" });
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloIdentityOptions);
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = "TMSLocalTesting" });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
@@ -64,8 +64,8 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
-            var siloIdentityOptions = Options.Create(new SiloIdentityOptions { ClusterId = clusterId });
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloIdentityOptions);
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
