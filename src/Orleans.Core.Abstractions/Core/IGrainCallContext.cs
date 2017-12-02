@@ -30,7 +30,7 @@ namespace Orleans
         /// <summary>
         /// Gets the arguments for this method invocation.
         /// </summary>
-        IList<object> Arguments { get; }
+        IGrainCallArguments Arguments { get; }
 
         /// <summary>
         /// Invokes the request.

@@ -71,9 +71,8 @@ namespace Orleans.Runtime
             }
         }
 
-        private IList<object> _modifedArguments;
         /// <inheritdoc />
-        public IList<object> Arguments => _modifedArguments ?? (_modifedArguments = request.Arguments);
+        public IGrainCallArguments Arguments => request.Arguments;
         
         /// <inheritdoc />
         public object Result { get; set; }
@@ -109,8 +108,6 @@ namespace Orleans.Runtime
             {
                 // Finally call the root-level invoker.
                 stage++;
-                if (_modifedArguments != null)
-                    this.request.Arguments = (InvokeMethodArguments)_modifedArguments;
 
                 this.Result = await rootInvoker.Invoke(this.Grain, this.request);
                 return;

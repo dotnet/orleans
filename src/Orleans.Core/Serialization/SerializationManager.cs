@@ -638,11 +638,17 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="original">The input data to be deep copied.</param>
         /// <returns>Deep copied clone of the original input object.</returns>
-        public object DeepCopy(object original)
+        public T DeepCopy<T>(T original)
+        {
+            DeepCopyInPlace(ref original);
+            return original;
+        }
+
+        internal void DeepCopyInPlace<T>(ref T original)
         {
             var context = this.serializationContext.Value;
             context.Reset();
-            
+
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -651,17 +657,14 @@ namespace Orleans.Serialization
                 context.SerializationManager.Copies.Increment();
             }
 
-            object copy = DeepCopyInner(original, context);
+            DeepCopyInPlaceInner(ref original, context);
             context.Reset();
-            
 
-            if (timer!=null)
+            if (timer != null)
             {
                 timer.Stop();
                 context.SerializationManager.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            
-            return copy;
         }
 
         /// <summary>
@@ -672,20 +675,58 @@ namespace Orleans.Serialization
         /// <param name="original">The input data to be deep copied.</param>
         /// <param name="context">The context.</param>
         /// <returns>Deep copied clone of the original input object.</returns>
-        public static object DeepCopyInner(object original, ICopyContext context)
+        public static T DeepCopyInner<T>(T original, ICopyContext context)
         {
-            if (original == null) return null;
+            DeepCopyInPlaceInner(ref original, context);
+            return original;
+        }
+
+        private static void DeepCopyInPlaceInner<T>(ref T original, ICopyContext context)
+        {
+            if (typeof(T).IsValueType)
+                DeepCopyInPlaceInnerOfValueType<T>(ref original, context);
+            else
+                DeepCopyInPlaceInnerOfReferenceType<T>(ref original, context);
+        }
+
+        private static void DeepCopyInPlaceInnerOfValueType<T>(ref T original, ICopyContext context)
+        {
             var sm = context.GetSerializationManager();
 
             var t = original.GetType();
             var shallow = t.IsOrleansShallowCopyable();
 
-            if (shallow)
-                return original;
+            if (shallow) return;
+
+            IExternalSerializer serializer;
+            if (sm.TryLookupExternalSerializer(t, out serializer))
+            {
+                original = (T)serializer.DeepCopy(original, context);
+            }
+
+            var copier = sm.GetCopier(t);
+            if (copier != null)
+            {
+                original = (T)copier(original, context);
+            }
+        }
+
+        private static void DeepCopyInPlaceInnerOfReferenceType<T>(ref T original, ICopyContext context)
+        {
+            if (original == null) return;
+            var sm = context.GetSerializationManager();
+
+            var t = original.GetType();
+            var shallow = t.IsOrleansShallowCopyable();
+
+            if (shallow) return;
 
             var reference = context.CheckObjectWhileCopying(original);
             if (reference != null)
-                return reference;
+            {
+                original = (T)reference;
+                return;
+            }
 
             object copy;
 
@@ -694,7 +735,8 @@ namespace Orleans.Serialization
             {
                 copy = serializer.DeepCopy(original, context);
                 context.RecordCopy(original, copy);
-                return copy;
+                original = (T)reference;
+                return;
             }
 
             var copier = sm.GetCopier(t);
@@ -702,10 +744,11 @@ namespace Orleans.Serialization
             {
                 copy = copier(original, context);
                 context.RecordCopy(original, copy);
-                return copy;
+                original = (T)reference;
+                return;
             }
 
-            return sm.DeepCopierHelper(t, original, context);
+            original = (T)sm.DeepCopierHelper(t, original, context);
         }
 
         private object DeepCopierHelper(Type t, object original, ICopyContext context)

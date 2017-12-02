@@ -117,10 +117,10 @@ namespace Orleans.Serialization
 
             // Built-in handlers: Orleans internal types
             feature.AddSerializerDelegates(
-                    typeof(InvokeMethodRequest),
-                    BuiltInTypes.CopyInvokeMethodRequest,
-                    BuiltInTypes.SerializeInvokeMethodRequest,
-                    BuiltInTypes.DeserializeInvokeMethodRequest);
+                    typeof(InvokeMethodRequest<>),
+                    BuiltInTypes.CopyGenericInvokeMethodRequest,
+                    BuiltInTypes.SerializeGenericInvokeMethodRequest,
+                    BuiltInTypes.DeserializeGenericInvokeMethodRequest);
             feature.AddSerializerDelegates(
                     typeof(Response),
                     BuiltInTypes.CopyOrleansResponse,

@@ -15,19 +15,19 @@ namespace Orleans.CodeGeneration
     /// <remarks>
     /// Each instance of this class can invoke calls on one generic method.
     /// </remarks>
-    public class GenericMethodInvoker : IEqualityComparer<InvokeMethodArguments>
+    public class GenericMethodInvoker : IEqualityComparer<IGrainCallArguments>
     {
         private static readonly ConcurrentDictionary<Type, MethodInfo> BoxMethods = new ConcurrentDictionary<Type, MethodInfo>();
         private static readonly Func<Type, MethodInfo> CreateBoxMethod = GetTaskConversionMethod;
         private static readonly MethodInfo GenericMethodInvokerDelegateMethodInfo =
-            TypeUtils.Method((GenericMethodInvokerDelegate del) => del.Invoke(null, default(InvokeMethodArguments)));
+            TypeUtils.Method((GenericMethodInvokerDelegate del) => del.Invoke(null, default(IGrainCallArguments)));
         private static readonly ILFieldBuilder FieldBuilder = new ILFieldBuilder();
 
         private readonly MethodInfo genericMethodInfo;
         private readonly Type grainInterfaceType;
         private readonly int typeParameterCount;
-        private readonly ConcurrentDictionary<InvokeMethodArguments, GenericMethodInvokerDelegate> invokers;
-        private readonly Func<InvokeMethodArguments, GenericMethodInvokerDelegate> createInvoker;
+        private readonly ConcurrentDictionary<IGrainCallArguments, GenericMethodInvokerDelegate> invokers;
+        private readonly Func<IGrainCallArguments, GenericMethodInvokerDelegate> createInvoker;
 
         /// <summary>
         ///  Invoke the generic method described by this instance on the provided <paramref name="grain"/>.
@@ -35,7 +35,7 @@ namespace Orleans.CodeGeneration
         /// <param name="grain">The grain.</param>
         /// <param name="arguments">The arguments, including the method's type parameters.</param>
         /// <returns>The method result.</returns>
-        private delegate Task<object> GenericMethodInvokerDelegate(IAddressable grain, InvokeMethodArguments arguments);
+        private delegate Task<object> GenericMethodInvokerDelegate(IAddressable grain, IGrainCallArguments arguments);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GenericMethodInvoker"/> class.
@@ -47,7 +47,7 @@ namespace Orleans.CodeGeneration
         {
             this.grainInterfaceType = grainInterfaceType;
             this.typeParameterCount = typeParameterCount;
-            this.invokers = new ConcurrentDictionary<InvokeMethodArguments, GenericMethodInvokerDelegate>(this);
+            this.invokers = new ConcurrentDictionary<IGrainCallArguments, GenericMethodInvokerDelegate>(this);
             this.genericMethodInfo = GetMethod(grainInterfaceType, methodName, typeParameterCount);
             this.createInvoker = this.CreateInvoker;
         }
@@ -58,21 +58,21 @@ namespace Orleans.CodeGeneration
         /// <param name="grain">The grain.</param>
         /// <param name="arguments">The arguments to the method with the type parameters first, followed by the method parameters.</param>
         /// <returns>The invocation result.</returns>
-        public Task<object> Invoke(IAddressable grain, InvokeMethodArguments arguments)
+        public Task<object> Invoke(IAddressable grain, IGrainCallArguments arguments)
         {
             var invoker = this.invokers.GetOrAdd(arguments, this.createInvoker);
             return invoker(grain, arguments);
         }
 
         private static readonly MethodInfo _getItemOfInvokeMethodArgumentsMethodInfo =
-            TypeUtils.Method((InvokeMethodArguments arg) => arg[0]);
+            TypeUtils.Method((IGrainCallArguments arg) => arg[0]);
 
         /// <summary>
         /// Creates an invoker delegate for the type arguments specified in <paramref name="arguments"/>.
         /// </summary>
         /// <param name="arguments">The arguments.</param>
         /// <returns>A new invoker delegate.</returns>
-        private GenericMethodInvokerDelegate CreateInvoker(InvokeMethodArguments arguments)
+        private GenericMethodInvokerDelegate CreateInvoker(IGrainCallArguments arguments)
         {
             // First, create the concrete method which will be called.
             var typeParameters = arguments.Take(this.typeParameterCount).Cast<Type>().ToArray();
@@ -150,10 +150,10 @@ namespace Orleans.CodeGeneration
         /// <param name="x">One argument list.</param>
         /// <param name="y">The other argument list.</param>
         /// <returns><see langword="true"/> if the type parameters in the respective arguments are equal, <see langword="false"/> otherwise.</returns>
-        bool IEqualityComparer<InvokeMethodArguments>.Equals(InvokeMethodArguments x, InvokeMethodArguments y)
+        bool IEqualityComparer<IGrainCallArguments>.Equals(IGrainCallArguments x, IGrainCallArguments y)
         {
             if (x == y) return true;
-            if (x.IsEmpty || y.IsEmpty) return false;
+            if (x.Length == 0 || y.Length == 0) return false;
 
             // Since this equality compararer only compares type parameters, ignore any elements after
             // the defined type parameter count.
@@ -173,9 +173,9 @@ namespace Orleans.CodeGeneration
         /// </summary>
         /// <param name="obj">The argument list.</param>
         /// <returns>A hash code.</returns>
-        int IEqualityComparer<InvokeMethodArguments>.GetHashCode(InvokeMethodArguments obj)
+        int IEqualityComparer<IGrainCallArguments>.GetHashCode(IGrainCallArguments obj)
         {
-            if (obj.IsEmpty || obj.Length == 0) return 0;
+            if (obj.Length == 0) return 0;
             unchecked
             {
                 // Only consider the type parameters.

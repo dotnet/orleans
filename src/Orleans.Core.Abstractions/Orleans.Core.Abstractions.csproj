@@ -13,7 +13,34 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="CodeGeneration\GrainCallArguments.g.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>GrainCallArguments.g.tt</DependentUpon>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="CodeGeneration\GrainCallArguments.g.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>GrainCallArguments.g.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="CodeGeneration\GrainCallArguments.g.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>GrainCallArguments.g.tt</DependentUpon>
+    </Compile>
   </ItemGroup>
   
 </Project>

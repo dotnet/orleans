@@ -1,5 +1,6 @@
 ﻿using Orleans.CodeGeneration;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -15,17 +16,19 @@ namespace Orleans.Runtime
         /// <param name="arguments">The method payload.</param>
         /// <param name="options">Invocation options.</param>
         /// <param name="silo">The target silo.</param>
-        void InvokeOneWayMethod(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo);
+        void InvokeOneWayMethod<TArgs>(GrainReference reference, int methodId, ref TArgs arguments, InvokeMethodOptions options, SiloAddress silo)
+            where TArgs : struct, IGrainCallArguments;
 
         /// <summary>Invokes a method on a remote object.</summary>
-        /// <typeparam name="T">The result type</typeparam>
+        /// <typeparam name="TResult">The result type</typeparam>
         /// <param name="reference">The reference to the addressable target.</param>
         /// <param name="methodId">The method to invoke.</param>
         /// <param name="arguments">The method payload.</param>
         /// <param name="options">Invocation options.</param>
         /// <param name="silo">The target silo.</param>
         /// <returns>Returns the response from the remote object.</returns>
-        Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo);
+        Task<TResult> InvokeMethodAsync<TArgs, TResult>(GrainReference reference, int methodId, ref TArgs arguments, InvokeMethodOptions options, SiloAddress silo)
+            where TArgs : struct, IGrainCallArguments;
 
         /// <summary>Converts the provided <paramref name="grain"/> to the specified interface.</summary>
         /// <typeparam name="TGrainInterface">The target grain interface type.</typeparam>

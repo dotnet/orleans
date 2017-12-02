@@ -2145,79 +2145,97 @@ namespace Orleans.Serialization
         #endregion
 
         #region InvokeMethodRequest
-
-        internal static void SerializeInvokeMethodRequest(object obj, ISerializationContext context, Type expected)
+        
+        internal static object CopyGenericInvokeMethodRequest(object original, ICopyContext context)
         {
-            var request = (InvokeMethodRequest)obj;
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            return concreteMethods.Item3(original, context);
+        }
+
+        internal static object DeserializeGenericInvokeMethodRequest(Type expected, IDeserializationContext context)
+        {
+            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            return concreteMethods.Item2(expected, context);
+        }
+
+        internal static void SerializeGenericInvokeMethodRequest(object original, ISerializationContext context, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            concreteMethods.Item1(original, context, expected);
+        }
+
+        private class SerializeInvokeMethodRequestVisitor : IGrainCallArgumentVisitor<ISerializationContext>
+        {
+            public static readonly SerializeInvokeMethodRequestVisitor Default = new SerializeInvokeMethodRequestVisitor();
+
+            public void Visit<TArg>(ref TArg item, ISerializationContext context)
+            {
+                SerializationManager.SerializeInner(item, context);
+            }
+        }
+
+        internal static void SerializeInvokeMethodRequest<TArgs>(object obj, ISerializationContext context, Type expected)
+            where TArgs : struct, IGrainCallArguments
+        {
+            var request = (InvokeMethodRequest<TArgs>)obj;
 
             context.StreamWriter.Write(request.InterfaceId);
             context.StreamWriter.Write(request.InterfaceVersion);
             context.StreamWriter.Write(request.MethodId);
-            context.StreamWriter.Write(request.Arguments.IsEmpty ? 0 : request.Arguments.Length);
 
-            if (!request.Arguments.IsEmpty)
+            if (request.Arguments.Length != 0)
             {
-                foreach (var arg in request.Arguments)
-                {
-                    SerializationManager.SerializeInner(arg, context, null);
-                }
+                request.Arguments.Visit(SerializeInvokeMethodRequestVisitor.Default, context);
             }
         }
 
-        internal static object DeserializeInvokeMethodRequest(Type expected, IDeserializationContext context)
+        private class DeserializeInvokeMethodRequestVisitor : IGrainCallArgumentVisitor<IDeserializationContext>
+        {
+            public static readonly DeserializeInvokeMethodRequestVisitor Default = new DeserializeInvokeMethodRequestVisitor();
+
+            public void Visit<TArg>(ref TArg item, IDeserializationContext context)
+            {
+                item = SerializationManager.DeserializeInner<TArg>(context);
+            }
+        }
+
+        internal static object DeserializeInvokeMethodRequest<TArgs>(Type expected, IDeserializationContext context)
+            where TArgs : struct, IGrainCallArguments
         {
             int iid = context.StreamReader.ReadInt();
             ushort iVersion = context.StreamReader.ReadUShort();
             int mid = context.StreamReader.ReadInt();
 
-            int argCount = context.StreamReader.ReadInt();
-
-            if (argCount == 0)
+            var request = new InvokeMethodRequest<TArgs>(iid, iVersion, mid);
+            if (request.Arguments.Length != 0)
             {
-                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.Empty);
+                request.Arguments.Visit(DeserializeInvokeMethodRequestVisitor.Default, context);
             }
-            else if (argCount == 1)
-            {
-                var arg = SerializationManager.DeserializeInner(null, context);
-                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.FromArgument(arg));
-            }
-            else
-            {
-                var args = new object[argCount];
-                for (var i = 0; i < argCount; i++)
-                {
-                    args[i] = SerializationManager.DeserializeInner(null, context);
-                }
 
-                return new InvokeMethodRequest(iid, iVersion, mid, InvokeMethodArguments.FromArguments(args));
+            return request;
+        }
+
+        private class CopyInvokeMethodRequestVisitor : IGrainCallArgumentVisitor<ICopyContext>
+        {
+            public static readonly CopyInvokeMethodRequestVisitor Default = new CopyInvokeMethodRequestVisitor();
+
+            public void Visit<TArg>(ref TArg item, ICopyContext context)
+            {
+                item = SerializationManager.DeepCopyInner(item, context);
             }
         }
 
-        internal static object CopyInvokeMethodRequest(object original, ICopyContext context)
+        internal static object CopyInvokeMethodRequest<TArgs>(object original, ICopyContext context)
+            where TArgs : struct, IGrainCallArguments
         {
-            var request = (InvokeMethodRequest)original;
-            InvokeMethodRequest result;
+            var request = (InvokeMethodRequest<TArgs>)original;
+            var result = new InvokeMethodRequest<TArgs>(request.InterfaceId, request.InterfaceVersion, request.MethodId, ref request.Arguments);
 
-            int argCount = request.Arguments.Length;
-
-            if (argCount == 0)
+            if (request.Arguments.Length != 0)
             {
-                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.Empty);
-            }
-            else if (argCount == 1)
-            {
-                var arg = SerializationManager.DeepCopyInner(request.Arguments[0], context);
-                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.FromArgument(arg));
-            }
-            else
-            {
-                var args = new object[argCount];
-                for (var i = 0; i < argCount; i++)
-                {
-                    args[i] = SerializationManager.DeepCopyInner(request.Arguments[i], context);
-                }
-
-                result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, InvokeMethodArguments.FromArguments(args));
+                request.Arguments.Visit(CopyInvokeMethodRequestVisitor.Default, context);
             }
 
             context.RecordCopy(original, result);

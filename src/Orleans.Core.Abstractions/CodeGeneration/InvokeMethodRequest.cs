@@ -1,5 +1,6 @@
 using System;
-
+using System.Collections;
+using System.Collections.Generic;
 
 namespace Orleans.CodeGeneration
 {
@@ -7,7 +8,7 @@ namespace Orleans.CodeGeneration
     /// Data object holding metadata associated with a grain Invoke request.
     /// </summary>
     [Serializable]
-    public sealed class InvokeMethodRequest
+    public abstract class InvokeMethodRequest
     {
         /// <summary> InterfaceId for this Invoke request. </summary>
         public int InterfaceId { get; private set; }
@@ -15,14 +16,13 @@ namespace Orleans.CodeGeneration
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
         /// <summary> Arguments for this Invoke request. </summary>
-        public InvokeMethodArguments Arguments;
+        public IGrainCallArguments Arguments => (IGrainCallArguments)this;
 
-        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, InvokeMethodArguments arguments)
+        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId)
         {
             InterfaceId = interfaceId;
             InterfaceVersion = interfaceVersion;
             MethodId = methodId;
-            Arguments = arguments;
         }
 
         /// <summary> 
@@ -35,6 +35,44 @@ namespace Orleans.CodeGeneration
         {
             return String.Format("InvokeMethodRequest {0}:{1}", InterfaceId, MethodId);
         }
+    }
+
+    [Serializable]
+    public sealed class InvokeMethodRequest<TArgs> : InvokeMethodRequest, IGrainCallArguments
+        where TArgs : struct, IGrainCallArguments
+    {
+        /// <summary> Arguments for this Invoke request. </summary>
+        public new TArgs Arguments;
+
+        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId)
+            : base(interfaceId, interfaceVersion, methodId)
+        {
+        }
+
+        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, ref TArgs arguments)
+            : base(interfaceId, interfaceVersion, methodId)
+        {
+            Arguments = arguments;
+        }
+
+        object IGrainCallArguments.this[int index]
+        {
+            get => Arguments[index];
+            set => Arguments[index] = value;
+        }
+
+        object IReadOnlyList<object>.this[int index] => Arguments[index];
+
+        int IGrainCallArguments.Length => Arguments.Length;
+
+        int IReadOnlyCollection<object>.Count => Arguments.Count;
+
+        IEnumerator<object> IEnumerable<object>.GetEnumerator() => Arguments.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => Arguments.GetEnumerator();
+
+        void IGrainCallArguments.Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context) =>
+            Arguments.Visit(vistor, context);
     }
 
     /// <summary>

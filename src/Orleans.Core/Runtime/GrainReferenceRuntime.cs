@@ -20,6 +20,7 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly IGrainCallArgumentVisitor<CheckAndDeepCopyArgumentVisitor.Context> _checkAndDeepCopy;
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
@@ -34,14 +35,16 @@ namespace Orleans.Runtime
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;
+            this._checkAndDeepCopy = new CheckAndDeepCopyArgumentVisitor();
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
 
         /// <inheritdoc />
-        public void InvokeOneWayMethod(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo)
+        public void InvokeOneWayMethod<TArgs>(GrainReference reference, int methodId, ref TArgs arguments, InvokeMethodOptions options, SiloAddress silo)
+            where TArgs : struct, IGrainCallArguments
         {
-            Task<object> resultTask = InvokeMethodAsync<object>(reference, methodId, arguments, options | InvokeMethodOptions.OneWay, silo);
+            Task<object> resultTask = InvokeMethodAsync<TArgs, object>(reference, methodId, ref arguments, options | InvokeMethodOptions.OneWay, silo);
             if (!resultTask.IsCompleted && resultTask.Result != null)
             {
                 throw new OrleansException("Unexpected return value: one way InvokeMethod is expected to return null.");
@@ -49,31 +52,15 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options, SiloAddress silo)
+        public Task<TResult> InvokeMethodAsync<TArgs, TResult>(GrainReference reference, int methodId, ref TArgs arguments, InvokeMethodOptions options, SiloAddress silo)
+            where TArgs : struct, IGrainCallArguments
         {
-            InvokeMethodArguments argsDeepCopy;
-            if (arguments.IsEmpty)
+            if (arguments.Count != 0)
             {
-                argsDeepCopy = InvokeMethodArguments.Empty;
-            }
-            else
-            {
-                CheckForGrainArguments(arguments);
-                SetGrainCancellationTokensTarget(arguments, reference);
-                
-                if (arguments.Length == 1)
-                {
-                    var arg = this.serializationManager.DeepCopy(arguments.AsArgument);
-                    argsDeepCopy = InvokeMethodArguments.FromArgument(arg);
-                }
-                else
-                {
-                    var args = (object[])this.serializationManager.DeepCopy(arguments.AsArguments);
-                    argsDeepCopy = InvokeMethodArguments.FromArguments(args);
-                }
+                arguments.Visit(_checkAndDeepCopy, new CheckAndDeepCopyArgumentVisitor.Context { Runtime = this, Target = reference });
             }
 
-            var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, argsDeepCopy);
+            var request = new InvokeMethodRequest<TArgs>(reference.InterfaceId, reference.InterfaceVersion, methodId, ref arguments);
 
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;
@@ -82,17 +69,17 @@ namespace Orleans.Runtime
 
             if (resultTask == null)
             {
-                if (typeof(T) == typeof(object))
+                if (typeof(TResult) == typeof(object))
                 {
                     // optimize for most common case when using one way calls.
-                    return OrleansTaskExtentions.CompletedTask as Task<T>;
+                    return OrleansTaskExtentions.CompletedTask as Task<TResult>;
                 }
 
-                return Task.FromResult(default(T));
+                return Task.FromResult(default(TResult));
             }
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return resultTask.ToTypedTask<T>();
+            return resultTask.ToTypedTask<TResult>();
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
@@ -100,7 +87,8 @@ namespace Orleans.Runtime
             return this.internalGrainFactory.Cast<TGrainInterface>(grain);
         }
 
-        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<object> InvokeMethod_Impl<TArgs>(GrainReference reference, InvokeMethodRequest<TArgs> request, string debugContext, InvokeMethodOptions options)
+            where TArgs : struct, IGrainCallArguments
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
@@ -209,7 +197,8 @@ namespace Orleans.Runtime
             }
         }
 
-        private static String GetDebugContext(string interfaceName, string methodName, ref InvokeMethodArguments arguments)
+        private static String GetDebugContext<TArgs>(string interfaceName, string methodName, ref TArgs arguments)
+            where TArgs : IGrainCallArguments
         {
             // String concatenation is approx 35% faster than string.Format here
             //debugContext = String.Format("{0}:{1}()", interfaceName, methodName);
@@ -217,7 +206,7 @@ namespace Orleans.Runtime
             debugContext.Append(interfaceName);
             debugContext.Append(":");
             debugContext.Append(methodName);
-            if (USE_DEBUG_CONTEXT_PARAMS && !arguments.IsEmpty && arguments.Length > 0)
+            if (USE_DEBUG_CONTEXT_PARAMS && arguments.Count > 0)
             {
                 debugContext.Append("(");
                 debugContext.Append(Utils.EnumerableToString(arguments));
@@ -230,30 +219,29 @@ namespace Orleans.Runtime
             return debugContext.ToString();
         }
 
-        private static void CheckForGrainArguments(InvokeMethodArguments arguments)
-        {
-            foreach (var argument in arguments)
-                if (argument is Grain)
-                    throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", argument.GetType().FullName));
-        }
-
-        /// <summary>
-        /// Sets target grain to the found instances of type GrainCancellationToken
-        /// </summary>
-        /// <param name="arguments"> Grain method arguments list</param>
-        /// <param name="target"> Target grain reference</param>
-        private void SetGrainCancellationTokensTarget(InvokeMethodArguments arguments, GrainReference target)
-        {
-            if (arguments == null) return;
-            foreach (var argument in arguments)
-            {
-                (argument as GrainCancellationToken)?.AddGrainReference(this.cancellationTokenRuntime, target);
-            }
-        }
-
         private bool IsUnordered(GrainReference reference)
         {
             return this.RuntimeClient.GrainTypeResolver?.IsUnordered(reference.GrainId.TypeCode) == true;
+        }
+
+        private sealed class CheckAndDeepCopyArgumentVisitor : IGrainCallArgumentVisitor<CheckAndDeepCopyArgumentVisitor.Context>
+        {
+            public struct Context
+            {
+                public GrainReferenceRuntime Runtime;
+                public GrainReference Target;
+            }
+
+            public void Visit<TArg>(ref TArg item, Context context)
+            {
+                if (item is Grain)
+                    throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", item.GetType().FullName));
+
+                // Sets target grain to the found instances of type GrainCancellationToken
+                (item as GrainCancellationToken)?.AddGrainReference(context.Runtime.cancellationTokenRuntime, context.Target);
+
+                context.Runtime.serializationManager.DeepCopyInPlace(ref item);
+            }
         }
     }
 }

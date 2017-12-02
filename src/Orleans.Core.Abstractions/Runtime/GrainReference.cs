@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -329,17 +330,19 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected void InvokeOneWayMethod(int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected void InvokeOneWayMethod<TArgs>(int methodId, TArgs arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+            where TArgs : struct, IGrainCallArguments
         {
-            this.Runtime.InvokeOneWayMethod(this, methodId, arguments, options | invokeMethodOptions, silo);
+            this.Runtime.InvokeOneWayMethod(this, methodId, ref arguments, options | invokeMethodOptions, silo);
         }
 
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected Task<T> InvokeMethodAsync<T>(int methodId, InvokeMethodArguments arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected Task<TResult> InvokeMethodAsync<TArgs, TResult>(int methodId, TArgs arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+            where TArgs : struct, IGrainCallArguments
         {
-            return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options | invokeMethodOptions, silo);
+            return this.Runtime.InvokeMethodAsync<TArgs, TResult>(this, methodId, ref arguments, options | invokeMethodOptions, silo);
         }
 
         #endregion
