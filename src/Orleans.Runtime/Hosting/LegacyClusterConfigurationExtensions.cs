@@ -42,12 +42,22 @@ namespace Orleans.Hosting
                 {
                     options.ClusterId = configuration.Globals.DeploymentId;
                 }
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
 
-                if (configuration.Globals.HasMultiClusterNetwork)
+            services.Configure<MultiClusterOptions>(options =>
+            {
+                var globals = configuration.Globals;
+                if (globals.HasMultiClusterNetwork)
                 {
                     options.HasMultiClusterNetwork = true;
+                    options.BackgroundGossipInterval = globals.BackgroundGossipInterval;
+                    options.DefaultMultiCluster = globals.DefaultMultiCluster.ToList();
+                    options.GlobalSingleInstanceNumberRetries = globals.GlobalSingleInstanceNumberRetries;
+                    options.GlobalSingleInstanceRetryInterval = globals.GlobalSingleInstanceRetryInterval;
+                    options.MaxMultiClusterGateways = globals.MaxMultiClusterGateways;
+                    options.UseGlobalSingleInstanceByDefault = globals.UseGlobalSingleInstanceByDefault;
                 }
-#pragma warning restore CS0618 // Type or member is obsolete
             });
 
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();

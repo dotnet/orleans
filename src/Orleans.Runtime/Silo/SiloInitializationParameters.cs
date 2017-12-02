@@ -18,10 +18,7 @@ namespace Orleans.Runtime
         /// </summary>
         public string ClusterId { get; set; }
 
-        /// <summary>
-        /// Whether this cluster is configured to be part of a multicluster network
-        /// </summary>
-        public bool HasMultiClusterNetwork { get; set; }
+        // TODO: add ServiceId.
     }
 
     /// <summary>

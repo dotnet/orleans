@@ -2,9 +2,9 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Serialization;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,8 +13,8 @@ namespace Orleans.Runtime.Messaging
         private readonly Gateway gateway;
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
-        private readonly GlobalConfiguration globalConfig;
         private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         internal GatewayAcceptor(
             MessageCenter msgCtr,
@@ -22,17 +22,17 @@ namespace Orleans.Runtime.Messaging
             IPEndPoint gatewayAddress,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            GlobalConfiguration globalConfig,
             ExecutorService executorService,
             IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory)
             : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
-            this.globalConfig = globalConfig;
             this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
         }
 
         protected override bool RecordOpenedSocket(Socket sock)
@@ -56,7 +56,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 //convert handshake cliendId to a GeoClient ID 
-                if (this.siloOptions.HasMultiClusterNetwork)
+                if (this.multiClusterOptions.HasMultiClusterNetwork)
                 {
                     client = GrainId.NewClientId(client.PrimaryKey, this.siloOptions.ClusterId);
                 }
@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Messaging
             gatewayTrafficCounter.Increment();
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.siloOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
+            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
                 msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloOptions.ClusterId);
             }

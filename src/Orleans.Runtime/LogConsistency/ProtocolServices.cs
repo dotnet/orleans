@@ -8,6 +8,7 @@ using Orleans.LogConsistency;
 using Orleans.MultiCluster;
 using Orleans.SystemTargetInterfaces;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
@@ -38,6 +39,7 @@ namespace Orleans.Runtime.LogConsistency
         private readonly MultiClusterConfiguration pseudoMultiClusterConfiguration;
 
         private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         public ProtocolServices(
             Grain gr,
@@ -46,6 +48,7 @@ namespace Orleans.Runtime.LogConsistency
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
             IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
@@ -55,8 +58,9 @@ namespace Orleans.Runtime.LogConsistency
             this.SerializationManager = serializationManager;
             this.multiClusterOracle = multiClusterOracle;
             this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
 
-            if (!this.siloOptions.HasMultiClusterNetwork)
+            if (!this.multiClusterOptions.HasMultiClusterNetwork)
             {
                 // we are creating a default multi-cluster configuration containing exactly one cluster, this one.
                 this.pseudoMultiClusterConfiguration = PseudoMultiClusterConfigurations.FindOrCreate(
@@ -123,7 +127,7 @@ namespace Orleans.Runtime.LogConsistency
         /// <inheritdoc />
         public SerializationManager SerializationManager { get; }
 
-        public bool MultiClusterEnabled => this.siloOptions.HasMultiClusterNetwork;
+        public bool MultiClusterEnabled => this.multiClusterOptions.HasMultiClusterNetwork;
     
         public string MyClusterId
         {

@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using Orleans.Runtime.Configuration;
-using Orleans.MultiCluster;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
+using Orleans.Hosting;
+using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory
 {
-
     internal class MultiClusterRegistrationStrategyManager
     {
-        public MultiClusterRegistrationStrategyManager(GlobalConfiguration config, IOptions<SiloOptions> siloOptions)
+        public MultiClusterRegistrationStrategyManager(IOptions<MultiClusterOptions> multiClusterOptions)
         {
-            if (siloOptions.Value.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
+            var options = multiClusterOptions.Value;
+            if (options.HasMultiClusterNetwork && options.UseGlobalSingleInstanceByDefault)
             {
                 this.DefaultStrategy = GlobalSingleInstanceRegistration.Singleton;
             }

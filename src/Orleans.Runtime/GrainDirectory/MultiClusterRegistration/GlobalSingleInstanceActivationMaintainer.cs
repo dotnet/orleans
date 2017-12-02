@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.SystemTargetInterfaces;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
@@ -22,21 +23,14 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly TimeSpan period;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
         // maintainer periodically takes and processes this list.
         private List<GrainId> doubtfulGrains = new List<GrainId>();
 
-        public GlobalSingleInstanceActivationMaintainer(
-            LocalGrainDirectory router,
-            Logger logger,
-            GlobalConfiguration config,
-            IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle,
-            ExecutorService executorService,
-            IOptions<SiloOptions> siloOptions,
-            ILoggerFactory loggerFactory)
+        public GlobalSingleInstanceActivationMaintainer(LocalGrainDirectory router, Logger logger, GlobalConfiguration config, IInternalGrainFactory grainFactory, IMultiClusterOracle multiClusterOracle, ExecutorService executorService, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
             :base(executorService, loggerFactory)
         {
             this.router = router;
@@ -44,6 +38,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
             this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
             this.period = config.GlobalSingleInstanceRetryInterval;
             logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
@@ -83,7 +78,7 @@ namespace Orleans.Runtime.GrainDirectory
         // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
         protected override async void Run()
         {
-            if (!this.siloOptions.HasMultiClusterNetwork)
+            if (!this.multiClusterOptions.HasMultiClusterNetwork)
                 return;
 
             var myClusterId = this.siloOptions.ClusterId;

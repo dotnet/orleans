@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 using Orleans.Runtime.Configuration;
@@ -40,7 +41,8 @@ namespace Orleans.Runtime.GrainDirectory
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
-            IOptions<SiloOptions> siloOptions)
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
             this.logger = logger;
@@ -48,7 +50,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.hasMultiClusterNetwork = siloOptions.Value.HasMultiClusterNetwork;
+            this.hasMultiClusterNetwork = multiClusterOptions.Value.HasMultiClusterNetwork;
             this.clusterId = siloOptions.Value.ClusterId;
         }
 

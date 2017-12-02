@@ -7,6 +7,7 @@ using System.Xml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -23,7 +24,7 @@ namespace Orleans.Runtime.Management
     [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
-        private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -33,7 +34,7 @@ namespace Orleans.Runtime.Management
         private ILogger logger;
 
         public ManagementGrain(
-            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
@@ -41,7 +42,7 @@ namespace Orleans.Runtime.Management
             GrainTypeManager grainTypeManager, 
             IVersionStore versionStore)
         {
-            this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
             this.multiClusterOracle = multiClusterOracle;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
@@ -426,7 +427,7 @@ namespace Orleans.Runtime.Management
 
         private IMultiClusterOracle GetMultiClusterOracle()
         {
-            if (!this.siloOptions.HasMultiClusterNetwork)
+            if (!this.multiClusterOptions.HasMultiClusterNetwork)
                 throw new OrleansException("No multicluster network configured");
             return this.multiClusterOracle;
         }
