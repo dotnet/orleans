@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
     <Title>Microsoft Orleans EventHubs Provider</Title>
-    <Description>Library of utility types for Microsoft Azure EventHubs of Microsoft Orleans.</Description>
+    <Description>Microsoft Orleans. streaming provider for Azure EventHubs</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>
     <DefineConstants>$(DefineConstants);ORLEANS_EVENTHUBS</DefineConstants>
   </PropertyGroup>

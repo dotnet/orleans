@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.AzureStorage</PackageId>
     <Title>Microsoft Orleans Streaming Azure Table Storage</Title>
-    <Description>Streaming storage providers for Azure Storage of Microsoft Orleans.</Description>
+    <Description>Microsoft Orleans streaming provider for Azure Queue Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Blob Storage</PackageTags>
   </PropertyGroup>
 

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Reminders.AzureStorage</PackageId>
     <Title>Microsoft Orleans Reminders Azure Table Storage</Title>
-    <Description>Reminders storage for Azure Table Storage of Microsoft Orleans.</Description>
+    <Description>Microsoft Orleans reminders provider for Azure Table Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Storage</PackageTags>
   </PropertyGroup>
 
