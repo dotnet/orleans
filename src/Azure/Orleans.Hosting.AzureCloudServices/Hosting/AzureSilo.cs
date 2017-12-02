@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
 using Orleans.AzureUtils.Utilities;
-using Orleans.Hosting.CloudServices;
+using Orleans.Hosting.AzureCloudServices;
 
 namespace Orleans.Runtime.Host
 {

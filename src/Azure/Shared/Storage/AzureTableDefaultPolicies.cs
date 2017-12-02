@@ -22,7 +22,7 @@ namespace Orleans.Streaming.EventHubs
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils
 #elif ORLEANS_HOSTING_CLOUDSERVICES // Temporary until azure silo/client is refactored
-namespace Orleans.Hosting.CloudServices
+namespace Orleans.Hosting.AzureCloudServices
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif

@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration.Build")]
 [assembly: InternalsVisibleTo("Orleans.Clustering.AzureStorage")]
-[assembly: InternalsVisibleTo("Orleans.Hosting.CloudServices")]
+[assembly: InternalsVisibleTo("Orleans.Hosting.AzureCloudServices")]
 [assembly: InternalsVisibleTo("Orleans.Persistence.AzureStorage")]
 [assembly: InternalsVisibleTo("Orleans.Reminders.AzureStorage")]
 [assembly: InternalsVisibleTo("Orleans.Runtime")]
