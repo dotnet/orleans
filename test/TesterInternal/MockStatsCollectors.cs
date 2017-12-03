@@ -76,7 +76,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
+        public Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName,
             string hostName)
         {
             return Task.CompletedTask;
@@ -110,7 +110,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName,
+        public Task Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName,
             IPEndPoint gateway, string hostName)
         {
             throw new NotImplementedException();
@@ -129,7 +129,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
+        public Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName,
             string hostName)
         {
             return Task.CompletedTask;

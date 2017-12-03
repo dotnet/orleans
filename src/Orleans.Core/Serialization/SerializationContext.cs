@@ -148,13 +148,12 @@ namespace Orleans.Serialization
                 this.initialOffset = offset;
                 this.StreamWriter = writer;
             }
-
-            public SerializationManager SerializationManager => this.parentContext.GetSerializationManager();
+            
             public IServiceProvider ServiceProvider => this.parentContext.ServiceProvider;
             public object AdditionalContext => this.parentContext.ServiceProvider;
             public IBinaryTokenStreamWriter StreamWriter { get; }
             public int CurrentOffset => this.initialOffset + this.StreamWriter.CurrentOffset;
-            public void SerializeInner(object obj, Type expected) => this.parentContext.SerializeInner(obj, expected);
+            public void SerializeInner(object obj, Type expected) => SerializationManager.SerializeInner(obj, this, expected);
             public void RecordObject(object original, int offset) => this.parentContext.RecordObject(original, offset);
             public int CheckObjectWhileSerializing(object raw) => this.parentContext.CheckObjectWhileSerializing(raw);
         }

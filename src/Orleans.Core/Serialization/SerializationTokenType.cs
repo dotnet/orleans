@@ -53,6 +53,7 @@ namespace Orleans.Serialization
         SpecifiedType = 97, // Followed by the type token, possibly plus generic arguments, or NamedType and the type name
         NamedType = 98,     // Followed by the type name as a string
         ExpectedType = 99,  // Indicates that the type can be deduced and is what can be deduced
+        KeyedSerializer = 100, // Followed by a byte identifying which serializer is being used.
 
         // Generic types and collections
         Tuple = 200,        // Add the count of items to this, followed by that many generic types, then the items

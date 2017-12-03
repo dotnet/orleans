@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Membership
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansSiloInstances";
 
         private DynamoDBStorage storage;
-        private string deploymentId;
+        private string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILoggerFactory loggerFactory;
         private readonly DynamoDBGatewayListProviderOptions options;
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Membership
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
-            this.deploymentId = clientConfiguration.DeploymentId;
+            this.clusterId = clientConfiguration.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 
@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Membership
         {
             var expressionValues = new Dictionary<string, AttributeValue>
             {
-                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) },
+                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                 { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue { N = INSTANCE_STATUS_ACTIVE } },
                 { $":{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}", new AttributeValue { N = "0"} }
             };

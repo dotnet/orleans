@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.Grains</RootNamespace>
     <AssemblyName>TestInternalGrains</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

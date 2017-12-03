@@ -77,7 +77,7 @@ namespace Benchmarks.Transactions
             {
                 return new SiloHostBuilder().ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)))
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
                     .UseInClusterTransactionManager(new TransactionsConfiguration())
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();

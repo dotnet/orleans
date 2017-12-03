@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Messaging;
@@ -38,10 +38,10 @@ namespace Orleans.Runtime.MembershipService
                     configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
                     break;
                 case LivenessProviderType.AzureTable:
-                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_AZURE_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_CLUSTERING_AZURESTORAGE);
                     break;
                 case LivenessProviderType.ZooKeeper:
-                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_CLUSTERING_ZOOKEEPER);
                     break;
                 case LivenessProviderType.Custom:
                     configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(configuration.MembershipTableAssembly);
@@ -56,7 +56,15 @@ namespace Orleans.Runtime.MembershipService
         {
             public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
             {
-                services.UseGrainBasedMembership();
+                services.UseDevelopmentMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
+            }
+
+            private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, DevelopmentMembershipOptions options)
+            {
+                if (configuration.SeedNodes?.Count > 0)
+                {
+                    options.PrimarySiloEndPoint = configuration.SeedNodes?.FirstOrDefault();
+                }
             }
         }
     }

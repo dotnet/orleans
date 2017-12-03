@@ -113,7 +113,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private const string INSTANCE_TABLE_NAME = "OrleansGossipTable";
 
-        private readonly AzureTableDataManager<GossipTableEntry> storage;
+        private readonly Orleans.AzureUtils.AzureTableDataManager<GossipTableEntry> storage;
         private readonly ILogger logger;
 
         internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
@@ -142,14 +142,14 @@ namespace Orleans.Runtime.MultiClusterNetwork
             {
                 string errorMsg = String.Format("Unable to create or connect to the Azure table {0} in {1}", 
                     instance.TableName, initTimeout);
-                instance.logger.Error(ErrorCode.AzureTable_32, errorMsg, te);
+                instance.logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_32, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
                 string errorMsg = String.Format("Exception trying to create or connect to Azure table {0} : {1}", 
                     instance.TableName, ex.Message);
-                instance.logger.Error(ErrorCode.AzureTable_33, errorMsg, ex);
+                instance.logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_33, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
             return instance;
@@ -177,7 +177,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 catch (Exception exc)
                 {
                     logger.Error(
-                        ErrorCode.AzureTable_61,
+                        (int)AzureUtils.Utilities.ErrorCode.AzureTable_61,
                         string.Format("Intermediate error parsing GossipTableEntry: {0}. Ignoring this entry.", tableEntry),
                         exc);
                 }
@@ -212,7 +212,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     catch (Exception exc)
                     {
                         logger.Error(
-                            ErrorCode.AzureTable_61,
+                            (int)AzureUtils.Utilities.ErrorCode.AzureTable_61,
                             string.Format("Intermediate error parsing GossipTableEntry: {0}. Ignoring this entry.", tableEntry),
                             exc);
                     }

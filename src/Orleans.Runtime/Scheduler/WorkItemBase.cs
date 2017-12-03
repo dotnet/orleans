@@ -30,10 +30,10 @@ namespace Orleans.Runtime.Scheduler
 
         public override string ToString()
         {
-            return String.Format("[{0} WorkItem Name={1}, Ctx={2}]", 
+            return string.Format("[{0} WorkItem Name={1}, Ctx={2}]", 
                 ItemType, 
-                Name ?? "",
-                (SchedulingContext == null) ? "null" : SchedulingContext.ToString()
+                Name ?? string.Empty,
+                SchedulingContext?.ToString() ?? "null"
             );
         }
     }

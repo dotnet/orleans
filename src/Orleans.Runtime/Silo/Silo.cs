@@ -183,9 +183,9 @@ namespace Orleans.Runtime
                 var hostContext = new HostBuilderContext(new Dictionary<object, object>());
                 DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
 
-                var applicationPartManager = hostContext.GetApplicationPartManager();
-                applicationPartManager.AddApplicationPartsFromAppDomain();
-                applicationPartManager.AddApplicationPartsFromBasePath();
+                hostContext.GetApplicationPartManager()
+                    .AddFromAppDomain()
+                    .AddFromApplicationBaseDirectory();
 
                 services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
                 services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
@@ -816,12 +816,8 @@ namespace Orleans.Runtime
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
 
-            if (!GlobalConfig.LivenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
-            {
-                // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
-                SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
-                    .WaitWithThrow(stopTimeout));
-            }
+            SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
+                .WaitWithThrow(stopTimeout));
 
             // incoming messages
             SafeExecute(incomingSystemAgent.Stop);

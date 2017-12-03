@@ -38,6 +38,7 @@ namespace TestServiceFabric
 
             this.resolver = new MockResolver();
             var globalConfig = new ClusterConfiguration().Globals;
+            globalConfig.HasMultiClusterNetwork = true;
             globalConfig.MaxMultiClusterGateways = 2;
             globalConfig.ClusterId = "MegaGoodCluster";
 

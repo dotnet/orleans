@@ -14,7 +14,7 @@ namespace Orleans.Serialization
 
         private static readonly RuntimeTypeHandle UIntPtrTypeHandle = typeof(UIntPtr).TypeHandle;
 
-        private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+        private static readonly Type DelegateType = typeof(Delegate);
         
         private static readonly Dictionary<RuntimeTypeHandle, SimpleTypeSerializer> DirectSerializers;
 
@@ -60,7 +60,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>A value indicating whether the provided <paramref name="type"/> is supported.</returns>
-        public static bool IsSupportedType(TypeInfo type)
+        public static bool IsSupportedType(Type type)
         {
             return !type.IsAbstract && !type.IsInterface && !type.IsArray && !type.IsEnum && IsSupportedFieldType(type);
         }
@@ -186,15 +186,14 @@ namespace Orleans.Serialization
             // Serialize each field
             foreach (var field in fields)
             {
-                SimpleTypeSerializer serializer;
-                var fieldType = field.FieldType.GetTypeInfo();
+                var fieldType = field.FieldType;
                 var typeHandle = field.FieldType.TypeHandle;
                 if (fieldType.IsEnum)
                 {
                     typeHandle = fieldType.GetEnumUnderlyingType().TypeHandle;
                 }
                 
-                if (DirectSerializers.TryGetValue(typeHandle, out serializer))
+                if (DirectSerializers.TryGetValue(typeHandle, out var serializer))
                 {
                     il.LoadArgument(1);
                     il.Call(SerializationMethodInfos.GetStreamFromSerializationContext);
@@ -247,8 +246,7 @@ namespace Orleans.Serialization
             foreach (var field in fields)
             {
                 // Deserialize the field.
-                SimpleTypeSerializer serializer;
-                var fieldType = field.FieldType.GetTypeInfo();
+                var fieldType = field.FieldType;
                 if (fieldType.IsEnum)
                 {
                     var typeHandle = fieldType.GetEnumUnderlyingType().TypeHandle;
@@ -259,7 +257,7 @@ namespace Orleans.Serialization
                     il.Call(DirectSerializers[typeHandle].ReadMethod);
                     il.StoreField(field);
                 }
-                else if (DirectSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                else if (DirectSerializers.TryGetValue(field.FieldType.TypeHandle, out var serializer))
                 {
                     il.LoadLocalAsReference(type, result);
                     il.LoadArgument(1);
@@ -315,7 +313,7 @@ namespace Orleans.Serialization
                         field =>
                             !field.IsNotSerialized()
                             && !field.IsStatic
-                            && IsSupportedFieldType(field.FieldType.GetTypeInfo())
+                            && IsSupportedFieldType(field.FieldType)
                             && (fieldFilter == null || fieldFilter(field)))
                     .ToList();
             result.Sort(fieldInfoComparer ?? FieldInfoComparer.Instance);
@@ -327,14 +325,14 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>A value indicating whether the provided type is supported as a field by this class.</returns>
-        private static bool IsSupportedFieldType(TypeInfo type)
+        private static bool IsSupportedFieldType(Type type)
         {
             if (type.IsPointer || type.IsByRef) return false;
 
-            var handle = type.AsType().TypeHandle;
+            var handle = type.TypeHandle;
             if (handle.Equals(IntPtrTypeHandle)) return false;
             if (handle.Equals(UIntPtrTypeHandle)) return false;
-            if (DelegateTypeInfo.IsAssignableFrom(type)) return false;
+            if (DelegateType.IsAssignableFrom(type)) return false;
 
             return true;
         }

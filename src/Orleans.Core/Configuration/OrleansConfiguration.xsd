@@ -314,6 +314,14 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="MaxSocketAge" type="tns:TimeSpan" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          The MaxSocketAge attribute specifies how long to keep an open socket before it is closed.
+          Default is TimeSpan.MaxValue (never close sockets automatically, unless they were broken).
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
 
   <xs:complexType name="SystemStoreConfiguration">
@@ -339,9 +347,9 @@
     <xs:attribute name="DeploymentId" type="xs:string" use="optional">
       <xs:annotation>
         <xs:documentation>
-          Specifies a unique identifier of this deployment.
+          Specifies a unique identifier of this cluster.
           If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime,
-          accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config.
+          accessible to the role via RoleEnvironment.ClusterId static variable and is passed to the silo automatically by the role via config.
           So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
           If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
         </xs:documentation>

@@ -2,10 +2,12 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
+using Orleans.Hosting;
 using Orleans.MultiCluster;
 using Orleans.Serialization;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -27,9 +29,9 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<IMembershipTableGrain> GetMembershipTableGrain()
         {
-            // TODO: this could be replaced with strongly typed options for configuring grain based membership
-            var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();
-            var isPrimarySilo = siloDetails.Type == Silo.SiloType.Primary;
+            var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentMembershipOptions>>().Value;
+            var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
+            bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndPoint);
             if (isPrimarySilo)
             {
                 this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
@@ -85,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string deploymentId) => this.grain.DeleteMembershipTableEntries(deploymentId);
+        public Task DeleteMembershipTableEntries(string clusterId) => this.grain.DeleteMembershipTableEntries(clusterId);
 
         public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key);
 
@@ -125,9 +127,9 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task DeleteMembershipTableEntries(string deploymentId)
+        public Task DeleteMembershipTableEntries(string clusterId)
         {
-            logger.Info("DeleteMembershipTableEntries {0}", deploymentId);
+            logger.Info("DeleteMembershipTableEntries {0}", clusterId);
             table = null;
             return Task.CompletedTask;
         }

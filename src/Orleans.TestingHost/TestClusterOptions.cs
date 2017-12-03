@@ -149,12 +149,11 @@ namespace Orleans.TestingHost
         /// Default client builder factory
         /// </summary>
         public static Func<ClientConfiguration, IClientBuilder> DefaultClientBuilderFactory = config =>
-            new ClientBuilder()
+            ClientBuilder.CreateDefault()
                 .UseConfiguration(config)
-                .AddApplicationPartsFromAppDomain()
-                .AddApplicationPartsFromBasePath()
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder,
-                    TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
+                    TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         /// <summary>
         /// Factory delegate to create a client builder which will be used to build the <see cref="TestCluster"/> client. 
@@ -170,7 +169,7 @@ namespace Orleans.TestingHost
         public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount, FallbackOptions extendedOptions)
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
-            config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
+            config.Globals.ClusterId = CreateDeploymentId(baseSiloPort);
 
             AddNodeConfiguration(config, Silo.SiloType.Primary, 0, baseSiloPort, baseGatewayPort);
             for (short instanceNumber = 1; instanceNumber < silosCount; instanceNumber++)
@@ -260,7 +259,7 @@ namespace Orleans.TestingHost
 
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
             config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
-            config.DeploymentId = clusterConfig.Globals.DeploymentId;
+            config.ClusterId = clusterConfig.Globals.ClusterId;
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             // If a debugger is attached, override the timeout setting
             config.ResponseTimeout = Debugger.IsAttached

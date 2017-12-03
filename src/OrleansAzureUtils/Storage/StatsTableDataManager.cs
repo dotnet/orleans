@@ -59,7 +59,7 @@ namespace Orleans.AzureUtils
         private const string DATE_TIME_FORMAT = "yyyy-MM-dd-" + "HH:mm:ss.fff 'GMT'"; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern
 
 
-        private AzureTableDataManager<StatsTableData> tableManager;
+        private Orleans.AzureUtils.AzureTableDataManager<StatsTableData> tableManager;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
@@ -73,9 +73,9 @@ namespace Orleans.AzureUtils
             this.logger = this.loggerFactory.CreateLogger<StatsTableDataManager>();
         }
 
-        async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName)
         {
-            this.deploymentId = deploymentId;
+            this.deploymentId = clusterId;
             this.address = address;
             name = siloName;
             myHostName = hostName;

@@ -5,6 +5,7 @@ using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -82,12 +83,6 @@ namespace UnitTests.Serialization
                 inputUnspecified.ToString(CultureInfo.InvariantCulture),
                 outputUnspecified.ToString(CultureInfo.InvariantCulture));
             Assert.Equal(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
-        }
-
-        [Serializable]
-        private class TestTypeA
-        {
-            public ICollection<TestTypeA> Collection { get; set; }
         }
 
         [Serializer(typeof(TestTypeA))]

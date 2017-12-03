@@ -675,30 +675,6 @@ namespace Orleans.Runtime
             return msg != null && Object.Equals(TargetSilo, msg.TargetSilo);
         }
 
-        // For statistical measuring of time spent in queues.
-        private ITimeInterval timeInterval;
-
-        public void Start()
-        {
-            timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
-            timeInterval.Start();
-        }
-
-        public void Stop()
-        {
-            timeInterval.Stop();
-        }
-
-        public void Restart()
-        {
-            timeInterval.Restart();
-        }
-
-        public TimeSpan Elapsed
-        {
-            get { return timeInterval.Elapsed; }
-        }
-
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
         {
             return new Message

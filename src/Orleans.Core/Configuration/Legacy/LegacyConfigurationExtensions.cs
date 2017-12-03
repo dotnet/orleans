@@ -29,6 +29,8 @@ namespace Orleans.Configuration
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
 
+            services.Configure<NetworkingOptions>(options => CopyNetworkingOptions(configuration, options));
+
             services.Configure<SerializationProviderOptions>(options =>
             {
                 options.SerializationProviders = configuration.SerializationProviders;
@@ -48,15 +50,19 @@ namespace Orleans.Configuration
 
         internal static void CopyCommonMessagingOptions(IMessagingConfiguration configuration, MessagingOptions options)
         {
-            options.OpenConnectionTimeout = configuration.OpenConnectionTimeout;
             options.ResponseTimeout = configuration.ResponseTimeout;
             options.MaxResendCount = configuration.MaxResendCount;
             options.ResendOnTimeout = configuration.ResendOnTimeout;
-            options.MaxSocketAge = configuration.MaxSocketAge;
             options.DropExpiredMessages = configuration.DropExpiredMessages;
             options.BufferPoolBufferSize = configuration.BufferPoolBufferSize;
             options.BufferPoolMaxSize = configuration.BufferPoolMaxSize;
             options.BufferPoolPreallocationSize = configuration.BufferPoolPreallocationSize;
+        }
+
+        internal static void CopyNetworkingOptions(IMessagingConfiguration configuration, NetworkingOptions options)
+        {
+            options.OpenConnectionTimeout = configuration.OpenConnectionTimeout;
+            options.MaxSocketAge = configuration.MaxSocketAge;
         }
 
         internal static void CopyStatisticsOptions(IStatisticsConfiguration configuration, StatisticsOptions options)

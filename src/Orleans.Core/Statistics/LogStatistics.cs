@@ -89,7 +89,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 var e = exc.GetBaseException();
-                logger.Error(ErrorCode.AzureTable_35, "Exception occurred during Stats reporter.", e);
+                logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during Stats reporter.", e);
             }
 
             // Reset current value for counter that have delta.

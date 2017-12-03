@@ -462,7 +462,7 @@ namespace Orleans.Storage
         private class GrainStateTableDataManager
         {
             public string TableName { get; private set; }
-            private readonly AzureTableDataManager<DynamicTableEntity> tableManager;
+            private readonly Orleans.AzureUtils.AzureTableDataManager<DynamicTableEntity> tableManager;
             private readonly ILogger logger;
 
             public GrainStateTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)

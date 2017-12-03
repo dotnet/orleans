@@ -74,7 +74,7 @@ namespace Orleans.Runtime.ReminderService
         }
     }
     
-    internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
+    internal class RemindersTableManager : Orleans.AzureUtils.AzureTableDataManager<ReminderTableEntry>
     {
         private const string REMINDERS_TABLE_NAME = "OrleansReminders";
 
@@ -83,34 +83,34 @@ namespace Orleans.Runtime.ReminderService
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public static async Task<RemindersTableManager> GetManager(Guid serviceId, string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<RemindersTableManager> GetManager(Guid serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            var singleton = new RemindersTableManager(serviceId, deploymentId, storageConnectionString, loggerFactory);
+            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, loggerFactory);
             try
             {
-                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and deploymentId {1}.", serviceId, deploymentId);
+                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
                 await singleton.InitTableAsync()
                     .WithTimeout(initTimeout);
             }
             catch (TimeoutException te)
             {
                 string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
-                singleton.Logger.Error(ErrorCode.AzureTable_38, errorMsg, te);
+                singleton.Logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_38, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
                 string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error(ErrorCode.AzureTable_39, errorMsg, ex);
+                singleton.Logger.Error((int)AzureUtils.Utilities.ErrorCode.AzureTable_39, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
             return singleton;
         }
 
-        private RemindersTableManager(Guid serviceId, string deploymentId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private RemindersTableManager(Guid serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
             : base(REMINDERS_TABLE_NAME, storageConnectionString, loggerFactory)
         {
-            DeploymentId = deploymentId;
+            DeploymentId = clusterId;
             ServiceId = serviceId;
         }
 

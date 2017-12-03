@@ -70,7 +70,7 @@ namespace Orleans.AzureUtils
         private IPEndPoint gateway;
         private string myHostName;
         private readonly SiloMetricsData metricsDataObject = new SiloMetricsData();
-        private AzureTableDataManager<SiloMetricsData> storage;
+        private Orleans.AzureUtils.AzureTableDataManager<SiloMetricsData> storage;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
@@ -81,9 +81,9 @@ namespace Orleans.AzureUtils
             logger = loggerFactory.CreateLogger<SiloMetricsTableDataManager>();
         }
 
-        public async Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
+        public async Task Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
         {
-            this.deploymentId = deploymentId;
+            this.deploymentId = clusterId;
             this.siloAddress = siloAddress;
             this.siloName = siloName;
             this.gateway = gateway;
