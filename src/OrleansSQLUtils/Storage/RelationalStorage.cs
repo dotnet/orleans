@@ -38,7 +38,10 @@ namespace Orleans.SqlUtils
         /// </summary>
         private readonly bool isSynchronousAdoNetImplementation;
 
-        private IDatabaseCommandInterceptor databaseCommandInterceptor;
+        /// <summary>
+        /// Command interceptor for the given data provider.
+        /// </summary>
+        private readonly ICommandInterceptor databaseCommandInterceptor;
 
 
         /// <summary>

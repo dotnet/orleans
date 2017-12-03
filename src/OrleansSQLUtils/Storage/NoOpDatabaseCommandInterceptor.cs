@@ -5,11 +5,11 @@ using System.Text;
 
 namespace OrleansSQLUtils.Storage
 {
-    internal class NoOpDatabaseCommandInterceptor : IDatabaseCommandInterceptor
+    internal class NoOpCommandInterceptor : ICommandInterceptor
     {
-        public static readonly IDatabaseCommandInterceptor Instance = new NoOpDatabaseCommandInterceptor();
+        public static readonly ICommandInterceptor Instance = new NoOpCommandInterceptor();
 
-        private NoOpDatabaseCommandInterceptor()
+        private NoOpCommandInterceptor()
         {
             
         }

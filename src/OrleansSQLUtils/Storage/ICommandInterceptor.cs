@@ -5,7 +5,7 @@ using System.Text;
 
 namespace OrleansSQLUtils.Storage
 {
-    internal interface IDatabaseCommandInterceptor
+    internal interface ICommandInterceptor
     {
         void Intercept(IDbCommand command);
     }

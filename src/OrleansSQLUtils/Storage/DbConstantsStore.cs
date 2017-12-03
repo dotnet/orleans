@@ -18,7 +18,7 @@ namespace Orleans.SqlUtils
                                     isSynchronousAdoNetImplementation: false,
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true,
-                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance)
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
                 },
                 {AdoNetInvariants.InvariantNameMySql, new DbConstants(
                                     startEscapeIndicator: '`',
@@ -27,7 +27,7 @@ namespace Orleans.SqlUtils
                                     isSynchronousAdoNetImplementation: true,
                                     supportsStreamNatively: false,
                                     supportsCommandCancellation: false,
-                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance)
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
                 },
                 {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
                                     startEscapeIndicator: '"',
@@ -36,7 +36,7 @@ namespace Orleans.SqlUtils
                                     isSynchronousAdoNetImplementation: true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
-                                    commandInterceptor: NoOpDatabaseCommandInterceptor.Instance) 
+                                    commandInterceptor: NoOpCommandInterceptor.Instance) 
                                     
                 },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
@@ -46,7 +46,7 @@ namespace Orleans.SqlUtils
                                     isSynchronousAdoNetImplementation: true,
                                     supportsStreamNatively: false,
                                     supportsCommandCancellation: false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
-                                    commandInterceptor: OracleDatabaseCommandInterceptor.Instance) 
+                                    commandInterceptor: OracleCommandInterceptor.Instance) 
                     
                 }, 
             };
@@ -122,7 +122,7 @@ namespace Orleans.SqlUtils
             return GetDbConstants(adoNetProvider).IsSynchronousAdoNetImplementation;
         }
 
-        public static IDatabaseCommandInterceptor GetDatabaseCommandInterceptor(string invariantName)
+        public static ICommandInterceptor GetDatabaseCommandInterceptor(string invariantName)
         {
             return GetDbConstants(invariantName).DatabaseCommandInterceptor;
         }
@@ -160,11 +160,11 @@ namespace Orleans.SqlUtils
         /// </summary>
         public readonly char EndEscapeIndicator;
 
-        public readonly IDatabaseCommandInterceptor DatabaseCommandInterceptor;
+        public readonly ICommandInterceptor DatabaseCommandInterceptor;
 
 
         public DbConstants(char startEscapeIndicator, char endEscapeIndicator, string unionAllSelectTemplate,
-                           bool isSynchronousAdoNetImplementation, bool supportsStreamNatively, bool supportsCommandCancellation, IDatabaseCommandInterceptor commandInterceptor)
+                           bool isSynchronousAdoNetImplementation, bool supportsStreamNatively, bool supportsCommandCancellation, ICommandInterceptor commandInterceptor)
         {
             StartEscapeIndicator = startEscapeIndicator;
             EndEscapeIndicator = endEscapeIndicator;

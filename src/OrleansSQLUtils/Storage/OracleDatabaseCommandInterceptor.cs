@@ -9,16 +9,16 @@ namespace OrleansSQLUtils.Storage
     /// <summary>
     /// This interceptor bypasses some Oracle specifics.
     /// </summary>
-    internal class OracleDatabaseCommandInterceptor : IDatabaseCommandInterceptor
+    internal class OracleCommandInterceptor : ICommandInterceptor
     {
-        public static readonly IDatabaseCommandInterceptor Instance = new OracleDatabaseCommandInterceptor();
+        public static readonly ICommandInterceptor Instance = new OracleCommandInterceptor();
 
         private readonly Lazy<Action<IDbDataParameter>> setClobOracleDbTypeAction;
         private readonly Lazy<Action<IDbDataParameter>> setBlobOracleDbTypeAction;
         private readonly Lazy<Action<IDbCommand>> setCommandBindByNameAction;
 
 
-        private OracleDatabaseCommandInterceptor()
+        private OracleCommandInterceptor()
         {
             setClobOracleDbTypeAction = new Lazy<Action<IDbDataParameter>>(() => BuildSetOracleDbTypeAction("Clob"));
             setBlobOracleDbTypeAction = new Lazy<Action<IDbDataParameter>>(() => BuildSetOracleDbTypeAction("Blob"));
@@ -26,7 +26,7 @@ namespace OrleansSQLUtils.Storage
         }
 
         /// <summary>
-        /// Creates a compiled lambda which sets the BindByName on OracleCommant to true.
+        /// Creates a compiled lambda which sets the BindByName property on OracleCommand to true.
         /// </summary>
         /// <returns>An action which takes a OracleCommand as IDbCommand </returns>
         private Action<IDbCommand> BuildSetBindByNameAction()
@@ -105,7 +105,7 @@ namespace OrleansSQLUtils.Storage
                 }
 
                 //Oracle doesn´t support DbType.Boolean, instead
-                //we map these to NUMBER
+                //we map these to DbType.Int32
                 if (commandParameter.DbType == DbType.Boolean)
                 {
                     commandParameter.Value = commandParameter.ToString() == Boolean.TrueString ? 1 : 0;
