@@ -27,8 +27,15 @@ namespace Orleans.Runtime
             executor.QueueWorkItem(ProcessAction, request);
         }
 
-        protected abstract void Process(T request);
-        
         public int Count => executor.WorkQueueCount;
+
+        protected abstract void Process(T request);
+
+        protected override ExecutorOptions GetExecutorOptions()
+        {
+            return new ThreadPoolExecutorOptions(GetType(), Name, Cts.Token, drainAfterCancel: DrainAfterCancel);
+        }
+
+        internal virtual bool DrainAfterCancel { get; } = false;
     }
 }

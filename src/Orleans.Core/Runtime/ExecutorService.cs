@@ -18,46 +18,58 @@ namespace Orleans.Runtime
 
     internal class ExecutorService
     {
-        public IExecutor GetExecutor(GetThreadPoolExecutorRequest request)
+        public IExecutor GetExecutor(ExecutorOptions executorOptions)
         {
-            var stageType = request.StageType;
-            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(stageType))
+            switch (executorOptions)
             {
-                return new ThreadPerTaskExecutor(request.StageName);
+                case ThreadPoolExecutorOptions options:
+                    return new ThreadPoolExecutor(options);
+                case SingleThreadExecutorOptions options:
+                    return new ThreadPerTaskExecutor(options);
+                default:
+                    throw new NotImplementedException();
             }
-            
-            return new ThreadPoolExecutor(
-                request.StageName,
-                request.CancellationToken,
-                typeof(IQueueDrainable).IsAssignableFrom(stageType));
-        }
-
-        public IExecutor GetThreadpPerTaskExecutor(GetExecutorRequest request)
-        {
-            return new ThreadPerTaskExecutor(request.StageName);
         }
     }
 
-    internal class GetThreadPoolExecutorRequest : GetExecutorRequest
+    internal class ThreadPoolExecutorOptions : ExecutorOptions
     {
-        public GetThreadPoolExecutorRequest(Type stageType, string stageName, CancellationToken ct) 
-            : base(stageType, stageName)
+        public ThreadPoolExecutorOptions(
+            Type stageType,
+            string stageName,
+            CancellationToken ct,
+            int degreeOfParallelism = 1,
+            bool drainAfterCancel = false)
+            : base(stageName)
         {
+            StageType = stageType;
+            DegreeOfParallelism = degreeOfParallelism;
+            DrainAfterCancel = drainAfterCancel;
             CancellationToken = ct;
         }
+
+        public Type StageType { get; }
+
+        public int DegreeOfParallelism { get; }
+
+        public bool DrainAfterCancel { get; }
 
         public CancellationToken CancellationToken { get; }
     }
 
-    internal class GetExecutorRequest
+    internal class SingleThreadExecutorOptions : ExecutorOptions
     {
-        public GetExecutorRequest(Type stageType, string stageName)
+        public SingleThreadExecutorOptions(string stageName) : base(stageName)
         {
-            StageType = stageType;
+        }
+    }
+
+    internal abstract class ExecutorOptions
+    {
+        protected ExecutorOptions(string stageName)
+        {
             StageName = stageName;
         }
-
-        public Type StageType { get; }
 
         public string StageName { get; }
     }

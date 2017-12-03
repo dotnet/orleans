@@ -63,7 +63,7 @@ namespace Orleans.Runtime.Scheduler
             applicationTurnsStopped = false;
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
-            executor = executorService.GetExecutor(new GetThreadPoolExecutorRequest(GetType(), "", new CancellationTokenSource().Token)); // need second executor for system
+            executor = executorService.GetExecutor(new ThreadPoolExecutorOptions(GetType(), "", new CancellationTokenSource().Token, 4)); // need second executor for system
             // add systemExecutor
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);

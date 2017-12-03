@@ -84,6 +84,11 @@ namespace Orleans.Runtime
 
         protected abstract void Run();
 
+        protected override ExecutorOptions GetExecutorOptions()
+        {
+            return new SingleThreadExecutorOptions(Name);
+        }
+
         private static void LogStatus(Logger log, string msg, params object[] args)
         {
             if (IsStarting)
