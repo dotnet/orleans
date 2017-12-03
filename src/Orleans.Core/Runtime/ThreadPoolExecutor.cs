@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
@@ -14,14 +15,15 @@ namespace Orleans.Runtime
        // private readonly HashSet<WorkerPoolThread> pool;
       //  private int runningThreadCount;
 
-        internal readonly int activeThreads = 3; // todo: accept as parameter 
+       // internal readonly int activeThreads = 3; // todo: accept as parameter 
         internal readonly TimeSpan MaxWorkQueueWait;
         internal readonly bool EnableWorkerThreadInjection;
-   //     private readonly ICorePerformanceMetrics performanceMetrics;
-   //     private readonly ILoggerFactory loggerFactory;
-     //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
-      //  private readonly ILogger timerLogger;
+        //     private readonly ICorePerformanceMetrics performanceMetrics;
+        //     private readonly ILoggerFactory loggerFactory;
+        //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
+        //  private readonly ILogger timerLogger;
 
+        private readonly QueueWorkItemCallback[] QueueWorkItemRefs;
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
         private readonly CancellationToken cancellationToken;
         private readonly bool drainAfterCancel;
@@ -30,11 +32,11 @@ namespace Orleans.Runtime
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        public ThreadPoolExecutor(string name, CancellationToken ct, bool drainAfterCancel)
+        public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
             if (StatisticsCollector.CollectQueueStats)
             {
-                queueTracking = new QueueTrackingStatistic(name);
+                queueTracking = new QueueTrackingStatistic(options.StageName);
             }
 
             // move to initialize  stats method
@@ -44,8 +46,8 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-            this.drainAfterCancel = drainAfterCancel;
-
+            this.drainAfterCancel = options.DrainAfterCancel;
+            cancellationToken = options.CancellationToken;
             cancellationToken.Register(() =>
             {
                 // allow threads to get a chance to exit gracefully.
@@ -53,9 +55,14 @@ namespace Orleans.Runtime
                 workQueue.CompleteAdding();
             });
 
-            for (var createThreadCount = 0; createThreadCount < activeThreads; createThreadCount++)
+            // padding reduces false sharing
+            var padding = 100;
+            QueueWorkItemRefs = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
+            for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
-                new ThreadPerTaskExecutor(name + createThreadCount).QueueWorkItem(_ => ProcessQueue());
+                var executorWorkItemSlotIndex = createThreadCount * padding;
+                new ThreadPerTaskExecutor(new SingleThreadExecutorOptions(options.StageName + createThreadCount))
+                    .QueueWorkItem(_ => ProcessQueue(executorWorkItemSlotIndex));
             }
         }
 
@@ -63,43 +70,26 @@ namespace Orleans.Runtime
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
-            var workItemCallback = new QueueWorkItemCallback(callback, state);
-
-
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking.OnEnQueueRequest(1, WorkQueueCount, workItemCallback);
-            }
-#endif
-
-            workQueue.Add(workItemCallback);
+            var workItem = new QueueWorkItemCallback(callback, state);
+            TrackRequestEnqueue(workItem);
+            workQueue.Add(workItem);
         }
 
-        protected void ProcessQueue()
+        protected void ProcessQueue(int workItemSlotIndex)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                queueTracking.OnStartExecution();
-            }
-#endif
+            TrackExecutionStart();
             try
             {
-                RunNonBatching();
+                RunNonBatching(workItemSlotIndex);
             }
             finally
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    queueTracking.OnStopExecution();
-                }
-#endif
+                TrackExecutionStop();
             }
         }
-        
-        protected void RunNonBatching()
+
+
+        protected void RunNonBatching(int workItemSlotIndex) // slotNumber
         {
             while (true)
             {
@@ -108,7 +98,7 @@ namespace Orleans.Runtime
                 {
                     return;
                 }
-                
+
                 QueueWorkItemCallback workItem;
                 try
                 {
@@ -119,18 +109,73 @@ namespace Orleans.Runtime
                     break;
                 }
 
+                QueueWorkItemRefs[workItemSlotIndex] = workItem;
+                TrackRequestDequeue(workItem);
+                TrackProcessingStart();
+
+                workItem.ExecuteWorkItem();
+
+                TrackProcessingStop();
+                QueueWorkItemRefs[workItemSlotIndex] = null;
+            }
+        }
+
+        #region StatisticsTracking
+
+        private void TrackRequestEnqueue(QueueWorkItemCallback workItem)
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking.OnEnQueueRequest(1, WorkQueueCount, workItem);
+            }
+#endif
+        }
+
+        private void TrackExecutionStart()
+        {
+
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                queueTracking.OnStartExecution();
+            }
+#endif
+        }
+
+        private void TrackExecutionStop()
+        {
+
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    queueTracking.OnStopExecution();
+                }
+#endif
+        }
+
+        private void TrackRequestDequeue(QueueWorkItemCallback workItem)
+        {
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
                 {
                     queueTracking.OnDeQueueRequest(workItem);
                 }
+#endif
+        }
 
+        private void TrackProcessingStart()
+        {
+#if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     threadTracking.OnStartProcessing();
                 }
 #endif
-                workItem.ExecuteWorkItem();
+        }
+
+        private void TrackProcessingStop()
+        {
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
@@ -138,14 +183,17 @@ namespace Orleans.Runtime
                     threadTracking.IncrementNumberOfProcessed();
                 }
 #endif
-            }
         }
 
-        internal  class QueueWorkItemCallback : ITimeInterval
+        #endregion
+
+        internal class QueueWorkItemCallback : ITimeInterval
         {
             public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => {}, null);
 
             private readonly WaitCallback callback;
+
+            private readonly Func<object, string> statusProvider;
 
             private readonly object state;
 
@@ -155,6 +203,12 @@ namespace Orleans.Runtime
             {
                 this.callback = callback;
                 this.state = state;
+            }
+
+            public QueueWorkItemCallback(WaitCallback callback, object state, Func<object, string> statusProvider)
+                : this(callback, state)
+            {
+                this.statusProvider = statusProvider;
             }
 
             public void ExecuteWorkItem()
@@ -178,6 +232,22 @@ namespace Orleans.Runtime
                 timeInterval.Restart();
             }
 
+            private string GetWorkItemStatus(bool detailed)
+            {
+                return statusProvider?.Invoke(state);
+            }
+
+            private bool IsFrozen()
+            {
+                if (timeInterval != null)
+                {
+                   // return timeInterval.Elapsed > OrleansTaskScheduler.TurnWarningLengthThreshold;
+                }
+                return false;
+              //  // If there is no active Task, check current wokr item, if any.
+             //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+             //   return frozenWorkItem;
+            }
             public TimeSpan Elapsed => timeInterval.Elapsed;
         }
     }

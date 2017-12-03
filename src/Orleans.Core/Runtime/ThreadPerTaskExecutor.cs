@@ -9,9 +9,9 @@ namespace Orleans.Runtime
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        public ThreadPerTaskExecutor(string name)
+        public ThreadPerTaskExecutor(SingleThreadExecutorOptions options)
         {
-            this.name = name;
+            this.name = options.StageName;
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -20,32 +20,41 @@ namespace Orleans.Runtime
             }
 #endif
         }
-
+        
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             new Thread(() =>
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartExecution();
-                }
-#endif
+                TrackExecutionStart();
                 callback.Invoke(state);
-
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopExecution();
-                }
-#endif
+                TrackExecutionStop();
             })
             {
                 IsBackground = true,
                 Name = name
             }.Start();
         }
-
+        
         public int WorkQueueCount => 0;
+
+        private void TrackExecutionStart()
+        {
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStartExecution();
+                }
+#endif
+        }
+
+        private void TrackExecutionStop()
+        {
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStopExecution();
+                }
+#endif
+        }
     }
 }
