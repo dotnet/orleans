@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
+using System.Linq;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
-using Orleans.Transactions;
-using Orleans.Transactions.Development;
+using Orleans.Hosting.Development;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using BenchmarkGrainInterfaces.Transaction;
-using System.Linq;
 
 namespace Benchmarks.Transactions
 {

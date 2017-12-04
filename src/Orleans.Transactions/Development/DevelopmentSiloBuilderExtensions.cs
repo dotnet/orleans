@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+using Orleans.Transactions.Development;
 
-namespace Orleans.Transactions.Development
+namespace Orleans.Hosting.Development
 {
     public static class DevelopmentSiloBuilderExtensions
     {
