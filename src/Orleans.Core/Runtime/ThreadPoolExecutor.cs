@@ -12,17 +12,18 @@ namespace Orleans.Runtime
     {
         private QueueTrackingStatistic queueTracking;
 
-       // private readonly HashSet<WorkerPoolThread> pool;
-      //  private int runningThreadCount;
+        // private readonly HashSet<WorkerPoolThread> pool;
+        //  private int runningThreadCount;
 
-       // internal readonly int activeThreads = 3; // todo: accept as parameter 
-        internal readonly TimeSpan MaxWorkQueueWait;
-        internal readonly bool EnableWorkerThreadInjection;
+        // internal readonly int activeThreads = 3; // todo: accept as parameter 
+        //   internal readonly TimeSpan MaxWorkQueueWait;
+        //     internal readonly bool EnableWorkerThreadInjection;
         //     private readonly ICorePerformanceMetrics performanceMetrics;
         //     private readonly ILoggerFactory loggerFactory;
         //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
         //  private readonly ILogger timerLogger;
 
+        private SafeTimer longTurnTimer;
         private readonly QueueWorkItemCallback[] QueueWorkItemRefs;
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
         private readonly CancellationToken cancellationToken;

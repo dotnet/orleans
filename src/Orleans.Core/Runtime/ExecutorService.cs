@@ -43,9 +43,9 @@ namespace Orleans.Runtime
             : base(stageName)
         {
             StageType = stageType;
+            CancellationToken = ct;
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
-            CancellationToken = ct;
         }
 
         public Type StageType { get; }
