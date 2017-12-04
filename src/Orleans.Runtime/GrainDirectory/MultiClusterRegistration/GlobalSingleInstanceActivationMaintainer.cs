@@ -30,8 +30,17 @@ namespace Orleans.Runtime.GrainDirectory
         // maintainer periodically takes and processes this list.
         private List<GrainId> doubtfulGrains = new List<GrainId>();
 
-        public GlobalSingleInstanceActivationMaintainer(LocalGrainDirectory router, Logger logger, GlobalConfiguration config, IInternalGrainFactory grainFactory, IMultiClusterOracle multiClusterOracle, ExecutorService executorService, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
-            :base(executorService, loggerFactory)
+        public GlobalSingleInstanceActivationMaintainer(
+            LocalGrainDirectory router,
+            Logger logger,
+            GlobalConfiguration config,
+            IInternalGrainFactory grainFactory,
+            IMultiClusterOracle multiClusterOracle,
+            ExecutorService executorService,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
+            ILoggerFactory loggerFactory)
+            : base(executorService, loggerFactory)
         {
             this.router = router;
             this.logger = logger;

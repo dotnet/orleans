@@ -9,12 +9,12 @@ namespace Orleans.Hosting
     public class MultiClusterOptions
     {
         /// <summary>
-        /// Whether this cluster is configured to be part of a multicluster network
+        /// Whether this cluster is configured to be part of a multi-cluster network
         /// </summary>
         public bool HasMultiClusterNetwork { get; set; } = false;
 
         /// <summary>
-        ///A list of cluster ids, to be used if no multicluster configuration is found in gossip channels.
+        ///A list of cluster ids, to be used if no multi-cluster configuration is found in gossip channels.
         /// </summary>
         public IList<string> DefaultMultiCluster { get; set; } = new List<string>();
 
@@ -30,7 +30,7 @@ namespace Orleans.Hosting
 
         /// <summary>
         /// Whether to use the global single instance protocol as the default
-        /// multicluster registration strategy.
+        /// multi-cluster registration strategy.
         /// </summary>
         public bool UseGlobalSingleInstanceByDefault { get; set; } = true;
 
