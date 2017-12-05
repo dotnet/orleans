@@ -10,16 +10,6 @@ namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
     {
-        private static readonly Action<TransactionsOptions> DefaultConfigureAction = options => { };
-
-        /// <summary>
-        /// Configure cluster to use an in-cluster transaction manager using defaults.
-        /// </summary>
-        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder)
-        {
-            return builder.UseInClusterTransactionManager(ob => ob.Configure(DefaultConfigureAction));
-        }
-
         /// <summary>
         /// Configure cluster to use an in-cluster transaction manager using a configure action.
         /// </summary>
@@ -31,17 +21,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure cluster to use an in-cluster transaction manager using a configuration builder.
         /// </summary>
-        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder, Action<OptionsBuilder<TransactionsOptions>> configureOptions)
+        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder, Action<OptionsBuilder<TransactionsOptions>> configureOptions = null)
         {
             return builder.ConfigureServices(services => services.UseInClusterTransactionManager(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure cluster services to use an in-cluster transaction manager using defaults.
-        /// </summary>
-        public static IServiceCollection UseInClusterTransactionManager(this IServiceCollection services)
-        {
-            return services.UseInClusterTransactionManager(ob => ob.Configure(DefaultConfigureAction));
         }
 
         /// <summary>
@@ -56,7 +38,7 @@ namespace Orleans.Hosting
         /// Configure cluster services to use an in-cluster transaction manager using a configuration builder.
         /// </summary>
         public static IServiceCollection UseInClusterTransactionManager(this IServiceCollection services,
-            Action<OptionsBuilder<TransactionsOptions>> configureOptions)
+            Action<OptionsBuilder<TransactionsOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<TransactionsOptions>());
             return services.AddTransient<TransactionLog>()
