@@ -21,6 +21,7 @@ namespace Orleans.Runtime
         protected Logger Log;
         protected readonly string type;
         protected FaultBehavior OnFault;
+        protected bool disposed;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
@@ -88,6 +89,7 @@ namespace Orleans.Runtime
 
         public virtual void Start()
         {
+            ThrowIfDisposed();
             lock (Lockable)
             {
                 if (State == ThreadState.Running)
@@ -115,6 +117,7 @@ namespace Orleans.Runtime
         {
             try
             {
+                ThrowIfDisposed();
                 lock (Lockable)
                 {
                     if (State == ThreadState.Running)
@@ -146,13 +149,15 @@ namespace Orleans.Runtime
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposing) return;
+            if (!disposing || disposed) return;
 
             if (Cts != null)
             {
                 Cts.Dispose();
                 Cts = null;
             }
+
+            disposed = true;
         }
 
 #endregion
@@ -163,6 +168,14 @@ namespace Orleans.Runtime
         }
 
         internal static bool IsStarting { get; set; }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException("Cannot access a disposed AsynchAgent"); 
+            }
+        }
 
         private void EnsureExecutorInitialized()
         {
