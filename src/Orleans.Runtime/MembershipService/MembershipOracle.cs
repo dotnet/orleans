@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
@@ -39,14 +41,15 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
         private readonly ILoggerFactory loggerFactory;
-        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+
+        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             this.membershipTableFactory = membershipTableFactory;
             this.grainFactory = grainFactory;
             logger = new LoggerWrapper<MembershipOracle>(loggerFactory);
-            membershipOracleData = new MembershipOracleData(siloDetails, nodeConfiguration, clusterConfiguration.Globals, logger);
+            membershipOracleData = new MembershipOracleData(siloDetails, nodeConfiguration, logger, multiClusterOptions.Value);
             probedSilos = new Dictionary<SiloAddress, int>();
             orleansConfig = clusterConfiguration;
             nodeConfig = nodeConfiguration;

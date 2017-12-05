@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 using Orleans.Runtime.Configuration;
@@ -38,7 +40,9 @@ namespace Orleans.Runtime.GrainDirectory
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle)
+            IMultiClusterOracle multiClusterOracle,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
             this.logger = logger;
@@ -46,8 +50,8 @@ namespace Orleans.Runtime.GrainDirectory
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.hasMultiClusterNetwork = config.HasMultiClusterNetwork;
-            this.clusterId = config.ClusterId;
+            this.hasMultiClusterNetwork = multiClusterOptions.Value.HasMultiClusterNetwork;
+            this.clusterId = siloOptions.Value.ClusterId;
         }
 
         public bool IsSynchronous { get { return false; } }

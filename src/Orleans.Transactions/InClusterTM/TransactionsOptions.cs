@@ -2,10 +2,9 @@
 
 namespace Orleans.Transactions
 {
-    [Serializable]
-    public class TransactionsConfiguration
+    public class TransactionsOptions
     {
-        public TransactionsConfiguration()
+        public TransactionsOptions()
         {
             UseDefaults();
         }
@@ -30,18 +29,6 @@ namespace Orleans.Transactions
         /// </summary>
         public TimeSpan TransactionRecordPreservationDuration { get; set; }
         public static readonly TimeSpan DefaultTransactionRecordPreservationDuration = TimeSpan.FromMinutes(1);
-
-        public void Copy(TransactionsConfiguration other)
-        {
-            if (other == null)
-                UseDefaults();
-            else
-            {
-                this.TransactionIdAllocationBatchSize = other.TransactionIdAllocationBatchSize;
-                this.AvailableTransactionIdThreshold = other.AvailableTransactionIdThreshold;
-                this.TransactionRecordPreservationDuration = other.TransactionRecordPreservationDuration;
-            }
-        }
 
         private void UseDefaults()
         {

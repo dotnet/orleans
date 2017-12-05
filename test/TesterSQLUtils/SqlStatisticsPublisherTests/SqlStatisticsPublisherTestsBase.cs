@@ -72,7 +72,6 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
         {
-
             var options = new SqlMembershipOptions()
             {
                 AdoInvariant = AdoInvariant,
@@ -80,7 +79,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
             };
 
             IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
-                this.environment.Services.GetRequiredService<GlobalConfiguration>(), Options.Create<SqlMembershipOptions>(options), 
+                this.environment.Services.GetRequiredService<IOptions<SiloOptions>>(), Options.Create(options), 
                 this.loggerFactory.CreateLogger<SqlMembershipTable>());
             await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");

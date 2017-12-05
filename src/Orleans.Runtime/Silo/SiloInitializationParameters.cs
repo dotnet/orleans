@@ -6,12 +6,19 @@ namespace Orleans.Runtime
     /// <summary>
     /// Silo identity configuration options.
     /// </summary>
-    public class SiloIdentityOptions
+    public class SiloOptions
     {
         /// <summary>
         /// Gets or sets the silo name.
         /// </summary>
         public string SiloName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
+        /// </summary>
+        public string ClusterId { get; set; }
+
+        // TODO: add ServiceId.
     }
 
     /// <summary>
@@ -22,12 +29,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="SiloInitializationParameters"/> class. 
         /// </summary>
-        /// <param name="identityOptions">The identity of this silo.</param>
+        /// <param name="siloOptions">The identity of this silo.</param>
         /// <param name="config">The cluster configuration.</param>
         public SiloInitializationParameters(
-            IOptions<SiloIdentityOptions> identityOptions,
+            IOptions<SiloOptions> siloOptions,
             ClusterConfiguration config) : this(
-            identityOptions.Value.SiloName,
+            siloOptions.Value.SiloName,
             config)
         {
         }

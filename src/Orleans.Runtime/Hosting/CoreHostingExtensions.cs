@@ -24,7 +24,7 @@ namespace Orleans.Hosting
             {
                 if (!context.Properties.ContainsKey("OrleansServicesAdded"))
                 {
-                    services.PostConfigure<SiloIdentityOptions>(options => options.SiloName = options.SiloName
+                    services.PostConfigure<SiloOptions>(options => options.SiloName = options.SiloName
                                            ?? context.HostingEnvironment.ApplicationName
                                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
@@ -45,7 +45,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder ConfigureSiloName(this ISiloHostBuilder builder, string siloName)
         {
-            builder.Configure<SiloIdentityOptions>(options => options.SiloName = siloName);
+            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
             return builder;
         }
 

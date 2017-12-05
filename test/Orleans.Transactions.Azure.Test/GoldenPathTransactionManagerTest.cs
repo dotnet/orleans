@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,7 +25,7 @@ namespace Orleans.Transactions.Azure.Tests
         private static ITransactionManager MakeTransactionManager()
         {
             TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
-            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsConfiguration>(new TransactionsConfiguration()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
+            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsOptions>(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }
@@ -36,7 +35,7 @@ namespace Orleans.Transactions.Azure.Tests
             TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
             var config = new ClientConfiguration();
             var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
-            var azureConfig = Options.Create(new AzureTransactionLogConfiguration()
+            var azureConfig = Options.Create(new AzureTransactionLogOptions()
             {
                 // TODO: Find better way for test isolation.
                 TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
