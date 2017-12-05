@@ -16,7 +16,7 @@ namespace Orleans.Transactions
         private const int MaxCheckpointBatchSize = 200;
         private static readonly TimeSpan DefaultLogMaintenanceInterval = TimeSpan.FromSeconds(1);
 
-        private readonly TransactionsConfiguration config;
+        private readonly TransactionsOptions options;
         private readonly TransactionLog transactionLog;
         private readonly ActiveTransactionsTracker activeTransactionsTracker;
         private readonly TimeSpan logMaintenanceInterval;
@@ -46,11 +46,11 @@ namespace Orleans.Transactions
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
         private TransactionManagerMetrics metrics;
-        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer,
+        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsOptions> configOption, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer,
             Factory<NodeConfiguration> getNodeConfig, TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;
-            this.config = configOption.Value;
+            this.options = configOption.Value;
             this.logger = loggerFactory.CreateLogger<TransactionManager>();
             this.logMaintenanceInterval = logMaintenanceInterval ?? DefaultLogMaintenanceInterval;
 
@@ -677,7 +677,7 @@ namespace Orleans.Transactions
             foreach (var txRecord in transactionsTable)
             {
                 if (txRecord.Value.State == TransactionState.Aborted &&
-                    txRecord.Value.CompletionTimeUtc + this.config.TransactionRecordPreservationDuration < DateTime.UtcNow)
+                    txRecord.Value.CompletionTimeUtc + this.options.TransactionRecordPreservationDuration < DateTime.UtcNow)
                 {
                     transactionsTable.TryRemove(txRecord.Key, out Transaction temp);
                 }
@@ -686,7 +686,7 @@ namespace Orleans.Transactions
                     lock (txRecord.Value)
                     {
                         if (txRecord.Value.HighestActiveTransactionIdAtCheckpoint < activeTransactionsTracker.GetSmallestActiveTransactionId() &&
-                            txRecord.Value.CompletionTimeUtc + this.config.TransactionRecordPreservationDuration < DateTime.UtcNow)
+                            txRecord.Value.CompletionTimeUtc + this.options.TransactionRecordPreservationDuration < DateTime.UtcNow)
                         {
                             // The oldest active transaction started after this transaction was checkpointed
                             // so no in progress transaction is going to take a dependency on this transaction

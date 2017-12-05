@@ -1,11 +1,9 @@
-﻿using System;
-using Orleans.Runtime.Configuration;
+﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Transactions.Development;
-using TestExtensions;
+using Orleans.Hosting.Development;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 
 namespace Orleans.Transactions.Tests
 {
@@ -27,7 +25,7 @@ namespace Orleans.Transactions.Tests
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
-                    .UseInClusterTransactionManager(new TransactionsConfiguration())
+                    .UseInClusterTransactionManager()
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();
             }

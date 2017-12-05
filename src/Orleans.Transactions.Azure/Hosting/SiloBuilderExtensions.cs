@@ -1,25 +1,46 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.Transactions.Abstractions;
-using System.Threading.Tasks;
+using Orleans.Transactions.Azure;
 
-namespace Orleans.Transactions.Azure
+namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure cluster to use azure transaction log.
+        /// Configure cluster to use azure transaction log using configure action.
         /// </summary>
-        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, AzureTransactionLogConfiguration config)
+        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, Action<AzureTransactionLogOptions> configureOptions)
         {
-            return builder.ConfigureServices(UseAzureTransactionLog)
-                          .Configure<AzureTransactionLogConfiguration>((cfg) => cfg.Copy(config));
-
+            return builder.UseAzureTransactionLog(ob => ob.Configure(configureOptions));
         }
 
-        private static void UseAzureTransactionLog(IServiceCollection services)
+        /// <summary>
+        /// Configure cluster to use azure transaction log using configuration builder.
+        /// </summary>
+        public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
         {
+            return builder.ConfigureServices(services => services.UseAzureTransactionLog(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure cluster service to use azure transaction log using configure action.
+        /// </summary>
+        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services, Action<AzureTransactionLogOptions> configureOptions)
+        {
+            return services.UseAzureTransactionLog(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure cluster service to use azure transaction log using configuration builder.
+        /// </summary>
+        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services,
+            Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
+        {
+            configureOptions?.Invoke(services.AddOptions<AzureTransactionLogOptions>());
+            services.AddTransient<IConfigurationValidator,AzureTransactionLogOptionsValidator>();
             services.AddTransient(AzureTransactionLogStorage.Create);
+            return services;
         }
     }
 }
