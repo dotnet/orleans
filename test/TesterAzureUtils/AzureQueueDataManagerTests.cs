@@ -56,15 +56,15 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage outMessage1 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 1: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage1));
+            logger.Info("PeekQueueMessage 1: {0}", PrintCloudQueueMessage(outMessage1));
             Assert.Equal(inMessage.AsString, outMessage1.AsString);
 
             CloudQueueMessage outMessage2 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 2: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage2));
+            logger.Info("PeekQueueMessage 2: {0}", PrintCloudQueueMessage(outMessage2));
             Assert.Equal(inMessage.AsString, outMessage2.AsString);
 
             CloudQueueMessage outMessage3 = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage 3: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage3));
+            logger.Info("GetQueueMessage 3: {0}", PrintCloudQueueMessage(outMessage3));
             Assert.Equal(inMessage.AsString, outMessage3.AsString);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
@@ -141,7 +141,7 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
             
             CloudQueueMessage outMessage = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage));
+            logger.Info("GetQueueMessage: {0}", PrintCloudQueueMessage(outMessage));
             Assert.Equal(inMessage.AsString, outMessage.AsString);
 
             await Task.Delay(visibilityTimeout);
@@ -153,6 +153,16 @@ namespace Tester.AzureUtils
 
             await manager.DeleteQueueMessage(outMessage2);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
+        }
+
+        private static string PrintCloudQueueMessage(CloudQueueMessage message)
+        {
+            return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
+                    message.Id,
+                    message.NextVisibleTime.HasValue ? LogFormatter.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
+                    message.DequeueCount,
+                    message.PopReceipt,
+                    message.AsString);
         }
     }
 }

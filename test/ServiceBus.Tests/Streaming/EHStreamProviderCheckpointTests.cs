@@ -2,10 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -14,12 +11,14 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Tester;
+using Orleans.Streaming.EventHubs;
 using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
+using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {

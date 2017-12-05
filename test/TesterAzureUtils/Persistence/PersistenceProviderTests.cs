@@ -10,7 +10,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.Storage;
-using Orleans.TestingHost.Utils;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.StorageTests;

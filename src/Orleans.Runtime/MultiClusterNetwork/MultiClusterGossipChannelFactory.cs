@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     switch (channelConfiguration.ChannelType)
                     {
                         case GlobalConfiguration.GossipChannelType.AzureTable:
-                            var tableChannel = AssemblyLoader.LoadAndCreateInstance<IGossipChannel>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, this.serviceProvider);
+                            var tableChannel = AssemblyLoader.LoadAndCreateInstance<IGossipChannel>(Constants.ORLEANS_CLUSTERING_AZURESTORAGE, logger, this.serviceProvider);
                             await tableChannel.Initialize(globalConfig.ServiceId, channelConfiguration.ConnectionString);
                             gossipChannels.Add(tableChannel);
                             break;

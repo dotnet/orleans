@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansAzureUtils</PackageId>
+    <Title>Microsoft Orleans Azure Utilities</Title>
+    <Description>Support library for hosting Orleans on Microsoft Azure.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageTags>$(PackageTags) Azure</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.Hosting.AzureCloudServices\Orleans.Hosting.AzureCloudServices.csproj" />
+    <ProjectReference Include="..\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.Statistics.AzureStorage\Orleans.Statistics.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
+  </ItemGroup>
+
+</Project>
