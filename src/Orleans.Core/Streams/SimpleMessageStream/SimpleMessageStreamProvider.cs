@@ -48,12 +48,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
                     .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
-            
+            this.loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            logger = loggerFactory.CreateLogger(this.GetType().FullName);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
             stateManager.CommitState();
-            this.loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            logger = loggerFactory.CreateLogger(this.GetType().FullName);
             return Task.CompletedTask;
         }
 
