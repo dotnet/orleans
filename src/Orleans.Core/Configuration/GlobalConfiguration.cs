@@ -827,9 +827,9 @@ namespace Orleans.Runtime.Configuration
                             ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),
                                 "Invalid Guid value for the ServiceId attribute on the Azure element");
                         }
-                        if (child.HasAttribute("ClusterId"))
+                        if (child.HasAttribute("DeploymentId"))
                         {
-                            this.ClusterId = child.GetAttribute("ClusterId");
+                            this.ClusterId = child.GetAttribute("DeploymentId");
                         }
                         if (child.HasAttribute(Constants.DATA_CONNECTION_STRING_NAME))
                         {

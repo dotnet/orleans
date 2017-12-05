@@ -11,6 +11,7 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.TestingHost.Utils;
 
 // ReSharper disable InconsistentNaming
@@ -46,11 +47,11 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory);
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = "TMSLocalTesting" });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
-                ClusterId = "TMSLocalTesting",
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
             await table.Init(config);
@@ -63,7 +64,8 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory);
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,

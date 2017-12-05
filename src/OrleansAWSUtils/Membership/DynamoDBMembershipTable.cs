@@ -27,12 +27,12 @@ namespace Orleans.Runtime.MembershipService
         private DynamoDBStorage storage;
         private readonly DynamoDBMembershipOptions options;
         private readonly string clusterId;
-        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipOptions> options, GlobalConfiguration globalConfiguration)
+        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, IOptions<DynamoDBMembershipOptions> options, IOptions<SiloOptions> siloOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = options.Value;
-            this.clusterId = globalConfiguration.ClusterId;
+            this.clusterId = siloOptions.Value.ClusterId;
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

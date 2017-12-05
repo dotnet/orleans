@@ -4,7 +4,6 @@ using Orleans.Transactions;
 
 [assembly: GenerateSerializer(typeof(TransactionalExtensionExtensions.TransactionalResourceExtensionWrapper))]
 [assembly: GenerateSerializer(typeof(CommitRecord))]
-[assembly: GenerateSerializer(typeof(TransactionsConfiguration))]
 [assembly: GenerateSerializer(typeof(TransactionalStateRecord<>))]
 [assembly: GenerateSerializer(typeof(PendingTransactionState<>))]
 [assembly: GenerateSerializer(typeof(TransactionalStorageLoadResponse<>))]

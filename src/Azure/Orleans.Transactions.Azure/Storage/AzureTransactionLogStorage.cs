@@ -28,7 +28,7 @@ namespace Orleans.Transactions.Azure
 
         //TODO: jbragg - Do not use serializationManager for persistent data!!
         private readonly SerializationManager serializationManager;
-        private readonly AzureTransactionLogConfiguration configuration;
+        private readonly AzureTransactionLogOptions options;
 
         // Azure Tables objects for persistent storage
         private CloudTable table;
@@ -43,21 +43,21 @@ namespace Orleans.Transactions.Azure
         private List<CommitRecord> currentRowTransactions;
         private int currentRowTransactionsIndex;
 
-        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogConfiguration> configuration)
+        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogOptions> configurationOptions)
         {
             this.serializationManager = serializationManager;
-            this.configuration = configuration.Value;
+            this.options = configurationOptions.Value;
         }
 
         public async Task Initialize()
         {
-            if (string.IsNullOrWhiteSpace(configuration.ConnectionString))
+            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
             {
-                throw new ArgumentNullException(nameof(configuration.ConnectionString));
+                throw new ArgumentNullException(nameof(this.options.ConnectionString));
             }
 
             // Retrieve the storage account from the connection string.
-            var storageAccount = CloudStorageAccount.Parse(configuration.ConnectionString);
+            var storageAccount = CloudStorageAccount.Parse(this.options.ConnectionString);
 
             // Create the table if not exists.
             CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
@@ -65,7 +65,7 @@ namespace Orleans.Transactions.Azure
             creationClient.DefaultRequestOptions.RetryPolicy = new LinearRetry(TimeSpan.FromSeconds(1), 60);
             creationClient.DefaultRequestOptions.ServerTimeout = TimeSpan.FromMinutes(3);
             creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-            CloudTable creationTable = creationClient.GetTableReference(configuration.TableName);
+            CloudTable creationTable = creationClient.GetTableReference(this.options.TableName);
             await creationTable.CreateIfNotExistsAsync().ConfigureAwait(false);
 
             // get table for operations
@@ -74,7 +74,7 @@ namespace Orleans.Transactions.Azure
             operationClient.DefaultRequestOptions.RetryPolicy = new LinearRetry(TimeSpan.FromMilliseconds(100), 5);
             operationClient.DefaultRequestOptions.ServerTimeout = TimeSpan.FromSeconds(3);
             operationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-            this.table = operationClient.GetTableReference(configuration.TableName);
+            this.table = operationClient.GetTableReference(this.options.TableName);
             
             var query = new TableQuery<StartRow>().Where(TableQuery.CombineFilters(
                 TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, StartRowPartitionKey),

@@ -19,6 +19,11 @@ namespace Orleans.Runtime
 
         public void QueueRequest(T request)
         {
+            if (State != ThreadState.Running)
+            {
+                throw new InvalidOperationException("Not running agent usage attempt");
+            }
+
             executor.QueueWorkItem(ProcessAction, request);
         }
 

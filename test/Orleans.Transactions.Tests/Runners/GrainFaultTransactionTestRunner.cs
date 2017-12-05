@@ -62,7 +62,7 @@ namespace Orleans.Transactions.Tests
             });
         }
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "Intermittent failure, jbragg investigating")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         public async Task AbortTransactionOnOrphanCalls(string transactionTestGrainClassName)
         {

@@ -146,6 +146,7 @@ namespace Tests.GeoClusterTests
                     // configure multi-cluster network
                     config.Globals.ServiceId = globalServiceId;
                     config.Globals.ClusterId = clusterId;
+                    config.Globals.HasMultiClusterNetwork = true;
                     config.Globals.MaxMultiClusterGateways = 2;
                     config.Globals.DefaultMultiCluster = null;
 

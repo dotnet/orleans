@@ -230,7 +230,7 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
-            services.TryAddTransient<IConfigurationValidator, ApplicationPartValidator>();
+            services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
         }
     }
 }
