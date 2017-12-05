@@ -12,7 +12,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, Action<AzureTransactionLogOptions> configureOptions)
         {
-            return builder.ConfigureServices(ob => ob.Configure(configureOptions));
+            return builder.UseAzureTransactionLog(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
