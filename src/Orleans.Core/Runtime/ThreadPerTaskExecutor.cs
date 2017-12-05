@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -55,6 +56,11 @@ namespace Orleans.Runtime
                     threadTracking.OnStopExecution();
                 }
 #endif
+        }
+
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            return true;
         }
     }
 }

@@ -170,19 +170,19 @@ namespace Orleans.Runtime
         internal static bool IsStarting { get; set; }
         
         protected abstract ExecutorOptions GetExecutorOptions();
-        private void ThrowIfDisposed()
-        {
-            if (disposed)
-            {
-                throw new ObjectDisposedException("Cannot access a disposed AsynchAgent"); 
-            }
-        }
-
+        
         private void EnsureExecutorInitialized()
         {
             if (executor == null)
             {
                 executor = executorService.GetExecutor(GetExecutorOptions());
+            }
+        }
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException("Cannot access a disposed AsynchAgent");
             }
         }
     }

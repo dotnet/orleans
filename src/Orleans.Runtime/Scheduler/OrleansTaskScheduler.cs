@@ -21,6 +21,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly ILogger taskWorkItemLogger;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         public readonly IExecutor executor;
+        public readonly IExecutor systemExecutor;
         private bool applicationTurnsStopped;
         
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
@@ -63,8 +64,10 @@ namespace Orleans.Runtime.Scheduler
             applicationTurnsStopped = false;
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
+
             executor = executorService.GetExecutor(new ThreadPoolExecutorOptions(GetType(), "", new CancellationTokenSource().Token, 4)); // need second executor for system
-            // add systemExecutor
+            systemExecutor = executorService.GetExecutor(new ThreadPoolExecutorOptions(GetType(), "", new CancellationTokenSource().Token));
+
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
          //   Pool = new WorkerPool(this, performanceMetrics, executorService, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
@@ -162,9 +165,7 @@ namespace Orleans.Runtime.Scheduler
 
         public void Stop()
         {
-         // executors cts cancel   executor.WorkQueueCount
-            //RunQueue.RunDown();
-            //Pool.Stop();
+            // todo: executors cts cancel   
         }
 
         protected override IEnumerable<Task> GetScheduledTasks()
@@ -205,7 +206,6 @@ namespace Orleans.Runtime.Scheduler
         public void ScheduleExecution(IWorkItem todo)
         {
             // add longTurnTimer
-            // add DoHealthCheck? 
             // todo: calculate time in queue - difference between enqueuing and start of execution
             executor.QueueWorkItem(state =>
             {

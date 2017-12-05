@@ -40,7 +40,6 @@ namespace Orleans.Runtime
                 queueTracking = new QueueTrackingStatistic(options.StageName);
             }
 
-            // move to initialize  stats method
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
@@ -88,7 +87,6 @@ namespace Orleans.Runtime
                 TrackExecutionStop();
             }
         }
-
 
         protected void RunNonBatching(int workItemSlotIndex) // slotNumber
         {
@@ -190,7 +188,7 @@ namespace Orleans.Runtime
 
         internal class QueueWorkItemCallback : ITimeInterval
         {
-            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => {}, null);
+            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null);
 
             private readonly WaitCallback callback;
 
@@ -216,7 +214,7 @@ namespace Orleans.Runtime
             {
                 callback.Invoke(state);
             }
-            
+
             public void Start()
             {
                 timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
@@ -242,14 +240,19 @@ namespace Orleans.Runtime
             {
                 if (timeInterval != null)
                 {
-                   // return timeInterval.Elapsed > OrleansTaskScheduler.TurnWarningLengthThreshold;
+                    // return timeInterval.Elapsed > OrleansTaskScheduler.TurnWarningLengthThreshold;
                 }
                 return false;
-              //  // If there is no active Task, check current wokr item, if any.
-             //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-             //   return frozenWorkItem;
+                //  // If there is no active Task, check current wokr item, if any.
+                //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+                //   return frozenWorkItem;
             }
             public TimeSpan Elapsed => timeInterval.Elapsed;
+        }
+
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -5,7 +5,7 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
-    internal interface IExecutor
+    internal interface IExecutor : IHealthCheckable
     {
         void QueueWorkItem(WaitCallback callback, object state = null);
 
