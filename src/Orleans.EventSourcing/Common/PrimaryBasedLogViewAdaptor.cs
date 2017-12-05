@@ -539,7 +539,7 @@ namespace Orleans.EventSourcing.Common
 
             if (notificationTracker != null)
             {
-                var remoteInstances = Services.RegistrationStrategy.GetRemoteInstances(newConfig, Services.MyClusterId).ToList();
+                var remoteInstances = Services.RegistrationStrategy.GetRemoteInstances(newConfig.Clusters, Services.MyClusterId).ToList();
                 notificationTracker.UpdateNotificationTargets(remoteInstances);
             }
         }
@@ -869,7 +869,7 @@ namespace Orleans.EventSourcing.Common
         /// <param name="exclude">if non-null, exclude this cluster id from the notification</param>
         protected void BroadcastNotification(INotificationMessage msg, string exclude = null)
         {
-            var remoteinstances = Services.RegistrationStrategy.GetRemoteInstances(Configuration, Services.MyClusterId);
+            var remoteinstances = Services.RegistrationStrategy.GetRemoteInstances(Configuration.Clusters, Services.MyClusterId);
 
             // if there is only one cluster, don't send notifications.
             if (remoteinstances.Count() == 0)

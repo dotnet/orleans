@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.LogConsistency;
 using Orleans.MultiCluster;
 using Orleans.SystemTargetInterfaces;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
@@ -35,8 +37,9 @@ namespace Orleans.Runtime.LogConsistency
         private readonly IInternalGrainFactory grainFactory;
         private readonly Grain grain;   // links to the grain that owns this service object
         private readonly MultiClusterConfiguration pseudoMultiClusterConfiguration;
-        
-        private readonly GlobalConfiguration globalConfig;
+
+        private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         public ProtocolServices(
             Grain gr,
@@ -44,7 +47,8 @@ namespace Orleans.Runtime.LogConsistency
             IMultiClusterRegistrationStrategy strategy,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
-            GlobalConfiguration globalConfig,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             IMultiClusterOracle multiClusterOracle)
         {
             this.grain = gr;
@@ -53,13 +57,14 @@ namespace Orleans.Runtime.LogConsistency
             this.RegistrationStrategy = strategy;
             this.SerializationManager = serializationManager;
             this.multiClusterOracle = multiClusterOracle;
-            this.globalConfig = globalConfig;
+            this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
 
-            if (!globalConfig.HasMultiClusterNetwork)
+            if (!this.multiClusterOptions.HasMultiClusterNetwork)
             {
                 // we are creating a default multi-cluster configuration containing exactly one cluster, this one.
                 this.pseudoMultiClusterConfiguration = PseudoMultiClusterConfigurations.FindOrCreate(
-                    this.globalConfig.ClusterId,
+                    this.siloOptions.ClusterId,
                     CreatePseudoConfig);
             }
         }
@@ -71,10 +76,10 @@ namespace Orleans.Runtime.LogConsistency
         public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
 
-            log?.Verbose3("SendMessage {0}->{1}: {2}", this.globalConfig.ClusterId, clusterId, payload);
+            log?.Verbose3("SendMessage {0}->{1}: {2}", this.siloOptions.ClusterId, clusterId, payload);
 
             // send the message to ourself if we are the destination cluster
-            if (this.globalConfig.ClusterId == clusterId)
+            if (this.siloOptions.ClusterId == clusterId)
             {
                 var g = (ILogConsistencyProtocolParticipant)grain;
                 // we are on the same scheduler, so we can call the method directly
@@ -122,13 +127,13 @@ namespace Orleans.Runtime.LogConsistency
         /// <inheritdoc />
         public SerializationManager SerializationManager { get; }
 
-        public bool MultiClusterEnabled => this.globalConfig.HasMultiClusterNetwork;
+        public bool MultiClusterEnabled => this.multiClusterOptions.HasMultiClusterNetwork;
     
         public string MyClusterId
         {
             get
             {
-                return this.globalConfig.ClusterId;
+                return this.siloOptions.ClusterId;
             }
         }
 
@@ -149,7 +154,7 @@ namespace Orleans.Runtime.LogConsistency
             {
                 foreach (var cluster in this.multiClusterOracle.GetMultiClusterConfiguration().Clusters)
                 {
-                    if (cluster != this.globalConfig.ClusterId)
+                    if (cluster != this.siloOptions.ClusterId)
                         yield return cluster;
                 }
             }
@@ -199,7 +204,7 @@ namespace Orleans.Runtime.LogConsistency
             if (!this.MultiClusterEnabled)
                 throw new OrleansException(string.Format("{0} (grain={1})", msg, grain.GrainReference));
             else
-                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.globalConfig.ClusterId));
+                throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.siloOptions.ClusterId));
         }
 
         public void CaughtException(string where, Exception e)

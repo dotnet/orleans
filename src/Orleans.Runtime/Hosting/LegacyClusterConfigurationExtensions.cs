@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -34,6 +35,32 @@ namespace Orleans.Hosting
                     var initializationParams = sp.GetRequiredService<SiloInitializationParameters>();
                     return () => initializationParams.NodeConfig;
                 });
+
+            services.Configure<SiloOptions>(options =>
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.DeploymentId))
+                {
+                    options.ClusterId = configuration.Globals.DeploymentId;
+                }
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
+
+            services.Configure<MultiClusterOptions>(options =>
+            {
+                var globals = configuration.Globals;
+                if (globals.HasMultiClusterNetwork)
+                {
+                    options.HasMultiClusterNetwork = true;
+                    options.BackgroundGossipInterval = globals.BackgroundGossipInterval;
+                    options.DefaultMultiCluster = globals.DefaultMultiCluster?.ToList() ?? new List<string>();
+                    options.GlobalSingleInstanceNumberRetries = globals.GlobalSingleInstanceNumberRetries;
+                    options.GlobalSingleInstanceRetryInterval = globals.GlobalSingleInstanceRetryInterval;
+                    options.MaxMultiClusterGateways = globals.MaxMultiClusterGateways;
+                    options.UseGlobalSingleInstanceByDefault = globals.UseGlobalSingleInstanceByDefault;
+                }
+            });
+
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
 
             services.AddOptions<StatisticsOptions>()
@@ -58,9 +85,9 @@ namespace Orleans.Hosting
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
 
-            services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloIdentityOptions>>((options, identityOptions) =>
+            services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloOptions>>((options, siloOptions) =>
             {
-                var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(identityOptions.Value.SiloName);
+                var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
 

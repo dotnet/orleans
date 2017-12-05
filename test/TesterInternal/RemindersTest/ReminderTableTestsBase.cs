@@ -11,6 +11,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.TestingHost.Utils;
 
 namespace UnitTests.RemindersTest
@@ -23,6 +24,7 @@ namespace UnitTests.RemindersTest
 
         private readonly IReminderTable remindersTable;
         protected ILoggerFactory loggerFactory;
+        protected IOptions<SiloOptions> siloOptions;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
@@ -34,7 +36,7 @@ namespace UnitTests.RemindersTest
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);
-
+            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration

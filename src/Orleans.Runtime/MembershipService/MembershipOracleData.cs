@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
 
         private UpdateFaultCombo myFaultAndUpdateZones;
 
-        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, GlobalConfiguration globalConfig, Logger log)
+        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, Logger log, MultiClusterOptions multiClusterOptions)
         {
             logger = log;
             localTable = new Dictionary<SiloAddress, MembershipEntry>();  
@@ -45,8 +46,8 @@ namespace Orleans.Runtime.MembershipService
             MyAddress = siloDetails.SiloAddress;
             MyHostname = nodeConfiguration.DNSHostName;
             SiloName = siloDetails.Name;
-            this.multiClusterActive = globalConfig.HasMultiClusterNetwork;
-            this.maxMultiClusterGateways = globalConfig.MaxMultiClusterGateways;
+            this.multiClusterActive = multiClusterOptions.HasMultiClusterNetwork;
+            this.maxMultiClusterGateways = multiClusterOptions.MaxMultiClusterGateways;
             CurrentStatus = SiloStatus.Created;
             clusterSizeStatistic = IntValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER_SIZE, () => localTableCopyOnlyActive.Count);
             clusterStatistic = StringValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER,
