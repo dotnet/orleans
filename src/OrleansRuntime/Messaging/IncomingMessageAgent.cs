@@ -127,12 +127,16 @@ namespace Orleans.Runtime.Messaging
                         var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
                         if (target.State == ActivationState.Valid)
                         {
-                            var overloadException = target.CheckOverloaded(Log);
-                            if (overloadException != null)
+                            // Response messages are not subject to overload checks.
+                            if (msg.Direction != Message.Directions.Response)
                             {
-                                // Send rejection as soon as we can, to avoid creating additional work for runtime
-                                dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
-                                return;
+                                var overloadException = target.CheckOverloaded(Log);
+                                if (overloadException != null)
+                                {
+                                    // Send rejection as soon as we can, to avoid creating additional work for runtime
+                                    dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
+                                    return;
+                                }
                             }
 
                             // Run ReceiveMessage in context of target activation
