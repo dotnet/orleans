@@ -24,11 +24,11 @@ namespace Orleans.Transactions.Azure
         {
             if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
             {
-                throw new OrleansConfigurationException($"The azure transaction log was configured with an invalid connection string");
+                throw new OrleansConfigurationException($"Invalid AzureTransactionLogOptions. ConnectionString is required.");
             }
             if (string.IsNullOrWhiteSpace(this.options.TableName))
             {
-                throw new OrleansConfigurationException($"The azure transaction log was configured with an invalid table name");
+                throw new OrleansConfigurationException($"Invalid AzureTransactionLogOptions. TableName is required.");
             }
         }
     }
