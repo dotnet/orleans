@@ -44,12 +44,25 @@ The stable production-quality release is located [here](https://github.com/dotne
 
 The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/netfx-bvt/lastStableBuild/artifact/)
 
-### Building From Source
+Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci . These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds we push to NuGet.org
+
+### Building from source
 
 Clone the sources from the GitHub [repo](https://github.com/dotnet/orleans) 
 
-Run run the `Build.cmd` script to build the binaries locally,
-then reference the required NuGet packages from `Binaries\NuGet.Packages\*`.
+Run the `Build.cmd` script to build the nuget packages locally,
+then reference the required NuGet packages from `/Artifacts/Release/*`.
+You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests (which take much longer)
+
+### Building and running tests in Visual Studio 2017
+.NET Core 2.0 SDK is a pre-requisite to build Orleans.sln.
+
+There might be errors trying to build from Visual Studio because of conflicts with the test discovery engine (error says could not copy `xunit.abstractions.dll`).
+The reason for that error is that you need to configure the test runner in VS like so (after opening the solution):
+* `Test` -> `Test Settings` -> Uncheck `Keep Test Execution Engine running`
+* `Test` -> `Test Settings` -> `Default Processor Architecture` -> Check `X64`
+
+Then either restart VS, or go to the task manager and kill the processes that starts with `vstest.`. Then build once again and it should succeed and tests should appear in the `Test Explorer` window.
 
 Documentation
 =============
