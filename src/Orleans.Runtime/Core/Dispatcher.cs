@@ -344,7 +344,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetGrain) == true)
+            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
             {
                 outgoing.IsAlwaysInterleave = true;
             }
