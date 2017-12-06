@@ -62,7 +62,8 @@ namespace Orleans.Serialization
         /// <returns>A value indicating whether the provided <paramref name="type"/> is supported.</returns>
         public static bool IsSupportedType(Type type)
         {
-            return !type.IsAbstract && !type.IsInterface && !type.IsArray && !type.IsEnum && IsSupportedFieldType(type);
+            return !type.IsAbstract && !type.IsInterface && !type.IsArray && !type.IsEnum &&
+                   IsSupportedFieldType(type) && !DotNetSerializableUtilities.HasSerializationHookAttributes(type);
         }
 
         /// <summary>
