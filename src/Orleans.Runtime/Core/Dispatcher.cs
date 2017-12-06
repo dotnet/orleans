@@ -636,7 +636,6 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
         {
-            MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             Action<Exception> onAddressingFailure = ex =>
             {
                 if (ShouldLogError(ex))
@@ -660,7 +659,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                TransportMessage(message);
+                TransportMessage(message, sendingActivation);
             };
 
             try
@@ -668,7 +667,7 @@ namespace Orleans.Runtime
                 var messageAddressingTask = AddressMessage(message);
                 if (messageAddressingTask.Status == TaskStatus.RanToCompletion)
                 {
-                    TransportMessage(message);
+                    TransportMessage(message, sendingActivation);
                 }
                 else
                 {
@@ -792,8 +791,9 @@ namespace Orleans.Runtime
         /// Directly send a message to the transport without processing
         /// </summary>
         /// <param name="message"></param>
-        public void TransportMessage(Message message)
+        public void TransportMessage(Message message, ActivationData sendingActivation = null)
         {
+            MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
             Transport.SendMessage(message);
         }
