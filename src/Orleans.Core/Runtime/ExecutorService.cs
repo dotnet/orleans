@@ -39,22 +39,26 @@ namespace Orleans.Runtime
             string stageName,
             CancellationToken ct,
             int degreeOfParallelism = 1,
-            bool drainAfterCancel = false)
+            bool drainAfterCancel = false,
+            TimeSpan? workItemExecutionTimeTreshold = null)
             : base(stageName)
         {
             StageType = stageType;
             CancellationToken = ct;
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
+            WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
         }
 
         public Type StageType { get; }
+        
+        public CancellationToken CancellationToken { get; }
 
         public int DegreeOfParallelism { get; }
 
         public bool DrainAfterCancel { get; }
 
-        public CancellationToken CancellationToken { get; }
+        public TimeSpan WorkItemExecutionTimeTreshold { get; }
     }
 
     internal class SingleThreadExecutorOptions : ExecutorOptions

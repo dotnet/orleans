@@ -8,14 +8,13 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ThreadPoolExecutor : IExecutor
+    internal class ThreadPoolExecutor : IExecutor, IHealthCheckable
     {
         private QueueTrackingStatistic queueTracking;
 
         // private readonly HashSet<WorkerPoolThread> pool;
         //  private int runningThreadCount;
-
-        // internal readonly int activeThreads = 3; // todo: accept as parameter 
+        
         //   internal readonly TimeSpan MaxWorkQueueWait;
         //     internal readonly bool EnableWorkerThreadInjection;
         //     private readonly ICorePerformanceMetrics performanceMetrics;
@@ -23,11 +22,9 @@ namespace Orleans.Runtime
         //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
         //  private readonly ILogger timerLogger;
 
-        private SafeTimer longTurnTimer;
         private readonly QueueWorkItemCallback[] QueueWorkItemRefs;
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
-        private readonly CancellationToken cancellationToken;
-        private readonly bool drainAfterCancel;
+        private readonly ThreadPoolExecutorOptions _executorOptions;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
@@ -46,9 +43,8 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-            this.drainAfterCancel = options.DrainAfterCancel;
-            cancellationToken = options.CancellationToken;
-            cancellationToken.Register(() =>
+            _executorOptions = options;
+            _executorOptions.CancellationToken.Register(() =>
             {
                 // allow threads to get a chance to exit gracefully.
                 workQueue.Add(QueueWorkItemCallback.NoOpQueueWorkItemCallback);
@@ -88,11 +84,11 @@ namespace Orleans.Runtime
             }
         }
 
-        protected void RunNonBatching(int workItemSlotIndex) // slotNumber
+        protected void RunNonBatching(int workItemSlotIndex)
         {
             while (true)
             {
-                if (!drainAfterCancel && cancellationToken.IsCancellationRequested ||
+                if (!_executorOptions.DrainAfterCancel && _executorOptions.CancellationToken.IsCancellationRequested ||
                     workQueue.IsCompleted)
                 {
                     return;
@@ -152,17 +148,7 @@ namespace Orleans.Runtime
                 }
 #endif
         }
-
-        //internal bool DoHealthCheck()
-        //{
-        //    if (!IsFrozen()) return true;
-
-        //    Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
-        //        "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
-        //        Name, ManagedThreadId, GetThreadStatus(true)));
-        //    return false;
-        //}
-
+        
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
             //// Capture the queue wait time for this task
@@ -205,7 +191,7 @@ namespace Orleans.Runtime
 
         internal class QueueWorkItemCallback : ITimeInterval
         {
-            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null);
+            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
 
             private readonly WaitCallback callback;
 
@@ -213,16 +199,19 @@ namespace Orleans.Runtime
 
             private readonly object state;
 
+            private readonly TimeSpan executionTimeTreshold;
+
             private ITimeInterval timeInterval;
 
-            public QueueWorkItemCallback(WaitCallback callback, object state)
+            public QueueWorkItemCallback(WaitCallback callback, object state, TimeSpan executionTimeTreshold)
             {
                 this.callback = callback;
                 this.state = state;
+                this.executionTimeTreshold = executionTimeTreshold;
             }
 
             public QueueWorkItemCallback(WaitCallback callback, object state, Func<object, string> statusProvider)
-                : this(callback, state)
+                : this(callback, state, TimeSpan.MaxValue)
             {
                 this.statusProvider = statusProvider;
             }
@@ -253,12 +242,23 @@ namespace Orleans.Runtime
                 return statusProvider?.Invoke(state);
             }
 
+            internal bool CheckHealth()
+            {
+                if (!IsFrozen()) return true;
+
+                //Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
+                //    "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
+                //    Name, ManagedThreadId, GetThreadStatus(true)));
+                return false;
+            }
+
             private bool IsFrozen()
             {
                 if (timeInterval != null)
                 {
-                    // return timeInterval.Elapsed > OrleansTaskScheduler.TurnWarningLengthThreshold;
+                     return timeInterval.Elapsed > executionTimeTreshold;
                 }
+
                 return false;
                 //  // If there is no active Task, check current wokr item, if any.
                 //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
@@ -269,7 +269,14 @@ namespace Orleans.Runtime
 
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            throw new NotImplementedException();
+            var ok = true;
+            foreach (var workItem in QueueWorkItemRefs)
+            {
+                if (workItem != null && !workItem.CheckHealth())
+                    ok = false;
+            }
+
+            return ok;
         }
     }
 }

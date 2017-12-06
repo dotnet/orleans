@@ -390,8 +390,7 @@ namespace Orleans.Runtime.Scheduler
         // Returns true if healthy, false if not
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            // todo: executor. check
-            return true; //Pool.DoHealthCheck();
+            return executor.CheckHealth(lastCheckTime) && systemExecutor.CheckHealth(lastCheckTime);
         }
 
         internal void PrintStatistics()
