@@ -63,10 +63,6 @@ namespace Orleans.CodeGeneration
                 };
                 appDomain = AppDomain.CreateDomain("Orleans-CodeGen Domain", null, appDomainSetup);
 
-                // Set up assembly resolver
-                var refResolver = new ReferenceResolver(options.ReferencedAssemblies);
-                appDomain.AssemblyResolve += refResolver.ResolveAssembly;
-
                 // Create an instance 
                 var generator =
                     (GrainClientGenerator)
@@ -89,13 +85,11 @@ namespace Orleans.CodeGeneration
         /// </summary>
         private bool CreateGrainClient(CodeGenOptions options)
         {
-            // Load input assembly 
-            // special case Orleans.dll because there is a circular dependency.
-            var assemblyName = AssemblyName.GetAssemblyName(options.InputAssembly.FullName);
-            var grainAssembly = (Path.GetFileName(options.InputAssembly.FullName) != "Orleans.dll")
-                                    ? Assembly.LoadFrom(options.InputAssembly.FullName)
-                                    : Assembly.Load(assemblyName);
-
+            // Set up assembly resolver
+            var inputAssemblyPath = options.InputAssembly.FullName;
+            var resolver = new AssemblyResolver(inputAssemblyPath, options.ReferencedAssemblies);
+            AppDomain.CurrentDomain.AssemblyResolve += resolver.ResolveAssembly;
+            
             // Create directory for output file if it does not exist
             var outputFileDirectory = Path.GetDirectoryName(options.OutputFileName);
 
@@ -110,17 +104,19 @@ namespace Orleans.CodeGeneration
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);
             
+            var source = codeGenerator.GenerateSourceForAssembly(resolver.Assembly);
             using (var sourceWriter = new StreamWriter(options.OutputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
                 DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine(codeGenerator.GenerateSourceForAssembly(grainAssembly));
+                sourceWriter.WriteLine(source);
                 RestoreWarnings(sourceWriter, suppressCompilerWarnings);
                 sourceWriter.WriteLine("#endif");
             }
 
             ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", options.OutputFileName);
 
+            AppDomain.CurrentDomain.AssemblyResolve -= resolver.ResolveAssembly;
             return true;
         }
 
@@ -285,63 +281,6 @@ namespace Orleans.CodeGeneration
             var errMsg = string.Format("Bad path {0} Reason = {1}", path, what);
             Console.WriteLine("CODEGEN-ERROR: " + errMsg);
             throw new ArgumentException("FAILED: " + errMsg);
-        }
-
-
-        /// <summary>
-        /// Simple class that loads the reference assemblies upon the AppDomain.AssemblyResolve
-        /// </summary>
-        [Serializable]
-        internal class ReferenceResolver
-        {
-            /// <summary>
-            /// Dictionary : Assembly file name without extension -> full path
-            /// </summary>
-            private Dictionary<string, string> referenceAssemblyPaths = new Dictionary<string, string>();
-
-            /// <summary>
-            /// Needs to be public so can be serialized accross the the app domain.
-            /// </summary>
-            public Dictionary<string, string> ReferenceAssemblyPaths
-            {
-                get
-                {
-                    return referenceAssemblyPaths;
-                }
-                set
-                {
-                    referenceAssemblyPaths = value;
-                }
-            }
-
-            /// <summary>
-            /// Inits the resolver
-            /// </summary>
-            /// <param name="referencedAssemblies">Full paths of referenced assemblies</param>
-            public ReferenceResolver(IEnumerable<string> referencedAssemblies)
-            {
-                if (null == referencedAssemblies) return;
-
-                foreach (var assemblyPath in referencedAssemblies) referenceAssemblyPaths[Path.GetFileNameWithoutExtension(assemblyPath)] = assemblyPath;
-            }
-
-            /// <summary>
-            /// Handles System.AppDomain.AssemblyResolve event of an System.AppDomain
-            /// </summary>
-            /// <param name="sender">The source of the event.</param>
-            /// <param name="args">The event data.</param>
-            /// <returns>The assembly that resolves the type, assembly, or resource; 
-            /// or null if theassembly cannot be resolved.
-            /// </returns>
-            public Assembly ResolveAssembly(object sender, ResolveEventArgs args)
-            {
-                Assembly assembly = null;
-                string path;
-                var asmName = new AssemblyName(args.Name);
-                if (referenceAssemblyPaths.TryGetValue(asmName.Name, out path)) assembly = Assembly.LoadFrom(path);
-                else ConsoleText.WriteStatus("Could not resolve {0}:", asmName.Name);
-                return assembly;
-            }
         }
     }
 }

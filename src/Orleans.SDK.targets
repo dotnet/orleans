@@ -37,8 +37,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansCodeGeneration"
-          AfterTargets="BeforeCompile"
-          BeforeTargets="CoreCompile"
+          AfterTargets="GenerateBuildDependencyFile"
+          BeforeTargets="AssignTargetPaths"
           Condition="'$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs">
@@ -62,7 +62,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       <CodeGenArgs Include="/out:$(CodeGenFilename)"/>
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
     </ItemGroup>
-    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen);DesignTimeBuild=true" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Copy SourceFiles="$(ProjectDepsFilePath)" DestinationFolder="$(CodeGenDirectory)" ContinueOnError="WarnAndContinue" Condition="Exists('$(ProjectDepsFilePath)')" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen);DesignTimeBuild=true;PreserveCompilationContext=true" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
     <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>

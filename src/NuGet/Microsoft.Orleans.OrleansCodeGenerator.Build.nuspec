@@ -36,6 +36,8 @@
     <file src="OrleansCodeGenerator.pdb" target="tools" />
     <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
     <file src="Microsoft.CodeAnalysis.dll" target="tools" />
+    <file src="Microsoft.DotNet.PlatformAbstractions.dll" target="tools" />
+    <file src="Microsoft.Extensions.DependencyModel.dll" target="tools" />
     <file src="Microsoft.Extensions.DependencyInjection.Abstractions.dll" target="tools" />
     <file src="Microsoft.Extensions.DependencyInjection.dll" target="tools" />
     <file src="Microsoft.Win32.Primitives.dll" target="tools" />
