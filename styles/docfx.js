@@ -470,7 +470,7 @@ $(function () {
 
         function filterNavItem(name, text) {
           if (!text) return true;
-          if (name.toLowerCase().indexOf(text.toLowerCase()) > -1) return true;
+          if (name && name.toLowerCase().indexOf(text.toLowerCase()) > -1) return true;
           return false;
         }
       });

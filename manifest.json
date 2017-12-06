@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/dotnet/orleans/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -122,11 +122,47 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Configuration2.0.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Configuration2.0.html",
+          "hash": "PFQGgwoNU1xhU/puIY0DUg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Migration1.5.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Migration1.5.html",
+          "hash": "hb9vyzW8CTLknQzzJhxT+g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/New.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/New.html",
+          "hash": "grNvJhT6Afo52J5Ewg6kDA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/Advanced-Concepts/Activation-Garbage-Collection.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Activation-Garbage-Collection.html",
-          "hash": "4JdIkNhpaNFf718hLPIuAw=="
+          "hash": "0zTDxASJ9De0WsuXvNED0A=="
         }
       },
       "is_incremental": false,
@@ -604,7 +640,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Frequently-Asked-Questions.html",
-          "hash": "CbQSBIQSqsPGZgj6vnNiMw=="
+          "hash": "QVazQ9eGmQC8VzbH2DYERw=="
         }
       },
       "is_incremental": false,
@@ -1331,7 +1367,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "o5QDrRfO3V9daziBRG48gA=="
+          "hash": "EPI/we0CwZqtIy/PLDBHvQ=="
         }
       },
       "is_incremental": false,
@@ -1883,7 +1919,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "w7QHYwCrGc5orIP7o4eLpw=="
+          "hash": "dixmSCgnXTFV9hEWPp+G+Q=="
         }
       },
       "is_incremental": false,
@@ -1961,23 +1997,14 @@
         "incrementalPhase": "build"
       },
       "processors": {
-        "RestApiDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor RestApiDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
-        "ManagedReferenceDocumentProcessor": {
+        "ResourceDocumentProcessor": {
           "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
