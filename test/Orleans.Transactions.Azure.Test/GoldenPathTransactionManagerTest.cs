@@ -9,7 +9,7 @@ using Orleans.Transactions.Tests;
 using TestExtensions;
 using Orleans.TestingHost.Utils;
 
-namespace Orleans.Transactions.Azure.Tests
+namespace Orleans.Transactions.AzureStorage.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
     public class GoldenPathTransactionManagerTest : GoldenPathTransactionManagerTestRunner

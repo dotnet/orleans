@@ -2,7 +2,7 @@
 using Xunit.Abstractions;
 using Orleans.Transactions.Tests;
 
-namespace Orleans.Transactions.Azure.Tests
+namespace Orleans.Transactions.AzureStorage.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
     public class OrchestrationTests : OrchestrationsTransactionsTestRunner, IClassFixture<TestFixture>
