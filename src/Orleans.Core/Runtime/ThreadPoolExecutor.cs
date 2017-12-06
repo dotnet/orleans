@@ -153,8 +153,25 @@ namespace Orleans.Runtime
 #endif
         }
 
+        //internal bool DoHealthCheck()
+        //{
+        //    if (!IsFrozen()) return true;
+
+        //    Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
+        //        "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
+        //        Name, ManagedThreadId, GetThreadStatus(true)));
+        //    return false;
+        //}
+
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
+            //// Capture the queue wait time for this task
+            //TimeSpan waitTime = todo.TimeSinceQueued;
+            //if (waitTime > scheduler.DelayWarningThreshold && !Debugger.IsAttached)
+            //{
+            //    SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
+            //    Log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, "Queue wait time of {0} for Item {1}", waitTime, todo);
+            //}
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
                 {
