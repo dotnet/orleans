@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.Azure
+namespace Orleans.Transactions.AzureStorage
 {
     /// <summary>
     /// TransactionLog ported from research.  Placeholder, is being rewritten.

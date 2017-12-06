@@ -11,7 +11,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
 using Orleans.Transactions.Development;
-using Orleans.Transactions.Azure;
+using Orleans.Transactions.AzureStorage;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 

@@ -136,7 +136,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Tests", "test\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj", "{CFD22413-CB67-40D6-B389-F038C8C38365}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure", "src\Azure\Orleans.Transactions.Azure\Orleans.Transactions.Azure.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.AzureStorage", "src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure.Test", "test\Orleans.Transactions.Azure.Test\Orleans.Transactions.Azure.Test.csproj", "{651C7B8E-6EEB-4A6B-84A3-B5D7E4554B99}"
 EndProject

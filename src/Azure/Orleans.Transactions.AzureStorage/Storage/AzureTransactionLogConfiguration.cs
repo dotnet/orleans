@@ -1,5 +1,5 @@
 ﻿
-namespace Orleans.Transactions.Azure
+namespace Orleans.Transactions.AzureStorage
 {
     public class AzureTransactionLogConfiguration
     {

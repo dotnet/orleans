@@ -56,7 +56,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure", "src\Azure\Orleans.Transactions.Azure\Orleans.Transactions.Azure.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.AzureStorage", "src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
