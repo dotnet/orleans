@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         
         protected override ExecutorOptions GetExecutorOptions()
         {
-            return new SingleThreadExecutorOptions(Name);
+            return new SingleThreadExecutorOptions(Name, Log);
         }
 
         private static void LogStatus(ILogger log, string msg, params object[] args)

@@ -35,12 +35,16 @@ namespace Orleans.Runtime
     
     internal abstract class ExecutorOptions
     {
-        protected ExecutorOptions(string stageName)
+        protected ExecutorOptions(string stageName,
+            ILogger log)
         {
             StageName = stageName;
+            Log = log;
         }
 
         public string StageName { get; }
+
+        public ILogger Log { get; }
     }
 
     internal class ThreadPoolExecutorOptions : ExecutorOptions
@@ -55,11 +59,10 @@ namespace Orleans.Runtime
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null)
-            : base(stageName)
+            : base(stageName, log)
         {
             StageType = stageType;
             CancellationToken = ct;
-            Log = log;
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
@@ -80,13 +83,11 @@ namespace Orleans.Runtime
         public TimeSpan DelayWarningThreshold { get; }
 
         public WorkItemStatusProvider WorkItemStatusProvider { get; }
-
-        public ILogger Log { get; }
     }
 
     internal class SingleThreadExecutorOptions : ExecutorOptions
     {
-        public SingleThreadExecutorOptions(string stageName) : base(stageName)
+        public SingleThreadExecutorOptions(string stageName, ILogger log) : base(stageName, log)
         {
         }
     }

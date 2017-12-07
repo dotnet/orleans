@@ -1,18 +1,19 @@
 ﻿using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
     internal class ThreadPerTaskExecutor : IExecutor
     {
-        private readonly string name;
+        private readonly SingleThreadExecutorOptions executorOptions;
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
         public ThreadPerTaskExecutor(SingleThreadExecutorOptions options)
         {
-            this.name = options.StageName;
+            executorOptions = options;
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -24,15 +25,25 @@ namespace Orleans.Runtime
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+
             new Thread(() =>
             {
-                TrackExecutionStart();
-                callback.Invoke(state);
-                TrackExecutionStop();
+                try
+                {
+                    TrackExecutionStart();
+                    callback.Invoke(state);
+                    TrackExecutionStop();
+                }
+                catch (Exception ex)
+                {
+                    executorOptions.Log
+                    .LogError(ex, $"Executor thread {Thread.CurrentThread.Name} encoundered unexpected exception.");
+                }
             })
             {
                 IsBackground = true,
-                Name = name
+                Name = executorOptions.StageName
             }.Start();
         }
 

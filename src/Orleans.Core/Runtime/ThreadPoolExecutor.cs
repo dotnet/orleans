@@ -12,18 +12,8 @@ namespace Orleans.Runtime
     {
         private QueueTrackingStatistic queueTracking;
 
-        // private readonly HashSet<WorkerPoolThread> pool;
-        //  private int runningThreadCount;
-        
-        //   internal readonly TimeSpan MaxWorkQueueWait;
-        //     internal readonly bool EnableWorkerThreadInjection;
-        //     private readonly ICorePerformanceMetrics performanceMetrics;
-        //     private readonly ILoggerFactory loggerFactory;
-        //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
-        //  private readonly ILogger timerLogger;
-
         private readonly QueueWorkItemCallback[] RunningWorkItems;
-        private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
+        private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
         private readonly ThreadPoolExecutorOptions executorOptions;
 
 #if TRACK_DETAILED_STATS
@@ -43,6 +33,7 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
+            workQueue = new BlockingCollection<QueueWorkItemCallback>();
             executorOptions = options;
             executorOptions.CancellationToken.Register(() =>
             {
@@ -57,7 +48,7 @@ namespace Orleans.Runtime
             for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
                 var executorWorkItemSlotIndex = createThreadCount * padding;
-                new ThreadPerTaskExecutor(new SingleThreadExecutorOptions(options.StageName + createThreadCount))
+                new ThreadPerTaskExecutor(new SingleThreadExecutorOptions(options.StageName + createThreadCount, executorOptions.Log))
                     .QueueWorkItem(_ => ProcessQueue(executorWorkItemSlotIndex));
             }
         }
@@ -66,7 +57,8 @@ namespace Orleans.Runtime
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
-            // check callback for null?
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+
             var workItem = new QueueWorkItemCallback(
                 callback, 
                 state,
@@ -158,8 +150,8 @@ namespace Orleans.Runtime
         
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
-            //// Capture the queue wait time for this task
-            TimeSpan waitTime = workItem.TimeSinceQueued;
+            // Capture the queue wait time for this task
+            var waitTime = workItem.TimeSinceQueued;
             if (waitTime > executorOptions.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
             {
                 SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();

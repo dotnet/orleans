@@ -12,7 +12,6 @@ namespace UnitTests.TesterInternal
             StatisticsCollector.StatisticsCollectionLevel = StatisticsLevel.Info;
             SchedulerStatisticsGroup.Init(loggerFactory);
             var scheduler = OrleansTaskScheduler.CreateTestInstance(4, performanceMetrics, loggerFactory);
-            scheduler.Start();
             WorkItemGroup ignore = scheduler.RegisterWorkContext(context);
             return scheduler;
         }
