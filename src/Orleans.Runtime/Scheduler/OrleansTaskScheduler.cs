@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Scheduler
             ThreadPoolExecutorOptions ExecutorOptionsFactory(int degreeOfParalelism)
             {
                 var executorName = "executor";
-                // todo : drainAQfterCancel system queue
+                // todo : drainAfterCancel system queue
                 return new ThreadPoolExecutorOptions(
                     GetType(),
                     executorName,
@@ -77,6 +77,7 @@ namespace Orleans.Runtime.Scheduler
                     loggerFactory.CreateLogger(executorName),
                     degreeOfParalelism,
                     workItemExecutionTimeTreshold: TurnWarningLengthThreshold,
+                    delayWarningThreshold: DelayWarningThreshold,
                     workItemStatusProvider: GetWorkItemStatus);
             }
 

@@ -8,7 +8,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ThreadPoolExecutor : IExecutor, IHealthCheckable
+    internal class ThreadPoolExecutor : IExecutor
     {
         private QueueTrackingStatistic queueTracking;
 
@@ -22,9 +22,9 @@ namespace Orleans.Runtime
         //   internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
         //  private readonly ILogger timerLogger;
 
-        private readonly QueueWorkItemCallback[] QueueWorkItemRefs;
+        private readonly QueueWorkItemCallback[] RunningWorkItems;
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue = new BlockingCollection<QueueWorkItemCallback>();
-        private readonly ThreadPoolExecutorOptions _executorOptions;
+        private readonly ThreadPoolExecutorOptions executorOptions;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
@@ -43,8 +43,8 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-            _executorOptions = options;
-            _executorOptions.CancellationToken.Register(() =>
+            executorOptions = options;
+            executorOptions.CancellationToken.Register(() =>
             {
                 // allow threads to get a chance to exit gracefully.
                 workQueue.Add(QueueWorkItemCallback.NoOpQueueWorkItemCallback);
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
 
             // padding reduces false sharing
             var padding = 100;
-            QueueWorkItemRefs = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
+            RunningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
             for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
                 var executorWorkItemSlotIndex = createThreadCount * padding;
@@ -66,11 +66,12 @@ namespace Orleans.Runtime
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
+            // check callback for null?
             var workItem = new QueueWorkItemCallback(
                 callback, 
                 state,
-                _executorOptions.WorkItemExecutionTimeTreshold,
-                _executorOptions.WorkItemStatusProvider);
+                executorOptions.WorkItemExecutionTimeTreshold,
+                executorOptions.WorkItemStatusProvider);
 
             TrackRequestEnqueue(workItem);
             workQueue.Add(workItem);
@@ -79,6 +80,7 @@ namespace Orleans.Runtime
         protected void ProcessQueue(int workItemSlotIndex)
         {
             TrackExecutionStart();
+
             try
             {
                 RunNonBatching(workItemSlotIndex);
@@ -93,7 +95,7 @@ namespace Orleans.Runtime
         {
             while (true)
             {
-                if (!_executorOptions.DrainAfterCancel && _executorOptions.CancellationToken.IsCancellationRequested ||
+                if (!executorOptions.DrainAfterCancel && executorOptions.CancellationToken.IsCancellationRequested ||
                     workQueue.IsCompleted)
                 {
                     return;
@@ -109,14 +111,14 @@ namespace Orleans.Runtime
                     break;
                 }
 
-                QueueWorkItemRefs[workItemSlotIndex] = workItem;
+                RunningWorkItems[workItemSlotIndex] = workItem;
                 TrackRequestDequeue(workItem);
                 TrackProcessingStart();
 
                 workItem.ExecuteWorkItem();
 
                 TrackProcessingStop();
-                QueueWorkItemRefs[workItemSlotIndex] = null;
+                RunningWorkItems[workItemSlotIndex] = null;
             }
         }
 
@@ -157,12 +159,15 @@ namespace Orleans.Runtime
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
             //// Capture the queue wait time for this task
-            //TimeSpan waitTime = todo.TimeSinceQueued;
-            //if (waitTime > scheduler.DelayWarningThreshold && !Debugger.IsAttached)
-            //{
-            //    SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-            //    Log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, "Queue wait time of {0} for Item {1}", waitTime, todo);
-            //}
+            TimeSpan waitTime = workItem.TimeSinceQueued;
+            if (waitTime > executorOptions.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
+            {
+                SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
+                executorOptions.Log.Warn(
+                    ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime,
+                    "Queue wait time of {0} for Item {1}", waitTime, workItem.State);
+            }
+
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
                 {
@@ -206,11 +211,13 @@ namespace Orleans.Runtime
 
             private readonly TimeSpan executionTimeTreshold;
 
+            private readonly DateTime enqueueTime;
+
             private ITimeInterval timeInterval;
 
             // lightweight execution time tracking 
             private DateTime executionStart;
-
+            
             public QueueWorkItemCallback(
                 WaitCallback callback, 
                 object state, 
@@ -221,7 +228,11 @@ namespace Orleans.Runtime
                 this.state = state;
                 this.executionTimeTreshold = executionTimeTreshold;
                 this.statusProvider = statusProvider;
+                this.enqueueTime = DateTime.UtcNow;
             }
+
+            internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
+            internal object State => state;
 
             public void ExecuteWorkItem()
             {
@@ -274,12 +285,12 @@ namespace Orleans.Runtime
         public bool CheckHealth(DateTime lastCheckTime)
         {
             var ok = true;
-            foreach (var workItem in QueueWorkItemRefs)
+            foreach (var workItem in RunningWorkItems)
             {
                 if (workItem != null && !workItem.CheckHealth())
                 {
                     ok = false;
-                    _executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
+                    executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
                         $"Work item {0} has been executing for long time:GetThreadStatus(true) {workItem.GetWorkItemStatus(true)}");
                 }
             }

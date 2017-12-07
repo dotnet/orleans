@@ -12,4 +12,3 @@ namespace Orleans.Runtime
         bool CheckHealth(DateTime lastCheckTime);
     }
 }
-

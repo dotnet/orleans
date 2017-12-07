@@ -53,6 +53,7 @@ namespace Orleans.Runtime
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
             TimeSpan? workItemExecutionTimeTreshold = null,
+            TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null)
             : base(stageName)
         {
@@ -62,6 +63,7 @@ namespace Orleans.Runtime
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
+            DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
             WorkItemStatusProvider = workItemStatusProvider;
         }
 
@@ -74,6 +76,8 @@ namespace Orleans.Runtime
         public bool DrainAfterCancel { get; }
 
         public TimeSpan WorkItemExecutionTimeTreshold { get; }
+
+        public TimeSpan DelayWarningThreshold { get; }
 
         public WorkItemStatusProvider WorkItemStatusProvider { get; }
 
