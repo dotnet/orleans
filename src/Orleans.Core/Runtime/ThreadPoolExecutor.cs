@@ -208,7 +208,7 @@ namespace Orleans.Runtime
 
             private ITimeInterval timeInterval;
 
-            // lightweight mean of execution time tracking 
+            // lightweight execution time tracking 
             private DateTime executionStart;
 
             public QueueWorkItemCallback(

@@ -32,6 +32,16 @@ namespace Orleans.Runtime
             }
         }
     }
+    
+    internal abstract class ExecutorOptions
+    {
+        protected ExecutorOptions(string stageName)
+        {
+            StageName = stageName;
+        }
+
+        public string StageName { get; }
+    }
 
     internal class ThreadPoolExecutorOptions : ExecutorOptions
     {
@@ -75,15 +85,5 @@ namespace Orleans.Runtime
         public SingleThreadExecutorOptions(string stageName) : base(stageName)
         {
         }
-    }
-
-    internal abstract class ExecutorOptions
-    {
-        protected ExecutorOptions(string stageName)
-        {
-            StageName = stageName;
-        }
-        
-        public string StageName { get; }
     }
 }

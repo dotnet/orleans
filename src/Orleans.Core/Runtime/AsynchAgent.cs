@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent : IDisposable 
+    internal abstract class AsynchAgent : IDisposable
     {
         public enum FaultBehavior
         {

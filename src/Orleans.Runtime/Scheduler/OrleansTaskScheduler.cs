@@ -12,7 +12,7 @@ using Orleans.Runtime.Counters;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [DebuggerDisplay("OrleansTaskScheduler RunQueue={RunQueue.Length}")] // todoRunQueue
+    [DebuggerDisplay("OrleansTaskScheduler RunQueueLength={" + nameof(RunQueueLength) + "}")]
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
         private readonly ILogger logger;
@@ -21,6 +21,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         public readonly IExecutor executor;
         public readonly IExecutor systemExecutor;
+        private readonly CancellationTokenSource cancellationTokenSource;
         private bool applicationTurnsStopped;
         
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
@@ -28,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
         internal LimitValue MaxPendingItemsLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
-        public int RunQueueLength => executor.WorkQueueCount;
+        public int RunQueueLength => executor.WorkQueueCount + systemExecutor.WorkQueueCount;
 
         public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
         {
@@ -57,6 +58,7 @@ namespace Orleans.Runtime.Scheduler
         {
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
             this.loggerFactory = loggerFactory;
+            cancellationTokenSource = new CancellationTokenSource();
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
@@ -67,17 +69,18 @@ namespace Orleans.Runtime.Scheduler
             ThreadPoolExecutorOptions ExecutorOptionsFactory(int degreeOfParalelism)
             {
                 var executorName = "executor";
+                // todo : drainAQfterCancel system queue
                 return new ThreadPoolExecutorOptions(
                     GetType(),
                     executorName,
-                    new CancellationTokenSource().Token,
+                    cancellationTokenSource.Token,
                     loggerFactory.CreateLogger(executorName),
                     degreeOfParalelism,
                     workItemExecutionTimeTreshold: TurnWarningLengthThreshold,
                     workItemStatusProvider: GetWorkItemStatus);
             }
 
-            executor = executorService.GetExecutor(ExecutorOptionsFactory(4));
+            executor = executorService.GetExecutor(ExecutorOptionsFactory(maxActiveThreads));
             systemExecutor = executorService.GetExecutor(ExecutorOptionsFactory(2));
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
@@ -155,11 +158,6 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        public void Start()
-        {
-            //Pool.Start();
-        }
-
         public void StopApplicationTurns()
         {
 #if DEBUG
@@ -177,12 +175,12 @@ namespace Orleans.Runtime.Scheduler
 
         public void Stop()
         {
-            // todo: executors cts cancel   
+            cancellationTokenSource.Cancel();
         }
 
         protected override IEnumerable<Task> GetScheduledTasks()
         {
-            return new Task[0];
+            return Array.Empty<Task>();
         }
 
         protected override void QueueTask(Task task)
@@ -333,7 +331,7 @@ namespace Orleans.Runtime.Scheduler
             return workgroupDirectory.TryGetValue(context, out workGroup) ? (TaskScheduler) workGroup.TaskRunner : this;
         }
 
-        public override int MaximumConcurrencyLevel { get { return 3; } } //Pool.MaxActiveThreads;
+        public override int MaximumConcurrencyLevel { get { return 3; } } // todo: Pool.MaxActiveThreads;
 
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
@@ -413,7 +411,7 @@ namespace Orleans.Runtime.Scheduler
             if (stats.Length > 0)
                 logger.Info(ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
-                    executor.WorkQueueCount, WorkItemGroupCount, stats);
+                    RunQueueLength, WorkItemGroupCount, stats);
         }
 
         private string GetWorkItemStatus(object item, bool detailed)
@@ -430,14 +428,14 @@ namespace Orleans.Runtime.Scheduler
 
             var sb = new StringBuilder();
             sb.AppendLine("Dump of current OrleansTaskScheduler status:");
-            //sb.AppendFormat("CPUs={0} RunQueue={1}, WorkItems={2} {3}",
-            //    Environment.ProcessorCount,
-            //    RunQueue.Length,
-            //    workgroupDirectory.Count,
-            //    applicationTurnsStopped ? "STOPPING" : "").AppendLine();
+            sb.AppendFormat("CPUs={0} RunQueue={1}, WorkItems={2} {3}",
+                Environment.ProcessorCount,
+                RunQueueLength,
+                workgroupDirectory.Count,
+                applicationTurnsStopped ? "STOPPING" : "").AppendLine();
 
-        //      sb.AppendLine("RunQueue:");
-       //     RunQueue.DumpStatus(sb); ??
+            // sb.AppendLine("RunQueue:");
+            // RunQueue.DumpStatus(sb); ?? - woun't work without additional costs
 
             //Pool.DumpStatus(sb);
 

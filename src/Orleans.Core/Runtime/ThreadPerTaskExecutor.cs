@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             }
 #endif
         }
-        
+
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             new Thread(() =>
@@ -35,7 +35,7 @@ namespace Orleans.Runtime
                 Name = name
             }.Start();
         }
-        
+
         public int WorkQueueCount => 0;
 
         private void TrackExecutionStart()

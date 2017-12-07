@@ -27,7 +27,8 @@ namespace Orleans.Runtime
             // Is there a better/safer way to identify worker threads? 
             if (context != null && scheduler != null)
             {
-                return; // todo
+                return; // todo, Currently only orleans own threads being initialized,
+                // but in perspective - this method will be called on external ones.
                 throw new InvalidOperationException("RuntimeContext.Current has already been initialized for this thread.");
             }
             context = new RuntimeContext {Scheduler = scheduler};
