@@ -17,9 +17,10 @@ namespace OrleansSQLUtils.Storage
     internal class DbStoredQueries
     {
         private readonly Dictionary<string, string> queries;
+
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
-            var fields = typeof (DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
+            var fields = typeof(DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
             var missingQueryKeys = fields.Except(queries.Keys).ToArray();
             if (missingQueryKeys.Length > 0)
@@ -34,7 +35,7 @@ namespace OrleansSQLUtils.Storage
         /// The query that's used to get all the stored queries.
         /// this will probably be the same for all relational dbs.
         /// </summary>
-        internal const string GetQueriesKey = "SELECT QueryKey, QueryText FROM OrleansQuery;";
+        internal const string GetQueriesKey = "SELECT QueryKey, QueryText FROM OrleansQuery";
 
         /// <summary>
         /// A query template to retrieve gateway URIs.
@@ -145,7 +146,10 @@ namespace OrleansSQLUtils.Storage
                         GrainRef = grainReferenceConverter.GetGrainFromKeyString(grainId),
                         ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
                         StartAt = record.GetValue<DateTime>(nameof(Columns.StartTime)),
-                        Period = TimeSpan.FromMilliseconds(record.GetValue<int>(nameof(Columns.Period))),
+
+                        //Use the GetInt32 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
+                        //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
+                        Period = TimeSpan.FromMilliseconds(record.GetInt32(nameof(Columns.Period))),
                         ETag = GetVersion(record).ToString()
                     };
                 }
@@ -164,8 +168,8 @@ namespace OrleansSQLUtils.Storage
                         SiloAddress = GetSiloAddress(record, nameof(Columns.Port)),
                         SiloName = TryGetSiloName(record),
                         HostName = record.GetValue<string>(nameof(Columns.HostName)),
-                        Status = record.GetValue<SiloStatus>(nameof(Columns.Status)),
-                        ProxyPort = record.GetValue<int>(nameof(Columns.ProxyPort)),
+                        Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), record.GetInt32(nameof(Columns.Status)).ToString()),
+                        ProxyPort = record.GetInt32(nameof(Columns.ProxyPort)),
                         StartTime = startTime.Value,
                         IAmAliveTime = record.GetValue<DateTime>(nameof(Columns.IAmAliveTime))
                     };
@@ -218,8 +222,10 @@ namespace OrleansSQLUtils.Storage
 
             private static SiloAddress GetSiloAddress(IDataRecord record, string portName)
             {
-                int port = record.GetValue<int>(portName);
-                int generation = record.GetValue<int>(nameof(Columns.Generation));
+                //Use the GetInt32 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
+                //GetValue<int> causes an InvalidCastException with orcale data provider. See https://github.com/dotnet/orleans/issues/3561
+                int port = record.GetInt32(portName);
+                int generation = record.GetInt32(nameof(Columns.Generation));
                 string address = record.GetValue<string>(nameof(Columns.Address));
                 var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(address), port), generation);
                 return siloAddress;
@@ -239,6 +245,7 @@ namespace OrleansSQLUtils.Storage
             internal Columns(IDbCommand cmd)
             {
                 command = cmd;
+
             }
 
             private void Add<T>(string paramName, T paramValue, DbType? dbType = null)
@@ -263,14 +270,14 @@ namespace OrleansSQLUtils.Storage
 
             private void AddGrainHash(string name, uint grainHash)
             {
-                Add(name, (int) grainHash);
+                Add(name, (int)grainHash);
             }
 
             internal string ClientId
             {
                 set { Add(nameof(ClientId), value); }
             }
-            
+
             internal int GatewayPort
             {
                 set { Add(nameof(GatewayPort), value); }
@@ -307,8 +314,7 @@ namespace OrleansSQLUtils.Storage
                     for (int i = 0; i < value.Count; ++i)
                     {
                         Add($"{IsValueDelta}{i}", value[i].IsValueDelta);
-                        Add($"{StatValue}{i}",
-                            value[i].IsValueDelta ? value[i].GetDeltaString() : value[i].GetValueString());
+                        Add($"{StatValue}{i}", value[i].IsValueDelta ? value[i].GetDeltaString() : value[i].GetValueString());
                         Add($"{Statistic}{i}", value[i].Name);
                     }
                 }
@@ -325,7 +331,9 @@ namespace OrleansSQLUtils.Storage
                     Add(nameof(value.IsOverloaded), value.IsOverloaded);
                     Add(nameof(value.ClientCount), value.ClientCount);
                 }
+
             }
+
 
             internal IClientPerformanceMetrics ClientMetrics
             {
@@ -423,12 +431,12 @@ namespace OrleansSQLUtils.Storage
 
             internal TimeSpan Period
             {
-                set { Add(nameof(Period), (int) value.TotalMilliseconds); }
+                set { Add(nameof(Period), (int)value.TotalMilliseconds); }
             }
 
             internal SiloStatus Status
             {
-                set { Add(nameof(Status), (int) value); }
+                set { Add(nameof(Status), (int)value); }
             }
 
             internal int ProxyPort

@@ -35,17 +35,17 @@ namespace Consul.Tests
             return filters;
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulMembershipOptions()
             {
                 Address = new Uri(this.connectionString)
             };
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create<ConsulMembershipOptions>(options), this.globalConfiguration);
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this.siloOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulGatewayListProviderOptions()

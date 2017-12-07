@@ -11,9 +11,9 @@ using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
 using Orleans.Transactions.Development;
-using Orleans.Transactions.Azure;
-using TestExtensions;
+using Orleans.Transactions.AzureStorage;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 
 namespace Benchmarks.TransactionManager
 {
@@ -40,7 +40,7 @@ namespace Benchmarks.TransactionManager
 
         private async Task Run(Factory<Task<ITransactionLogStorage>> storageFactory)
         {
-            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsConfiguration()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
+            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
             await tm.StartAsync();
             ITransactionManagerService tms = new TransactionManagerService(tm);
             Stopwatch sw;
@@ -149,7 +149,7 @@ namespace Benchmarks.TransactionManager
         {
             var config = new ClientConfiguration();
             var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
-            var azureConfig = Options.Create(new AzureTransactionLogConfiguration()
+            var azureConfig = Options.Create(new AzureTransactionLogOptions()
             {
                 // TODO: Find better way for test isolation.
                 TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",

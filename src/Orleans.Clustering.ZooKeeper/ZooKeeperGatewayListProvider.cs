@@ -16,12 +16,12 @@ namespace Orleans.Runtime.Membership
     {
         private ZooKeeperWatcher watcher;
         /// <summary>
-        /// the node name for this deployment. for eg. /DeploymentId
+        /// the node name for this deployment. for eg. /ClusterId
         /// </summary>
         private string deploymentPath;
 
         /// <summary>
-        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/DeploymentId"
+        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Membership
         {
             watcher = new ZooKeeperWatcher(logger);
 
-            deploymentPath = "/" + clientConfiguration.DeploymentId;
+            deploymentPath = "/" + clientConfiguration.ClusterId;
             deploymentConnectionString = options.Value.ConnectionString + deploymentPath;
             maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }

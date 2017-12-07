@@ -80,7 +80,41 @@ namespace Orleans.Transactions.Tests
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
+                if (expected != actual) this.output.WriteLine($"{grain} - failed");
                 Assert.Equal(expected, actual);
+            }
+        }
+
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        public virtual async Task RepeatGrainReadWriteTransaction(string transactionTestGrainClassName)
+        {
+            const int repeat = 10;
+            const int delta = 5;
+            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
+
+            List<Guid> grainIds = Enumerable.Range(0, grainCount)
+                    .Select(i => Guid.NewGuid())
+                    .ToList();
+
+            List<ITransactionTestGrain> grains = grainIds
+                    .Select(id => TestGrain(transactionTestGrainClassName, id))
+                    .ToList();
+
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            await coordinator.MultiGrainSet(grains, delta);
+            for (int i = 0; i < repeat; i++)
+            {
+                await coordinator.MultiGrainDouble(grains);
+
+                int expected = delta * (int)Math.Pow(2,i+1);
+                foreach (var grain in grains)
+                {
+                    int actual = await grain.Get();
+                    if (expected != actual) this.output.WriteLine($"{grain} - failed");
+                    Assert.Equal(expected, actual);
+                }
             }
         }
 

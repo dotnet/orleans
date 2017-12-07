@@ -18,7 +18,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Server", "src\Orlea
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAWSUtils", "src\OrleansAWSUtils\OrleansAWSUtils.csproj", "{96AA7AEE-BDD9-4B12-9F15-D2BCCCFE1580}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "src\OrleansAzureUtils\OrleansAzureUtils.csproj", "{549F3A9B-582F-4AAB-8CD9-425F1A3CCDDE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "src\Azure\OrleansAzureUtils\OrleansAzureUtils.csproj", "{549F3A9B-582F-4AAB-8CD9-425F1A3CCDDE}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Bond", "src\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
 EndProject
@@ -28,7 +28,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.EventSourcing", "sr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{CD7707C0-F70A-4121-B980-D4ABD410C5E2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansSQLUtils", "src\OrleansSQLUtils\OrleansSQLUtils.csproj", "{3CBF459A-C43F-40B7-8F96-2B44D55840C5}"
 EndProject
@@ -56,7 +56,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure", "src\Orleans.Transactions.Azure\Orleans.Transactions.Azure.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.AzureStorage", "src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

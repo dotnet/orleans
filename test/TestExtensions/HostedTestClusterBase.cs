@@ -1,4 +1,6 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -17,8 +19,8 @@ namespace TestExtensions
         protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
 
         protected IClusterClient Client => this.HostedCluster.Client;
-        protected Logger Logger => this.Client.Logger;
-        protected Logger logger => this.Logger;
+        protected ILogger Logger => this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+        protected ILogger logger => this.Logger;
 
         protected HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
@@ -41,8 +43,8 @@ namespace TestExtensions
 
         protected IGrainFactory GrainFactory => this.Client;
 
-        protected Logger Logger => this.Client.Logger;
-        protected Logger logger => this.Logger;
+        protected ILogger Logger => this.logger;
+        protected ILogger logger;
 
         public TestClusterPerTest()
         {
@@ -52,6 +54,7 @@ namespace TestExtensions
                 testCluster.Deploy();
             }
             this.HostedCluster = testCluster;
+            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual TestCluster CreateTestCluster()

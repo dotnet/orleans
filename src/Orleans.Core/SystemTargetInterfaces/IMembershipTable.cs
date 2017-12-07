@@ -5,7 +5,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -21,9 +20,9 @@ namespace Orleans
         Task InitializeMembershipTable(bool tryInitTableVersion);
 
         /// <summary>
-        /// Deletes all table entries of the given deploymentId
+        /// Deletes all table entries of the given clusterId
         /// </summary>
-        Task DeleteMembershipTableEntries(string deploymentId);
+        Task DeleteMembershipTableEntries(string clusterId);
 
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.

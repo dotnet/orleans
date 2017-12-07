@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 using Orleans.Providers;
@@ -18,7 +20,7 @@ namespace Orleans.Streams
     [StorageProvider(ProviderName = "PubSubStore")]
     internal class PubSubRendezvousGrain : Grain<PubSubGrainState>, IPubSubRendezvousGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private const bool DEBUG_PUB_SUB = false;
 
         private static readonly CounterStatistic counterProducersAdded;
@@ -46,7 +48,7 @@ namespace Orleans.Streams
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
+            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger($"{GetType().FullName}.{RuntimeIdentity}.{IdentityString}");
             LogPubSubCounts("OnActivateAsync");
             return Task.CompletedTask;
         }
@@ -148,8 +150,8 @@ namespace Orleans.Streams
             if (numProducers <= 0)
                 return;
 
-            if (logger.IsVerbose)
-                logger.Info("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}", 
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.Debug("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}", 
                     numProducers, streamConsumer, Utils.EnumerableToString(State.Producers));
                 
             // Notify producers about a new streamConsumer.
@@ -261,7 +263,7 @@ namespace Orleans.Streams
 
         private void LogPubSubCounts(string fmt, params object[] args)
         {
-            if (logger.IsVerbose || DEBUG_PUB_SUB)
+            if (logger.IsEnabled(LogLevel.Debug) || DEBUG_PUB_SUB)
             {
                 int numProducers = 0;
                 int numConsumers = 0;
@@ -346,7 +348,7 @@ namespace Orleans.Streams
             try
             {
                 pubSubState.Fault();
-                if (logger.IsVerbose) logger.Verbose("Setting subscription {0} to a faulted state.", subscriptionId.Guid);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Setting subscription {0} to a faulted state.", subscriptionId.Guid);
 
                 await WriteStateAsync();
                 await NotifyProducersOfRemovedSubscription(pubSubState.SubscriptionId, pubSubState.Stream);
@@ -366,7 +368,7 @@ namespace Orleans.Streams
             int numProducersBeforeNotify = State.Producers.Count;
             if (numProducersBeforeNotify > 0)
             {
-                if (logger.IsVerbose) logger.Verbose("Notifying {0} existing producers about unregistered consumer.", numProducersBeforeNotify);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Notifying {0} existing producers about unregistered consumer.", numProducersBeforeNotify);
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers

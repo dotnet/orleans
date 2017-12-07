@@ -21,7 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
 
         internal GrainDirectoryHandoffManager(
@@ -31,7 +31,7 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
-            logger = new LoggerWrapper<GrainDirectoryHandoffManager>(loggerFactory);
+            logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
@@ -59,11 +59,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (batchUpdate.Count == 0 || silosHoldingMyPartitionCopy.Count == 0)
             {
-                if (logger.IsVerbose) logger.Verbose((isFullCopy ? "FULL" : "DELTA") + " handoff finished with empty delta (nothing to send)");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug((isFullCopy ? "FULL" : "DELTA") + " handoff finished with empty delta (nothing to send)");
                 return;
             }
 
-            if (logger.IsVerbose) logger.Verbose("Sending {0} items to my {1}: (ring status is {2})", 
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending {0} items to my {1}: (ring status is {2})", 
                 batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.RingStatusToString());
 
             var tasks = new List<Task>();
@@ -87,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
                     SiloAddress captureSilo = silo;
                     Dictionary<GrainId, IGrainInfo> captureChunk = chunk;
                     bool captureIsFullCopy = isFullCopy;
-                    if (logger.IsVerbose) logger.Verbose("Sending handed off partition to " + captureSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending handed off partition to " + captureSilo);
 
                     Task pendingRequest;
                     if (lastPromise.TryGetValue(captureSilo, out pendingRequest))
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsVerbose) logger.Verbose("Processing silo remove event for " + removedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo remove event for " + removedSilo);
 
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
@@ -139,7 +139,7 @@ namespace Orleans.Runtime.GrainDirectory
                 SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {
-                    if (logger.IsVerbose) logger.Verbose("Merging my partition with the copy of silo " + removedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
                     localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
                     // no need to send our new partition to all others, as they
@@ -147,12 +147,12 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 else
                 {
-                    if (logger.IsVerbose) logger.Verbose("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
                     // adjust copy for the predecessor of the failed silo
                     directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
                 }
                 localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
-                if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
             }
         }
@@ -164,7 +164,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async void ProcessSiloStoppingEvent_Impl()
         {
-            if (logger.IsVerbose) logger.Verbose("Processing silo stopping event");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo stopping event");
 
             // As we're about to enter an async context further down, this is the latest opportunity to lock, modify and copy
             // silosHoldingMyPartition for use inside of HandoffMyPartitionUponStop
@@ -196,7 +196,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsVerbose) logger.Verbose("Processing silo add event for " + addedSilo);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo add event for " + addedSilo);
 
                 // Reset our follower list to take the changes into account
                 ResetFollowers();
@@ -211,7 +211,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (successors[0].Equals(addedSilo))
                 {
                     // split my local directory and send to my new immediate successor his share
-                    if (logger.IsVerbose) logger.Verbose("Splitting my partition between me and " + addedSilo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Splitting my partition between me and " + addedSilo);
                     GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
                         grain =>
                         {
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     if (splitPartListSingle.Count > 0)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
                         localDirectory.Scheduler.QueueTask(async () =>
                         {
                             await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListSingle, singleActivation:true);
@@ -235,7 +235,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     if (splitPartListMulti.Count > 0)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
                         localDirectory.Scheduler.QueueTask(async () =>
                         {
                             await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti, singleActivation:false);
@@ -256,7 +256,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     else
                     {
-                        if (logger.IsVerbose) logger.Verbose("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
                         GrainDirectoryPartition splitPart = directoryPartitionsMap[predecessorOfNewSilo].Split(
                             grain =>
                             {
@@ -272,7 +272,7 @@ namespace Orleans.Runtime.GrainDirectory
                 SiloAddress oldSuccessor = directoryPartitionsMap.FirstOrDefault(pair => !successors.Contains(pair.Key)).Key;
                 if (oldSuccessor == null) return;
 
-                if (logger.IsVerbose) logger.Verbose("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
                 directoryPartitionsMap.Remove(oldSuccessor);
             }
         }
@@ -281,7 +281,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsVerbose) logger.Verbose("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
 
                 if (!directoryPartitionsMap.ContainsKey(source))
                 {
@@ -313,7 +313,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsVerbose) logger.Verbose("Got request to unregister directory partition copy from " + source);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to unregister directory partition copy from " + source);
                 directoryPartitionsMap.Remove(source);
             }
         }
@@ -329,7 +329,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void RemoveOldFollower(SiloAddress silo)
         {
-            if (logger.IsVerbose) logger.Verbose("Removing my copy from silo " + silo);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing my copy from silo " + silo);
             // release this old copy, as we have got a new one
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>

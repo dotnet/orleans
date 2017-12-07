@@ -67,13 +67,13 @@ namespace Orleans.Providers.SqlServer
         /// <summary>
         /// Adds configuration parameters
         /// </summary>
-        /// <param name="deployment">Deployment ID</param>
+        /// <param name="clusterId">Deployment ID</param>
         /// <param name="hostName">Host name</param>
         /// <param name="client">Client ID</param>
         /// <param name="address">IP address</param>
-        public void AddConfiguration(string deployment, string hostName, string client, IPAddress address)
+        public void AddConfiguration(string clusterId, string hostName, string client, IPAddress address)
         {
-            deploymentId = deployment;
+            deploymentId = clusterId;
             isSilo = false;
             this.hostName = hostName;
             clientId = client;
@@ -84,15 +84,15 @@ namespace Orleans.Providers.SqlServer
         /// <summary>
         /// Adds configuration parameters
         /// </summary>
-        /// <param name="deployment">Deployment ID</param>
+        /// <param name="clusterId">Deployment ID</param>
         /// <param name="silo">Silo name</param>
         /// <param name="siloId">Silo ID</param>
         /// <param name="address">Silo address</param>
         /// <param name="gatewayAddress">Client gateway address</param>
         /// <param name="hostName">Host name</param>
-        public void AddConfiguration(string deployment, bool silo, string siloId, SiloAddress address, IPEndPoint gatewayAddress, string hostName)
+        public void AddConfiguration(string clusterId, bool silo, string siloId, SiloAddress address, IPEndPoint gatewayAddress, string hostName)
         {
-            deploymentId = deployment;
+            deploymentId = clusterId;
             isSilo = silo;
             siloName = siloId;
             siloAddress = address;
@@ -129,7 +129,7 @@ namespace Orleans.Providers.SqlServer
         }
 
 
-        Task ISiloMetricsDataPublisher.Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
+        Task ISiloMetricsDataPublisher.Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
         {
             return Task.CompletedTask;
         }
@@ -154,7 +154,7 @@ namespace Orleans.Providers.SqlServer
         }
 
 
-        Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName)
         {
             return Task.CompletedTask;
         }

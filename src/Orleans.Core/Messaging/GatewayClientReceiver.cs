@@ -43,7 +43,7 @@ namespace Orleans.Messaging
                     while (buffer.TryDecodeMessage(out msg))
                     {
                         gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
-                        if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
+                        if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
                     }
                 }
             }

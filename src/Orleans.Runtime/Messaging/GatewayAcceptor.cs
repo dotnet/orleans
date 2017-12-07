@@ -1,9 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Serialization;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -12,7 +13,8 @@ namespace Orleans.Runtime.Messaging
         private readonly Gateway gateway;
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
-        private readonly GlobalConfiguration globalConfig;
+        private readonly SiloOptions siloOptions;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         internal GatewayAcceptor(
             MessageCenter msgCtr,
@@ -20,15 +22,17 @@ namespace Orleans.Runtime.Messaging
             IPEndPoint gatewayAddress,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            GlobalConfiguration globalConfig,
             ExecutorService executorService,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory)
             : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
-            this.globalConfig = globalConfig;
+            this.siloOptions = siloOptions.Value;
+            this.multiClusterOptions = multiClusterOptions.Value;
         }
 
         protected override bool RecordOpenedSocket(Socket sock)
@@ -40,21 +44,21 @@ namespace Orleans.Runtime.Messaging
             // refuse clients that are connecting to the wrong cluster
             if (client.Category == UniqueKey.Category.GeoClient)
             {
-                if(client.Key.ClusterId != this.globalConfig.ClusterId)
+                if(client.Key.ClusterId != this.siloOptions.ClusterId)
                 {
                     Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId,
                         string.Format(
                             "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            client, client.Key.ClusterId, this.globalConfig.ClusterId));
+                            client, client.Key.ClusterId, this.siloOptions.ClusterId));
                     return false;
                 }
             }
             else
             {
                 //convert handshake cliendId to a GeoClient ID 
-                if (this.globalConfig.HasMultiClusterNetwork)
+                if (this.multiClusterOptions.HasMultiClusterNetwork)
                 {
-                    client = GrainId.NewClientId(client.PrimaryKey, this.globalConfig.ClusterId);
+                    client = GrainId.NewClientId(client.PrimaryKey, this.siloOptions.ClusterId);
                 }
             }
 
@@ -88,9 +92,9 @@ namespace Orleans.Runtime.Messaging
             gatewayTrafficCounter.Increment();
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.globalConfig.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
+            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.globalConfig.ClusterId);
+                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloOptions.ClusterId);
             }
 
             // Are we overloaded?
@@ -99,7 +103,7 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 MessageCenter.TryDeliverToProxy(rejection);
-                if (Log.IsVerbose) Log.Verbose("Rejecting a request due to overloading: {0}", msg.ToString());
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();
                 return;
             }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -8,16 +9,9 @@ namespace UnitTests.SqlStatisticsPublisherTests
 {
     internal class StatisticsPublisherProviderRuntime : IProviderRuntime
     {
-        private readonly Logger logger;
-
-        public StatisticsPublisherProviderRuntime(Logger logger)
-        {
-            this.logger = logger;
-        }
-
         public Logger GetLogger(string loggerName)
         {
-            return logger;
+            throw new NotImplementedException();
         }
 
         public Guid ServiceId

@@ -23,17 +23,16 @@ namespace Orleans.SqlUtils
         /// When inserting statistics and generating a batch insert clause, these are the columns in the statistics
         /// table that will be updated with multiple values. The other ones are updated with one value only.
         /// </summary>
-        private readonly static string[] InsertStatisticsMultiupdateColumns =
-        {
-            $"@{DbStoredQueries.Columns.IsValueDelta}",
-            $"@{DbStoredQueries.Columns.StatValue}",
-            $"@{DbStoredQueries.Columns.Statistic}"
+        private static readonly string[] InsertStatisticsMultiupdateColumns = {
+            DbStoredQueries.Columns.IsValueDelta,
+            DbStoredQueries.Columns.StatValue,
+            DbStoredQueries.Columns.Statistic
         };
 
-        /// <summary>
-        /// the orleans functional queries
-        /// </summary>
-        private readonly DbStoredQueries dbStoredQueries;
+    /// <summary>
+    /// the orleans functional queries
+    /// </summary>
+    private readonly DbStoredQueries dbStoredQueries;
 
         private readonly IGrainReferenceConverter grainReferenceConverter;
 
@@ -94,16 +93,18 @@ namespace Orleans.SqlUtils
             SiloAddress siloAddress, string hostName, ISiloPerformanceMetrics siloMetrics)
         {
             return ExecuteAsync(dbStoredQueries.UpsertSiloMetricsKey, command =>
-                new DbStoredQueries.Columns(command)
-                {
-                    DeploymentId = deploymentId,
-                    HostName = hostName,
-                    SiloMetrics = siloMetrics,
-                    SiloAddress = siloAddress,
-                    GatewayAddress = gateway.Address,
-                    GatewayPort = gateway.Port,
-                    SiloId = siloId
-                });
+            {
+                var columns = new DbStoredQueries.Columns(command);
+
+                columns.DeploymentId = deploymentId;
+                columns.HostName = hostName;
+                columns.SiloMetrics = siloMetrics;
+                columns.SiloAddress = siloAddress;
+                columns.GatewayAddress = gateway.Address;
+                columns.GatewayPort = gateway.Port;
+                columns.SiloId = siloId;
+                return columns;
+            });
         }
 
         /// <summary>
@@ -162,18 +163,29 @@ namespace Orleans.SqlUtils
             //to BEGIN TRANSACTION; INSERT INTO [OrleansStatisticsTable] <columns> SELECT <variables>; UNION ALL <variables> COMMIT TRANSACTION;
             //where the UNION ALL is multiplied as many times as there are counters to insert.
             int startFrom = queryTemplate.IndexOf("SELECT", StringComparison.Ordinal) + "SELECT".Length + 1;
-                //This +1 is to have a space between SELECT and the first parameter name to not to have a SQL syntax error.
+            //This +1 is to have a space between SELECT and the first parameter name to not to have a SQL syntax error.
             int lastSemicolon = queryTemplate.LastIndexOf(";", StringComparison.Ordinal);
             int endTo = lastSemicolon > 0 ? queryTemplate.LastIndexOf(";", lastSemicolon - 1, StringComparison.Ordinal) : -1;
             var template = queryTemplate.Substring(startFrom, endTo - startFrom);
-            var parameterNames = template.Split(new[] {","}, StringSplitOptions.RemoveEmptyEntries).Select(i => i.Trim()).ToArray();
+
+            //HACK: The oracle query template ends with FROM DUAL, other providers queries don´t.
+            //It has to stay in the query template, but needs to removed from the template variable, because
+            //the otherwise the Replace which used for the union generation below would generate an invalid query  
+            template = template.Replace(" FROM DUAL", String.Empty);
+
+            var parameterNames = template.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
+                                         .Select(i => i.Trim()).ToArray();
+
             var collectionOfParametersToBeUnionized = new List<string>();
             var parametersToBeUnioned = new string[parameterNames.Length];
             for (int counterIndex = 0; counterIndex < counters.Count; ++counterIndex)
             {
                 for (int parameterNameIndex = 0; parameterNameIndex < parameterNames.Length; ++parameterNameIndex)
                 {
-                    if (InsertStatisticsMultiupdateColumns.Contains(parameterNames[parameterNameIndex]))
+                    //The column names in InsertStatisticsMultiupdateColumns are without parameter placeholders,
+                    //but parameterNames are with placeholders. As the placeholder is provider dependent, we are ignoring 
+                    //the placeholder when looking for columns.
+                    if (InsertStatisticsMultiupdateColumns.Any(x => parameterNames[parameterNameIndex].EndsWith(x)))
                     {
                         //These parameters change for each row. The format is
                         //@StatValue0, @StatValue1, @StatValue2, ... @sStatValue{counters.Count}.
@@ -191,14 +203,17 @@ namespace Orleans.SqlUtils
             var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
             var query = queryTemplate.Replace(template, string.Join(storageConsts.UnionAllSelectTemplate, collectionOfParametersToBeUnionized));
             return ExecuteAsync(query, command =>
-                new DbStoredQueries.Columns(command)
+            {
+                var columns = new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     HostName = hostName,
-                    Counters = counters,
                     Name = siloOrClientName,
                     Id = id
-                });
+                };
+                columns.Counters = counters;
+                return columns;
+            });
         }
 
         /// <summary>
@@ -210,7 +225,7 @@ namespace Orleans.SqlUtils
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainReference grainRef)
         {
             return ReadAsync(dbStoredQueries.ReadReminderRowsKey, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
-                new DbStoredQueries.Columns(command) {ServiceId = serviceId, GrainId = grainRef.ToKeyString()},
+                new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainRef.ToKeyString() },
                 ret => new ReminderTableData(ret.ToList()));
         }
 
@@ -224,10 +239,10 @@ namespace Orleans.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
-            var query = (int) beginHash < (int) endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
+            var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
             return ReadAsync(query, record => DbStoredQueries.Converters.GetReminderEntry(record, this.grainReferenceConverter), command =>
-                new DbStoredQueries.Columns(command) {ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash},
+                new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
 
@@ -304,7 +319,7 @@ namespace Orleans.SqlUtils
         internal Task DeleteReminderRowsAsync(string serviceId)
         {
             return ExecuteAsync(dbStoredQueries.DeleteReminderRowsKey, command =>
-                new DbStoredQueries.Columns(command) {ServiceId = serviceId});
+                new DbStoredQueries.Columns(command) { ServiceId = serviceId });
         }
 
         /// <summary>
@@ -315,7 +330,7 @@ namespace Orleans.SqlUtils
         internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId)
         {
             return ReadAsync(dbStoredQueries.GatewaysQueryKey, DbStoredQueries.Converters.GetGatewayUri, command =>
-                new DbStoredQueries.Columns(command) {DeploymentId = deploymentId, Status = SiloStatus.Active},
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, Status = SiloStatus.Active },
                 ret => ret.ToList());
         }
 
@@ -328,7 +343,7 @@ namespace Orleans.SqlUtils
         internal Task<MembershipTableData> MembershipReadRowAsync(string deploymentId, SiloAddress siloAddress)
         {
             return ReadAsync(dbStoredQueries.MembershipReadRowKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
-                new DbStoredQueries.Columns(command) {DeploymentId = deploymentId, SiloAddress = siloAddress},
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, SiloAddress = siloAddress },
                 ConvertToMembershipTableData);
         }
 
@@ -340,7 +355,7 @@ namespace Orleans.SqlUtils
         internal Task<MembershipTableData> MembershipReadAllAsync(string deploymentId)
         {
             return ReadAsync(dbStoredQueries.MembershipReadAllKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
-                new DbStoredQueries.Columns(command) {DeploymentId = deploymentId}, ConvertToMembershipTableData);
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ConvertToMembershipTableData);
         }
 
         /// <summary>
@@ -351,7 +366,7 @@ namespace Orleans.SqlUtils
         internal Task DeleteMembershipTableEntriesAsync(string deploymentId)
         {
             return ExecuteAsync(dbStoredQueries.DeleteMembershipTableEntriesKey, command =>
-                new DbStoredQueries.Columns(command) {DeploymentId = deploymentId});
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId });
         }
 
         /// <summary>
@@ -361,7 +376,7 @@ namespace Orleans.SqlUtils
         /// <param name="siloAddress"></param>
         /// <param name="iAmAliveTime"></param>
         /// <returns></returns>
-        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress,DateTime iAmAliveTime)
+        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime)
         {
             return ExecuteAsync(dbStoredQueries.UpdateIAmAlivetimeKey, command =>
                 new DbStoredQueries.Columns(command)
@@ -380,7 +395,7 @@ namespace Orleans.SqlUtils
         internal Task<bool> InsertMembershipVersionRowAsync(string deploymentId)
         {
             return ReadAsync(dbStoredQueries.InsertMembershipVersionKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command) {DeploymentId = deploymentId}, ret => ret.First());
+                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ret => ret.First());
         }
 
         /// <summary>

@@ -30,9 +30,9 @@ namespace Orleans.TestingHost.Utils
         /// Create trace file name for a specific node or client in a specific deployment
         /// </summary>
         /// <param name="nodeName"></param>
-        /// <param name="deploymentId"></param>
+        /// <param name="clusterId"></param>
         /// <returns></returns>
-        public static string CreateTraceFileName(string nodeName, string deploymentId)
+        public static string CreateTraceFileName(string nodeName, string clusterId)
         {
             const string traceFileFolder = "logs";
 
@@ -41,7 +41,7 @@ namespace Orleans.TestingHost.Utils
                 Directory.CreateDirectory(traceFileFolder);
             }
 
-            var traceFileName = $"{traceFileFolder}\\{deploymentId}_{nodeName}.log";
+            var traceFileName = $"{traceFileFolder}\\{clusterId}_{nodeName}.log";
 
             return traceFileName;
         }

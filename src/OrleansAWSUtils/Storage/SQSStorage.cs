@@ -42,10 +42,10 @@ namespace OrleansAWSUtils.Storage
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
         /// <param name="connectionString">The connection string</param>
-        /// <param name="deploymentId">The cluster deployment Id</param>
-        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string deploymentId = "")
+        /// <param name="clusterId">The cluster Id</param>
+        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string clusterId = "")
         {
-            QueueName = string.IsNullOrWhiteSpace(deploymentId) ? queueName : $"{deploymentId}-{queueName}";
+            QueueName = string.IsNullOrWhiteSpace(clusterId) ? queueName : $"{clusterId}-{queueName}";
             ParseDataConnectionString(connectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();

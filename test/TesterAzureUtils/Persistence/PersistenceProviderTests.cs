@@ -10,7 +10,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.Storage;
-using Orleans.TestingHost.Utils;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.StorageTests;
@@ -37,7 +36,7 @@ namespace Tester.AzureUtils.Persistence
                 fixture.GrainFactory,
                 fixture.Services,
                 new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(new LoggerWrapper<LoadedProviderTypeLoaders>(NullLoggerFactory.Instance)),
+                new LoadedProviderTypeLoaders(new NullLogger<LoadedProviderTypeLoaders>()),
                 NullLoggerFactory.Instance);
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();

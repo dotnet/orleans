@@ -24,7 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
         
         private readonly HashSet<SiloAddress> membershipCache;
         private readonly AsynchAgent maintainer;
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly SiloAddress seed;
         private readonly RegistrarManager registrarManager;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -38,7 +38,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         protected SiloAddress Seed { get { return seed; } }
 
-        internal Logger Logger { get { return log; } } // logger is shared with classes that manage grain directory
+        internal ILogger Logger { get { return log; } } // logger is shared with classes that manage grain directory
 
         internal bool Running;
 
@@ -102,12 +102,14 @@ namespace Orleans.Runtime.GrainDirectory
             RegistrarManager registrarManager,
             ExecutorService executorService,
             IOptions<DevelopmentMembershipOptions> developmentMembershipOptions,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory)
         {
-            this.log = new LoggerWrapper<LocalGrainDirectory>(loggerFactory);
+            this.log = loggerFactory.CreateLogger<LocalGrainDirectory>();
             var globalConfig = clusterConfig.Globals;
 
-            var clusterId = globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null;
+            var clusterId = multiClusterOptions.Value.HasMultiClusterNetwork ? siloOptions.Value.ClusterId : null;
             MyAddress = siloDetails.SiloAddress;
 
             Scheduler = scheduler;
@@ -133,7 +135,7 @@ namespace Orleans.Runtime.GrainDirectory
                     grainFactory, 
                     executorService,
                     loggerFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, loggerFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, siloOptions, multiClusterOptions, loggerFactory);
 
             var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndPoint;
             if (primarySiloEndPoint != null)
@@ -216,7 +218,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
-            log.Info("Start (SeverityLevel={0})", log.SeverityLevel);
+            log.Info("Start");
             Running = true;
             if (maintainer != null)
             {
@@ -301,7 +303,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 HandoffManager.ProcessSiloAddEvent(silo);
 
-                if (log.IsVerbose) log.Verbose("Silo {0} added silo {1}", MyAddress, silo);
+                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} added silo {1}", MyAddress, silo);
             }
         }
 
@@ -337,7 +339,7 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalDirectory(silo);
                 AdjustLocalCache(silo);
 
-                if (log.IsVerbose) log.Verbose("Silo {0} removed silo {1}", MyAddress, silo);
+                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} removed silo {1}", MyAddress, silo);
             }
         }
 
@@ -476,7 +478,7 @@ namespace Orleans.Runtime.GrainDirectory
             // give a special treatment for special grains
             if (grainId.IsSystemTarget)
             {
-                if (log.IsVerbose2) log.Verbose2("Silo {0} looked for a system target {1}, returned {2}", MyAddress, grainId, MyAddress);
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a system target {1}, returned {2}", MyAddress, grainId, MyAddress);
                 // every silo owns its system targets
                 return MyAddress;
             }
@@ -495,7 +497,7 @@ namespace Orleans.Runtime.GrainDirectory
                     throw new ArgumentException(errorMsg, "grainId = " + grainId);
                 }
                 // Directory info for the membership table grain has to be located on the primary (seed) node, for bootstrapping
-                if (log.IsVerbose2) log.Verbose2("Silo {0} looked for a special grain {1}, returned {2}", MyAddress, grainId, Seed);
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a special grain {1}, returned {2}", MyAddress, grainId, Seed);
                 return Seed;
             }
 
@@ -537,7 +539,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
-            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress.GetConsistentHashCode());
             return siloAddress;
         }
 
@@ -652,7 +654,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task UnregisterAfterNonexistingActivation(ActivationAddress addr, SiloAddress origin)
         {
-            log.Verbose2("UnregisterAfterNonexistingActivation addr={0} origin={1}", addr, origin);
+            log.Trace("UnregisterAfterNonexistingActivation addr={0} origin={1}", addr, origin);
 
             if (origin == null || membershipCache.Contains(origin))
             {
@@ -798,7 +800,7 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo = CalculateTargetSilo(grain, false);
             // No need to check that silo != null since we're passing excludeThisSiloIfStopping = false
 
-            if (log.IsVerbose) log.Verbose("Silo {0} tries to lookup for {1}-->{2} ({3}-->{4})", MyAddress, grain, silo, grain.GetUniformHashCode(), silo.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} tries to lookup for {1}-->{2} ({3}-->{4})", MyAddress, grain, silo, grain.GetUniformHashCode(), silo.GetConsistentHashCode());
 
             // check if we own the grain
             if (silo.Equals(MyAddress))
@@ -809,10 +811,10 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
                     // some recent changes in the membership
-                    if (log.IsVerbose2) log.Verbose2("LocalLookup mine {0}=null", grain);
+                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
                     return false;
                 }
-                if (log.IsVerbose2) log.Verbose2("LocalLookup mine {0}={1}", grain, result.Addresses.ToStrings());
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}={1}", grain, result.Addresses.ToStrings());
                 LocalDirectorySuccesses.Increment();
                 localSuccesses.Increment();
                 return true;
@@ -824,10 +826,10 @@ namespace Orleans.Runtime.GrainDirectory
             result.Addresses = GetLocalCacheData(grain);
             if (result.Addresses == null)
             {
-                if (log.IsVerbose2) log.Verbose2("TryFullLookup else {0}=null", grain);
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("TryFullLookup else {0}=null", grain);
                 return false;
             }
-            if (log.IsVerbose2) log.Verbose2("LocalLookup cache {0}={1}", grain, result.Addresses.ToStrings());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Addresses.ToStrings());
             cacheSuccesses.Increment();
             localSuccesses.Increment();
             return true;
@@ -848,8 +850,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task<AddressesAndTag> LookupInCluster(GrainId grainId, string clusterId)
         {
-            if (clusterId == null)
-                throw new ArgumentNullException("clusterId");
+            if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
 
             if (clusterId == ClusterId)
             {
@@ -896,13 +897,13 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
                     // some recent changes in the membership
-                    if (log.IsVerbose2) log.Verbose2("FullLookup mine {0}=none", grainId);
+                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}=none", grainId);
                     localResult.Addresses = new List<ActivationAddress>();
                     localResult.VersionTag = GrainInfo.NO_ETAG;
                     return localResult;
                 }
 
-                if (log.IsVerbose2) log.Verbose2("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
                 LocalDirectorySuccesses.Increment();
                 return localResult;
             }
@@ -919,7 +920,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // update the cache
                 result.Addresses = result.Addresses.Where(t => IsValidSilo(t.Silo)).ToList();
-                if (log.IsVerbose2) log.Verbose2("FullLookup remote {0}={1}", grainId, result.Addresses.ToStrings());
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup remote {0}={1}", grainId, result.Addresses.ToStrings());
 
                 var entries = result.Addresses.Select(t => Tuple.Create(t.Silo, t.Activation)).ToList();
 

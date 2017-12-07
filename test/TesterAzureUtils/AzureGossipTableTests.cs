@@ -15,12 +15,9 @@ namespace Tester.AzureUtils
 {
     public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private Guid globalServiceId; //this should be the same for all clusters. Use this as partition key.
-        //this should be unique per cluster. Can we use deployment id? 
-        //problem with only using deployment id is that it is not known before deployment and hence not in the config file.
-        private string deploymentId;
         private SiloAddress siloAddress1;
         private SiloAddress siloAddress2;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
@@ -29,10 +26,9 @@ namespace Tester.AzureUtils
         public AzureGossipTableTests()
         {
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
-            logger = new LoggerWrapper<AzureGossipTableTests>(loggerFactory);
+            logger = loggerFactory.CreateLogger<AzureGossipTableTests>();
         
             globalServiceId = Guid.NewGuid();
-            deploymentId = "test-" + globalServiceId;
 
             IPAddress ip;
             if (!IPAddress.TryParse("127.0.0.1", out ip))
@@ -45,13 +41,12 @@ namespace Tester.AzureUtils
             IPEndPoint ep2 = new IPEndPoint(ip, 21112);
             siloAddress2 = SiloAddress.New(ep2, 0);
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("Global ServiceId={0}", globalServiceId);
 
             GlobalConfiguration config = new GlobalConfiguration
             {
                 ServiceId = globalServiceId,
                 ClusterId = "0",
-                DeploymentId = deploymentId,
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
 

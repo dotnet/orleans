@@ -13,6 +13,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Clustering.AzureStorage;
 
 namespace Tester.AzureUtils
 {
@@ -33,7 +34,7 @@ namespace Tester.AzureUtils
             }
         }
 
-        private string deploymentId;
+        private string clusterId;
         private int generation;
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;
@@ -44,14 +45,14 @@ namespace Tester.AzureUtils
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            deploymentId = "test-" + Guid.NewGuid();
+            this.clusterId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
 
-            output.WriteLine("DeploymentId={0} Generation={1}", deploymentId, generation);
+            output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString, fixture.LoggerFactory)
+            manager = OrleansSiloInstanceManager.GetManager(this.clusterId, TestDefaultConfiguration.DataConnectionString, fixture.LoggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 
@@ -64,7 +65,7 @@ namespace Tester.AzureUtils
 
                 output.WriteLine("TestCleanup Timeout={0}", timeout);
 
-                manager.DeleteTableEntries(deploymentId).WaitWithThrow(timeout);
+                manager.DeleteTableEntries(this.clusterId).WaitWithThrow(timeout);
 
                 output.WriteLine("TestCleanup -  Finished");
                 manager = null;
@@ -97,7 +98,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                .WithTimeout(Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies.TableOperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }
@@ -206,7 +207,7 @@ namespace Tester.AzureUtils
 
         private void RegisterSiloInstance()
         {
-            string partitionKey = deploymentId;
+            string partitionKey = this.clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
             IPEndPoint myEndpoint = siloAddress.Endpoint;
@@ -216,7 +217,7 @@ namespace Tester.AzureUtils
                 PartitionKey = partitionKey,
                 RowKey = rowKey,
 
-                DeploymentId = deploymentId,
+                DeploymentId = this.clusterId,
                 Address = myEndpoint.Address.ToString(),
                 Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
@@ -238,7 +239,7 @@ namespace Tester.AzureUtils
 
         private async Task<Tuple<SiloInstanceTableEntry, string>> FindSiloEntry(SiloAddress siloAddr)
         {
-            string partitionKey = deploymentId;
+            string partitionKey = this.clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
 
             output.WriteLine("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);

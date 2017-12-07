@@ -7,7 +7,7 @@ namespace Orleans.Transactions
 {
     internal class ActiveTransactionsTracker : IDisposable
     {
-        private readonly TransactionsConfiguration config;
+        private readonly TransactionsOptions options;
         private readonly TransactionLog transactionLog;
         private readonly ILogger logger;
         private readonly object lockObj;
@@ -20,9 +20,9 @@ namespace Orleans.Transactions
         private long maxAllocatedTransactionId;
         private volatile bool disposed;
 
-        public ActiveTransactionsTracker(IOptions<TransactionsConfiguration> configOption, TransactionLog transactionLog, ILoggerFactory loggerFactory)
+        public ActiveTransactionsTracker(IOptions<TransactionsOptions> configOption, TransactionLog transactionLog, ILoggerFactory loggerFactory)
         {
-            this.config = configOption.Value;
+            this.options = configOption.Value;
             this.transactionLog = transactionLog;
             this.logger = loggerFactory.CreateLogger(nameof(ActiveTransactionsTracker));
             lockObj = new object();
@@ -44,7 +44,7 @@ namespace Orleans.Transactions
         {
             var id = Interlocked.Increment(ref highestActiveTransactionId);
 
-            if (maxAllocatedTransactionId - highestActiveTransactionId <= config.AvailableTransactionIdThreshold)
+            if (maxAllocatedTransactionId - highestActiveTransactionId <= options.AvailableTransactionIdThreshold)
             {
                 // Signal the allocation thread to allocate more Ids
                 allocationEvent.Set();
@@ -99,9 +99,9 @@ namespace Orleans.Transactions
 
                     lock (lockObj)
                     {
-                        if (maxAllocatedTransactionId - highestActiveTransactionId <= config.AvailableTransactionIdThreshold)
+                        if (maxAllocatedTransactionId - highestActiveTransactionId <= options.AvailableTransactionIdThreshold)
                         {
-                            var batchSize = config.TransactionIdAllocationBatchSize;
+                            var batchSize = options.TransactionIdAllocationBatchSize;
                             transactionLog.UpdateStartRecord(maxAllocatedTransactionId + batchSize).GetAwaiter().GetResult();
 
                             maxAllocatedTransactionId += batchSize;

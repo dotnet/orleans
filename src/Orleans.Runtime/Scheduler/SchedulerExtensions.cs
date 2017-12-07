@@ -7,67 +7,23 @@ namespace Orleans.Runtime.Scheduler
     {
         internal static Task<T> QueueTask<T>(this OrleansTaskScheduler scheduler, Func<Task<T>> taskFunc, ISchedulingContext targetContext)
         {
-            var resolver = new TaskCompletionSource<T>();
-            Func<Task> asyncFunc =
-                async () =>
-                {
-                    try
-                    {
-                        RequestContext.Clear();
-                        T result = await taskFunc();
-                        resolver.TrySetResult(result);
-                    }
-                    catch (Exception exc)
-                    {
-                        resolver.TrySetException(exc);
-                    }
-                };
-
-            // it appears that it's not important that we fire-and-forget asyncFunc() because we wait on the
-            scheduler.QueueWorkItem(new ClosureWorkItem(() => asyncFunc().Ignore()), targetContext);
-            return resolver.Task;
+            var workItem = new AsyncClosureWorkItem<T>(taskFunc);
+            scheduler.QueueWorkItem(workItem, targetContext);
+            return workItem.Task;
         }
 
         internal static Task QueueTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext)
         {
-            var resolver = new TaskCompletionSource<bool>();
-            Func<Task> asyncFunc =
-                async () =>
-                {
-                    try
-                    {
-                        RequestContext.Clear();
-                        await taskFunc();
-                        resolver.TrySetResult(true);
-                    }
-                    catch (Exception exc)
-                    {
-                        resolver.TrySetException(exc);
-                    }
-                };
-            scheduler.QueueWorkItem(new ClosureWorkItem(() => asyncFunc().Ignore()), targetContext);
-            return resolver.Task;
+            var workItem = new AsyncClosureWorkItem(taskFunc);
+            scheduler.QueueWorkItem(workItem, targetContext);
+            return workItem.Task;
         }
 
         internal static Task QueueNamedTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext, string activityName = null)
         {
-            var resolver = new TaskCompletionSource<bool>();
-            Func<Task> asyncFunc =
-                async () =>
-                {
-                    try
-                    {
-                        RequestContext.Clear();
-                        await taskFunc();
-                        resolver.TrySetResult(true);
-                    }
-                    catch (Exception exc)
-                    {
-                        resolver.TrySetException(exc);
-                    }
-                };
-            scheduler.QueueWorkItem(new ClosureWorkItem(() => asyncFunc().Ignore(), () => activityName), targetContext);
-            return resolver.Task;
+            var workItem = new AsyncClosureWorkItem(taskFunc, activityName);
+            scheduler.QueueWorkItem(workItem, targetContext);
+            return workItem.Task;
         }
 
         internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, ISchedulingContext targetContext)

@@ -70,8 +70,8 @@ namespace UnitTests.Streaming.Reliability
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })
-            .AddApplicationPartsFromAppDomain()
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.DeploymentId)));
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         public class SiloBuilderFactory : ISiloBuilderFactory
         {
@@ -85,7 +85,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;
                     })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
             }
         }
 
@@ -108,11 +108,11 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            var deploymentId = HostedCluster.DeploymentId;
+            var clusterId = HostedCluster.ClusterId;
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, _streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, _streamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 

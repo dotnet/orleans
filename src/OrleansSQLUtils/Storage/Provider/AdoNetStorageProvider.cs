@@ -84,7 +84,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The default query to initialize this structure from the Orleans database.
         /// </summary>
-        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey';";
+        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'";
 
         /// <summary>
         /// The default ADO.NET invariant used for storage if none is given. This corresponds to Orleans.Runtime.Constants.INVARIANT_NAME_SQL_SERVER.
@@ -191,7 +191,6 @@ namespace Orleans.Storage
             var connectionInvariant = config.Properties.ContainsKey(DataConnectionInvariantPropertyName) ? config.Properties[DataConnectionInvariantPropertyName] : DefaultAdoInvariantInvariantPropertyName;
             Storage = RelationalStorage.CreateInstance(connectionInvariant, config.Properties[DataConnectionStringPropertyName]);
             ServiceId = providerRuntime.ServiceId.ToString();
-
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
@@ -248,7 +247,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", ServiceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
-                }, (selector, resultSetCount, token) => { return Task.FromResult(selector.GetValue(0).ToString()); }, CancellationToken.None).ConfigureAwait(false));
+                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), CancellationToken.None).ConfigureAwait(false));
                 storageVersion = clearRecord.SingleOrDefault();
             }
             catch(Exception ex)
@@ -369,7 +368,7 @@ namespace Orleans.Storage
                             storageState = choice.Deserializer.Deserialize(payload, grainStateType);
                         }
 
-                        version = selector.GetValue<int?>("Version");
+                        version = selector.GetNullableInt32("Version");
                     }
 
                     return Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
@@ -433,7 +432,7 @@ namespace Orleans.Storage
                     command.AddParameter("PayloadJson", (string)(serializer.Serializer.Tag == UseJsonFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                     command.AddParameter("PayloadXml", (string)(serializer.Serializer.Tag == UseXmlFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                 }, (selector, resultSetCount, token) =>
-                { return Task.FromResult(selector.GetValueOrDefault<int?>("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
+                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
             catch(Exception ex)

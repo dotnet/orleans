@@ -1,4 +1,6 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Transactions.Tests
@@ -6,11 +8,11 @@ namespace Orleans.Transactions.Tests
     public class TransactionOrchestrationResultGrain : Grain, ITransactionOrchestrationResultGrain
     {
         private readonly TransactionOrchestrationResult orchestrationResult = new TransactionOrchestrationResult();
-        private Logger logger;
+        private ILogger logger;
 
         public override Task OnActivateAsync()
         {
-            this.logger = this.GetLogger(nameof(TransactionOrchestrationResultGrain));
+            this.logger = this.ServiceProvider.GetRequiredService<ILogger<TransactionOrchestrationResultGrain>>();
             return Task.CompletedTask;
         }
 

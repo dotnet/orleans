@@ -21,6 +21,11 @@ namespace Orleans.Runtime
         /// </summary>
         private static readonly AssemblyName OrleansCoreAssembly = typeof(RuntimeVersion).GetTypeInfo().Assembly.GetName();
 
+        /// <summary>
+        /// The assembly name of the core Orleans abstractions assembly.
+        /// </summary>
+        private static readonly AssemblyName OrleansAbstractionsAssembly = typeof(IGrain).GetTypeInfo().Assembly.GetName();
+
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 
         private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
@@ -544,12 +549,12 @@ namespace Orleans.Runtime
             }
         }
 
-        public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
+        public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, ILogger logger)
         {
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, ILogger logger)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, ILogger logger=null)
         {
             try
             {
@@ -569,52 +574,6 @@ namespace Orleans.Runtime
                 {
                     return typeLoadException.Types?.Where(type => type != null).Select(type => type.GetTypeInfo()) ??
                            Enumerable.Empty<TypeInfo>();
-                }
-
-                return Enumerable.Empty<TypeInfo>();
-            }
-        }
-
-        //TODO: delete this one after runtime migrate off Logger
-        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger = null)
-        {
-            try
-            {
-                return assembly.DefinedTypes;
-            }
-            catch (Exception exception)
-            {
-                var typeLoadException = exception as ReflectionTypeLoadException;
-
-                if (typeLoadException != null)
-                {
-                    if (typeLoadException.LoaderExceptions != null)
-                    {
-                        //
-                        // If we've only BadImageFormatExceptions in LoaderExceptions, then it's ok to not to log, otherwise log
-                        // as a warning.
-                        //
-
-                        if (logger != null && logger.IsWarning)
-                        {
-                            if (typeLoadException.LoaderExceptions.Any(ex => !(ex is BadImageFormatException)) || logger.IsVerbose)
-                            {
-                                var message =
-                                    $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
-                                logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
-                            }
-                        }
-                    }
-
-                    return typeLoadException.Types?.Where(type => type != null).Select(type => type.GetTypeInfo()) ??
-                           Enumerable.Empty<TypeInfo>();
-                }
-
-                if (logger != null && logger.IsWarning)
-                {
-                    var message =
-                        $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
-                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
                 }
 
                 return Enumerable.Empty<TypeInfo>();
@@ -1110,7 +1069,8 @@ namespace Orleans.Runtime
             // We want to be loosely coupled to the assembly version if an assembly depends on an older Orleans,
             // but we want a strong assembly match for the Orleans binary itself 
             // (so we don't load 2 different versions of Orleans by mistake)
-            return DoReferencesContain(assembly.GetReferencedAssemblies(), OrleansCoreAssembly)
+            var references = assembly.GetReferencedAssemblies();
+            return DoReferencesContain(references, OrleansCoreAssembly) || DoReferencesContain(references, OrleansAbstractionsAssembly)
                    || string.Equals(assembly.GetName().FullName, OrleansCoreAssembly.FullName, StringComparison.Ordinal);
         }
 

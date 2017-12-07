@@ -34,9 +34,7 @@ namespace OrleansTelemetryConsumers.Counters
             var loggerFactory = CreateDefaultLoggerFactory($"{this.GetType()}.log");
 
             var parts = new ApplicationPartManager();
-            parts.AddApplicationPartsFromAppDomain();
-            parts.AddApplicationPartsFromBasePath();
-            parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
+            parts.AddFromAppDomain().AddFromApplicationBaseDirectory().AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             var grainClassFeature = parts.CreateAndPopulateFeature<GrainClassFeature>();
 
             CrashUtils.GrainTypes = grainClassFeature.Classes.Select(metadata => TypeUtils.GetFullName(metadata.ClassType)).ToList();

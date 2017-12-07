@@ -15,9 +15,9 @@ namespace ServiceBus.Tests.MonitorTests
 {
     public class EventHubReceiverMonitorForTesting : IQueueAdapterReceiverMonitor
     {
-        public static EventHubReceiverMonitorForTesting Instance = new EventHubReceiverMonitorForTesting(null, null);
+        public static EventHubReceiverMonitorForTesting Instance = new EventHubReceiverMonitorForTesting();
         public EventHubReceiverMonitorCounters CallCounters;
-        private EventHubReceiverMonitorForTesting(EventHubReceiverMonitorDimensions dimensions, Logger logger)
+        private EventHubReceiverMonitorForTesting()
         {
             this.CallCounters = new EventHubReceiverMonitorCounters();
         }

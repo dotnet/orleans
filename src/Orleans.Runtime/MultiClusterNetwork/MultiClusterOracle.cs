@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.MultiClusterNetwork
@@ -17,7 +18,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         public static readonly TimeSpan CleanupSilentGoneGatewaysAfter = TimeSpan.FromSeconds(30);
 
         private readonly MultiClusterOracleData localData;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly SafeRandom random;
         private readonly string clusterId;
         private readonly IReadOnlyList<string> defaultMultiCluster;
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
         private readonly ILoggerFactory loggerFactory;
-        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions)
             : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -41,9 +42,9 @@ namespace Orleans.Runtime.MultiClusterNetwork
             if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
             var config = siloDetails.ClusterConfig.Globals;
-            logger = new LoggerWrapper<MultiClusterOracle>(loggerFactory);
+            logger = loggerFactory.CreateLogger<MultiClusterOracle>();
             localData = new MultiClusterOracleData(logger, grainFactory);
-            clusterId = config.ClusterId;
+            clusterId = siloOptions.Value.ClusterId;
             defaultMultiCluster = config.DefaultMultiCluster;
             random = new SafeRandom();
 
@@ -136,7 +137,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public async Task Start()
         {
-            logger.Info(ErrorCode.MultiClusterNetwork_Starting, "MultiClusterOracle starting on {0}, Severity={1} ", Silo, logger.SeverityLevel);
+            logger.Info(ErrorCode.MultiClusterNetwork_Starting, "MultiClusterOracle starting on {0}", Silo);
             try
             {
                 if (string.IsNullOrEmpty(clusterId))
@@ -194,7 +195,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private void OnGossipTimerTick(object _)
         {
-            logger.Verbose3("-timer");
+            logger.Trace("-timer");
             PublishChanges();
             PeriodicBackgroundGossip();
         }
@@ -202,7 +203,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         // called in response to changed status, and periodically
         private void PublishChanges()
         {
-            logger.Verbose("--- PublishChanges: assess");
+            logger.Debug("--- PublishChanges: assess");
 
             var activeLocalGateways = this.siloStatusOracle.GetApproximateMultiClusterGateways();
 
@@ -223,8 +224,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
             if (iAmGateway)
                 DemoteLocalGateways(activeLocalGateways, ref deltas);
 
-            if (logger.IsVerbose)
-                logger.Verbose("--- PublishChanges: found activeGateways={0} iAmGateway={1} publish={2}",
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.Debug("--- PublishChanges: found activeGateways={0} iAmGateway={1} publish={2}",
                    string.Join(",", activeLocalGateways), iAmGateway, deltas);
 
             if (!deltas.IsEmpty)
@@ -269,7 +270,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 }
             }
 
-            logger.Verbose("--- PublishChanges: done");
+            logger.Debug("--- PublishChanges: done");
         }
 
         private IEnumerable<SiloAddress> GetApproximateOtherActiveSilos()
@@ -281,7 +282,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private void PeriodicBackgroundGossip()
         {
-            logger.Verbose("--- PeriodicBackgroundGossip");
+            logger.Debug("--- PeriodicBackgroundGossip");
             // pick random target for full gossip
             var gateways = localData.Current.Gateways.Values
                            .Where(gw => !gw.SiloAddress.Equals(this.Silo) && gw.Status == GatewayStatus.Active)
@@ -321,7 +322,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             RemoveIdleWorkers(this.clusterWorkers);
             RemoveIdleWorkers(this.siloWorkers);
 
-            logger.Verbose("--- PeriodicBackgroundGossip: done");
+            logger.Debug("--- PeriodicBackgroundGossip: done");
         }
 
         // the set of all known clusters
@@ -351,7 +352,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         // called by remote nodes that publish changes
         public Task Publish(IMultiClusterGossipData gossipData, bool forwardLocally)
         {
-            logger.Verbose("--- Publish: receive {0} data {1}", forwardLocally ? "remote" : "local", gossipData);
+            logger.Debug("--- Publish: receive {0} data {1}", forwardLocally ? "remote" : "local", gossipData);
 
             var data = (MultiClusterData)gossipData;
 
@@ -366,7 +367,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             PublishMyStatusToNewDestinations(delta);
 
-            logger.Verbose("--- Publish: done");
+            logger.Debug("--- Publish: done");
 
             return Task.CompletedTask;
         }
@@ -374,7 +375,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         // called by remote nodes' full background gossip
         public Task<IMultiClusterGossipData> Synchronize(IMultiClusterGossipData gossipData)
         {
-            logger.Verbose("--- Synchronize: gossip {0}", gossipData);
+            logger.Debug("--- Synchronize: gossip {0}", gossipData);
 
             var data = (MultiClusterData)gossipData;
 
@@ -382,7 +383,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             PublishMyStatusToNewDestinations(delta);
 
-            logger.Verbose("--- Synchronize: done, answer={0}", delta);
+            logger.Debug("--- Synchronize: done, answer={0}", delta);
 
             return Task.FromResult((IMultiClusterGossipData)delta);
         }
@@ -420,7 +421,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         // receive a remote request for finding lagging silos in this cluster or on this silo
         public async Task<List<SiloAddress>> FindLaggingSilos(MultiClusterConfiguration expected, bool forwardLocally)
         {
-            logger.Verbose("--- FindLaggingSilos: {0}, {1}", forwardLocally ? "remote" : "local", expected);
+            logger.Debug("--- FindLaggingSilos: {0}, {1}", forwardLocally ? "remote" : "local", expected);
 
             var result = new List<SiloAddress>();
 
@@ -448,7 +449,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 }
             }
 
-            logger.Verbose("--- FindLaggingSilos: done, found {0}", result.Count);
+            logger.Debug("--- FindLaggingSilos: done, found {0}", result.Count);
 
             return result;
         }
@@ -533,7 +534,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 // add the data to the data waiting to be published
                 toPublish = toPublish.Merge(data);
 
-                if (oracle.logger.IsVerbose)
+                if (oracle.logger.IsEnabled(LogLevel.Debug))
                    LogQueuedPublish(toPublish);
 
                 Notify();
@@ -608,9 +609,9 @@ namespace Orleans.Runtime.MultiClusterNetwork
             protected override void LogQueuedPublish(MultiClusterData data)
             {
                 if (TargetsRemoteCluster)
-                    oracle.logger.Verbose("enqueued publish to cluster {0}, cumulative: {1}", Cluster, data);
+                    oracle.logger.Debug("enqueued publish to cluster {0}, cumulative: {1}", Cluster, data);
                 else
-                    oracle.logger.Verbose("enqueued publish to silo {0}, cumulative: {1}", Silo, data);
+                    oracle.logger.Debug("enqueued publish to silo {0}, cumulative: {1}", Silo, data);
             }
 
             protected async override Task Publish(int id, MultiClusterData data)
@@ -626,7 +627,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     Silo = oracle.GetRandomClusterGateway(Cluster);
                 }
 
-                oracle.logger.Verbose("-{0} Publish to silo {1} ({2}) {3}", id, Silo, Cluster ?? "local", data);
+                oracle.logger.Debug("-{0} Publish to silo {1} ({2}) {3}", id, Silo, Cluster ?? "local", data);
                 try
                 {
                     // publish to the remote system target
@@ -636,7 +637,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     LastException = null;
                     if (data.Gateways.ContainsKey(oracle.Silo))
                         KnowsMe = data.Gateways[oracle.Silo].Status == GatewayStatus.Active;
-                    oracle.logger.Verbose("-{0} Publish to silo successful", id);
+                    oracle.logger.Debug("-{0} Publish to silo successful", id);
                 }
                 catch (Exception e)
                 {
@@ -655,7 +656,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 if (TargetsRemoteCluster)
                     Silo = oracle.GetRandomClusterGateway(Cluster);
 
-                oracle.logger.Verbose("-{0} Synchronize with silo {1} ({2})", id, Silo, Cluster ?? "local");
+                oracle.logger.Debug("-{0} Synchronize with silo {1} ({2})", id, Silo, Cluster ?? "local");
                 try
                 {
                     var remoteOracle = this.grainFactory.GetSystemTarget<IMultiClusterGossipService>(Constants.MultiClusterOracleId, Silo);
@@ -668,7 +669,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     LastException = null;
                     if (data.Gateways.ContainsKey(oracle.Silo))
                         KnowsMe = data.Gateways[oracle.Silo].Status == GatewayStatus.Active;
-                    oracle.logger.Verbose("-{0} Synchronize with silo successful, answer={1}", id, answer);
+                    oracle.logger.Debug("-{0} Synchronize with silo successful, answer={1}", id, answer);
 
                     oracle.PublishMyStatusToNewDestinations(delta);
                 }
@@ -697,17 +698,17 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             protected override void LogQueuedPublish(MultiClusterData data)
             {
-                oracle.logger.Verbose("enqueue publish to channel {0}, cumulative: {1}", channel.Name, data);
+                oracle.logger.Debug("enqueue publish to channel {0}, cumulative: {1}", channel.Name, data);
             }
 
             protected async override Task Publish(int id, MultiClusterData data)
             {
-                oracle.logger.Verbose("-{0} Publish to channel {1} {2}", id, channel.Name, data);
+                oracle.logger.Debug("-{0} Publish to channel {1} {2}", id, channel.Name, data);
                 try
                 {
                     await channel.Publish(data);
                     LastException = null;
-                    oracle.logger.Verbose("-{0} Publish to channel successful, answer={1}", id, data);
+                    oracle.logger.Debug("-{0} Publish to channel successful, answer={1}", id, data);
                 }
                 catch (Exception e)
                 {
@@ -718,7 +719,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             }
             protected async override Task Synchronize(int id)
             {
-                oracle.logger.Verbose("-{0} Synchronize with channel {1}", id, channel.Name);
+                oracle.logger.Debug("-{0} Synchronize with channel {1}", id, channel.Name);
                 try
                 {
                     var answer = await channel.Synchronize(oracle.localData.Current);
@@ -727,7 +728,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     var delta = oracle.localData.ApplyDataAndNotify(answer);
 
                     LastException = null;
-                    oracle.logger.Verbose("-{0} Synchronize with channel successful", id);
+                    oracle.logger.Debug("-{0} Synchronize with channel successful", id);
 
                     oracle.PublishMyStatusToNewDestinations(delta);
                 }
@@ -749,8 +750,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
             var data = new MultiClusterData(this.injectedConfig);
             this.injectedConfig = null;
 
-            if (logger.IsVerbose)
-                logger.Verbose("-InjectConfiguration {0}", data.Configuration.ToString());
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.Debug("-InjectConfiguration {0}", data.Configuration.ToString());
 
             var delta = this.localData.ApplyDataAndNotify(data);
 
@@ -780,7 +781,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 || (myStatus.Status == GatewayStatus.Active
                       && myStatus.HeartbeatTimestamp - existingEntry.HeartbeatTimestamp > this.resendActiveStatusAfter))
             {
-                logger.Verbose2("-InjectLocalStatus {0}", myStatus);
+                logger.Trace("-InjectLocalStatus {0}", myStatus);
 
                 // update current data with status
                 var delta = this.localData.ApplyDataAndNotify(new MultiClusterData(myStatus));
@@ -814,8 +815,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             var data = new MultiClusterData(toBeUpdated);
 
-            if (logger.IsVerbose)
-                logger.Verbose("-DemoteLocalGateways {0}", data.ToString());
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.Debug("-DemoteLocalGateways {0}", data.ToString());
  
             var delta = this.localData.ApplyDataAndNotify(data);
 

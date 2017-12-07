@@ -39,7 +39,7 @@ namespace Orleans.Providers.Streams.Common
     public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
-        private Logger                  logger;
+        private ILogger                  logger;
         private IQueueAdapterFactory    adapterFactory;
         private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
@@ -66,11 +66,11 @@ namespace Orleans.Providers.Streams.Common
             
             Name = name;
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
-            logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
             adapterFactory.Init(config, Name, providerRuntime.ServiceProvider);
             queueAdapter = await adapterFactory.CreateAdapter();
             this.loggerFactory = providerUtilitiesManager.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
             myConfig = new PersistentStreamProviderConfig(config);
             this.providerConfig = config;
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
