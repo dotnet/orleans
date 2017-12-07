@@ -1,14 +1,11 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using Orleans.Serialization;
 using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using System.Diagnostics.CodeAnalysis;
-
-    using Orleans.Serialization;
-
-    using Xunit;
-
     [TestCategory("BVT"), TestCategory("Serialization")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ILSerializerTests

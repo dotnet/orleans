@@ -3,20 +3,22 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Net;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using TestExtensions;
+using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -26,12 +28,6 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Serialization
 {
-    using System.Reflection;
-
-    using Orleans.GrainDirectory;
-    using Orleans.Runtime.GrainDirectory;
-
-    using TestGrainInterfaces;
     public class BuiltInSerializerCollectionFixture
     {
         public ConcurrentDictionary<BuiltInSerializerTests.SerializerToUse, SerializationTestEnvironment> Environments { get; } =
