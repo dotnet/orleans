@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -122,6 +122,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Codegen.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Codegen.html",
+          "hash": "YSKAJJm9RqX21VRi+PqmEg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/2.0/Configuration2.0.md",
       "output": {
         ".html": {
@@ -150,7 +162,19 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/New.html",
-          "hash": "grNvJhT6Afo52J5Ewg6kDA=="
+          "hash": "osvYU7d4uhI6A2YUsCY/Hg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Transactions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Transactions.html",
+          "hash": "fE6XXaTBVBuq2xwWuxtM4Q=="
         }
       },
       "is_incremental": false,
@@ -1367,7 +1391,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "EPI/we0CwZqtIy/PLDBHvQ=="
+          "hash": "5F1qdymbSJBwU7jlr34bXQ=="
         }
       },
       "is_incremental": false,
@@ -1962,9 +1986,6 @@
       "version": ""
     },
     {
-      "log_codes": [
-        "InvalidYamlHeader"
-      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -1992,8 +2013,7 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": false,
-        "details": "Cannot build incrementally because last build info is missing.",
+        "can_incremental": true,
         "incrementalPhase": "build"
       },
       "processors": {
@@ -2002,13 +2022,13 @@
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": true,
+          "incrementalPhase": "build"
+        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
-        "ConceptualDocumentProcessor": {
-          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }
