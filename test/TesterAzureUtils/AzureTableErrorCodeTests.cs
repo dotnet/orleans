@@ -1,6 +1,6 @@
 using System;
 using System.Net;
-using Orleans.AzureUtils;
+using Orleans.Tests.AzureUtils;
 using Xunit;
 
 namespace Tester.AzureUtils
@@ -46,7 +46,7 @@ namespace Tester.AzureUtils
         {
             
             string tableName = "abc-123";
-            Assert.Throws<ArgumentException>(() => 
+            Assert.Throws<ArgumentException>(() =>
             AzureStorageUtils.ValidateTableName(tableName));
         }
 

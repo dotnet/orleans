@@ -35,7 +35,7 @@ namespace UnitTests.MembershipTests
             return filters;
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             var options = new SqlMembershipOptions()
             {
@@ -45,7 +45,7 @@ namespace UnitTests.MembershipTests
             return new SqlMembershipTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options), loggerFactory.CreateLogger<SqlMembershipTable>());
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new SqlGatewayListProviderOptions()
             {

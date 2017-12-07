@@ -59,7 +59,7 @@ namespace UnitTests.StorageTests.Relational
                 this.GrainFactory,
                 this.Services,
                 new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(new LoggerWrapper<LoadedProviderTypeLoaders>(NullLoggerFactory.Instance)),
+                new LoadedProviderTypeLoaders(new NullLogger<LoadedProviderTypeLoaders>()),
                 NullLoggerFactory.Instance);
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
         }

@@ -35,7 +35,7 @@ namespace Consul.Tests
             return filters;
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulMembershipOptions()
@@ -45,7 +45,7 @@ namespace Consul.Tests
             return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this.siloOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulGatewayListProviderOptions()

@@ -30,13 +30,13 @@ namespace Tester.AzureUtils
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter(typeof(AzureTableDataManager<>).FullName, LogLevel.Trace);
+            filters.AddFilter(typeof(Orleans.Clustering.AzureStorage.AzureTableDataManager<>).FullName, LogLevel.Trace);
             filters.AddFilter(typeof(OrleansSiloInstanceManager).FullName, LogLevel.Trace);
             filters.AddFilter("Orleans.Storage", LogLevel.Trace);
             return filters;
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             TestUtils.CheckForAzureStorage();
             var options = new AzureTableMembershipOptions()
@@ -47,7 +47,7 @@ namespace Tester.AzureUtils
             return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.siloOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new AzureTableGatewayListProviderOptions()
             {

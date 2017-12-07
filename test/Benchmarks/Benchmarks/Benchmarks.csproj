@@ -14,8 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Transactions.Azure\Orleans.Transactions.Azure.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\BenchmarkGrains\BenchmarkGrains.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Hosting;
@@ -21,6 +22,7 @@ using Xunit.Abstractions;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
+using Orleans.Persistence.AzureStorage;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -36,7 +38,7 @@ namespace Tester.AzureUtils.Persistence
         private readonly ITestOutputHelper output;
         protected TestCluster HostedCluster { get; private set; }
         private readonly double timingFactor;
-        protected readonly Logger logger;
+        protected readonly ILogger logger;
         private const int LoopIterations_Grain = 1000;
         private const int BatchSize = 100;
 

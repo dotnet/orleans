@@ -7,7 +7,7 @@ using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 
-namespace Orleans.Transactions.Azure.Tests
+namespace Orleans.Transactions.AzureStorage.Tests
 {
     public class TestFixture : BaseTestClusterFixture
     {

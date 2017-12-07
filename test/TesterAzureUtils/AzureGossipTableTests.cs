@@ -15,7 +15,7 @@ namespace Tester.AzureUtils
 {
     public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private Guid globalServiceId; //this should be the same for all clusters. Use this as partition key.
         private SiloAddress siloAddress1;
@@ -26,7 +26,7 @@ namespace Tester.AzureUtils
         public AzureGossipTableTests()
         {
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
-            logger = new LoggerWrapper<AzureGossipTableTests>(loggerFactory);
+            logger = loggerFactory.CreateLogger<AzureGossipTableTests>();
         
             globalServiceId = Guid.NewGuid();
 

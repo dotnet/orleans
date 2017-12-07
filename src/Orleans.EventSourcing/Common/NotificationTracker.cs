@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.EventSourcing.Common
 {
@@ -29,7 +30,7 @@ namespace Orleans.EventSourcing.Common
 
             foreach (var x in remoteInstances)
             {
-                services.Log(Severity.Verbose, "Now sending notifications to {0}", x);
+                services.Log(LogLevel.Debug, "Now sending notifications to {0}", x);
                 sendWorkers.Add(x, new NotificationWorker(this, x));
             }
         }
@@ -65,7 +66,7 @@ namespace Orleans.EventSourcing.Common
             var removed = sendWorkers.Keys.Except(remoteInstances);
             foreach (var x in removed)
             {
-                services.Log(Severity.Verbose, "No longer sending notifications to {0}", x);
+                services.Log(LogLevel.Debug, "No longer sending notifications to {0}", x);
                 sendWorkers[x].Done = true;
                 sendWorkers.Remove(x);
             }
@@ -75,7 +76,7 @@ namespace Orleans.EventSourcing.Common
             {
                 if (x != services.MyClusterId)
                 {
-                    services.Log(Severity.Verbose, "Now sending notifications to {0}", x);
+                    services.Log(LogLevel.Debug, "Now sending notifications to {0}", x);
                     sendWorkers.Add(x, new NotificationWorker(this, x));
                 }
             }
@@ -199,13 +200,13 @@ namespace Orleans.EventSourcing.Common
                     await tracker.services.SendMessage(msg, clusterId);
 
                     // notification was successful
-                    tracker.services.Log(Severity.Verbose, "Sent notification to cluster {0}: {1}", clusterId, msg);
+                    tracker.services.Log(LogLevel.Debug, "Sent notification to cluster {0}: {1}", clusterId, msg);
 
                     LastConnectionIssue.Resolve(tracker.listener, tracker.services);
                 }
                 catch (Exception e)
                 {
-                    tracker.services.Log(Severity.Info, "Could not send notification to cluster {0}: {1}", clusterId, e);
+                    tracker.services.Log(LogLevel.Information, "Could not send notification to cluster {0}: {1}", clusterId, e);
 
                     LastConnectionIssue.Record(
                         new NotificationFailed() { RemoteCluster = clusterId, Exception = e },

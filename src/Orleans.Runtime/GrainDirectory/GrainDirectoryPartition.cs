@@ -213,7 +213,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         private Dictionary<GrainId, IGrainInfo> partitionData;
         private readonly object lockable;
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly ILoggerFactory loggerFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly GlobalConfiguration globalConfig;
@@ -231,7 +231,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
-            log = new LoggerWrapper<GrainDirectoryPartition>(loggerFactory);
+            log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
             this.globalConfig = globalConfig;
             this.grainFactory = grainFactory;
@@ -288,7 +288,7 @@ namespace Orleans.Runtime.GrainDirectory
                 grainInfo.AddActivation(activation, silo);
             }
 
-            if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding activation for grain {0}", grain.ToString());
             return grainInfo.VersionTag;
         }
 
@@ -302,7 +302,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
         internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus)
         {
-            if (log.IsVerbose3) log.Verbose3("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
 
             AddressAndTag result = new AddressAndTag();
 
@@ -358,8 +358,7 @@ namespace Orleans.Runtime.GrainDirectory
                     partitionData.Remove(grain);
 
             }
-            if (log.IsVerbose3)
-                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
         }
 
    
@@ -373,7 +372,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 partitionData.Remove(grain);
             }
-            if (log.IsVerbose3) log.Verbose3("Removing grain {0}", grain.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing grain {0}", grain.ToString());
         }
 
         /// <summary>
@@ -503,7 +502,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (partitionData.ContainsKey(pair.Key))
                     {
-                        if (log.IsVerbose) log.Verbose("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
+                        if (log.IsEnabled(LogLevel.Debug)) log.Debug("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
                         var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
                         if (activationsToDrop == null) continue;
 

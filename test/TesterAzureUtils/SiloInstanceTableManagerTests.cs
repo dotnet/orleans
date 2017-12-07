@@ -13,6 +13,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Clustering.AzureStorage;
 
 namespace Tester.AzureUtils
 {
@@ -97,7 +98,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                .WithTimeout(Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies.TableOperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }

@@ -37,13 +37,13 @@ namespace Orleans.Runtime.Placement
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly bool useLocalCache = true;
         // For: SelectSiloPowerOfK
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
-        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, LoggerWrapper<ActivationCountPlacementDirector> logger)
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, ILogger<ActivationCountPlacementDirector> logger)
         {
             this.logger = logger;
 

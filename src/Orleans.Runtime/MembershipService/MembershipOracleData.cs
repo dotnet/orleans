@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Orleans.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
@@ -16,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
         private List<SiloAddress> localMultiClusterGatewaysCopy;               // a cached copy of the silos that are designated gateways
 
         private readonly List<ISiloStatusListener> statusListeners;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         
         private IntValueStatistic clusterSizeStatistic;
         private StringValueStatistic clusterStatistic;
@@ -31,8 +32,8 @@ namespace Orleans.Runtime.MembershipService
         private readonly int maxMultiClusterGateways; // set by configuration
 
         private UpdateFaultCombo myFaultAndUpdateZones;
-
-        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, Logger log, MultiClusterOptions multiClusterOptions)
+        
+        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, ILogger log, MultiClusterOptions multiClusterOptions)
         {
             logger = log;
             localTable = new Dictionary<SiloAddress, MembershipEntry>();  
@@ -72,11 +73,11 @@ namespace Orleans.Runtime.MembershipService
                 if (!localTableCopy.TryGetValue(siloAddress, out status))
                 {
                     if (CurrentStatus == SiloStatus.Active)
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", siloAddress.ToLongString());
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", siloAddress.ToLongString());
                     status = SiloStatus.None;
                 }
             }
-            if (logger.IsVerbose3) logger.Verbose3("-GetApproximateSiloStatus returned {0} for silo: {1}", status, siloAddress.ToLongString());
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("-GetApproximateSiloStatus returned {0} for silo: {1}", status, siloAddress.ToLongString());
             return status;
         }
 
@@ -84,13 +85,13 @@ namespace Orleans.Runtime.MembershipService
         internal Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
         {
             Dictionary<SiloAddress, SiloStatus> dict = onlyActive ? localTableCopyOnlyActive : localTableCopy;
-            if (logger.IsVerbose3) logger.Verbose3("-GetApproximateSiloStatuses returned {0} silos: {1}", dict.Count, Utils.DictionaryToString(dict));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("-GetApproximateSiloStatuses returned {0} silos: {1}", dict.Count, Utils.DictionaryToString(dict));
             return dict;
         }
 
         internal List<SiloAddress> GetApproximateMultiClusterGateways()
         {
-            if (logger.IsVerbose3) logger.Verbose3("-GetApproximateMultiClusterGateways returned {0} silos: {1}", localMultiClusterGatewaysCopy.Count, string.Join(",", localMultiClusterGatewaysCopy));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("-GetApproximateMultiClusterGateways returned {0} silos: {1}", localMultiClusterGatewaysCopy.Count, string.Join(",", localMultiClusterGatewaysCopy));
             return localMultiClusterGatewaysCopy;
         }
 
@@ -225,7 +226,7 @@ namespace Orleans.Runtime.MembershipService
             if (this.multiClusterActive)
                 localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
 
-            if (logger.IsVerbose) logger.Verbose("-Updated my local view of {0} status. It is now {1}.", entry.SiloAddress.ToLongString(), GetSiloStatus(entry.SiloAddress));
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-Updated my local view of {0} status. It is now {1}.", entry.SiloAddress.ToLongString(), GetSiloStatus(entry.SiloAddress));
 
             NotifyLocalSubscribers(entry.SiloAddress, entry.Status);
             return true;
@@ -252,7 +253,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void NotifyLocalSubscribers(SiloAddress siloAddress, SiloStatus newStatus)
         {
-            if (logger.IsVerbose2) logger.Verbose2("-NotifyLocalSubscribers about {0} status {1}", siloAddress.ToLongString(), newStatus);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("-NotifyLocalSubscribers about {0} status {1}", siloAddress.ToLongString(), newStatus);
             
             List<ISiloStatusListener> copy;
             lock (statusListeners)

@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 MessageCenter.TryDeliverToProxy(rejection);
-                if (Log.IsVerbose) Log.Verbose("Rejecting a request due to overloading: {0}", msg.ToString());
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();
                 return;
             }

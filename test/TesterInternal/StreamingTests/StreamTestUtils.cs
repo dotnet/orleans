@@ -7,6 +7,7 @@ using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.StreamingTests
 {
@@ -14,7 +15,7 @@ namespace UnitTests.StreamingTests
     {
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
 
-        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestCluster siloHost)
+        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, TestCluster siloHost)
         {
             SiloAddress primSilo = siloHost.Primary.SiloAddress;
             SiloAddress secSilo = siloHost.SecondarySilos.First()?.SiloAddress;
@@ -23,7 +24,7 @@ namespace UnitTests.StreamingTests
                 testName, primSilo, secSilo, streamId, streamProviderName);
         }
 
-        internal static void LogEndTest(string testName, Logger logger)
+        internal static void LogEndTest(string testName, ILogger logger)
         {
             logger.Info("\n\n--END------------------------ {0} --------------------------------- \n\n", testName);
         }

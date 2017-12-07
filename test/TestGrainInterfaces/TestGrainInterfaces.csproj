@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Core" Version="$(FSharpCoreVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
   </ItemGroup>
 </Project>

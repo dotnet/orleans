@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Tester.AzureUtils</RootNamespace>
     <AssemblyName>Tester.AzureUtils</AssemblyName>
+    <DefineConstants>$(DefineConstants);TESTER_AZUREUTILS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,8 +17,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Azure\Orleans.Statistics.AzureStorage\Orleans.Statistics.AzureStorage.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Hosting.AzureCloudServices\Orleans.Hosting.AzureCloudServices.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
@@ -40,5 +46,17 @@
     <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Azure\Shared\Storage\AzureStorageUtils.cs" Link="Storage\AzureStorageUtils.cs" />
+    <Compile Include="..\..\src\Azure\Shared\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />
+    <Compile Include="..\..\src\Azure\Shared\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
+    <Compile Include="..\..\src\Azure\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Utilities\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 </Project>

@@ -7,8 +7,6 @@ namespace Orleans.Storage
 {
     internal interface IStorageProviderManager : IProviderManager
     {
-        Logger GetLogger(string loggerName);
-
         IEnumerable<string> GetProviderNames();
 
         int GetNumLoadedProviders();

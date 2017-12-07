@@ -33,7 +33,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         private const string testDatabaseName = "OrleansStatisticsTest";
         
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SqlStatisticsPublisher StatisticsPublisher;
         
@@ -41,14 +41,14 @@ namespace UnitTests.SqlStatisticsPublisherTests
         {
             this.environment = environment;
             this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log");
-            logger = new LoggerWrapper<SqlStatisticsPublisherTestsBase>(loggerFactory);
+            logger = loggerFactory.CreateLogger<SqlStatisticsPublisherTestsBase>();
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             ConnectionString = fixture.ConnectionString;
 
             StatisticsPublisher = new SqlStatisticsPublisher();
-            StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(logger),
+            StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(),
                 new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString)).Wait();
         }
 

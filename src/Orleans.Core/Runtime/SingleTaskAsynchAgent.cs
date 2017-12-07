@@ -83,18 +83,18 @@ namespace Orleans.Runtime
         }
 
         protected abstract void Run();
-
+        
         protected override ExecutorOptions GetExecutorOptions()
         {
             return new SingleThreadExecutorOptions(Name);
         }
 
-        private static void LogStatus(Logger log, string msg, params object[] args)
+        private static void LogStatus(ILogger log, string msg, params object[] args)
         {
             if (IsStarting)
             {
                 // Reduce log noise during silo startup
-                if (log.IsVerbose) log.Verbose(msg, args);
+                if (log.IsEnabled(LogLevel.Debug)) log.Debug(msg, args);
             }
             else
             {
