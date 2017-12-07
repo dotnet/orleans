@@ -32,8 +32,7 @@ namespace TestExtensions
             var builder = TestClusterOptions.FallbackOptions.DefaultConfigurationBuilder();
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
-                { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },
-                { nameof(TestClusterOptions.FallbackOptions.TraceToConsole), "false" },
+                { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
             });
 
             AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");

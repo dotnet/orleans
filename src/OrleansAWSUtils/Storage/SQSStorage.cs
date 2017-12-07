@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using SQSMessage = Amazon.SQS.Model.Message;
 
@@ -23,7 +24,7 @@ namespace OrleansAWSUtils.Storage
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
-        private Logger Logger;
+        private ILogger Logger;
         private string accessKey;
         private string secretKey;
         private string service;
@@ -38,14 +39,15 @@ namespace OrleansAWSUtils.Storage
         /// <summary>
         /// Default Ctor
         /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
         /// <param name="connectionString">The connection string</param>
-        /// <param name="deploymentId">The cluster deployment Id</param>
-        public SQSStorage(string queueName, string connectionString, string deploymentId = "")
+        /// <param name="clusterId">The cluster Id</param>
+        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string clusterId = "")
         {
-            QueueName = string.IsNullOrWhiteSpace(deploymentId) ? queueName : $"{deploymentId}-{queueName}";
+            QueueName = string.IsNullOrWhiteSpace(clusterId) ? queueName : $"{clusterId}-{queueName}";
             ParseDataConnectionString(connectionString);
-            Logger = LogManager.GetLogger($"SQSStorage", LoggerType.Runtime);
+            Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
         }
 
@@ -82,8 +84,24 @@ namespace OrleansAWSUtils.Storage
 
         private void CreateClient()
         {
-            var credentials = new BasicAWSCredentials(accessKey, secretKey);
-            sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                // Local SQS instance (for testing)
+                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
+            }
+            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+            {
+                // AWS SQS instance (auth via explicit credentials)
+                var credentials = new BasicAWSCredentials(accessKey, secretKey);
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            }
+            else
+            {
+                // AWS SQS instance (implicit auth - EC2 IAM Roles etc)
+                sqsClient = new AmazonSQSClient(new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+            }
         }
 
         private async Task<string> GetQueueUrl()

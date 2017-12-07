@@ -1,13 +1,22 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
+using OrleansAWSUtils.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
+using OrleansAWSUtils;
+using OrleansAWSUtils.Membership;
+using OrleansAWSUtils.Options;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -17,24 +26,35 @@ namespace AWSUtils.Tests.MembershipTests
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")] 
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride("DynamoDBDataManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        private static LoggerFilterOptions CreateFilters()
+        {
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("DynamoDBDataManager", LogLevel.Trace);
+            filters.AddFilter("OrleansSiloInstanceManager", LogLevel.Trace);
+            filters.AddFilter("Storage", LogLevel.Trace);
+            return filters;
+        }
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
-
-            return new DynamoDBMembershipTable();
+            var options = new DynamoDBMembershipOptions()
+            {
+                ConnectionString = this.connectionString,
+            };
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.siloOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            return new DynamoDBGatewayListProvider();
+            var options = new DynamoDBGatewayListProviderOptions();
+            LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
+            return new DynamoDBGatewayListProvider(this.loggerFactory, this.clientConfiguration, Options.Create<DynamoDBGatewayListProviderOptions>(options));
         }
 
         protected override Task<string> GetConnectionString()

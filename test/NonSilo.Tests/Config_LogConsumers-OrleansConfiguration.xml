@@ -7,15 +7,10 @@
   <Defaults>
     <Networking Address="localhost" Port="0" />
     <Scheduler MaxActiveThreads="0" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="" >
-      <LogConsumer>UnitTests.DummyLogConsumer,NonSilo.Tests</LogConsumer>
-      <!--
-      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />
-      <TraceLevelOverride LogPrefix="Runtime.Message" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Catalog" TraceLevel="Verbose" />
-      -->
-    </Tracing>
+    <Tracing PropagateActivityId="true"/>
+    <Telemetry>
+      <TelemetryConsumer Assembly="NonSilo.Tests" Type="UnitTests.DummyMetricTelemetryConsumer" connString="foo" />
+    </Telemetry>
     <Limits>
       <Limit Name="Limit1" SoftLimit="1" HardLimit="2" />
       <Limit Name="Limit2" SoftLimit="2" HardLimit="4" />

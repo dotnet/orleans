@@ -24,9 +24,6 @@ namespace Orleans.Azure.Silos
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Initializing config", "Information");
 
-            // Set the maximum number of concurrent connections 
-            ServicePointManager.DefaultConnectionLimit = 12;
-
             // For information on handling configuration changes see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
             RoleEnvironment.Changing += RoleEnvironmentChanging;
             SetupEnvironmentChangeHandlers();

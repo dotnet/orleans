@@ -7,8 +7,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
@@ -18,6 +20,9 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
+using Orleans.Persistence.AzureStorage;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -33,12 +38,36 @@ namespace Tester.AzureUtils.Persistence
         private readonly ITestOutputHelper output;
         protected TestCluster HostedCluster { get; private set; }
         private readonly double timingFactor;
-        protected readonly Logger logger;
+        protected readonly ILogger logger;
         private const int LoopIterations_Grain = 1000;
         private const int BatchSize = 100;
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
+        }
+
+        public static Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+            })
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
         {
@@ -281,7 +310,7 @@ namespace Tester.AzureUtils.Persistence
         {
             var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -301,7 +330,7 @@ namespace Tester.AzureUtils.Persistence
 
             output.WriteLine("Silos restarted");
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
             Assert.Equal(initialServiceId,  this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
             
             val = await grain.GetValue();

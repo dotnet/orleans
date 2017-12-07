@@ -13,6 +13,8 @@ using OrleansAWSUtils;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using OrleansAWSUtils.Storage;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Storage
 {
@@ -43,8 +45,6 @@ namespace Orleans.Storage
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private string tableName;
-        private static int counter;
-        private readonly int id;
         private string serviceId;
         private bool isDeleteStateOnClear = false;
         private bool useJsonFormat;
@@ -60,6 +60,7 @@ namespace Orleans.Storage
         /// </summary>
         public Logger Log { get; private set; }
 
+        private ILogger logger;
         private DynamoDBStorage storage;
         private SerializationManager serializationManager;
 
@@ -69,7 +70,6 @@ namespace Orleans.Storage
         public DynamoDBStorageProvider()
         {
             tableName = TABLE_NAME_DEFAULT_VALUE;
-            id = Interlocked.Increment(ref counter);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
@@ -85,9 +85,10 @@ namespace Orleans.Storage
 
             isDeleteStateOnClear = config.Properties.ContainsKey(DELETE_ON_CLEAR_PROPERTY_NAME) &&
                 "true".Equals(config.Properties[DELETE_ON_CLEAR_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
-
-            Log = providerRuntime.GetLogger("Storage.AWSDynamoDBStorage." + id);
-
+            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            var loggerName = $"{this.GetType().FullName}.{name}";
+            logger = loggerFactory.CreateLogger(loggerName);
+            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                 Name, serviceId, tableName, isDeleteStateOnClear);
 
@@ -99,9 +100,9 @@ namespace Orleans.Storage
 
             initMsg = string.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
-            Log.Info(ErrorCode.StorageProviderBase, "AWS DynamoDB Provider: {0}", initMsg);
+            logger.Info(ErrorCode.StorageProviderBase, "AWS DynamoDB Provider: {0}", initMsg);
 
-            storage = new DynamoDBStorage(config.Properties[DATA_CONNECTION_STRING_PROPERTY_NAME], Log);
+            storage = new DynamoDBStorage(config.Properties[DATA_CONNECTION_STRING_PROPERTY_NAME], providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>());
             return storage.InitializeTable(tableName,
                 new List<KeySchemaElement>
                 {
@@ -113,11 +114,6 @@ namespace Orleans.Storage
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 });
-        }
-
-        internal void InitLogger(Logger logger)
-        {
-            Log = logger;
         }
 
         /// <summary> Shutdown this storage provider. </summary>
@@ -134,7 +130,7 @@ namespace Orleans.Storage
             if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainReference);
-            if (Log.IsVerbose3) Log.Verbose3(ErrorCode.StorageProviderBase, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, partitionKey, grainReference, tableName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.StorageProviderBase, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, partitionKey, grainReference, tableName);
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
             var record = await storage.ReadSingleEntryAsync(tableName,
@@ -187,7 +183,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                Log.Error(ErrorCode.StorageProviderBase, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
+                logger.Error(ErrorCode.StorageProviderBase, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
                     grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
                 throw;
             }
@@ -260,7 +256,7 @@ namespace Orleans.Storage
             if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainReference);
-            if (Log.IsVerbose3) Log.Verbose3(ErrorCode.StorageProviderBase, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, partitionKey, grainReference, grainState.ETag, isDeleteStateOnClear, tableName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.StorageProviderBase, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, partitionKey, grainReference, grainState.ETag, isDeleteStateOnClear, tableName);
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
             var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
 
@@ -284,7 +280,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                Log.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
+                logger.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
                     operation, grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
                 throw;
             }
@@ -341,7 +337,7 @@ namespace Orleans.Storage
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
-                Log.Error(0, sb.ToString(), exc);
+                logger.Error(0, sb.ToString(), exc);
                 throw new AggregateException(sb.ToString(), exc);
             }
 
@@ -357,7 +353,7 @@ namespace Orleans.Storage
                 entity.StringState = JsonConvert.SerializeObject(grainState, jsonSettings);
                 dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
 
-                if (Log.IsVerbose3) Log.Verbose3("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
             else
@@ -366,7 +362,7 @@ namespace Orleans.Storage
                 entity.BinaryState = this.serializationManager.SerializeToByteArray(grainState);
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
-                if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     dataSize, entity.GrainReference, entity.GrainType);
             }
 

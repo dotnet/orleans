@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -14,16 +16,17 @@ namespace Tester.AzureUtils
     [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
     public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
         private string queueName;
 
         public AzureQueueDataManagerTests()
         {
             ClientConfiguration config = new ClientConfiguration();
-            config.TraceFilePattern = null;
-            LogManager.Initialize(config);
-            logger = LogManager.GetLogger("AzureQueueDataManagerTests", LoggerType.Application);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId));
+            logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
+            this.loggerFactory = loggerFactory;
         }
 
         public void Dispose()
@@ -35,7 +38,7 @@ namespace Tester.AzureUtils
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
+            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
             await manager.InitQueueAsync();
             return manager;
         }
@@ -53,15 +56,15 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage outMessage1 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 1: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage1));
+            logger.Info("PeekQueueMessage 1: {0}", PrintCloudQueueMessage(outMessage1));
             Assert.Equal(inMessage.AsString, outMessage1.AsString);
 
             CloudQueueMessage outMessage2 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 2: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage2));
+            logger.Info("PeekQueueMessage 2: {0}", PrintCloudQueueMessage(outMessage2));
             Assert.Equal(inMessage.AsString, outMessage2.AsString);
 
             CloudQueueMessage outMessage3 = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage 3: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage3));
+            logger.Info("GetQueueMessage 3: {0}", PrintCloudQueueMessage(outMessage3));
             Assert.Equal(inMessage.AsString, outMessage3.AsString);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
@@ -138,7 +141,7 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
             
             CloudQueueMessage outMessage = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage));
+            logger.Info("GetQueueMessage: {0}", PrintCloudQueueMessage(outMessage));
             Assert.Equal(inMessage.AsString, outMessage.AsString);
 
             await Task.Delay(visibilityTimeout);
@@ -150,6 +153,16 @@ namespace Tester.AzureUtils
 
             await manager.DeleteQueueMessage(outMessage2);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
+        }
+
+        private static string PrintCloudQueueMessage(CloudQueueMessage message)
+        {
+            return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
+                    message.Id,
+                    message.NextVisibleTime.HasValue ? LogFormatter.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
+                    message.DequeueCount,
+                    message.PopReceipt,
+                    message.AsString);
         }
     }
 }

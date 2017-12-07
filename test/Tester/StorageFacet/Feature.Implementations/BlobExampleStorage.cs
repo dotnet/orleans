@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
+using Orleans.Hosting;
 
 namespace Tester.StorageFacet.Implementations
 {
@@ -46,10 +47,13 @@ namespace Tester.StorageFacet.Implementations
 
     public static class BlobExampleStorageExtensions
     {
-        public static void UseBlobExampleStorage(this IServiceCollection services, string name)
+        public static void UseBlobExampleStorage(this ISiloHostBuilder builder, string name)
         {
-            services.AddTransientNamedService<IExampleStorageFactory,BlobExampleStorageFactory>(name);
-            services.AddTransient(typeof(BlobExampleStorage<>));
+            builder.ConfigureServices(services =>
+            {
+                services.AddTransientNamedService<IExampleStorageFactory, BlobExampleStorageFactory>(name);
+                services.AddTransient(typeof(BlobExampleStorage<>));
+            });
         }
     }
 }

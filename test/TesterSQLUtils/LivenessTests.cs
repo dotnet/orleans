@@ -2,9 +2,13 @@
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
+using OrleansSQLUtils.Configuration;
 
 namespace UnitTests.MembershipTests
 {

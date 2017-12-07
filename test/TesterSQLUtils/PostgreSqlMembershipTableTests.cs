@@ -1,31 +1,56 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.SqlUtils;
+using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
+using OrleansSQLUtils;
+using OrleansSQLUtils.Options;
 
 namespace UnitTests.MembershipTests
 {
     [TestCategory("Membership"), TestCategory("PostgreSql")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {
-        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
-            LogManager.AddTraceLevelOverride(typeof(PostgreSqlMembershipTableTests).Name, Severity.Verbose3);
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        private static LoggerFilterOptions CreateFilters()
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter);
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter(typeof(PostgreSqlMembershipTableTests).Name, LogLevel.Trace);
+            return filters;
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            return new SqlMembershipTable(this.GrainReferenceConverter);
+            var options = new SqlMembershipOptions()
+            {
+                AdoInvariant = GetAdoInvariant(),
+                ConnectionString = this.connectionString,
+            };
+            return new SqlMembershipTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options), this.loggerFactory.CreateLogger<SqlMembershipTable>());
+        }
+
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
+        {
+            var options = new SqlGatewayListProviderOptions()
+            {
+                ConnectionString = this.connectionString,
+                AdoInvariant = GetAdoInvariant()
+            };
+            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter
+                ,this.clientConfiguration, Options.Create(options));
         }
 
         protected override string GetAdoInvariant()

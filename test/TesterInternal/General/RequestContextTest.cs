@@ -29,10 +29,8 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(initialSilosCount: 1);
-
                 options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
                 options.ClientConfiguration.PropagateActivityId = true;
-
                 return new TestCluster(options);
             }
         }
@@ -72,6 +70,7 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Trace.CorrelationManager.ActivityId = activityId;
+            Assert.True(RequestContext.PropagateActivityId); // "Verify activityId propagation is enabled."
             Guid result = await grain.E2ELegacyActivityId();
             Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
         }

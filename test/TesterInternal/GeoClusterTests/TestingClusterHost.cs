@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
@@ -11,6 +13,9 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
+using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
+using Orleans.TestingHost.Utils;
 
 namespace Tests.GeoClusterTests
 {
@@ -81,30 +86,6 @@ namespace Tests.GeoClusterTests
                 throw;
             }
         }
-        public void AssertNull<T>(T actual, string comment)
-        {
-            try
-            {
-                Assert.Null(actual);
-            }
-            catch (Exception e)
-            {
-                WriteLog("null assertion failed; actual={0} comment={1}", actual, comment);
-                throw e;
-            }
-        }
-        public void AssertTrue(bool actual, string comment)
-        {
-            try
-            {
-                Assert.True(actual);
-            }
-            catch (Exception e)
-            {
-                WriteLog("true assertion failed; actual={0} comment={1}", actual, comment);
-                throw e;
-            }
-        }
 
         /// <summary>
         /// Wait for the multicluster-gossip sub-system to stabilize.
@@ -165,6 +146,7 @@ namespace Tests.GeoClusterTests
                     // configure multi-cluster network
                     config.Globals.ServiceId = globalServiceId;
                     config.Globals.ClusterId = clusterId;
+                    config.Globals.HasMultiClusterNetwork = true;
                     config.Globals.MaxMultiClusterGateways = 2;
                     config.Globals.DefaultMultiCluster = null;
 
@@ -182,6 +164,25 @@ namespace Tests.GeoClusterTests
         }
 
 
+        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
+
+            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
+            {
+                    TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
+                    builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
+                    builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
+                    builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+            }
+        }
+
         public void NewCluster(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
         {
             TestCluster testCluster;
@@ -198,7 +199,7 @@ namespace Tests.GeoClusterTests
                 };
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
                 customizer?.Invoke(options.ClusterConfiguration);
                 testCluster = new TestCluster(options.ClusterConfiguration, null);
                 testCluster.Deploy();
@@ -305,7 +306,10 @@ namespace Tests.GeoClusterTests
 
                 configCustomizer?.Invoke(config);
 
-                this.InternalClient = (IInternalClusterClient) new ClientBuilder().UseConfiguration(config).Build();
+                this.InternalClient = (IInternalClusterClient) new ClientBuilder()
+                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                    .UseConfiguration(config)
+                    .Build();
                 this.InternalClient.Connect().Wait();
             }
 

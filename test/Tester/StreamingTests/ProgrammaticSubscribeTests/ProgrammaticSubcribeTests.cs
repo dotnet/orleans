@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TestExtensions;
 using Xunit;
 using UnitTests.GrainInterfaces;
@@ -279,7 +280,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, Logger logger)
+        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger)
         {
             int numProduced = 0;
             foreach (var p in producers)

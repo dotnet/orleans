@@ -7,15 +7,19 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.TestingHost;
 
 namespace TestExtensions
 {
     public class SerializationTestEnvironment : IDisposable
     {
-        public SerializationTestEnvironment(ClientConfiguration config = null)
+        public SerializationTestEnvironment(ClientConfiguration config = null, Action<IClientBuilder> configureClientBuilder = null)
         {
             if (config == null) config = this.DefaultConfig();
-            this.Client = new ClientBuilder().UseConfiguration(config).Build();
+            
+            var builder = TestClusterOptions.DefaultClientBuilderFactory(config);
+            configureClientBuilder?.Invoke(builder);
+            this.Client = builder.Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
@@ -35,17 +39,16 @@ namespace TestExtensions
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
                 config.Gateways.Add(new IPEndPoint(0, 0));
             }
-            config.TraceToConsole = false;
         }
 
         internal OutsideRuntimeClient RuntimeClient { get; set; }
 
-        public static SerializationTestEnvironment InitializeWithDefaults(ClientConfiguration config = null)
+        public static SerializationTestEnvironment InitializeWithDefaults(ClientConfiguration config = null, Action<IClientBuilder> configureClientBuilder = null)
         {
             config = config ?? new ClientConfiguration();
             MixinDefaults(config);
 
-            var result = new SerializationTestEnvironment(config);
+            var result = new SerializationTestEnvironment(config, configureClientBuilder);
             return result;
         }
 

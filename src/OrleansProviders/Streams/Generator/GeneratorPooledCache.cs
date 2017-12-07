@@ -7,6 +7,8 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using static System.String;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -24,8 +26,8 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval"></param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool, serializationManager);
             cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger, cacheMonitor, monitorWriteInterval);
@@ -66,7 +68,7 @@ namespace Orleans.Providers.Streams.Generator
 
         private class GeneratorPooledCacheEvictionStrategy : ChronologicalEvictionStrategy<CachedMessage>
         {
-            public GeneratorPooledCacheEvictionStrategy(Logger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+            public GeneratorPooledCacheEvictionStrategy(ILogger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
                 : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
             {            
             }
@@ -230,11 +232,10 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime dequeueTimeUtc = DateTime.UtcNow;
-            foreach (IBatchContainer container in messages)
-            {
-                cache.Add(container as GeneratedBatchContainer, dequeueTimeUtc);
-            }
+            List<GeneratedBatchContainer> generatedMessages = messages
+                .Cast<GeneratedBatchContainer>()
+                .ToList();
+            cache.Add(generatedMessages, DateTime.UtcNow);
         }
 
         /// <summary>

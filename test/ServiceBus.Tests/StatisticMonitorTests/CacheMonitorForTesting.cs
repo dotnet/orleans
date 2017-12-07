@@ -15,14 +15,12 @@ namespace ServiceBus.Tests.MonitorTests
 {
     public class CacheMonitorForTesting : ICacheMonitor
     {
-        public static CacheMonitorForTesting Instance = new CacheMonitorForTesting(null, null);
+        public static CacheMonitorForTesting Instance = new CacheMonitorForTesting();
         public CacheMonitorCounters CallCounters;
-        private Logger logger;
 
-        private CacheMonitorForTesting(EventHubCacheMonitorDimensions dimensions, Logger logger)
+        private CacheMonitorForTesting()
         {
             this.CallCounters = new CacheMonitorCounters();
-            this.logger = logger;
         }
 
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,

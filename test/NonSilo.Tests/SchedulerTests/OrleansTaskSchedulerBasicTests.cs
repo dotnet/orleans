@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
@@ -12,6 +14,7 @@ using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans;
+using Orleans.TestingHost.Utils;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -46,16 +49,16 @@ namespace UnitTests.SchedulerTests
         private readonly SiloPerformanceMetrics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
-
+        private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)
         {
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup();
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup);
-            InitSchedulerLogging();
+            loggerFactory = InitSchedulerLogging();
+            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
             this.rootContext = new UnitTestSchedulingContext();
-            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics);
+            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics, loggerFactory);
         }
         
         public void Dispose()
@@ -64,8 +67,6 @@ namespace UnitTests.SchedulerTests
             this.performanceMetrics.Dispose();
             this.runtimeStatisticsGroup.Dispose();
             this.scheduler.Stop();
-            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
-            //LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("AsynchronyPrimitives")]
@@ -635,6 +636,54 @@ namespace UnitTests.SchedulerTests
             Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }
 
+        [Fact]
+        public async Task RequestContextProtectedInQueuedTasksTest()
+        {
+            string key = Guid.NewGuid().ToString();
+            string value = Guid.NewGuid().ToString();
+
+            // Caller RequestContext is protected from clear within QueueTask
+            RequestContext.Set(key, value);
+            await this.scheduler.QueueTask(() => AsyncCheckClearRequestContext(key), this.rootContext);
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is protected from clear within QueueTask even if work is not actually asynchronous.
+            await this.scheduler.QueueTask(() => NonAsyncCheckClearRequestContext(key), this.rootContext);
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is protected from clear when work is asynchronous.
+            Func<Task> asyncCheckClearRequestContext = async () =>
+            {
+                RequestContext.Clear();
+                Assert.Null(RequestContext.Get(key));
+                await Task.Delay(TimeSpan.Zero);
+            };
+            await asyncCheckClearRequestContext();
+            Assert.Equal(value, (string)RequestContext.Get(key));
+
+            // Caller RequestContext is NOT protected from clear when work is not asynchronous.
+            Func<Task> nonAsyncCheckClearRequestContext = () =>
+            {
+                RequestContext.Clear();
+                Assert.Null(RequestContext.Get(key));
+                return Task.CompletedTask;
+            };
+            await nonAsyncCheckClearRequestContext();
+            Assert.Null(RequestContext.Get(key));
+        }
+
+        private async Task AsyncCheckClearRequestContext(string key)
+        {
+            Assert.Null(RequestContext.Get(key));
+            await Task.Delay(TimeSpan.Zero);
+        }
+
+        private Task NonAsyncCheckClearRequestContext(string key)
+        {
+            Assert.Null(RequestContext.Get(key));
+            return Task.CompletedTask;
+        }
+
         private void LogContext(string what)
         {
             lock (lockable)
@@ -657,27 +706,18 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        internal static void InitSchedulerLogging()
+        internal static ILoggerFactory InitSchedulerLogging()
         {
-            LogManager.UnInitialize();
-            //LogManager.LogConsumers.Add(new LogWriterToConsole());
-            if (!LogManager.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
-            {
-                LogManager.TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
-            }
-
-            var traceLevels = new[]
-            {
-                Tuple.Create("Scheduler", Severity.Verbose3),
-                Tuple.Create("Scheduler.WorkerPoolThread", Severity.Verbose2),
-            };
-            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>(traceLevels));
-
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("Scheduler", LogLevel.Trace);
+            filters.AddFilter("Scheduler.WorkerPoolThread", LogLevel.Trace);
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();
             NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
-            StatisticsCollector.Initialize(config);
-            SchedulerStatisticsGroup.Init();
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.SiloName, orleansConfig.Globals.ClusterId), filters);
+            StatisticsCollector.Initialize(StatisticsLevel.Info);
+            SchedulerStatisticsGroup.Init(loggerFactory);
+            return loggerFactory;
         }
     }
 }

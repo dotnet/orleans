@@ -38,7 +38,7 @@ namespace Tests.GeoClusterTests
             numGrains = 600;
             await RunWithTimeout("IndependentCreation", 5000, IndependentCreation);
             await RunWithTimeout("CreationRace", 10000, CreationRace);
-            await RunWithTimeout("ConflictResolution", 20000, ConflictResolution);
+            await RunWithTimeout("ConflictResolution", 40000, ConflictResolution);
         }
 
         /// <summary>
@@ -354,7 +354,7 @@ namespace Tests.GeoClusterTests
         // so they both activate an instance
         // and one of them deactivated once communication is unblocked
 
-        public async Task ConflictResolution()
+        private async Task ConflictResolution()
         {
             int offset = random.Next();
 

@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Async;
 using Orleans.Streams;
 using Orleans.Providers;
 using Orleans.Streams.Core;
@@ -44,14 +43,14 @@ namespace Tester.TestStreamProviders
             Name = name;
             mode = providerConfig.GetEnumProperty(FailureInjectionModeString, FailureInjectionStreamProviderMode.NoFault);
             return mode == FailureInjectionStreamProviderMode.InitializationThrowsException
-                ? TaskUtility.Faulted(new ProviderInitializationException("Error initializing provider " + typeof(FailureInjectionStreamProvider)))
+                ? Task.FromException<object>(new ProviderInitializationException("Error initializing provider " + typeof(FailureInjectionStreamProvider)))
                 : Task.CompletedTask;
         }
 
         public Task Start()
         {
             return mode == FailureInjectionStreamProviderMode.StartThrowsException
-                ? TaskUtility.Faulted(new ProviderStartException("Error starting provider " + typeof(FailureInjectionStreamProvider).Name))
+                ? Task.FromException<object>(new ProviderStartException("Error starting provider " + typeof(FailureInjectionStreamProvider).Name))
                 : Task.CompletedTask;
         }
     }

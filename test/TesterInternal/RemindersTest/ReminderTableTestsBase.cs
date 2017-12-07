@@ -10,6 +10,9 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.RemindersTest
 {
@@ -17,35 +20,35 @@ namespace UnitTests.RemindersTest
     public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
         protected readonly TestEnvironmentFixture ClusterFixture;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private readonly IReminderTable remindersTable;
-
+        protected ILoggerFactory loggerFactory;
+        protected IOptions<SiloOptions> siloOptions;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
-        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture)
+        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
-            LogManager.Initialize(new NodeConfiguration());
-            
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid();
-            var deploymentId = "test-" + serviceId;
+            var clusterId = "test-" + serviceId;
 
-            logger.Info("DeploymentId={0}", deploymentId);
-
+            logger.Info("ClusterId={0}", clusterId);
+            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration
             {
                 ServiceId = serviceId,
-                DeploymentId = deploymentId,
+                ClusterId = clusterId,
                 AdoInvariantForReminders = GetAdoInvariant(),
                 DataConnectionStringForReminders = fixture.ConnectionString
             };
 
             var rmndr = CreateRemindersTable();
-            rmndr.Init(globalConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            rmndr.Init(globalConfiguration).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
             remindersTable = rmndr;
         }
 

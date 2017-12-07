@@ -7,6 +7,8 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <!-- Needed for tests to force the generation of binding redirects -->
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
@@ -23,11 +25,12 @@
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' ">
+  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' and '$(TargetFramework)' == '$(TestProjectTargetFramework)' ">
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 </Project>

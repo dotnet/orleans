@@ -100,40 +100,26 @@ namespace UnitTests.Grains
         {
         }
     }
-
-#pragma warning disable 618
-    public class GenericMethodInterceptionGrain<T> : Grain, IGenericMethodInterceptionGrain<T>, IGrainInvokeInterceptor
-#pragma warning restore 618
+    
+    public class GenericMethodInterceptionGrain<T> : Grain, IGenericMethodInterceptionGrain<T>, IGrainCallFilter
     {
-        public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)
-        {
-            if (methodInfo.Name == nameof(GetInputAsString))
-            {
-                return Task.FromResult<object>($"Hah! You wanted {request.Arguments[0]}, but you got me!");
-            }
-
-            return invoker.Invoke(this, request);
-        }
-
         public Task<string> SayHello() => Task.FromResult("Hello");
 
         public Task<string> GetInputAsString(T input) => Task.FromResult(input.ToString());
-    }
-
-#pragma warning disable 618
-    public class TrickyInterceptionGrain : Grain, ITrickyMethodInterceptionGrain, IGrainInvokeInterceptor
-#pragma warning restore 618
-    {
-        public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)
+        public async Task Invoke(IGrainCallContext context)
         {
-            if (methodInfo.Name == nameof(GetInputAsString))
+            if (context.Method.Name == nameof(GetInputAsString))
             {
-                return Task.FromResult<object>($"Hah! You wanted {request.Arguments[0]}, but you got me!");
+                context.Result = $"Hah! You wanted {context.Arguments[0]}, but you got me!";
+                return;
             }
 
-            return invoker.Invoke(this, request);
+            await context.Invoke();
         }
-
+    }
+    
+    public class TrickyInterceptionGrain : Grain, ITrickyMethodInterceptionGrain, IGrainCallFilter
+    {
         public Task<string> SayHello() => Task.FromResult("Hello");
         
         public Task<string> GetInputAsString(string input) => Task.FromResult(input);
@@ -141,11 +127,19 @@ namespace UnitTests.Grains
         public Task<string> GetInputAsString(bool input) => Task.FromResult(input.ToString(CultureInfo.InvariantCulture));
 
         public Task<int> GetBestNumber() => Task.FromResult(38);
-    }
+        public async Task Invoke(IGrainCallContext context)
+        {
+            if (context.Method.Name == nameof(GetInputAsString))
+            {
+                context.Result = $"Hah! You wanted {context.Arguments[0]}, but you got me!";
+                return;
+            }
 
-#pragma warning disable 618
-    public class GrainCallFilterTestGrain : Grain, IGrainCallFilterTestGrain, IGrainCallFilter, IGrainInvokeInterceptor
-#pragma warning restore 618
+            await context.Invoke();
+        }
+    }
+    
+    public class GrainCallFilterTestGrain : Grain, IGrainCallFilterTestGrain, IGrainCallFilter
     {
         private const string Key = GrainCallFilterTestConstants.Key;
 
@@ -163,7 +157,7 @@ namespace UnitTests.Grains
             return $"I will {(early ? string.Empty : "not ")}misbehave!";
         }
 
-        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "6");
+        public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
 
         public async Task Invoke(IGrainCallContext ctx)
         {
@@ -173,30 +167,20 @@ namespace UnitTests.Grains
             //
 
             this.context = ctx;
-            var value = RequestContext.Get(Key) as string;
-            if (value != null) RequestContext.Set(Key, value + '4');
+            if (string.Equals(ctx.Method.Name, nameof(CallWithBadInterceptors)) && (bool)ctx.Arguments[0])
+            {
+                await ctx.Invoke();
+            }
+
+            if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
             await ctx.Invoke();
+
+            if (string.Equals(ctx.Method?.Name, nameof(CallWithBadInterceptors)) && (bool)ctx.Arguments[1])
+            {
+                await ctx.Invoke();
+            }
+
             this.context = null;
-        }
-
-        public async Task<object> Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker)
-        {
-            var value = RequestContext.Get(Key) as string;
-            if (value != null) RequestContext.Set(Key, value + '5');
-
-            if (string.Equals(method?.Name, nameof(CallWithBadInterceptors)) && (bool)request.Arguments[0])
-            {
-                await context.Invoke();
-            }
-
-            var result = await invoker.Invoke(this, request);
-
-            if (string.Equals(method?.Name, nameof(CallWithBadInterceptors)) && (bool)request.Arguments[1])
-            {
-                await context.Invoke();
-            }
-
-            return result;
         }
     }
 }

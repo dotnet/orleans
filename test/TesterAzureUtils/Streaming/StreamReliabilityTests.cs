@@ -6,11 +6,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -44,7 +47,6 @@ namespace UnitTests.Streaming.Reliability
 
             this.numExpectedSilos = 2;
             var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
@@ -60,8 +62,31 @@ namespace UnitTests.Streaming.Reliability
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>().UseClientBuilderFactory(clientBuilderFactory);
+        }
 
-            return new TestCluster(options);
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
+            {
+                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+            })
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseAzureTableMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.MaxStorageBusyRetries = 3;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
         }
 
         public StreamReliabilityTests(ITestOutputHelper output)
@@ -83,11 +108,11 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            var deploymentId = HostedCluster.DeploymentId;
+            var clusterId = HostedCluster.ClusterId;
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, _streamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 

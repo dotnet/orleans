@@ -21,17 +21,20 @@ You can then compile as usual, build solution.
 
 ```
 dotnet restore
-dotnet build
 ```
 
 #### Running the sample
+From Visual Studio, you can start start the SiloHost and OrleansClient projects simultaneously (you can set up multiple startup projects by right-clicking the solution in the Solution Explorer, and select `Set StartUp projects`.
+
+Alternatively, you can run from the command line:
+
 To start the silo
 ```
-dotnet src\SiloHost\bin\Debug\netcoreapp1.1\SiloHost.dll
+dotnet run --project src\SiloHost
 ```
 
 
 To start the client (you will have to use a different command window)
 ```
-dotnet src\OrleansClient\bin\Debug\netcoreapp1.1\OrleansClient.dll
+dotnet run --project src\OrleansClient\
 ```

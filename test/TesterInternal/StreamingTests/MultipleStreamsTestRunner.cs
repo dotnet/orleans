@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -16,7 +18,7 @@ namespace UnitTests.Streaming
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
@@ -26,7 +28,7 @@ namespace UnitTests.Streaming
         {
             this.client = client;
             this.streamProviderName = streamProvider;
-            this.logger = LogManager.GetLogger("MultipleStreamsTestRunner", LoggerType.Application);
+            this.logger = (TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
             this.testNumber = testNum;
             this.runFullTest = fullTest;
         }

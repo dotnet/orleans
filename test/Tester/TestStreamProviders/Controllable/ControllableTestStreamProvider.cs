@@ -34,7 +34,7 @@ namespace Tester.TestStreamProviders.Controllable
 
             public bool IsRewindable { get; private set; }
             public StreamProviderDirection Direction { get; private set; }
-            public void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
+            public void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider)
             {
                 Name = providerName;
             }

@@ -1,32 +1,42 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using OrleansAWSUtils.Options;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime.Membership
 {
     internal class DynamoDBGatewayListProvider : IGatewayListProvider
     {
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansSiloInstances";
 
         private DynamoDBStorage storage;
-        private TimeSpan gatewayListRefreshPeriod;
-        private string deploymentId;
+        private string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
+        private readonly ILoggerFactory loggerFactory;
+        private readonly DynamoDBGatewayListProviderOptions options;
+        private readonly TimeSpan maxStaleness;
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBGatewayListProviderOptions> options)
+        {
+            this.loggerFactory = loggerFactory;
+            this.options = options.Value;
+            this.clusterId = clientConfiguration.ClusterId;
+            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+        }
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider(ClientConfiguration conf, Logger logger)
+        public Task InitializeGatewayListProvider()
         {
-            gatewayListRefreshPeriod = conf.GatewayListRefreshPeriod;
-            deploymentId = conf.DeploymentId;
-
-            storage = new DynamoDBStorage(conf.DataConnectionString, logger);
+            storage = new DynamoDBStorage(loggerFactory, options.AccessKey, options.SecretKey, options.Service, options.ReadCapacityUnits, options.WriteCapacityUnits);
             return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
                 {
@@ -44,7 +54,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var expressionValues = new Dictionary<string, AttributeValue>
             {
-                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(deploymentId) },
+                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                 { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue { N = INSTANCE_STATUS_ACTIVE } },
                 { $":{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}", new AttributeValue { N = "0"} }
             };
@@ -69,7 +79,7 @@ namespace Orleans.Runtime.MembershipService
 
         public TimeSpan MaxStaleness
         {
-            get { return gatewayListRefreshPeriod; }
+            get { return this.maxStaleness; }
         }
 
         public bool IsUpdatable

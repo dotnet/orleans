@@ -10,65 +10,6 @@ using Xunit;
 
 namespace NonSilo.Tests.UnitTests.SerializerTests
 {
-    [Serializable]
-    public class ClassWithCustomCopier
-    {
-        public int IntProperty { get; set; }
-        public string StringProperty { get; set; }
-
-        public static int CopyCounter { get; set; }
-
-        static ClassWithCustomCopier()
-        {
-            CopyCounter = 0;
-        }
-
-        [CopierMethod]
-        private static object Copy(object input, ICopyContext context)
-        {
-            CopyCounter++;
-            var obj = input as ClassWithCustomCopier;
-            return new ClassWithCustomCopier() { IntProperty = obj.IntProperty, StringProperty = obj.StringProperty };
-        }
-    }
-
-    [Serializable]
-    public class ClassWithCustomSerializer
-    {
-        public int IntProperty { get; set; }
-        public string StringProperty { get; set; }
-
-        public static int SerializeCounter { get; set; }
-        public static int DeserializeCounter { get; set; }
-
-        static ClassWithCustomSerializer()
-        {
-            SerializeCounter = 0;
-            DeserializeCounter = 0;
-        }
-
-        [SerializerMethod]
-        private static void Serialize(object input, ISerializationContext context, Type expected)
-        {
-            SerializeCounter++;
-            var obj = input as ClassWithCustomSerializer;
-            var stream = context.StreamWriter;
-            stream.Write(obj.IntProperty);
-            stream.Write(obj.StringProperty);
-        }
-
-        [DeserializerMethod]
-        private static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            DeserializeCounter++;
-            var result = new ClassWithCustomSerializer();
-            var stream = context.StreamReader;
-            result.IntProperty = stream.ReadInt();
-            result.StringProperty = stream.ReadString();
-            return result;
-        }
-    }
-
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class CustomSerializerTests
     {
@@ -77,7 +18,6 @@ namespace NonSilo.Tests.UnitTests.SerializerTests
         public CustomSerializerTests(TestEnvironmentFixture fixture)
         {
             this.fixture = fixture;
-            LogManager.Initialize(new NodeConfiguration());
         }
 
         [Fact, TestCategory("Serialization")]

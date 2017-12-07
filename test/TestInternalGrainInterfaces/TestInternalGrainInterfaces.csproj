@@ -3,9 +3,11 @@
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestInternalGrainInterfaces</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
 

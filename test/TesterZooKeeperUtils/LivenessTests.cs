@@ -1,6 +1,8 @@
 ﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
@@ -20,10 +22,25 @@ namespace Tester.ZooKeeperUtils
 
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+        }
+
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseZooKeeperMembership(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
         }
 
         [SkippableFact, TestCategory("Membership"), TestCategory("ZooKeeper")]

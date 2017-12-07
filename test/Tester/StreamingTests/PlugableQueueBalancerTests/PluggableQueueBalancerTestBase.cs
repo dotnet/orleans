@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
@@ -7,6 +8,7 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
@@ -20,7 +22,6 @@ namespace Tester.StreamingTests
         public static void ConfigureCustomQueueBalancer(Dictionary<string, string> streamProviderSettings, ClusterConfiguration config)
         {
             CustomPersistentProviderConfig.WriteProperties(streamProviderSettings);
-            config.UseStartupType<TestStartup>();
         }
 
         private static PersistentStreamProviderConfig CreateConfigWithCustomBalancerType()
@@ -43,12 +44,20 @@ namespace Tester.StreamingTests
             }
         }
 
-        public class TestStartup
+        public class SiloBuilderFactory : ISiloBuilderFactory
         {
-            public IServiceProvider ConfigureServices(IServiceCollection services)
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .ConfigureServices(ConfigureServices)
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
+
+            private void ConfigureServices(IServiceCollection services)
             {
                 services.AddTransient<LeaseBasedQueueBalancerForTest>();
-                return services.BuildServiceProvider();
             }
         }
     }

@@ -10,6 +10,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -42,11 +43,12 @@ namespace Orleans.Providers.Streams.Generator
         private IStreamFailureHandler streamFailureHandler;
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
-        private Logger logger;
         private SerializationManager serializationManager;
+        private ITelemetryProducer telemetryProducer;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
         private MonitorAggregationDimensions sharedDimensions;
-
+        private ILoggerFactory loggerFactory;
+        private string providerName;
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
         /// </summary>
@@ -63,41 +65,42 @@ namespace Orleans.Providers.Streams.Generator
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, Logger, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ITelemetryProducer, ICacheMonitor> CacheMonitorFactory;
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, ITelemetryProducer, IBlockPoolMonitor> BlockPoolMonitorFactory;
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, Logger, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
         /// <summary>
         /// Initialize the factory
         /// </summary>
         /// <param name="providerConfig"></param>
         /// <param name="providerName"></param>
-        /// <param name="log"></param>
         /// <param name="svcProvider"></param>
-        public void Init(IProviderConfiguration providerConfig, string providerName, Logger log, IServiceProvider svcProvider)
+        public void Init(IProviderConfiguration providerConfig, string providerName,  IServiceProvider svcProvider)
         {
-            logger = log;
+            this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
             serviceProvider = svcProvider;
+            this.providerName = providerName;
             receivers = new ConcurrentDictionary<QueueId, Receiver>();
             adapterConfig = new GeneratorAdapterConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
+            this.telemetryProducer = svcProvider.GetService<ITelemetryProducer>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions, logger) => new DefaultCacheMonitor(dimensions, logger);
+                this.CacheMonitorFactory = (dimensions, telemetryProducer) => new DefaultCacheMonitor(dimensions, telemetryProducer);
             if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions, logger) => new DefaultBlockPoolMonitor(dimensions, logger);
+                this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
             if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions, logger) => new DefaultQueueAdapterReceiverMonitor(dimensions, logger);
+                this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
             if (adapterConfig.GeneratorConfigType != null)
             {
                 generatorConfig = (IStreamGeneratorConfig)(serviceProvider?.GetService(adapterConfig.GeneratorConfigType) ?? Activator.CreateInstance(adapterConfig.GeneratorConfigType));
@@ -117,7 +120,7 @@ namespace Orleans.Providers.Streams.Generator
                 // 1 meg block size pool
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.logger.GetSubLogger(typeof(DefaultBlockPoolMonitor).Name)), oneMb);
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
             }
         }
@@ -188,7 +191,7 @@ namespace Orleans.Providers.Streams.Generator
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, logger.GetSubLogger(typeof(IQueueAdapterReceiverMonitor).Name));
+            var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
             SetGeneratorOnReciever(receiver);
             return receiver;
@@ -296,8 +299,8 @@ namespace Orleans.Providers.Streams.Generator
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side.
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
-            var cacheMonitor = this.CacheMonitorFactory(dimensions, logger.GetSubLogger(typeof(ICacheMonitor).Name));
-            return new GeneratorPooledCache(bufferPool, logger.GetSubLogger(typeof(GeneratorPooledCache).Name), serializationManager, 
+            var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
+            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.providerName}.{queueId}"), serializationManager, 
                 cacheMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
     }

@@ -5,11 +5,15 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Providers.SqlServer;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.TestingHost.Utils;
+using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
@@ -29,22 +33,22 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         private const string testDatabaseName = "OrleansStatisticsTest";
         
-        private readonly Logger logger;
-
+        private readonly ILogger logger;
+        private readonly ILoggerFactory loggerFactory;
         private readonly SqlStatisticsPublisher StatisticsPublisher;
         
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
             this.environment = environment;
-            LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log");
+            logger = loggerFactory.CreateLogger<SqlStatisticsPublisherTestsBase>();
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             ConnectionString = fixture.ConnectionString;
 
             StatisticsPublisher = new SqlStatisticsPublisher();
-            StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(logger),
+            StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(),
                 new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString)).Wait();
         }
 
@@ -68,16 +72,17 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
         {
-            GlobalConfiguration config = new GlobalConfiguration
+            var options = new SqlMembershipOptions()
             {
-                DeploymentId = "statisticsDeployment",
                 AdoInvariant = AdoInvariant,
-                DataConnectionString = ConnectionString
+                ConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>());
-            await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(TimeSpan.FromMinutes(1));
-            StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddress.NewLocalAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
+            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
+                this.environment.Services.GetRequiredService<IOptions<SiloOptions>>(), Options.Create(options), 
+                this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
+            StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));
         }
 

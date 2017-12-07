@@ -6,6 +6,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Xunit;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace UnitTests.StorageTests
 {
@@ -15,9 +17,8 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
                 ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-                LogManager.Initialize(cfg);
             }
         }
 

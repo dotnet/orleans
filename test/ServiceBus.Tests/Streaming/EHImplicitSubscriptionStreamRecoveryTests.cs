@@ -1,23 +1,21 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Table;
-using Orleans;
-using Orleans.AzureUtils;
+using Orleans.Streaming.EventHubs;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester;
 using Tester.StreamingTests;
 using TestExtensions;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
+using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -61,7 +59,7 @@ namespace ServiceBus.Tests.StreamingTests
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
+                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
                 dataManager.InitTableAsync().Wait();
                 dataManager.ClearTableAsync().Wait();
             }

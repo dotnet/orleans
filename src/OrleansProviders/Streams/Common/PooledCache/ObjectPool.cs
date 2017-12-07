@@ -1,8 +1,6 @@
 ﻿
 using System;
-using Orleans.Runtime;
 using System.Threading;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 
 namespace Orleans.Providers.Streams.Common
@@ -18,11 +16,11 @@ namespace Orleans.Providers.Streams.Common
         private readonly ConcurrentStack<T> pool;
         private readonly Func<T> factoryFunc;
         private long totalObjects;
-        private Timer timer;
         /// <summary>
         /// monitor to report statistics for current object pool
         /// </summary>
-        protected IObjectPoolMonitor monitor;
+        private readonly IObjectPoolMonitor monitor;
+        private readonly PeriodicAction periodicMonitoring;
 
         /// <summary>
         /// Simple object pool
@@ -39,12 +37,14 @@ namespace Orleans.Providers.Streams.Common
 
             this.factoryFunc = factoryFunc;
             pool = new ConcurrentStack<T>();
-            this.monitor = monitor;
 
+            // monitoring
+            this.monitor = monitor;
             if (this.monitor != null && monitorWriteInterval.HasValue)
             {
-                this.timer = new Timer(this.ReportObjectPoolStatistics, null, monitorWriteInterval.Value, monitorWriteInterval.Value);
+                this.periodicMonitoring = new PeriodicAction(monitorWriteInterval.Value, this.ReportObjectPoolStatistics);
             }
+
             this.totalObjects = 0;
         }
 
@@ -62,6 +62,7 @@ namespace Orleans.Providers.Streams.Common
                 Interlocked.Increment(ref this.totalObjects);
             }
             this.monitor?.TrackObjectAllocated();
+            this.periodicMonitoring?.TryAction(DateTime.UtcNow);
             resource.Pool = this;
             return resource;
         }
@@ -73,10 +74,11 @@ namespace Orleans.Providers.Streams.Common
         public virtual void Free(T resource)
         {
             this.monitor?.TrackObjectReleased();
+            this.periodicMonitoring?.TryAction(DateTime.UtcNow);
             pool.Push(resource);
         }
 
-        private void ReportObjectPoolStatistics(object state)
+        private void ReportObjectPoolStatistics()
         {
             var availableObjects = this.pool.Count;
             long claimedObjects = this.totalObjects - availableObjects;

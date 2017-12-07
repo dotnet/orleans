@@ -1,8 +1,7 @@
-﻿using System;
+﻿using HelloWorld.Interfaces;
+using Orleans;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using HelloWorld.Interfaces;
-using Orleans;
 
 namespace HelloWorld.Grains
 {
@@ -14,7 +13,7 @@ namespace HelloWorld.Grains
 
             await WriteStateAsync();
 
-            return "You said: '" + greeting + "', I say: Hello!";
+            return $"You said: '{greeting}', I say: Hello!";
         }
 
         public Task<IEnumerable<string>> GetGreetings()
@@ -25,7 +24,6 @@ namespace HelloWorld.Grains
 
     public class GreetingArchive
     {
-        public List<string> Greetings { get; private set; } = new List<string>();
-
+        public List<string> Greetings { get; } = new List<string>();
     }
 }

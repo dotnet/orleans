@@ -3,7 +3,9 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using TestGrainInterfaces;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -12,15 +14,34 @@ namespace NonSilo.Tests
     /// Tests for <see cref="ClientBuilder"/>.
     /// </summary>
     [TestCategory("BVT")]
+    [TestCategory("ClientBuilder")]
     public class ClientBuilderTests
     {
+        /// <summary>
+        /// Tests that the client builder will fail if no assemblies are configured.
+        /// </summary>
+        [Fact]
+        public void ClientBuilder_AssembliesTest()
+        {
+            var builder = (IClientBuilder)new ClientBuilder();
+            Assert.Throws<OrleansConfigurationException>(() => builder.Build());
+
+            // Adding an application assembly allows the builder to build successfully.
+            builder = new ClientBuilder().ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly));
+            using (var client = builder.Build())
+            {
+                Assert.NotNull(client);
+            }
+        }
+
         /// <summary>
         /// Tests that a client can be created without specifying configuration.
         /// </summary>
         [Fact]
         public void ClientBuilder_NoSpecifiedConfigurationTest()
         {
-            using (var client = new ClientBuilder().Build())
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            using (var client = builder.Build())
             {
                 Assert.NotNull(client);
             }
@@ -32,7 +53,7 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleBuildTest()
         {
-            var builder = new ClientBuilder();
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
             using (builder.Build())
             {
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -45,7 +66,7 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = new ClientBuilder().UseConfiguration(new ClientConfiguration());
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClientConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.UseConfiguration(new ClientConfiguration()));
         }
 
@@ -55,7 +76,7 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_NullConfigurationTest()
         {
-            var builder = new ClientBuilder();
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
         
@@ -65,7 +86,7 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_ServiceProviderTest()
         {
-            var builder = new ClientBuilder();
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
 
@@ -103,6 +124,12 @@ namespace NonSilo.Tests
                 // The last registered service should be provided by default.
                 Assert.Equal(2, client.ServiceProvider.GetRequiredService<MyService>().Id);
             }
+        }
+
+        private static void RemoveConfigValidators(IServiceCollection services)
+        {
+            var validators = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
+            foreach (var validator in validators) services.Remove(validator);
         }
 
         private class MyService

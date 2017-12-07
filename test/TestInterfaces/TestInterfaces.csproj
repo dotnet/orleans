@@ -2,9 +2,10 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.Interfaces</RootNamespace>
     <AssemblyName>TestInterfaces</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(BuildFlavor)' == 'Current' ">
+  <ItemGroup>
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
 </Project>

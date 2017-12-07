@@ -1,35 +1,38 @@
 @if not defined _echo @echo off
 setlocal
 
-if [%1]==[]                GOTO CURRENT
-if [%1]==[current]         GOTO CURRENT
-if [%1]==[netstandard-win] GOTO CURRENT
-if [%1]==[netstandard]     GOTO CURRENT
-if [%1]==[netfx]           GOTO LEGACY
-if [%1]==[legacy]          GOTO LEGACY
-if [%1]==[all]             GOTO ALL
+if not defined BuildConfiguration SET BuildConfiguration=Debug
 
-:CURRENT
-set BuildFlavor=
-cmd /c "%~dp0Test-Core.cmd"
-set exitcode=%errorlevel%
-GOTO END
+SET CMDHOME=%~dp0
+@REM Remove trailing backslash \
+set CMDHOME=%CMDHOME:~0,-1%
 
-:LEGACY
-set BuildFlavor=Legacy
-cmd /c "%~dp0Test-Core.cmd"
-set exitcode=%errorlevel%
-GOTO END
+pushd "%CMDHOME%"
+@cd
 
-:ALL
-set BuildFlavor=
-cmd /c "%~dp0Test-Core.cmd"
-set exitcode=%errorlevel%
+SET TestResultDir=%CMDHOME%\Binaries\%BuildConfiguration%\TestResults
 
-set BuildFlavor=Legacy
-cmd /c "%~dp0Test-Core.cmd"
-set /a exitcode=%errorlevel%+%exitcode%
+if not exist %TestResultDir% md %TestResultDir%
 
-:END
-endlocal&set exitcode=%exitcode%
-exit /B %exitcode%
+SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
+SET _CoreDirectory=bin\%BuildConfiguration%\netcoreapp2.0\win10-x64
+
+rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
+if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1
+if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2
+
+copy %CMDHOME%\test\Versions\TestVersionGrains\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\
+copy %CMDHOME%\test\Versions\TestVersionGrains2\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\
+
+set TESTS=%CMDHOME%\test\TesterAzureUtils\%_Directory%\Tester.AzureUtils.dll,%CMDHOME%\test\TesterInternal\%_Directory%\TesterInternal.dll,%CMDHOME%\test\Tester\%_Directory%\Tester.dll,%CMDHOME%\test\DefaultCluster.Tests\%_Directory%\DefaultCluster.Tests.dll,%CMDHOME%\test\NonSilo.Tests\%_Directory%\NonSilo.Tests.dll,%CMDHOME%\test\AWSUtils.Tests\%_Directory%\AWSUtils.Tests.dll,%CMDHOME%\test\BondUtils.Tests\%_Directory%\BondUtils.Tests.dll,%CMDHOME%\test\Consul.Tests\%_Directory%\Consul.Tests.dll,%CMDHOME%\test\GoogleUtils.Tests\%_Directory%\GoogleUtils.Tests.dll,%CMDHOME%\test\ServiceBus.Tests\%_Directory%\ServiceBus.Tests.dll,%CMDHOME%\test\TestServiceFabric\%_Directory%\TestServiceFabric.dll,%CMDHOME%\test\TesterSQLUtils\%_Directory%\Tester.SQLUtils.dll,%CMDHOME%\test\TesterZooKeeperUtils\%_Directory%\Tester.ZooKeeperUtils.dll,%CMDHOME%\test\RuntimeCodeGen.Tests\%_Directory%\RuntimeCodeGen.Tests.dll,%CMDHOME%\test\Orleans.Transactions.Tests\%_Directory%\Orleans.Transactions.Tests.dll,%CMDHOME%\test\Orleans.Transactions.Azure.Test\%_Directory%\Orleans.Transactions.Azure.Tests.dll
+
+if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=SlowBVT'
+
+@Echo Test assemblies = %TESTS%
+@Echo Test filters = %TEST_FILTERS%
+
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%TestResultDir%'"
+set testresult=%errorlevel%
+popd
+endlocal&set testresult=%testresult%
+exit /B %testresult%

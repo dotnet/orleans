@@ -2,34 +2,33 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureGossipTableTests : AzureStorageBasicTests 
+    public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         private Guid globalServiceId; //this should be the same for all clusters. Use this as partition key.
-        //this should be unique per cluster. Can we use deployment id? 
-        //problem with only using deployment id is that it is not known before deployment and hence not in the config file.
-        private string deploymentId;
         private SiloAddress siloAddress1;
         private SiloAddress siloAddress2;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
         private AzureTableBasedGossipChannel gossipTable; // This type is internal
-
+        private readonly ILoggerFactory loggerFactory;
         public AzureGossipTableTests()
         {
-            logger = LogManager.GetLogger("AzureGossipTableTests", LoggerType.Application);
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log");
+            logger = loggerFactory.CreateLogger<AzureGossipTableTests>();
         
             globalServiceId = Guid.NewGuid();
-            deploymentId = "test-" + globalServiceId;
 
             IPAddress ip;
             if (!IPAddress.TryParse("127.0.0.1", out ip))
@@ -42,22 +41,26 @@ namespace Tester.AzureUtils
             IPEndPoint ep2 = new IPEndPoint(ip, 21112);
             siloAddress2 = SiloAddress.New(ep2, 0);
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            logger.Info("Global ServiceId={0}", globalServiceId);
 
             GlobalConfiguration config = new GlobalConfiguration
             {
                 ServiceId = globalServiceId,
                 ClusterId = "0",
-                DeploymentId = deploymentId,
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
 
-            gossipTable = new AzureTableBasedGossipChannel();
+            gossipTable = new AzureTableBasedGossipChannel(loggerFactory);
             var done = gossipTable.Initialize(config.ServiceId, config.DataConnectionString);
             if (!done.Wait(timeout))
             {
                 throw new TimeoutException("Could not create/read table.");
             }
+        }
+
+        public void Dispose()
+        {
+            this.loggerFactory.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure"), TestCategory("Storage")]

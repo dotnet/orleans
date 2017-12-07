@@ -3,16 +3,33 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests
 {
-    public class AssemblyLoaderTests 
+    public class AssemblyLoaderTests :IDisposable
     {
         const string ExpectedFileName = "OrleansProviders.dll";
-        private readonly Logger logger = LogManager.GetLogger("AssemblyLoaderTests", LoggerType.Application);
+
+        private readonly ILoggerFactory defaultLoggerFactory;
+
+        private readonly ILogger logger;
+
+        public AssemblyLoaderTests()
+        {
+            this.defaultLoggerFactory =
+                TestingUtils.CreateDefaultLoggerFactory("AssemblyLoaderTests.log");
+            this.logger = defaultLoggerFactory.CreateLogger<AssemblyLoaderTests>();
+        }
+
+        public void Dispose()
+        {
+            this.defaultLoggerFactory.Dispose();
+        }
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()
@@ -90,9 +107,12 @@ namespace UnitTests
 
         private List<string> NewExclusionList()
         {
-            var exclusionList = new List<string>(AssemblyLoaderCriteria.SystemBinariesList);
-            exclusionList.Add("UnitTests.dll");
-            return exclusionList;
+            return new List<string>(new[]
+            {
+                "Orleans.Core.dll",
+                "OrleansRuntime.dll",
+                "UnitTests.dll"
+            });
         }
 
         private AssemblyLoader NewAssemblyLoader(List<string> exclusionList)
@@ -100,20 +120,8 @@ namespace UnitTests
             var directories =
                 new Dictionary<string, SearchOption>
                     {
-                        {Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), 
-                            SearchOption.AllDirectories}
+                        { Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath), SearchOption.AllDirectories }
                     };
-
-            //
-            // We need to add current directory in case if xUnit is running an isolated copy of this test dll.
-            //
-
-            var currentDirectory = Path.GetDirectoryName(Environment.CurrentDirectory);
-
-            if (!directories.ContainsKey(currentDirectory))
-            {
-                directories.Add(currentDirectory, SearchOption.AllDirectories);
-            }
 
             var excludeCriteria =
                 new AssemblyLoaderPathNameCriterion[]

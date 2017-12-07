@@ -8,6 +8,7 @@ using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -28,17 +29,17 @@ namespace AWSUtils.Tests.Streaming
                 throw new SkipException("Empty connection string");
             }
 
-            var deploymentId = Guid.NewGuid().ToString();
+            var clusterId = Guid.NewGuid().ToString();
             var streamConnectionString = new Dictionary<string, string>
                 {
                     { "DataConnectionString",  StreamConnectionString},
-                    { "DeploymentId",  deploymentId}
+                    { "DeploymentId",  clusterId}
                 };
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             
-            options.ClusterConfiguration.Globals.DeploymentId = deploymentId;
-            options.ClientConfiguration.DeploymentId = deploymentId;
+            options.ClusterConfiguration.Globals.ClusterId = clusterId;
+            options.ClientConfiguration.ClusterId = clusterId;
             options.ClientConfiguration.DataConnectionString = StreamConnectionString;
             options.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
             options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
@@ -53,9 +54,9 @@ namespace AWSUtils.Tests.Streaming
 
         public override void Dispose()
         {
-            var deploymentId = HostedCluster.DeploymentId;
+            var clusterId = HostedCluster.ClusterId;
             base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StreamConnectionString).Wait();
+            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StreamConnectionString, NullLoggerFactory.Instance).Wait();
         }
 
         [SkippableFact, TestCategory("AWS")]

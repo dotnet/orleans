@@ -9,4 +9,19 @@ namespace UnitTests.GrainInterfaces
 
         Task TakeSerializedData(object data);
     }
+
+    interface ISimpleTestTempGrain : IGrainWithGuidKey
+    {
+        Task SimpleMethod(MyType mt);
+    }
+
+    public class MyType
+    {
+        private int A;
+
+        public void SetA(int a)
+        {
+            this.A = a;
+        }
+    }
 }

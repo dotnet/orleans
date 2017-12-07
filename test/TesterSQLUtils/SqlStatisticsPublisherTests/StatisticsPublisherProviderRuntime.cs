@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -8,17 +9,9 @@ namespace UnitTests.SqlStatisticsPublisherTests
 {
     internal class StatisticsPublisherProviderRuntime : IProviderRuntime
     {
-        private readonly Logger logger;
-        private InvokeInterceptor invokeInterceptor;
-
-        public StatisticsPublisherProviderRuntime(Logger logger)
-        {
-            this.logger = logger;
-        }
-
         public Logger GetLogger(string loggerName)
         {
-            return logger;
+            throw new NotImplementedException();
         }
 
         public Guid ServiceId
@@ -39,16 +32,6 @@ namespace UnitTests.SqlStatisticsPublisherTests
         public IServiceProvider ServiceProvider
         {
             get { throw new NotImplementedException(); }
-        }
-
-        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
-        {
-            this.invokeInterceptor = interceptor;
-        }
-
-        public InvokeInterceptor GetInvokeInterceptor()
-        {
-            return this.invokeInterceptor;
         }
 
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)

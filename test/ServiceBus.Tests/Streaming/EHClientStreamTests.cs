@@ -1,12 +1,12 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
+using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
 using ServiceBus.Tests.TestStreamProviders.EventHub;
@@ -42,7 +42,6 @@ namespace ServiceBus.Tests.StreamingTests
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
-
         public EHClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -60,7 +59,7 @@ namespace ServiceBus.Tests.StreamingTests
         public override void Dispose()
         {
             base.Dispose();
-            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
+            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
             dataManager.InitTableAsync().Wait();
             dataManager.ClearTableAsync().Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
@@ -78,7 +77,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName, NullLoggerFactory.Instance), true);
         }
 
         private static void AdjustConfig(ClusterConfiguration config)

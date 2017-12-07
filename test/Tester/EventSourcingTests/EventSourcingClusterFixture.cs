@@ -4,9 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.EventSourcing.CustomStorage;
+using Orleans.Hosting;
 using TestExtensions;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime;
+using Orleans.Storage;
+using Orleans.TestingHost.Utils;
 
 namespace Tester.EventSourcingTests
 {
@@ -30,15 +36,28 @@ namespace Tester.EventSourcingTests
             // log consistency providers are used to configure journaled grains
             options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider("LogStorage");
             options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("StateStorage");
-
-            // we turn on extra logging  to see more tracing from the log consistency providers
-            foreach (var o in options.ClusterConfiguration.Overrides)
-            {
-                o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Storage.MemoryStorage", Severity.Verbose));
-                o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("LogViews", Severity.Verbose));
-            }
-
+            
+            options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
             return new TestCluster(options);
         }
+
+        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
+
+            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
+            {
+                TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
+                builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
+                builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+            }
+        }
+
     }
 }

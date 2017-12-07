@@ -11,9 +11,6 @@ namespace GPSTracker.Web
 
         public override bool OnStart()
         {
-            // Set the maximum number of concurrent connections 
-            ServicePointManager.DefaultConnectionLimit = 12;
-
             Trace.WriteLine("Starting Role Entry Point");
 
             silo = new AzureSilo();

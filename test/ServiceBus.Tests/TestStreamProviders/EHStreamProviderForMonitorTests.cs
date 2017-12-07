@@ -14,12 +14,8 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Runtime.Configuration;
 using System.Threading;
-#if !BUILD_FLAVOR_LEGACY
 using Microsoft.Azure.EventHubs;
-#else
-using Microsoft.ServiceBus;
-using Microsoft.ServiceBus.Messaging;
-#endif
+using Microsoft.Extensions.Logging;
 using ServiceBus.Tests.MonitorTests;
 
 namespace ServiceBus.Tests.TestStreamProviders
@@ -30,11 +26,11 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             private CachePressureInjectionMonitor cachePressureInjectionMonitor;
 
-            public override void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
+            public override void Init(IProviderConfiguration providerCfg, string providerName,  IServiceProvider svcProvider)
             {
-                this.ReceiverMonitorFactory = (dimensions, logger) => EventHubReceiverMonitorForTesting.Instance;
+                this.ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => EventHubReceiverMonitorForTesting.Instance;
                 this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
-                base.Init(providerCfg, providerName, log, svcProvider);
+                base.Init(providerCfg, providerName, svcProvider);
             }
 
             private void ChangeCachePressure()
@@ -46,12 +42,13 @@ namespace ServiceBus.Tests.TestStreamProviders
             {
                 var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
                 var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
+                var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
                 var eventHubPath = hubSettings.Path;
                 var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
-                Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => CacheMonitorForTesting.Instance;
-                Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) =>BlockPoolMonitorForTesting.Instance;
+                Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = (dimensions, logger, telemetryProducer) => CacheMonitorForTesting.Instance;
+                Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger, telemetryProducer) =>BlockPoolMonitorForTesting.Instance;
                 return new CacheFactoryForMonitorTesting(this.cachePressureInjectionMonitor, providerSettings, SerializationManager,
-                    sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory);
+                    sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory);
             }
 
             private class CacheFactoryForMonitorTesting : EventHubQueueCacheFactory
@@ -59,15 +56,16 @@ namespace ServiceBus.Tests.TestStreamProviders
                 private CachePressureInjectionMonitor cachePressureInjectionMonitor;
                 public CacheFactoryForMonitorTesting(CachePressureInjectionMonitor cachePressureInjectionMonitor, EventHubStreamProviderSettings providerSettings,
                    SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
-                   Func<EventHubCacheMonitorDimensions, Logger, ICacheMonitor> cacheMonitorFactory = null,
-                   Func<EventHubBlockPoolMonitorDimensions, Logger, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                    : base(providerSettings, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                   ILoggerFactory loggerFactory,
+                   Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
+                   Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
+                    : base(providerSettings, serializationManager, sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory)
                 {
                     this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
                 }
 
                 protected override void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamProviderSettings providerSettings,
-                        Logger cacheLogger)
+                        ILogger cacheLogger)
                 {
                     cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
                 }

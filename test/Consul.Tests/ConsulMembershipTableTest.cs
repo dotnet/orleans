@@ -1,8 +1,15 @@
-﻿using Orleans;
+﻿using System;
+using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.ConsulUtils.Configuration;
+using Orleans.ConsulUtils.Options;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
@@ -16,24 +23,36 @@ namespace Consul.Tests
     [TestCategory("Membership"), TestCategory("Consul")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
-        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
-        {
-            LogManager.AddTraceLevelOverride("ConsulBasedMembershipTable", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+        public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        { 
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        private static LoggerFilterOptions CreateFilters()
         {
-            ConsulTestUtils.EnsureConsul();
-
-            return new ConsulBasedMembershipTable();
+            var filters = new LoggerFilterOptions();
+            filters.AddFilter("ConsulBasedMembershipTable", Microsoft.Extensions.Logging.LogLevel.Trace);
+            filters.AddFilter("Storage", Microsoft.Extensions.Logging.LogLevel.Trace);
+            return filters;
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
+            var options = new ConsulMembershipOptions()
+            {
+                Address = new Uri(this.connectionString)
+            };
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this.siloOptions);
+        }
 
-            return new ConsulBasedMembershipTable();
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
+        {
+            ConsulTestUtils.EnsureConsul();
+            var options = new ConsulGatewayListProviderOptions()
+            {
+                Address = new Uri(this.connectionString)
+            };
+            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), this.clientConfiguration, Options.Create(options));
         }
 
         protected override async Task<string> GetConnectionString()

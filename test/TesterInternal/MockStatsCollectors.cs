@@ -10,6 +10,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.TestHooks;
 
 namespace UnitTests.Stats
 {
@@ -75,7 +77,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
+        public Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName,
             string hostName)
         {
             return Task.CompletedTask;
@@ -96,20 +98,20 @@ namespace UnitTests.Stats
         private IStatsCollectorGrain grain;
         private OrleansTaskScheduler taskScheduler;
         private SchedulingContext schedulingContext;
-        private Logger logger;
+        private ILogger logger;
 
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            this.logger = providerRuntime.GetLogger("MockStatsSiloCollector");
+            this.logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<MockStatsSiloCollector>>();
             this.grain = providerRuntime.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
             this.taskScheduler = providerRuntime.ServiceProvider.GetRequiredService<OrleansTaskScheduler>();
-            this.schedulingContext = providerRuntime.ServiceProvider.GetRequiredService<Silo>().testHook.SchedulingContext;
+            this.schedulingContext = providerRuntime.ServiceProvider.GetRequiredService<TestHooksSystemTarget>().SchedulingContext;
             logger.Info("{0} Init called", GetType().Name);
             return Task.CompletedTask;
         }
 
-        public Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName,
+        public Task Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName,
             IPEndPoint gateway, string hostName)
         {
             throw new NotImplementedException();
@@ -128,7 +130,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName,
+        public Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName,
             string hostName)
         {
             return Task.CompletedTask;

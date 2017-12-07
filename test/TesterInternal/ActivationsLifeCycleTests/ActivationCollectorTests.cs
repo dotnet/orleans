@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -25,7 +27,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private TestCluster testCluster;
 
-        private Logger logger;
+        private ILogger logger;
 
         private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
@@ -38,7 +40,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
             testCluster = new TestCluster(config);
             testCluster.Deploy();
-            this.logger = this.testCluster.Client.Logger;
+            this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
         private void Initialize(TimeSpan collectionAgeLimit)
@@ -56,6 +58,35 @@ namespace UnitTests.ActivationsLifeCycleTests
             GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
             testCluster?.StopAllSilos();
             testCluster = null;
+        }
+
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorForceCollection()
+        {
+            Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            const int grainCount = 1000;
+            var fullGrainTypeName = typeof(IdleActivationGcTestGrain1).FullName;
+
+            List<Task> tasks = new List<Task>();
+            logger.Info("ActivationCollectorForceCollection: activating {0} grains.", grainCount);
+            for (var i = 0; i < grainCount; ++i)
+            {
+                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
+                tasks.Add(g.Nop());
+            }
+            await Task.WhenAll(tasks);
+
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            var grain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+
+            await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
+
+            await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
         }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]

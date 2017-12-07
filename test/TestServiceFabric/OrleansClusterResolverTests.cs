@@ -1,20 +1,17 @@
-﻿using System.Threading.Tasks;
-
+﻿using System;
+using System.Fabric;
+using System.Fabric.Health;
+using System.Fabric.Query;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
+using Orleans.Membership.ServiceFabric;
+using Orleans.Membership.ServiceFabric.Utilities;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TestServiceFabric
 {
-    using System;
-    using System.Fabric;
-    using System.Fabric.Health;
-    using System.Fabric.Query;
-
-    using Microsoft.Orleans.ServiceFabric;
-    using Microsoft.Orleans.ServiceFabric.Utilities;
-
-    using Xunit.Abstractions;
-
     [TestCategory("ServiceFabric"), TestCategory("BVT")]
     public class OrleansClusterResolverTests
     {
@@ -23,27 +20,25 @@ namespace TestServiceFabric
         private readonly TestOutputLogger log;
 
         private readonly IFabricQueryManager queryManager;
-
+        private readonly ITestOutputHelper output;
         public OrleansClusterResolverTests(ITestOutputHelper output)
         {
             this.serviceName = new Uri("fabric:/test/robust/coffee");
             
-            var first = new ServicePartitionList
-            {
-                new MockPartition(ServiceKind.Stateful, null, HealthState.Ok, ServicePartitionStatus.Ready)
-            };
-
             this.queryManager = Substitute.For<IFabricQueryManager>();
             this.log = new TestOutputLogger(output);
+            this.output = output;
         }
 
         [Fact]
         public async Task ClusterResolverBasicTest()
         {
+            var loggerFactory = new LoggerFactory();
+            loggerFactory.AddProvider(new TestOutputLoggerProvider(this.output));
             var resolver = new FabricServiceSiloResolver(
                 this.serviceName,
                 this.queryManager,
-                this.log.GetLogger);
+                loggerFactory.CreateLogger<FabricServiceSiloResolver>());
             await resolver.Refresh();
         }
     }

@@ -10,6 +10,9 @@ using Orleans.Runtime.ReminderService;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.TestingHost.Utils;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -25,13 +28,14 @@ namespace Tester.AzureUtils.TimerTests
 
         private Guid ServiceId;
 
-        private Logger log;
-        
+        private ILogger log;
+        private ILoggerFactory loggerFactory;
         public ReminderTests_Azure_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
-            log = LogManager.GetLogger(GetType().Name, LoggerType.Application);
+            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
+            log = loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
             ServiceId = Guid.NewGuid();
 
@@ -43,14 +47,14 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>());
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = "TMSLocalTesting" });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
-                DeploymentId = "TMSLocalTesting",
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
-            await table.Init(config, log);
+            await table.Init(config);
 
             await TestTableInsertRate(table, 10);
             await TestTableInsertRate(table, 500);
@@ -59,31 +63,32 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("ReminderService")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
-            string deploymentId = NewDeploymentId();
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>());
+            string clusterId = NewClusterId();
+            var siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions);
             var config = new GlobalConfiguration()
             {
                 ServiceId = ServiceId,
-                DeploymentId = deploymentId,
+                ClusterId = clusterId,
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
-            await table.Init(config, log);
+            await table.Init(config);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
-            Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);
+            Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
             ReminderEntry expected = NewReminderEntry();
             await table.UpsertRow(expected);
             rows = (await GetAllRows(table)).ToArray();
 
-            Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, deploymentId);
+            Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
             ReminderEntry actual = rows[0];
-            Assert.Equal(expected.GrainRef,  actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, deploymentId);
-            Assert.Equal(expected.ReminderName,  actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, deploymentId);
-            Assert.Equal(expected.Period,  actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, deploymentId);
+            Assert.Equal(expected.GrainRef,  actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, clusterId);
+            Assert.Equal(expected.ReminderName,  actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, clusterId);
+            Assert.Equal(expected.Period,  actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
             // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
-            /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, deploymentId);*/
-            Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={ServiceId}, did={deploymentId}) row contains an invalid etag.");
+            /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, clusterId);*/
+            Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={ServiceId}, did={clusterId}) row contains an invalid etag.");
         }
 
         private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
@@ -141,7 +146,7 @@ namespace Tester.AzureUtils.TimerTests
                 };
         }
 
-        private string NewDeploymentId()
+        private string NewClusterId()
         {
             return string.Format("ReminderTest.{0}", Guid.NewGuid());
         }

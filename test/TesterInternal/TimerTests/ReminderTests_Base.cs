@@ -6,10 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -35,20 +37,21 @@ namespace UnitTests.TimerTests
         protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
         protected const long failCheckAfter = 6; // safe value: 9
 
-        protected Logger log;
+        protected ILogger log;
 
         public ReminderTests_Base(BaseTestClusterFixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
 
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
+            ClientConfiguration configuration = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
+            var filters = new LoggerFilterOptions();
 #if DEBUG
-            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
-            LogManager.AddTraceLevelOverride("Reminder", Severity.Verbose3);
+            filters.AddFilter("Storage", LogLevel.Trace);
+            filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
-            log = LogManager.GetLogger(this.GetType().Name, LoggerType.Application);
+
+            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.ClusterId), filters).CreateLogger<ReminderTests_Base>();
         }
 
         public IGrainFactory GrainFactory { get; }

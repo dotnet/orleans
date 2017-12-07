@@ -7,9 +7,13 @@ using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.Logging.Abstractions;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using OrleansAWSUtils.Membership;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -26,7 +30,7 @@ namespace AWSUtils.Tests.Liveness
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage($"Service=http://localhost:8000", null);
+                    storage = new DynamoDBStorage($"Service=http://localhost:8000", NullLoggerFactory.Instance);
                 }
                 catch (AmazonServiceException)
                 {
@@ -52,19 +56,41 @@ namespace AWSUtils.Tests.Liveness
         {
         }
 
+        public static string ConnectionString = "Service=http://localhost:8000;";
         public override TestCluster CreateTestCluster()
         {
-            if (!isDynamoDbAvailable.Value)
+            if (!isDynamoDbAvailable.Value)                                                                                    
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = "Service=http://localhost:8000;"; ;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
-            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansAWSUtils";
+            options.ClusterConfiguration.Globals.DataConnectionString = ConnectionString;
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
+                .UseClientBuilderFactory(clientBuilderFactory);
+        }
+
+        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
+            .UseConfiguration(config).UseDynamoDBGatewayListProvider(gatewayOptions =>
+            {
+               LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
+            })
+            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
+        public class SiloBuilderFactory : ISiloBuilderFactory
+        {
+            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            {
+                return new SiloHostBuilder()
+                    .ConfigureSiloName(siloName)
+                    .UseConfiguration(clusterConfiguration)
+                    .UseDynamoDBMembership(options =>
+                    {
+                        options.ConnectionString = ConnectionString;
+                    })
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using OrleansAWSUtils.Reminders;
@@ -15,7 +16,7 @@ namespace AWSUtils.Tests.RemindersTest
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
+        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, new LoggerFilterOptions())
         {
         }
 
@@ -24,7 +25,7 @@ namespace AWSUtils.Tests.RemindersTest
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
-            return new DynamoDBReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>());
+            return new DynamoDBReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory);
         }
 
         protected override Task<string> GetConnectionString()

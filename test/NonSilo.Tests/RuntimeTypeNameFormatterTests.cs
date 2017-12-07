@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using Orleans.Runtime;
 using Orleans.Utilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -27,6 +29,7 @@ namespace NonSilo.Tests
         {
             var types = new[]
             {
+                typeof(NameValueCollection),
                 typeof(int),
                 typeof(int[]),
                 typeof(int*[]),
@@ -42,15 +45,16 @@ namespace NonSilo.Tests
                     .MakePointerType()
                     .MakePointerType()
                     .MakeArrayType(10)
-                    .MakeByRefType()
+                    .MakeByRefType(),
+                typeof(NameValueCollection)
             };
-
+            
             foreach (var type in types)
             {
                 var formatted = RuntimeTypeNameFormatter.Format(type);
                 this.output.WriteLine($"Full Name: {type.FullName}");
                 this.output.WriteLine($"Formatted: {formatted}");
-                var isRecoverable = Type.GetType(formatted, throwOnError: false) == type;
+                var isRecoverable = new CachedTypeResolver().TryResolveType(formatted, out var resolved) && resolved == type;
                 Assert.True(isRecoverable, $"Type.GetType(\"{formatted}\") must be equal to the original type.");
             }
         }

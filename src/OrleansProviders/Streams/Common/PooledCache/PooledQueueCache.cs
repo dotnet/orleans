@@ -1,11 +1,10 @@
 ﻿
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -33,10 +32,10 @@ namespace Orleans.Providers.Streams.Common
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ICacheMonitor cacheMonitor;
+        private readonly PeriodicAction periodicMonitoring;
         private int itemCount;
-        private Timer timer;
         /// <summary>
         /// Cached message most recently added
         /// </summary>
@@ -76,8 +75,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="comparer"></param>
         /// <param name="logger"></param>
         /// <param name="cacheMonitor"></param>
-        /// <param name="cacheMonitorWriteInterval">cache monitor write interval</param>
-        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
+        /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
+        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, ILogger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             if (cacheDataAdapter == null)
             {
@@ -93,7 +92,7 @@ namespace Orleans.Providers.Streams.Common
             }
             this.cacheDataAdapter = cacheDataAdapter;
             this.comparer = comparer;
-            this.logger = logger.GetSubLogger("messagecache", "-");
+            this.logger = logger;
             this.itemCount = 0;
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
@@ -101,9 +100,8 @@ namespace Orleans.Providers.Streams.Common
 
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
             {
-                this.timer = new Timer(this.ReportCacheMessageStatistics, null, cacheMonitorWriteInterval.Value, cacheMonitorWriteInterval.Value);
+                this.periodicMonitoring = new PeriodicAction(cacheMonitorWriteInterval.Value, this.ReportCacheMessageStatistics);
             }
-           
         }
 
         /// <summary>
@@ -125,7 +123,7 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
-        private void ReportCacheMessageStatistics(object state)
+        private void ReportCacheMessageStatistics()
         {
             if (this.IsEmpty)
             {
@@ -316,16 +314,11 @@ namespace Orleans.Providers.Streams.Common
                 streamPosisions.Add(this.Add(message, dequeueTime));
             }
             this.cacheMonitor?.TrackMessagesAdded(messages.Count);
+            periodicMonitoring?.TryAction(dequeueTime);
             return streamPosisions;
         }
 
-        /// <summary>
-        /// Add a queue message to the cache
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="dequeueTimeUtc"></param>
-        /// <returns></returns>
-        public StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
+        private StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
         {
             if (message == null)
             {

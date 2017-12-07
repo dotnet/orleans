@@ -1,27 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Fabric;
-using System.Net;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Grains;
+using GrainInterfaces;
+using Microsoft.Extensions.Logging;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
-using Microsoft.Orleans.ServiceFabric;
-using Orleans;
-using Orleans.Runtime;
+using Orleans.Hosting;
+using Orleans.Hosting.ServiceFabric;
 using Orleans.Runtime.Configuration;
 
 namespace StatelessCalculatorService
 {
-    using GrainInterfaces;
-
-    using Microsoft.Extensions.DependencyInjection;
-
-    using Orleans.Providers;
-
     /// <summary>
     /// An instance of this class is created for each service instance by the Service Fabric runtime.
     /// </summary>
@@ -38,9 +29,36 @@ namespace StatelessCalculatorService
         /// <returns>A collection of listeners.</returns>
         protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners()
         {
-            ServiceEventSource.Current.Message($"[PID {Process.GetCurrentProcess().Id}] CreateServiceInstanceListeners()");
-            ClusterStartup.Service = this;
-            return new[] { OrleansServiceListener.CreateStateless(this.GetClusterConfiguration()) };
+            // Listeners can be opened and closed multiple times over the lifetime of a service instance.
+            // A new Orleans silo will be both created and initialized each time the listener is opened and will be shutdown 
+            // when the listener is closed.
+            var listener = OrleansServiceListener.CreateStateless(
+                (serviceContext, builder) =>
+                {
+                    // Use Service Fabric for cluster membership.
+                    builder.AddServiceFabricMembership(serviceContext);
+                    
+                    // Optional: configure logging.
+                    builder.ConfigureLogging(logging => logging.AddDebug());
+
+                    var config = new ClusterConfiguration();
+                    config.Globals.RegisterBootstrapProvider<BootstrapProvider>("poke_grains");
+                    config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+                    // Service Fabric manages port allocations, so update the configuration using those ports.
+                    config.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext);
+
+                    // Tell Orleans to use this configuration.
+                    builder.UseConfiguration(config);
+
+                    // Add your application assemblies.
+                    builder.AddApplicationPart(typeof(ICalculatorGrain).Assembly);
+
+                    // Alternative: add all loadable assemblies in the current base path (see AppDomain.BaseDirectory).
+                    builder.AddApplicationPartsFromBasePath();
+                });
+
+            return new[] { listener };
         }
 
         /// <summary>
@@ -58,85 +76,5 @@ namespace StatelessCalculatorService
                 await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
             }
         }
-
-        public ClusterConfiguration GetClusterConfiguration()
-        {
-            var config = new ClusterConfiguration();
-            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
-            config.Globals.DataConnectionString = "UseDevelopmentStorage=true";
-            config.Globals.RegisterBootstrapProvider<BootstrapProvider>("booter");
-            config.Defaults.StartupTypeName = typeof(ClusterStartup).AssemblyQualifiedName;
-            LogManager.LogConsumers.Add(new EventSourceLogger());
-            return config;
-        }
-
-        public class ClusterStartup
-        {
-            public static StatelessService Service { get; set; }
-
-            public IServiceProvider ConfigureServices(IServiceCollection services)
-            {
-                services.AddServiceFabricSupport(Service);
-                return services.BuildServiceProvider();
-            }
-        }
-    }
-
-    public class EventSourceLogger : ILogConsumer
-    {
-        private readonly ServiceEventSource eventSource;
-        private readonly string pid;
-
-        public EventSourceLogger()
-        {
-            this.eventSource = ServiceEventSource.Current;
-            this.pid = Process.GetCurrentProcess().Id.ToString();
-        }
-
-        public void Log(
-            Severity severity,
-            LoggerType loggerType,
-            string caller,
-            string message,
-            IPEndPoint myIpEndPoint,
-            Exception exception,
-            int eventCode = 0)
-        {
-            if (exception != null) eventSource.Message($"[{severity}@{myIpEndPoint}@PID:{pid}] {message}\nException: {exception}");
-            else eventSource.Message($"[{severity}@{myIpEndPoint}@PID:{pid}] {message}");
-        }
-    }
-
-    public class BootstrapProvider : IBootstrapProvider
-    {
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            var logger = providerRuntime.GetLogger(nameof(BootstrapProvider));
-            this.Name = name;
-            
-            var grain = providerRuntime.GrainFactory.GetGrain<ICalculatorGrain>(Guid.Empty);
-            Task.Factory.StartNew(
-                async () =>
-                {
-                    while (true)
-                    {
-                        try
-                        {
-                            var value = await grain.Add(1);
-                            logger.Info($"{value - 1} + 1 = {value}");
-                            await Task.Delay(TimeSpan.FromSeconds(4));
-                        }
-                        catch (Exception exception)
-                        {
-                            logger.Warn(exception.HResult, "Exception in bootstrap provider. Ignoring.", exception);
-                        }
-                    }
-                }).Ignore();
-            return Task.FromResult(0);
-        }
-
-        public Task Close() => Task.FromResult(0);
-
-        public string Name { get; set; }
     }
 }

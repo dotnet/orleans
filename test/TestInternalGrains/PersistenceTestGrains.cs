@@ -961,7 +961,6 @@ namespace UnitTests.Grains
                     callStack);
                 this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 this.scheduler.DumpSchedulerStatus();
-                LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
             }

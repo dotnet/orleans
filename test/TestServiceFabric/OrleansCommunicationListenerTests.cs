@@ -7,17 +7,18 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Microsoft.Orleans.ServiceFabric;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
 using NSubstitute;
+using Orleans.Hosting;
+using Orleans.Hosting.ServiceFabric;
 using Orleans.Runtime.Configuration;
+using Orleans.ServiceFabric;
 using Xunit;
 
 namespace TestServiceFabric
 {
-    using Microsoft.Orleans.ServiceFabric.Models;
-    using Microsoft.Orleans.ServiceFabric.Utilities;
-
     [TestCategory("ServiceFabric")]
     public class OrleansCommunicationListenerTests
     {
@@ -31,7 +32,6 @@ namespace TestServiceFabric
             Dns.GetHostName());
 
         private readonly MockServiceContext serviceContext;
-
         private readonly ClusterConfiguration clusterConfig = new ClusterConfiguration { Defaults = { Generation = 864 } };
 
         public OrleansCommunicationListenerTests()
@@ -51,20 +51,30 @@ namespace TestServiceFabric
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
-                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
-            var siloHost = Substitute.For<ISiloHost>();
-            var listener = new OrleansCommunicationListener(this.serviceContext, clusterConfig)
-            {
-                SiloHost = siloHost
-            };
+            
+            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
+            var listener = new OrleansCommunicationListener(
+                builder =>
+                {
+                    builder.ConfigureServices(
+                        services =>
+                        {
+                            // Use our mock silo host.
+                            services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
+                        });
 
-            siloHost.NodeConfig.Returns(_ => clusterConfig.CreateNodeConfigurationForSilo(listener.SiloName));
-
+                    // Our cluster configuration is what feeds the endpoint info, so add it.
+                    builder.UseConfiguration(this.clusterConfig);
+                });
+            
             var result = await listener.OpenAsync(CancellationToken.None);
+
+            var siloHost = listener.Host;
             var publishedEndpoints = JsonConvert.DeserializeObject<FabricSiloInfo>(result);
 
             var siloAddress = publishedEndpoints.SiloAddress;
@@ -75,13 +85,13 @@ namespace TestServiceFabric
             gatewayAddress.Generation.ShouldBeEquivalentTo(864);
             gatewayAddress.Endpoint.Port.ShouldBeEquivalentTo(8888);
 
-            siloHost.ReceivedWithAnyArgs(1).Start(null, null);
-            siloHost.DidNotReceive().Stop();
+            await siloHost.ReceivedWithAnyArgs(1).StartAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));
+            await siloHost.DidNotReceive().StopAsync(Arg.Any<CancellationToken>());
 
             siloHost.ClearReceivedCalls();
             await listener.CloseAsync(CancellationToken.None);
-            siloHost.Received(1).Stop();
-            siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
+            await siloHost.ReceivedWithAnyArgs(1).StopAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));
+            await siloHost.DidNotReceiveWithAnyArgs().StartAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -91,37 +101,48 @@ namespace TestServiceFabric
             activationContext.GetEndpoints().Returns(_ => endpoints);
 
             // Check for the silo endpoint.
-            var exception = Assert.Throws<KeyNotFoundException>(() => new OrleansCommunicationListener(serviceContext, clusterConfig));
-            Assert.Contains(OrleansCommunicationListener.SiloEndpointName, exception.Message);
+            var exception = Assert.Throws<KeyNotFoundException>(() => this.clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext));
+            var siloEndpointName = ServiceFabricConstants.SiloEndpointName;
+            Assert.Contains(siloEndpointName, exception.Message);
 
             // Check for the proxy endpoint.
-            endpoints.Add(CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082));
-            exception = Assert.Throws<KeyNotFoundException>(() => new OrleansCommunicationListener(serviceContext, clusterConfig));
-            Assert.Contains(OrleansCommunicationListener.GatewayEndpointName, exception.Message);
+            endpoints.Add(CreateEndpoint(siloEndpointName, 9082));
+            exception = Assert.Throws<KeyNotFoundException>(() => clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext));
+            Assert.Contains(ServiceFabricConstants.GatewayEndpointName, exception.Message);
         }
 
         [Fact]
-        public void AbortStopAndDisposesSilo()
+        public async Task AbortStopAndDisposesSilo()
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
-                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
-            var siloHost = Substitute.For<ISiloHost>();
+            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
             var listener = new OrleansCommunicationListener(
-                serviceContext,
-                new ClusterConfiguration())
-            {
-                SiloHost = siloHost
-            };
+                builder =>
+                {
+                    builder.ConfigureServices(
+                        services =>
+                        {
+                            // Use our mock silo host.
+                            services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
+                        });
+
+                    // Our cluster configuration is what feeds the endpoint info, so add it.
+                    builder.UseConfiguration(this.clusterConfig);
+                });
+
+            await listener.OpenAsync(CancellationToken.None);
+            var siloHost = listener.Host;
+            siloHost.ClearReceivedCalls();
 
             listener.Abort();
-            siloHost.ReceivedWithAnyArgs(1).Stop();
-            siloHost.ReceivedWithAnyArgs(1).Dispose();
-            siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
+            await siloHost.ReceivedWithAnyArgs(1).StopAsync(Arg.Is<CancellationToken>(c => c.IsCancellationRequested));
+            await siloHost.DidNotReceiveWithAnyArgs().StartAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -129,23 +150,32 @@ namespace TestServiceFabric
         {
             var endpoints = new EndpointsCollection
             {
-                CreateEndpoint(OrleansCommunicationListener.SiloEndpointName, 9082),
-                CreateEndpoint(OrleansCommunicationListener.GatewayEndpointName, 8888)
+                CreateEndpoint(ServiceFabricConstants.SiloEndpointName, 9082),
+                CreateEndpoint(ServiceFabricConstants.GatewayEndpointName, 8888)
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
-            var siloHost = Substitute.For<ISiloHost>();
+            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
             var listener = new OrleansCommunicationListener(
-                serviceContext,
-                new ClusterConfiguration())
-            {
-                SiloHost = siloHost
-            };
+                builder =>
+                {
+                    builder.ConfigureServices(
+                        services =>
+                        {
+                            // Use our mock silo host.
+                            services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
+                        });
 
+                    // Our cluster configuration is what feeds the endpoint info, so add it.
+                    builder.UseConfiguration(this.clusterConfig);
+                });
+
+            await listener.OpenAsync(CancellationToken.None);
+            var siloHost = listener.Host;
+            siloHost.ClearReceivedCalls();
             await listener.CloseAsync(CancellationToken.None);
-            siloHost.ReceivedWithAnyArgs(1).Stop();
-            siloHost.DidNotReceiveWithAnyArgs().Dispose();
-            siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
+            await siloHost.ReceivedWithAnyArgs(1).StopAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));
+            await siloHost.DidNotReceiveWithAnyArgs().StartAsync(Arg.Any<CancellationToken>());
         }
 
         private static EndpointResourceDescription CreateEndpoint(string name, int port)
@@ -156,6 +186,40 @@ namespace TestServiceFabric
                 .Invoke(endpoint, new object[] {port});
 
             return endpoint;
+        }
+        
+        public class MockSiloHost : ISiloHost
+        {
+            private readonly TaskCompletionSource<int> stopped = new TaskCompletionSource<int>();
+
+            public MockSiloHost(IServiceProvider services)
+            {
+                this.Services = services;
+            }
+
+            /// <inheritdoc />
+            public virtual IServiceProvider Services { get; }
+
+            /// <inheritdoc />
+            public virtual Task Stopped => this.stopped.Task;
+
+            /// <inheritdoc />
+            public virtual async Task StartAsync(CancellationToken cancellationToken)
+            {
+                // Await to avoid compiler warnings.
+                await Task.CompletedTask;
+            }
+
+            /// <inheritdoc />
+            public virtual Task StopAsync(CancellationToken cancellationToken)
+            {
+                this.stopped.TrySetResult(0);
+                return Task.CompletedTask;
+            }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

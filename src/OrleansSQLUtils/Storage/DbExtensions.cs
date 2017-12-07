@@ -62,7 +62,7 @@ namespace Orleans.SqlUtils
             { typeof(DateTimeOffset?),  DbType.DateTimeOffset },
         });
 
-        
+
         /// <summary>
         /// Creates a new SQL parameter using the given arguments.
         /// </summary>
@@ -99,7 +99,7 @@ namespace Orleans.SqlUtils
         /// <param name="size">The size of the parameter value.</param>
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
         /// <returns>A parameter created using the given arguments.</returns>
-        public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType=null)
+        public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
         {
             command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
         }
@@ -113,14 +113,21 @@ namespace Orleans.SqlUtils
         /// <param name="fieldName">The name of the field to retrieve.</param>
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
-        /// <exception cref="IndexOutOfRangeException"/>
+        /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
         public static TValue GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue @default = default(TValue))
         {
-            var ordinal = record.GetOrdinal(fieldName);
-            return record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
-        }
 
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
 
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.
@@ -130,12 +137,21 @@ namespace Orleans.SqlUtils
         /// <param name="fieldName">The name of the field to retrieve.</param>
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
-        /// <exception cref="IndexOutOfRangeException"/>
+        /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
         public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, string fieldName, TValue @default = default(TValue))
         {
-            var ordinal = record.GetOrdinal(fieldName);
-            return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false))
+                    ? @default
+                    : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
         }
 
 
@@ -165,6 +181,7 @@ namespace Orleans.SqlUtils
         /// <exception cref="IndexOutOfRangeException"/>                
         public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default(TValue))
         {
+
             return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
         }
 
@@ -176,14 +193,65 @@ namespace Orleans.SqlUtils
         /// <param name="record">The record from which to retrieve the value.</param>
         /// <param name="fieldName">The name of the field.</param>
         /// <returns>Value in the given field indicated by <see paramref="fieldName"/>.</returns>
-        /// <exception cref="IndexOutOfRangeException"/>
+        /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>        
         public static TValue GetValue<TValue>(this IDataRecord record, string fieldName)
         {
-            var ordinal = record.GetOrdinal(fieldName);
-            return (TValue)record.GetValue(ordinal);
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return (TValue)record.GetValue(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
         }
 
+
+        /// <summary>
+        /// Returns a value with the given <see paramref="fieldName"/> as int.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <exception cref="DataException"/>
+        /// <returns>Integer value in the given field indicated by <see paramref="fieldName"/>.</returns>
+        public static int GetInt32(this IDataRecord record, string fieldName)
+        {
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return record.GetInt32(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
+
+        /// <summary>
+        /// Returns a value with the given <see paramref="fieldName"/> as nullable int.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <exception cref="DataException"/>
+        /// <returns>Nullable int value in the given field indicated by <see paramref="fieldName"/>.</returns>
+        public static int? GetNullableInt32(this IDataRecord record, string fieldName)
+        {
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                var value = record.GetValue(ordinal);
+                if (value == DBNull.Value)
+                    return null;
+
+                return Convert.ToInt32(value);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
 
         /// <summary>
         /// Returns a value with the given <see paramref="fieldName"/>.
@@ -193,12 +261,19 @@ namespace Orleans.SqlUtils
         /// <param name="fieldName">The name of the field.</param>
         /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>Value in the given field indicated by <see paramref="fieldName"/>.</returns>
-        /// <exception cref="IndexOutOfRangeException"/>
+        /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>        
-        public static async Task<TValue> GetValueAsync<TValue>(this DbDataReader record, string fieldName, CancellationToken cancellationToken=default(CancellationToken))
+        public static async Task<TValue> GetValueAsync<TValue>(this DbDataReader record, string fieldName, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var ordinal = record.GetOrdinal(fieldName);
-            return await record.GetFieldValueAsync<TValue>(ordinal, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                return await record.GetFieldValueAsync<TValue>(ordinal, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
         }
 
 
@@ -211,12 +286,12 @@ namespace Orleans.SqlUtils
         /// <param name="parameters">The parameters.</param>
         /// <param name="nameMap">Maps a given property name to another one defined in the map.</param>
         /// <remarks>Does not support collection parameters currently. Does not cache reflection results.</remarks>
-        public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null) 
+        public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null)
         {
-            if(!EqualityComparer<T>.Default.Equals(parameters, default(T)))
+            if (!EqualityComparer<T>.Default.Equals(parameters, default(T)))
             {
                 var properties = parameters.GetType().GetTypeInfo().GetProperties();
-                for(int i = 0; i < properties.Length; ++i)
+                for (int i = 0; i < properties.Length; ++i)
                 {
                     var property = properties[i];
                     var value = property.GetValue(parameters, null);
@@ -246,10 +321,10 @@ namespace Orleans.SqlUtils
             //get garbage collected. Consequently the original struct value would not be set.            
             object obj = Activator.CreateInstance<TResult>();
             var properties = obj.GetType().GetProperties();
-            for(int i = 0; i < properties.Length; ++i)
+            for (int i = 0; i < properties.Length; ++i)
             {
                 var rp = record[properties[i].Name];
-                if(!Equals(rp, DBNull.Value))
+                if (!Equals(rp, DBNull.Value))
                 {
                     properties[i].SetValue(obj, rp, null);
                 }

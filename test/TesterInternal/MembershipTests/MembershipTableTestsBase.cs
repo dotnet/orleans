@@ -9,9 +9,12 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.MembershipTests
 {
@@ -31,43 +34,42 @@ namespace UnitTests.MembershipTests
     {
         private readonly TestEnvironmentFixture environment;
         private static readonly string hostName = Dns.GetHostName();
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
-        private readonly string deploymentId;
-
+        protected readonly string clusterId;
+        protected readonly string connectionString;
+        protected ILoggerFactory loggerFactory;
+        protected IOptions<SiloOptions> siloOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
-
-        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
+        protected readonly ClientConfiguration clientConfiguration;
+        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
-            LogManager.Initialize(new NodeConfiguration());
-            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
-            deploymentId = "test-" + Guid.NewGuid();
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
+            logger = loggerFactory.CreateLogger(this.GetType().FullName);
 
-            logger.Info("DeploymentId={0}", deploymentId);
+            this.clusterId = "test-" + Guid.NewGuid();
+
+            logger.Info("ClusterId={0}", this.clusterId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
+            this.connectionString = fixture.ConnectionString;
+            this.siloOptions = Options.Create(new SiloOptions() { ClusterId = this.clusterId });
+            var adoVariant = GetAdoInvariant();
 
-            var globalConfiguration = new GlobalConfiguration
+            membershipTable = CreateMembershipTable(logger);
+            membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+
+            clientConfiguration = new ClientConfiguration
             {
-                DeploymentId = deploymentId,
-                AdoInvariant = GetAdoInvariant(),
+                ClusterId = this.clusterId,
+                AdoInvariant = adoVariant,
                 DataConnectionString = fixture.ConnectionString
             };
 
-            membershipTable = CreateMembershipTable(logger);
-            membershipTable.InitializeMembershipTable(globalConfiguration, true, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
-
-            var clientConfiguration = new ClientConfiguration
-            {
-                DeploymentId = globalConfiguration.DeploymentId,
-                AdoInvariant = globalConfiguration.AdoInvariant,
-                DataConnectionString = globalConfiguration.DataConnectionString
-            };
-
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
@@ -80,12 +82,13 @@ namespace UnitTests.MembershipTests
         {
             if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                membershipTable.DeleteMembershipTableEntries(deploymentId).Wait();
+                membershipTable.DeleteMembershipTableEntries(this.clusterId).Wait();
             }
+            this.loggerFactory.Dispose();
         }
 
-        protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);
-        protected abstract IMembershipTable CreateMembershipTable(Logger logger);
+        protected abstract IGatewayListProvider CreateGatewayListProvider(ILogger logger);
+        protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
         protected abstract Task<string> GetConnectionString();
 
         protected virtual string GetAdoInvariant()
@@ -433,7 +436,7 @@ namespace UnitTests.MembershipTests
 
         private static SiloAddress CreateSiloAddressForTest()
         {
-            var siloAddress = SiloAddress.NewLocalAddress(Interlocked.Increment(ref generation));
+            var siloAddress = SiloAddressUtils.NewLocalSiloAddress(Interlocked.Increment(ref generation));
             siloAddress.Endpoint.Port = 12345;
             return siloAddress;
         }

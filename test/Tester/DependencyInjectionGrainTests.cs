@@ -10,6 +10,8 @@ using UnitTests.Grains;
 using Xunit;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Hosting;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.General
 {
@@ -23,8 +25,34 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.UseStartupType<TestStartup>();
+                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
                 return new TestCluster(options);
+            }
+
+            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            {
+                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                {
+                    return new SiloHostBuilder()
+                        .ConfigureSiloName(siloName)
+                        .UseConfiguration(clusterConfiguration)
+                        .ConfigureServices(ConfigureServices)
+                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                }
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services.AddSingleton<IInjectedService, InjectedService>();
+                services.AddScoped<IInjectedScopedService, InjectedScopedService>();
+
+                // explicitly register a grain class to assert that it will NOT use the registration, 
+                // as by design this is not supported.
+                services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
+                    sp => new ExplicitlyRegisteredSimpleDIGrain(
+                        sp.GetRequiredService<IInjectedService>(),
+                        "some value",
+                        5));
             }
         }
 
@@ -148,25 +176,6 @@ namespace UnitTests.General
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
             Assert.Contains("Error creating activation for", exception.Message);
             Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
-        }
-
-        public class TestStartup
-        {
-            public IServiceProvider ConfigureServices(IServiceCollection services)
-            {
-                services.AddSingleton<IInjectedService, InjectedService>();
-                services.AddScoped<IInjectedScopedService, InjectedScopedService>();
-
-                // explicitly register a grain class to assert that it will NOT use the registration, 
-                // as by design this is not supported.
-                services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
-                    sp => new ExplicitlyRegisteredSimpleDIGrain(
-                        sp.GetRequiredService<IInjectedService>(),
-                        "some value",
-                        5));
-
-                return services.BuildServiceProvider();
-            }
         }
     }
 }

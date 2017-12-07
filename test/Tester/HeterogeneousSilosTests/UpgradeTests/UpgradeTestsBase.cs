@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
@@ -203,7 +204,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 siloType = Silo.SiloType.Primary;
                 // Setup configuration
                 this.options = new TestClusterOptions(SiloCount);
-                options.ClusterConfiguration.UseStartupType<TestVersionGrains.Startup>();
                 options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
                 options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
                 options.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
@@ -218,19 +218,22 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 siloName = $"Secondary_{siloIdx}";
                 siloType = Silo.SiloType.Secondary;
             }
-
+            
             var silo = AppDomainSiloHandle.Create(
                 siloName,
                 siloType,
-                options.ClusterConfiguration,
-                options.ClusterConfiguration.Overrides[siloName],
-                new Dictionary<string, GeneratedAssembly>(),
-                rootDir.FullName);
+                typeof(TestVersionGrains.VersionGrainsSiloBuilderFactory),
+                this.options.ClusterConfiguration,
+                this.options.ClusterConfiguration.Overrides[siloName],
+                applicationBase: rootDir.FullName);
 
             if (this.siloIdx == 0)
             {
                 // If it was the first silo, setup the client
-                Client = new ClientBuilder().UseConfiguration(options.ClientConfiguration).Build();
+                Client = new ClientBuilder()
+                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                    .UseConfiguration(options.ClientConfiguration)
+                    .Build();
                 await Client.Connect();
                 ManagementGrain = Client.GetGrain<IManagementGrain>(0);
             }

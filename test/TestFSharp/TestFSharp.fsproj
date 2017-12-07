@@ -2,6 +2,7 @@
   <PropertyGroup>
     <AssemblyName>TestFSharp</AssemblyName>
     <RootNamespace>TestFSharp</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
 
