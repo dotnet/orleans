@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime
@@ -38,16 +39,20 @@ namespace Orleans.Runtime
             Type stageType,
             string stageName,
             CancellationToken ct,
+            ILogger log,
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
-            TimeSpan? workItemExecutionTimeTreshold = null)
+            TimeSpan? workItemExecutionTimeTreshold = null,
+            WorkItemStatusProvider workItemStatusProvider = null)
             : base(stageName)
         {
             StageType = stageType;
             CancellationToken = ct;
+            Log = log;
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
+            WorkItemStatusProvider = workItemStatusProvider;
         }
 
         public Type StageType { get; }
@@ -59,6 +64,10 @@ namespace Orleans.Runtime
         public bool DrainAfterCancel { get; }
 
         public TimeSpan WorkItemExecutionTimeTreshold { get; }
+
+        public WorkItemStatusProvider WorkItemStatusProvider { get; }
+
+        public ILogger Log { get; }
     }
 
     internal class SingleThreadExecutorOptions : ExecutorOptions
@@ -74,7 +83,7 @@ namespace Orleans.Runtime
         {
             StageName = stageName;
         }
-
+        
         public string StageName { get; }
     }
 }

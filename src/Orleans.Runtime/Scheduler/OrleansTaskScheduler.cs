@@ -64,8 +64,21 @@ namespace Orleans.Runtime.Scheduler
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
-            executor = executorService.GetExecutor(new ThreadPoolExecutorOptions(GetType(), "", new CancellationTokenSource().Token, 4)); // need second executor for system
-            systemExecutor = executorService.GetExecutor(new ThreadPoolExecutorOptions(GetType(), "", new CancellationTokenSource().Token));
+            ThreadPoolExecutorOptions ExecutorOptionsFactory(int degreeOfParalelism)
+            {
+                var executorName = "executor";
+                return new ThreadPoolExecutorOptions(
+                    GetType(),
+                    executorName,
+                    new CancellationTokenSource().Token,
+                    loggerFactory.CreateLogger(executorName),
+                    degreeOfParalelism,
+                    workItemExecutionTimeTreshold: TurnWarningLengthThreshold,
+                    workItemStatusProvider: GetWorkItemStatus);
+            }
+
+            executor = executorService.GetExecutor(ExecutorOptionsFactory(4));
+            systemExecutor = executorService.GetExecutor(ExecutorOptionsFactory(2));
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
@@ -401,6 +414,12 @@ namespace Orleans.Runtime.Scheduler
                 logger.Info(ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     executor.WorkQueueCount, WorkItemGroupCount, stats);
+        }
+
+        private string GetWorkItemStatus(object item, bool detailed)
+        {
+            if (!detailed || !(item is IWorkItem workItem)) return string.Empty;
+            return workItem is WorkItemGroup group ? string.Format("WorkItemGroup Details: {0}", group.DumpStatus()) : string.Empty;
         }
 
         internal void DumpSchedulerStatus(bool alwaysOutput = true)

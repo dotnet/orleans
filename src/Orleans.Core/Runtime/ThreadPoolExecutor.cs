@@ -66,7 +66,12 @@ namespace Orleans.Runtime
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
-            var workItem = new QueueWorkItemCallback(callback, state);
+            var workItem = new QueueWorkItemCallback(
+                callback, 
+                state,
+                _executorOptions.WorkItemExecutionTimeTreshold,
+                _executorOptions.WorkItemStatusProvider);
+
             TrackRequestEnqueue(workItem);
             workQueue.Add(workItem);
         }
@@ -195,7 +200,7 @@ namespace Orleans.Runtime
 
             private readonly WaitCallback callback;
 
-            private readonly Func<object, string> statusProvider;
+            private readonly WorkItemStatusProvider statusProvider;
 
             private readonly object state;
 
@@ -203,21 +208,24 @@ namespace Orleans.Runtime
 
             private ITimeInterval timeInterval;
 
-            public QueueWorkItemCallback(WaitCallback callback, object state, TimeSpan executionTimeTreshold)
+            // lightweight mean of execution time tracking 
+            private DateTime executionStart;
+
+            public QueueWorkItemCallback(
+                WaitCallback callback, 
+                object state, 
+                TimeSpan executionTimeTreshold,
+                WorkItemStatusProvider statusProvider = null)
             {
                 this.callback = callback;
                 this.state = state;
                 this.executionTimeTreshold = executionTimeTreshold;
-            }
-
-            public QueueWorkItemCallback(WaitCallback callback, object state, Func<object, string> statusProvider)
-                : this(callback, state, TimeSpan.MaxValue)
-            {
                 this.statusProvider = statusProvider;
             }
 
             public void ExecuteWorkItem()
             {
+                executionStart = DateTime.UtcNow;
                 callback.Invoke(state);
             }
 
@@ -237,19 +245,14 @@ namespace Orleans.Runtime
                 timeInterval.Restart();
             }
 
-            private string GetWorkItemStatus(bool detailed)
+            internal string GetWorkItemStatus(bool detailed)
             {
-                return statusProvider?.Invoke(state);
+                return $"WorkItem={state} Executing for {Utils.Since(executionStart)} {statusProvider?.Invoke(state, detailed)}";
             }
 
             internal bool CheckHealth()
             {
-                if (!IsFrozen()) return true;
-
-                //Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
-                //    "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
-                //    Name, ManagedThreadId, GetThreadStatus(true)));
-                return false;
+                return !IsFrozen();
             }
 
             private bool IsFrozen()
@@ -260,10 +263,11 @@ namespace Orleans.Runtime
                 }
 
                 return false;
-                //  // If there is no active Task, check current wokr item, if any.
+                //  // If there is no active Task, check current work item, if any.
                 //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
                 //   return frozenWorkItem;
             }
+
             public TimeSpan Elapsed => timeInterval.Elapsed;
         }
 
@@ -273,10 +277,16 @@ namespace Orleans.Runtime
             foreach (var workItem in QueueWorkItemRefs)
             {
                 if (workItem != null && !workItem.CheckHealth())
+                {
                     ok = false;
+                    _executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
+                        $"Work item {0} has been executing for long time:GetThreadStatus(true) {workItem.GetWorkItemStatus(true)}");
+                }
             }
 
             return ok;
         }
     }
+
+    internal delegate string WorkItemStatusProvider(object state, bool detailed);
 }
