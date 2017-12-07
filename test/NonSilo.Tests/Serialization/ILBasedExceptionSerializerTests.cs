@@ -1,18 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Utilities;
 using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using Orleans.Serialization;
-
-    using Xunit;
-
     [TestCategory("BVT"), TestCategory("Serialization")]
     public class ILBasedExceptionSerializerTests
     {
