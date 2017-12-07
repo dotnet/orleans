@@ -770,7 +770,10 @@ namespace Orleans
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
-                throw new ArgumentException("Argument obj is already a grain reference.");
+                throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
+
+            if (obj is Grain)
+                throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
             if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
