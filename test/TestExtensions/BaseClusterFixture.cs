@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -9,7 +11,7 @@ namespace TestExtensions
     public abstract class BaseTestClusterFixture : IDisposable
     {
         private ExceptionDispatchInfo preconditionsException;
-
+        private ILogger appLogger;
         static BaseTestClusterFixture()
         {
             TestDefaultConfiguration.InitializeDefaults();
@@ -33,6 +35,7 @@ namespace TestExtensions
                 testCluster?.Deploy();
             }
             this.HostedCluster = testCluster;
+            this.appLogger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public void EnsurePreconditionsMet()
@@ -51,7 +54,8 @@ namespace TestExtensions
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
-        public Logger Logger => this.Client?.Logger;
+        public ILogger Logger => this.appLogger;
+           
 
         public virtual void Dispose()
         {

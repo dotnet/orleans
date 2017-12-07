@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
     {
         private readonly TestEnvironmentFixture environment;
         private static readonly string hostName = Dns.GetHostName();
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
         protected readonly string clusterId;
@@ -47,7 +47,7 @@ namespace UnitTests.MembershipTests
         {
             this.environment = environment;
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
-            logger = new LoggerWrapper<MembershipTableTestsBase>(loggerFactory);
+            logger = loggerFactory.CreateLogger(this.GetType().FullName);
 
             this.clusterId = "test-" + Guid.NewGuid();
 
@@ -87,8 +87,8 @@ namespace UnitTests.MembershipTests
             this.loggerFactory.Dispose();
         }
 
-        protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);
-        protected abstract IMembershipTable CreateMembershipTable(Logger logger);
+        protected abstract IGatewayListProvider CreateGatewayListProvider(ILogger logger);
+        protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
         protected abstract Task<string> GetConnectionString();
 
         protected virtual string GetAdoInvariant()

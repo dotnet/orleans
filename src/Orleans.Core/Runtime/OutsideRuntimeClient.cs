@@ -26,7 +26,7 @@ namespace Orleans
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private ILogger logger;
-        private Logger callBackDataLogger;
+        private ILogger callBackDataLogger;
         private ILogger timerLogger;
         private ClientConfiguration config;
         private ClientMessagingOptions clientMessagingOptions;
@@ -105,7 +105,7 @@ namespace Orleans
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
-            this.callBackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
+            this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 

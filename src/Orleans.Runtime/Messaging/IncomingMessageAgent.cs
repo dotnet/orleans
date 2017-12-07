@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
         public override void Start()
         {
             base.Start();
-            if (Log.IsVerbose3) Log.Verbose3("Started incoming message agent for silo at {0} for {1} messages", messageCenter.MyAddress, category);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Started incoming message agent for silo at {0} for {1} messages", messageCenter.MyAddress, category);
         }
 
         protected override void Run()
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
                 var msg = messageCenter.WaitMessage(category, ct);
                 if (msg == null)
                 {
-                    if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
+                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
                     // Null return means cancelled
                     break;
                 }

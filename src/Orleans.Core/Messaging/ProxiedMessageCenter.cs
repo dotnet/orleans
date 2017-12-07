@@ -83,7 +83,7 @@ namespace Orleans.Messaging
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference[] grainBuckets;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
@@ -124,8 +124,8 @@ namespace Orleans.Messaging
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
-            logger = new LoggerWrapper<ProxiedMessageCenter>(loggerFactory);
-            if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
+            logger = loggerFactory.CreateLogger<ProxiedMessageCenter>();
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
                 () =>
@@ -148,7 +148,7 @@ namespace Orleans.Messaging
             {
                 queueTracking.OnStartExecution();
             }
-            if (logger.IsVerbose) logger.Verbose("Proxy grain client started");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
         }
 
         public void PrepareToStop()
@@ -192,7 +192,7 @@ namespace Orleans.Messaging
                     {
                         gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, executorService, this.loggerFactory, this.openConnectionTimeout);
                         gatewayConnections[addr] = gatewayConnection;
-                        if (logger.IsVerbose) logger.Verbose("Creating gateway to {0} for pre-addressed message", addr);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
                     }
                 }
@@ -223,7 +223,7 @@ namespace Orleans.Messaging
                     {
                         gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
                         gatewayConnections[addr] = gatewayConnection;
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
                     }
                     // else - Fast path - we've got a live gatewayConnection to use
@@ -254,12 +254,12 @@ namespace Orleans.Messaging
                             logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, GatewayManager);
                             return;
                         }
-                        if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
                             gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
                             gatewayConnections[addr] = gatewayConnection;
-                            if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
+                            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));
                             startRequired = true;
                         }
@@ -287,7 +287,7 @@ namespace Orleans.Messaging
             try
             {
                 gatewayConnection.QueueRequest(msg);
-                if (logger.IsVerbose2) logger.Verbose2(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewayConnection.Address);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewayConnection.Address);
             }
             catch (InvalidOperationException)
             {
@@ -344,23 +344,23 @@ namespace Orleans.Messaging
             catch (ThreadAbortException exc)
             {
                 // Silo may be shutting-down, so downgrade to verbose log
-                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
+                logger.Debug(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
                 Thread.ResetAbort();
                 return null;
             }
             catch (OperationCanceledException exc)
             {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
+                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
                 return null;
             }
             catch (ObjectDisposedException exc)
             {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
+                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
                 return null;
             }
             catch (InvalidOperationException exc)
             {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
+                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
                 return null;
             }
             catch (Exception ex)
@@ -388,11 +388,11 @@ namespace Orleans.Messaging
             var reason = String.Format(reasonFormat, reasonParams);
             if (msg.Direction != Message.Directions.Request)
             {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
             }
             else
             {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
                 QueueIncomingMessage(error);

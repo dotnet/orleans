@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -29,7 +30,7 @@ namespace Orleans.Streams
             Filter = filter;
         }
 
-        internal void SafeDisposeCursor(Logger logger)
+        internal void SafeDisposeCursor(ILogger logger)
         {
             try
             {

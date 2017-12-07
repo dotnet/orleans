@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.LogConsistency;
 using Orleans.Storage;
@@ -81,7 +82,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                     await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalStateCache);
 
-                    Services.Log(Severity.Verbose, "read success {0}", GlobalStateCache);
+                    Services.Log(LogLevel.Debug, "read success {0}", GlobalStateCache);
 
                     LastPrimaryIssue.Resolve(Host, Services);
 
@@ -92,7 +93,7 @@ namespace Orleans.EventSourcing.StateStorage
                     LastPrimaryIssue.Record(new ReadFromStateStorageFailed() { Exception = e }, Host, Services);
                 }
 
-                Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
+                Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
 
                 await LastPrimaryIssue.DelayBeforeRetry();
             }
@@ -128,7 +129,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                 GlobalStateCache = nextglobalstate;
 
-                Services.Log(Severity.Verbose, "write ({0} updates) success {1}", updates.Length, GlobalStateCache);
+                Services.Log(LogLevel.Debug, "write ({0} updates) success {1}", updates.Length, GlobalStateCache);
 
                 LastPrimaryIssue.Resolve(Host, Services);
             }
@@ -139,7 +140,7 @@ namespace Orleans.EventSourcing.StateStorage
 
             if (!batchsuccessfullywritten)
             {
-                Services.Log(Severity.Verbose, "write apparently failed {0} {1}", nextglobalstate, LastPrimaryIssue);
+                Services.Log(LogLevel.Debug, "write apparently failed {0} {1}", nextglobalstate, LastPrimaryIssue);
 
                 while (true) // be stubborn until we can read what is there
                 {
@@ -150,7 +151,7 @@ namespace Orleans.EventSourcing.StateStorage
                     {
                         await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalStateCache);
 
-                        Services.Log(Severity.Verbose, "read success {0}", GlobalStateCache);
+                        Services.Log(LogLevel.Debug, "read success {0}", GlobalStateCache);
 
                         LastPrimaryIssue.Resolve(Host, Services);
 
@@ -161,7 +162,7 @@ namespace Orleans.EventSourcing.StateStorage
                         LastPrimaryIssue.Record(new ReadFromStateStorageFailed() { Exception = e }, Host, Services);
                     }
 
-                    Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
+                    Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
                 }
 
                 // check if last apparently failed write was in fact successful
@@ -170,7 +171,7 @@ namespace Orleans.EventSourcing.StateStorage
                 {
                     GlobalStateCache = nextglobalstate;
 
-                    Services.Log(Severity.Verbose, "last write ({0} updates) was actually a success {1}", updates.Length, GlobalStateCache);
+                    Services.Log(LogLevel.Debug, "last write ({0} updates) was actually a success {1}", updates.Length, GlobalStateCache);
 
                     batchsuccessfullywritten = true;
                 }
@@ -291,7 +292,7 @@ namespace Orleans.EventSourcing.StateStorage
             // discard notifications that are behind our already confirmed state
             while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalStateCache.StateAndMetaData.GlobalVersion)
             {
-                Services.Log(Severity.Verbose, "discarding notification {0}", notifications.ElementAt(0).Value);
+                Services.Log(LogLevel.Debug, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
@@ -318,10 +319,10 @@ namespace Orleans.EventSourcing.StateStorage
 
                 GlobalStateCache.ETag = updateNotification.ETag;         
 
-                Services.Log(Severity.Verbose, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalStateCache);
+                Services.Log(LogLevel.Debug, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalStateCache);
             }
 
-            Services.Log(Severity.Verbose2, "unprocessed notifications in queue: {0}", notifications.Count);
+            Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
          
@@ -338,7 +339,7 @@ namespace Orleans.EventSourcing.StateStorage
         private void enter_operation(string name)
         {
 #if DEBUG
-            Services.Log(Severity.Verbose2, "/-- enter {0}", name);
+            Services.Log(LogLevel.Trace, "/-- enter {0}", name);
             Debug.Assert(!operation_in_progress);
             operation_in_progress = true;
 #endif
@@ -348,7 +349,7 @@ namespace Orleans.EventSourcing.StateStorage
         private void exit_operation(string name)
         {
 #if DEBUG
-            Services.Log(Severity.Verbose2, "\\-- exit {0}", name);
+            Services.Log(LogLevel.Trace, "\\-- exit {0}", name);
             Debug.Assert(operation_in_progress);
             operation_in_progress = false;
 #endif

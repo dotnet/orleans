@@ -30,7 +30,7 @@ namespace Orleans.Messaging
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         protected override void Process(Message msg)
         {
-            if (Log.IsVerbose2) Log.Verbose2("Got a {0} message to send: {1}", msg.Direction, msg);
+            if (Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Got a {0} message to send: {1}", msg.Direction, msg);
             bool continueSend = PrepareMessageForSend(msg);
             if (!continueSend) return;
 
@@ -54,7 +54,7 @@ namespace Orleans.Messaging
                 {
                     this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
                         headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
-                    if (this.Log.IsVerbose3) this.Log.Verbose3("Sending large message {0}", msg.ToLongString());
+                    if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Sending large message {0}", msg.ToLongString());
                 }
             }
             catch (Exception exc)

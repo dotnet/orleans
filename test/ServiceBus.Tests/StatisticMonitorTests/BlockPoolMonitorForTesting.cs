@@ -15,9 +15,9 @@ namespace ServiceBus.Tests.MonitorTests
 {
     public class BlockPoolMonitorForTesting : IBlockPoolMonitor
     {
-        public static BlockPoolMonitorForTesting Instance = new BlockPoolMonitorForTesting(null, null);
+        public static BlockPoolMonitorForTesting Instance = new BlockPoolMonitorForTesting();
         public ObjectPoolMonitorCounters CallCounters;
-        private BlockPoolMonitorForTesting(EventHubBlockPoolMonitorDimensions dimensions, Logger logger)
+        private BlockPoolMonitorForTesting()
         {
             CallCounters = new ObjectPoolMonitorCounters();
         }

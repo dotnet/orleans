@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -168,7 +169,7 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        private async Task LogGrainIdentity(Logger logger, ILivenessTestGrain grain)
+        private async Task LogGrainIdentity(ILogger logger, ILivenessTestGrain grain)
         {
             logger.Info("Grain {0}, activation {1} on {2}",
                 await grain.GetGrainReference(),

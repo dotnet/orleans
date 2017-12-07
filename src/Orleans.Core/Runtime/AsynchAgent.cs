@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         protected IExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
-        protected Logger Log;
+        protected ILogger Log;
         protected readonly string type;
         protected FaultBehavior OnFault;
         protected bool disposed;
@@ -52,7 +52,7 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = new LoggerWrapper(Name, loggerFactory);
+            Log = loggerFactory.CreateLogger(Name);
 
             this.executorService = executorService;
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure DomainUnload handler does not throw.
-                Log.Verbose("Ignoring error during Stop: {0}", exc);
+                Log.Debug("Ignoring error during Stop: {0}", exc);
             }
         }
 
@@ -107,7 +107,7 @@ namespace Orleans.Runtime
                 State = ThreadState.Running;
             }
 
-            if (Log.IsVerbose) Log.Verbose("Started asynch agent " + this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
         }
 
         public virtual void OnStart() { }
@@ -134,9 +134,9 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure stop does not throw.
-                Log.Verbose("Ignoring error during Stop: {0}", exc);
+                Log.Debug("Ignoring error during Stop: {0}", exc);
             }
-            Log.Verbose("Stopped agent");
+            Log.Debug("Stopped agent");
         }
 
 #region IDisposable Members

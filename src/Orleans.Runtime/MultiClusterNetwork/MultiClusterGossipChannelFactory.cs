@@ -10,9 +10,9 @@ namespace Orleans.Runtime.MultiClusterNetwork
     {
         private readonly GlobalConfiguration globalConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
-        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider, LoggerWrapper<MultiClusterGossipChannelFactory> logger)
+        public MultiClusterGossipChannelFactory(GlobalConfiguration globalConfig, IServiceProvider serviceProvider, ILogger<MultiClusterGossipChannelFactory> logger)
         {
             this.globalConfig = globalConfig;
             this.serviceProvider = serviceProvider;

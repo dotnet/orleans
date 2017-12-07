@@ -12,8 +12,8 @@ namespace Orleans.Providers
     internal class LoadedProviderTypeLoaders
     {
         internal ConcurrentBag<ProviderTypeLoader> Managers { get; private set; }
-        private readonly Logger logger;
-        public LoadedProviderTypeLoaders(LoggerWrapper<LoadedProviderTypeLoaders> logger)
+        private readonly ILogger logger;
+        public LoadedProviderTypeLoaders(ILogger<LoadedProviderTypeLoaders> logger)
         {
             this.Managers = new ConcurrentBag<ProviderTypeLoader>();
             AppDomain.CurrentDomain.AssemblyLoad += ProcessNewAssembly;
@@ -56,7 +56,7 @@ namespace Orleans.Providers
         private readonly HashSet<Type> alreadyProcessed;
         public bool IsActive { get; set; }
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
 
         public ProviderTypeLoader(Func<Type, bool> condition, Action<Type> action, ILoggerFactory loggerFactory)
@@ -64,7 +64,7 @@ namespace Orleans.Providers
             this.condition = condition;
             callback = action;
             alreadyProcessed = new HashSet<Type>();
-            this.logger = new LoggerWrapper<ProviderTypeLoader>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<ProviderTypeLoader>();
             IsActive = true;
          }
 

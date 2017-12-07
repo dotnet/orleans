@@ -14,10 +14,10 @@ namespace Orleans.Runtime.MembershipService
     internal class GrainBasedMembershipTable : IMembershipTable
     {
         private readonly IServiceProvider serviceProvider;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private IMembershipTableGrain grain;
 
-        public GrainBasedMembershipTable(IServiceProvider serviceProvider, LoggerWrapper<MembershipTableFactory> logger)
+        public GrainBasedMembershipTable(IServiceProvider serviceProvider, ILogger<MembershipTableFactory> logger)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;

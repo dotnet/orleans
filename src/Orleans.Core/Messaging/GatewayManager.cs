@@ -24,7 +24,7 @@ namespace Orleans.Messaging
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private readonly SafeRandom rand;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly object lockable;
 
@@ -36,7 +36,7 @@ namespace Orleans.Messaging
             config = cfg;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
-            logger = new LoggerWrapper<GatewayManager>(loggerFactory);
+            logger = loggerFactory.CreateLogger<GatewayManager>();
             this.loggerFactory = loggerFactory;
             lockable = new object();
             gatewayRefreshCallInitiated = false;
@@ -197,9 +197,9 @@ namespace Orleans.Messaging
 
                 // the listProvider.GetGateways() is not under lock.
                 var currentKnownGateways = ListProvider.GetGateways().GetResult();
-                if (logger.IsVerbose)
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Verbose("Found {0} knownGateways from Gateway listProvider {1}", currentKnownGateways.Count, Utils.EnumerableToString(currentKnownGateways));
+                    logger.Debug("Found {0} knownGateways from Gateway listProvider {1}", currentKnownGateways.Count, Utils.EnumerableToString(currentKnownGateways));
                 }
 
                 // the next one will grab the lock.
@@ -241,7 +241,7 @@ namespace Orleans.Messaging
 
                 DateTime prevRefresh = lastRefreshTime;
                 lastRefreshTime = DateTime.UtcNow;
-                if (logger.IsInfo)
+                if (logger.IsEnabled(LogLevel.Information))
                 {
                     logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
                             "Refreshed the live Gateway list. Found {0} gateways from Gateway listProvider: {1}. Picked only known live out of them. Now has {2} live Gateways: {3}. Previous refresh time was = {4}",

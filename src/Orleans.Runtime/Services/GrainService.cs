@@ -17,9 +17,8 @@ namespace Orleans.Runtime
         private readonly IConsistentRingProvider ring;
         private readonly string typeName;
         private GrainServiceStatus status;
-
-        /// <summary>Logger instance to be used by grain service subclasses</summary>
-        protected Logger Logger { get; }
+        
+        private ILogger Logger;
         /// <summary>Token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
         /// <summary>Monotonically increasing serial number of the version of the ring range owned by the grain service instance</summary>
@@ -50,7 +49,7 @@ namespace Orleans.Runtime
         protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
-            Logger = new LoggerWrapper(typeName, loggerFactory);
+            Logger = loggerFactory.CreateLogger(typeName);
 
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;

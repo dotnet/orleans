@@ -14,7 +14,7 @@ namespace Orleans.Runtime
 {
     internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener, IDisposable
     {
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloStatusOracle statusOracle;
         private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
                 throw new ArgumentNullException(nameof(scheduler));
             if (implicitStreamSubscriberTable == null)
                 throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
-            this.logger = new LoggerWrapper<TypeManager>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<TypeManager>();
             this.grainTypeManager = grainTypeManager;
             this.statusOracle = oracle;
             this.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
@@ -100,7 +100,7 @@ namespace Orleans.Runtime
             // Check if we have to refresh
             if (!hasToRefreshClusterGrainInterfaceMap)
             {
-                logger.Verbose3("OnRefreshClusterMapTimer: no refresh required");
+                logger.Trace("OnRefreshClusterMapTimer: no refresh required");
                 return;
             }
             hasToRefreshClusterGrainInterfaceMap = false;
@@ -124,13 +124,13 @@ namespace Orleans.Runtime
                 GrainInterfaceMap value;
                 if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))
                 {
-                    logger.Verbose3($"OnRefreshClusterMapTimer: value already found locally for {siloAddress}");
+                    logger.Trace($"OnRefreshClusterMapTimer: value already found locally for {siloAddress}");
                     newSilosClusterGrainInterfaceMap[siloAddress] = value;
                 }
                 else
                 {
                     // Value not found, let's get it
-                    logger.Verbose3($"OnRefreshClusterMapTimer: value not found locally for {siloAddress}");
+                    logger.Trace($"OnRefreshClusterMapTimer: value not found locally for {siloAddress}");
                     getGrainInterfaceMapTasks.Add(GetTargetSiloGrainInterfaceMap(siloAddress));
                 }
             }
