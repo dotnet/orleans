@@ -31,6 +31,7 @@ namespace Orleans.Runtime.Scheduler
         private TimeSpan totalQueuingDelay;
         private readonly long quantumExpirations;
         private readonly int workItemGroupStatisticsNumber;
+        private readonly CancellationToken cancellationToken;
 
         internal ActivationTaskScheduler TaskRunner { get; private set; }
         
@@ -128,11 +129,15 @@ namespace Orleans.Runtime.Scheduler
         //private static readonly int MaxWaitingThreads = 500;
 
 
-        internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext, ILoggerFactory loggerFactory)
+        internal WorkItemGroup(
+            OrleansTaskScheduler sched, 
+            ISchedulingContext schedulingContext,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct)
         {
-            // todo: should accept cancellation token
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
+            cancellationToken = ct;
             state = WorkGroupStatus.Waiting;
             workItems = new Queue<Task>();
             lockable = new Object();
@@ -309,12 +314,12 @@ namespace Orleans.Runtime.Scheduler
                         }
 
                         // Check the cancellation token (means that the silo is stopping)
-                        //if (thread.CancelToken.IsCancellationRequested) // todo
-                        //{
-                        //    log.Warn(ErrorCode.SchedulerSkipWorkCancelled, "Thread {0} is exiting work loop due to cancellation token. WorkItemGroup: {1}, Have {2} work items in the queue.",
-                        //        thread.ToString(), this.ToString(), WorkItemCount);
-                        //    break;
-                        //}
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            log.Warn(ErrorCode.SchedulerSkipWorkCancelled, "Thread {0} is exiting work loop due to cancellation token. WorkItemGroup: {1}, Have {2} work items in the queue.",
+                                thread.ToString(), this.ToString(), WorkItemCount);
+                            break;
+                        }
                     }
 
                     // Get the first Work Item on the list

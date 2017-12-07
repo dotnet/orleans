@@ -232,8 +232,7 @@ namespace Orleans.Runtime.Scheduler
                 }
             });
         }
-
-
+        
         // Enqueue a work item to a given context
         public void QueueWorkItem(IWorkItem workItem, ISchedulingContext context)
         {
@@ -280,7 +279,7 @@ namespace Orleans.Runtime.Scheduler
         {
             if (context == null) return null;
 
-            var wg = new WorkItemGroup(this, context, this.loggerFactory);
+            var wg = new WorkItemGroup(this, context, this.loggerFactory, cancellationTokenSource.Token);
             workgroupDirectory.TryAdd(context, wg);
             return wg;
         }
