@@ -217,27 +217,49 @@ namespace Orleans.Messaging
                 // now take whatever listProvider gave us and exclude those we think are dead.
 
                 var live = new List<Uri>();
+                var now = DateTime.UtcNow;
 
                 var knownGateways = currentKnownGateways as IList<Uri> ?? currentKnownGateways.ToList();
                 foreach (Uri trial in knownGateways)
                 {
-                    DateTime diedAt;
                     // We consider a node to be dead if we recorded it is dead due to socket error
                     // and it was recorded (diedAt) not too long ago (less than maxStaleness ago).
                     // The latter is to cover the case when the Gateway provider returns an outdated list that does not yet reflect the actually recently died Gateway.
                     // If it has passed more than maxStaleness - we assume maxStaleness is the upper bound on Gateway provider freshness.
-                    bool isDead = knownDead.TryGetValue(trial, out diedAt) && DateTime.UtcNow.Subtract(diedAt) < maxStaleness;
+                    var isDead = false;
+                    if (knownDead.TryGetValue(trial, out var diedAt))
+                    {
+                        if (now.Subtract(diedAt) < maxStaleness)
+                        {
+                            isDead = true;
+                        }
+                        else
+                        {
+                            // Remove stale entries.
+                            knownDead.Remove(trial);
+                        }
+                    }
+
                     if (!isDead)
                     {
                         live.Add(trial);
                     }
                 }
 
+                if (live.Count == 0)
+                {
+                    logger.Warn(
+                        ErrorCode.GatewayManager_AllGatewaysDead,
+                        "All gateways have previously been marked as dead. Clearing the list of dead gateways to expedite reconnection.");
+                    live.AddRange(knownGateways);
+                    knownDead.Clear();
+                }
+
                 // swap cachedLiveGateways pointer in one atomic operation
                 cachedLiveGateways = live;
 
                 DateTime prevRefresh = lastRefreshTime;
-                lastRefreshTime = DateTime.UtcNow;
+                lastRefreshTime = now;
                 if (logger.IsInfo)
                 {
                     logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
