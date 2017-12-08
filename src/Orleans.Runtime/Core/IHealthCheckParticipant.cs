@@ -1,7 +1,7 @@
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Interface for health check participants (which are being polled by Watchdog)
+    /// Interface for health check participants
     /// </summary>
     public interface IHealthCheckParticipant : IHealthCheckable
     {

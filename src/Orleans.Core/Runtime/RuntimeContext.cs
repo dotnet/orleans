@@ -25,12 +25,13 @@ namespace Orleans.Runtime
             // There seems to be an implicit coupling of threads and contexts here that may be fragile. 
             // E.g. if InitializeThread() is mistakenly called on a wrong thread, would that thread be considered a worker pool thread from that point on? 
             // Is there a better/safer way to identify worker threads? 
-            if (context != null && scheduler != null)
+            if (context != null)
             {
-                return; // todo, Currently only orleans own threads being initialized,
-                // but in perspective - this method will be called on external ones.
-                throw new InvalidOperationException("RuntimeContext.Current has already been initialized for this thread.");
+                // Currently only orleans own threads being initialized,
+                // but in perspective - this method will be called on external ones
+                return; 
             }
+
             context = new RuntimeContext {Scheduler = scheduler};
         }
 
@@ -49,7 +50,7 @@ namespace Orleans.Runtime
         internal static void ResetExecutionContext()
         {
             context.ActivationContext = null;
-            context.Scheduler = null;
+            context.Scheduler = null; 
         }
 
         public override string ToString()

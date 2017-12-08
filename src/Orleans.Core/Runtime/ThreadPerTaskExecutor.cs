@@ -37,8 +37,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    executorOptions.Log
-                    .LogError(ex, $"Executor thread {Thread.CurrentThread.Name} encoundered unexpected exception.");
+                    executorOptions.Log.LogError(ex, $"Executor thread {Thread.CurrentThread.Name} encoundered unexpected exception.");
                 }
             })
             {

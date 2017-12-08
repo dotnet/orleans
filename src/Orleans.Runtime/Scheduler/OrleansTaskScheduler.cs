@@ -66,23 +66,23 @@ namespace Orleans.Runtime.Scheduler
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
-            ThreadPoolExecutorOptions ExecutorOptionsFactory(int degreeOfParalelism)
+            IExecutor GetExecutor(string namePrefix, int degreeOfParalelism, bool drainAfterCancel)
             {
-                var executorName = "executor";
-                // todo : drainAfterCancel system queue
-                return new ThreadPoolExecutorOptions(
-                    GetType(),
-                    executorName,
-                    cancellationTokenSource.Token,
-                    loggerFactory.CreateLogger(executorName),
-                    degreeOfParalelism,
-                    workItemExecutionTimeTreshold: TurnWarningLengthThreshold,
-                    delayWarningThreshold: DelayWarningThreshold,
-                    workItemStatusProvider: GetWorkItemStatus);
+                var executorName = namePrefix + "SchedulerExecutor";
+                return executorService.GetExecutor(new ThreadPoolExecutorOptions(
+                      GetType(),
+                      executorName,
+                      cancellationTokenSource.Token,
+                      loggerFactory.CreateLogger(executorName),
+                      degreeOfParalelism,
+                      drainAfterCancel,
+                      TurnWarningLengthThreshold,
+                      DelayWarningThreshold,
+                      GetWorkItemStatus));
             }
 
-            executor = executorService.GetExecutor(ExecutorOptionsFactory(maxActiveThreads));
-            systemExecutor = executorService.GetExecutor(ExecutorOptionsFactory(2));
+            executor = GetExecutor(string.Empty, maxActiveThreads, false);
+            systemExecutor = GetExecutor("System", 1, true);
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
@@ -216,8 +216,6 @@ namespace Orleans.Runtime.Scheduler
 
         public void ScheduleExecution(IWorkItem todo)
         {
-            // add longTurnTimer
-            // todo: calculate time in queue - difference between enqueuing and start of execution
             executor.QueueWorkItem(state =>
             {
                 RuntimeContext.InitializeThread(this);

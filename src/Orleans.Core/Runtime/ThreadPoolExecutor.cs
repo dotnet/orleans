@@ -224,6 +224,7 @@ namespace Orleans.Runtime
             }
 
             internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
+
             internal object State => state;
 
             public void ExecuteWorkItem()
@@ -266,9 +267,6 @@ namespace Orleans.Runtime
                 }
 
                 return false;
-                //  // If there is no active Task, check current work item, if any.
-                //   bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-                //   return frozenWorkItem;
             }
 
             public TimeSpan Elapsed => timeInterval.Elapsed;
@@ -283,7 +281,7 @@ namespace Orleans.Runtime
                 {
                     ok = false;
                     executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
-                        $"Work item {0} has been executing for long time:GetThreadStatus(true) {workItem.GetWorkItemStatus(true)}");
+                        $"Work item {workItem.GetWorkItemStatus(true)} has been executing for long time.");
                 }
             }
 
