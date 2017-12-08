@@ -242,10 +242,9 @@ namespace UnitTestGrains
 
         private void LogStatus(string what)
         {
-            //logger.Info("{0} Tick # {1} - {2} - RuntimeContext.Current={3} TaskScheduler.Current={4} CurrentWorkerThread={5}",
-            //            timerName, tickCount, what, RuntimeContext.Current, TaskScheduler.Current,
-            //            WorkerPoolThread.CurrentWorkerThread);
+            logger.Info("{0} Tick # {1} - {2} - RuntimeContext.Current={3} TaskScheduler.Current={4} CurrentWorkerThread={5}",
+                        timerName, tickCount, what, RuntimeContext.Current, TaskScheduler.Current,
+                        Thread.CurrentThread.Name);
         }
-
     }
 }

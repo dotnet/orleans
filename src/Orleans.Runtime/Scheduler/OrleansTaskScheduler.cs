@@ -28,6 +28,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly WaitCallback workItemExecutionCallback;
 
         private readonly CancellationTokenSource cancellationTokenSource;
+        private readonly int maximumConcurrencyLevel;
         private bool applicationTurnsStopped;
 
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
@@ -89,8 +90,10 @@ namespace Orleans.Runtime.Scheduler
                     GetWorkItemStatus));
             }
 
+            var maxSystemThreads = 1;
+            maximumConcurrencyLevel = maxActiveThreads + maxSystemThreads;
             mainExecutor = GetExecutor(string.Empty, maxActiveThreads, false);
-            systemExecutor = GetExecutor("System", 1, true);
+            systemExecutor = GetExecutor("System", maxSystemThreads, true);
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
@@ -334,7 +337,7 @@ namespace Orleans.Runtime.Scheduler
             return workgroupDirectory.TryGetValue(context, out workGroup) ? (TaskScheduler) workGroup.TaskRunner : this;
         }
 
-        public override int MaximumConcurrencyLevel { get { return 3; } } // todo: Pool.MaxActiveThreads;
+        public override int MaximumConcurrencyLevel => maximumConcurrencyLevel;
 
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
@@ -426,9 +429,7 @@ namespace Orleans.Runtime.Scheduler
         private void WorkItemProcessor(object state)
         {
             var todo = (IWorkItem)state;
-
             TrackWorkItemDequeue();
-
             RuntimeContext.InitializeThread(this);
 
             try

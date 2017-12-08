@@ -276,18 +276,18 @@ namespace Orleans.Runtime
 
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            var ok = true;
+            var healthy = true;
             foreach (var workItem in RunningWorkItems)
             {
                 if (workItem != null && !workItem.CheckHealth())
                 {
-                    ok = false;
+                    healthy = false;
                     executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
                         $"Work item {workItem.GetWorkItemStatus(true)} has been executing for long time.");
                 }
             }
 
-            return ok;
+            return healthy;
         }
     }
 
